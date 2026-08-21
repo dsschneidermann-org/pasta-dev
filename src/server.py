@@ -278,7 +278,7 @@ These thoughts mean STOP — you're rationalizing how to continue without using 
 If calling `tree` reveals an empty workspace, no project overview doc or the `toc` pages: Documentation, ADRs, Features and Bug Reports - suggest to create and setup the workspace with these `toc` pages and a "Project Overview" page at the users request. The workspace page structure is:
 
 - Project Overview + `architecture` and `document` pages go under the Documentation `toc` page.
-- `adr` pages go under the ADRs `toc` page.
+- `decision-record` pages go under the ADRs `toc` page.
 - `feature-brief`, `simple-change` and `epic` pages go under the Features `toc` page.
 - An `epic`'s `feature-brief` children are created under the epic itself, NOT under the Features `toc` page - the epic's ship gate only sees briefs that are its own children.
 - `bug-report` pages go under the Bug Reports `toc` page.

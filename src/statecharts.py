@@ -34,6 +34,7 @@ def _element_fsm(tag: str, section: str, field: str):
 
 # Page-status machines (one per registered page type).
 ArchitectureMachine = machine_class(_page_fsm("architecture"))
+DecisionRecordMachine = machine_class(_page_fsm("decision-record"))
 BugReportMachine = machine_class(_page_fsm("bug-report"))
 SimpleChangeMachine = machine_class(_page_fsm("simple-change"))
 FeatureBriefMachine = machine_class(_page_fsm("feature-brief"))
