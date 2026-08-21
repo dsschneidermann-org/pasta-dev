@@ -47,7 +47,7 @@ so a fixture's SHAPE never moves when a production type does.
 
 from __future__ import annotations
 
-from src.pagetypes import (
+from .pagetypes import (
     BLOCKS,
     LIST,
     PROSE,

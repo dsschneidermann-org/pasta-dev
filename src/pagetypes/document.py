@@ -1,0 +1,39 @@
+"""The `document` page type: general-purpose prose for content no typed page holds."""
+
+from __future__ import annotations
+
+from . import (
+    FSMSpec,
+    PageType,
+    SectionSpec,
+    _blocks,
+    add_link_cmd,
+    all_block_cmds,
+    set_title_cmd,
+)
+
+_DOCUMENT = PageType(
+    tag="document",
+    name="Document",
+    description=(
+        "A general-purpose prose page for content that doesn't fit a typed page - notes, guides, "
+        "references, narratives. The richest block-editing surface in the wiki."
+    ),
+    sections=(
+        SectionSpec("body", "Body", (
+            _blocks("body", description="""
+                The document body, built from structured blocks: headings so a reader can navigate,
+                paragraphs for prose, code blocks for anything with a precise shape, and tables for
+                anything genuinely tabular. Lead with what the reader needs first. Emphasis and links
+                are structured inline runs, not markdown syntax.
+                """),
+        )),
+    ),
+    # The full rich blocks surface - add + in-place set per kind, plus remove/reorder - in one call.
+    commands=(*all_block_cmds("body"), add_link_cmd(), set_title_cmd()),
+    fsm=FSMSpec(
+        name="Document",
+        initial="active",
+        states=("active",),
+    ),
+)
