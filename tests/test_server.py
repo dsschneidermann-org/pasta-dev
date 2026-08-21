@@ -59,7 +59,7 @@ def test_end_to_end_authoring_flow(mcp):
     # The sole `do` edge from `open` is the `close` transition, now shaped kind='transition'
     # commands=[event] (the singular `command` field is gone from `do`).
     close_edge = result["next"]["do"][0]
-    assert close_edge["kind"] == "transition" and close_edge["commands"] == ["close"]
+    assert close_edge["kind"] == "transition" and close_edge["command"] == "close"
 
     # tree and listWorkspaces reflect reality.
     tree = call(mcp, "tree", {"workspaceId": workspace_id})
@@ -110,7 +110,7 @@ def test_lifecycle_transition_blocked_until_required_fields(mcp):
     assert result["status"] == "planning"
     # The next transition is itself gated: beginImplementation needs a part first, so it is not yet a
     # `do` edge (each `do` edge carries a `commands` array).
-    assert "beginImplementation" not in {c for edge in result["next"]["do"] for c in edge["commands"]}
+    assert "beginImplementation" not in {edge["command"] for edge in result["next"]["do"]}
     # beginImplementation also carries a page-status guard on the pinned child (it must be `ready`).
     # The child's own markReady is parent-gated, so it only becomes possible now that we are in
     # `planning`; ready it here so the rest of this test isolates the required-content gates.
@@ -139,21 +139,21 @@ def test_batch_and_next_actions_via_server(mcp):
         {"command": "addStep", "args": {"text": "build"}}, {"command": "markReady"}]})
     actions = call(mcp, "nextActions", {"workspaceId": wid})
     # agent edge from `planning`; every `do` edge carries a `commands` array (singular `command` is gone)
-    assert "beginImplementation" in {c for edge in actions["do"] for c in edge["commands"]}
+    assert "beginImplementation" in {edge["command"] for edge in actions["do"]}
 
 
 def test_echoed_next_carries_stage_field_setters(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     # createPage echoes `next`: a fresh draft feature surfaces its stage field setter (setSummary).
     created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
-    assert "setSummary" in {c for edge in created["next"]["do"] for c in edge["commands"]}
+    assert "setSummary" in {edge["command"] for edge in created["next"]["do"]}
     # mutatePageBatch echoes the same rollup: after advancing to `planning`, the new stage's field
     # setter (addPart) shows and the previous stage's setSummary drops out (stage-scoping).
     result = call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": created["id"], "commands": [
         {"command": "setSummary", "args": {"text": "S"}},
         {"command": "beginPlanning"},
     ]})
-    planning_do = {c for edge in result["next"]["do"] for c in edge["commands"]}
+    planning_do = {edge["command"] for edge in result["next"]["do"]}
     assert "addPart" in planning_do and "setSummary" not in planning_do
 
 
@@ -320,5 +320,5 @@ def test_create_page_echoes_initial_state_guidance_and_children_do_not(mcp):
     parent = call(mcp, "createPage",
                   {"workspaceId": workspace_id, "type": "test-lifecycle", "title": "Parent"})
     assert "guidance" not in parent
-    assert parent["children"]                                   # the pinned child was minted
+    assert parent["children"]                                   # the pinned child was created
     assert all("guidance" not in entry for entry in parent["children"])

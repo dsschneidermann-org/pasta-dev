@@ -149,7 +149,7 @@ def test_state_page_opens_with_its_state_guidance():
     # The text an agent gets on entering a state is the text a human reads on its page.
     pagetypes.set_test_mode(False)
     guidance = get_page_type("feature-brief").fsm.guidance_for("review")
-    assert guidance                                        # the one documented state
+    assert guidance                                        # one of the documented states
     docs = state_docs(get_page_type("feature-brief"))
     for line in guidance.splitlines():
         assert line in docs["feature-brief-review"]
@@ -160,7 +160,7 @@ def test_state_page_without_guidance_keeps_the_placeholder():
     # Pins the narrow scope: a sibling state, and a type with no guidance at all.
     pagetypes.set_test_mode(False)
     brief = state_docs(get_page_type("feature-brief"))
-    assert "The `building` state of the `feature-brief` page type." in brief["feature-brief-building"]
+    assert "The `draft` state of the `feature-brief` page type." in brief["feature-brief-draft"]
     document = state_docs(get_page_type("document"))
     assert "The `active` state of the `document` page type." in document["document-active"]
 
@@ -188,5 +188,49 @@ def test_bullet_keeps_notes_on_the_header_line():
 def test_field_line_renders_a_descriptionless_field_as_a_bare_bullet():
     # No description means no continuation block and no trailing separator.
     field = {"key": "commit", "kind": "scalar", "description": "",
-             "choices": None, "elementFields": None, "elementStates": None}
+             "choices": None, "elementFields": None, "elementStates": None,
+             "elementBlocks": None}
     assert _field_line(field) == "  - `commit` *(scalar)*"
+
+
+def test_field_line_notes_block_element_fields():
+    field = {"key": "items", "kind": "list", "description": "",
+             "choices": None, "elementFields": ["text", "detail"], "elementStates": None,
+             "elementBlocks": [{"field": "detail", "kinds": ["paragraph", "code"]}]}
+    assert _field_line(field) == (
+        "  - `items` *(list)* · element fields: `text`, `detail` · "
+        "block element fields: `detail` (paragraph, code)"
+    )
+
+
+def test_field_line_notes_block_kinds():
+    """A blocks field teaches its vocabulary in the generated docs, because a reader can no
+    longer infer it from a list of per-kind command names."""
+    field = {"key": "body", "kind": "blocks", "description": "",
+             "choices": None, "elementFields": None, "elementStates": None,
+             "elementBlocks": None,
+             "blockKinds": ["paragraph", "heading", "code"]}
+    assert _field_line(field) == (
+        "  - `body` *(blocks)* · block kinds: `paragraph`, `heading`, `code`"
+    )
+
+
+def test_field_line_omits_block_kinds_for_a_non_blocks_field():
+    field = {"key": "items", "kind": "list", "description": "",
+             "choices": None, "elementFields": ["text"], "elementStates": None,
+             "elementBlocks": None, "blockKinds": None}
+    assert _field_line(field) == "  - `items` *(list)* · element fields: `text`"
+
+
+def test_generated_docs_name_no_deleted_block_command():
+    """The per-kind commands are gone; a generated page still naming one would send an authoring
+    agent at a command that does not exist."""
+    deleted = ("addParagraph", "addHeading", "addDivider", "addQuote", "addTable",
+               "addDetailParagraph", "addDetailCode", "addNoteCode", "addDesignCode",
+               "addDecisionCode", "addDecisionBlock", "setParagraph", "setHeading",
+               "setDetailParagraph", "setDetailCode")
+    pages = all_state_docs()
+    assert pages
+    for name, text in pages.items():
+        for command in deleted:
+            assert command not in text, f"{name} still names {command}"

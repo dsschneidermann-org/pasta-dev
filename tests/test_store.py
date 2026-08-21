@@ -131,14 +131,14 @@ def test_add_decision_ref_integrity(store):
     # A decision referencing a non-existent question aborts the commit.
     with pytest.raises(ValidationError):
         store.mutate_page_batch(workspace.id, child.id, [
-            {"command": "addDecision", "args": {"questionId": "nope", "text": "x"}}
+            {"command": "addDecisions", "args": {"blocks": [{"kind": "decision", "questionId": "nope", "text": "x"}]}}
         ])
     # Mint the question on the parent, then the same decision resolves.
     asked, asked_created = store.mutate_page_batch(workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "contrast?"}}
     ])
     result, result_created = store.mutate_page_batch(workspace.id, child.id, [
-        {"command": "addDecision", "args": {"questionId": asked_created[0], "text": "WCAG AA"}}
+        {"command": "addDecisions", "args": {"blocks": [{"kind": "decision", "questionId": asked_created[0], "text": "WCAG AA"}]}}
     ])
     assert result.sections["decisions"]["body"][0]["questionId"] == asked_created[0]
 
@@ -173,22 +173,22 @@ def test_inline_ref_integrity_mutate_page(store):
     # A dangling inline page-ref aborts the commit and writes nothing.
     with pytest.raises(ValidationError):
         store.mutate_page_batch(workspace.id, doc.id, [
-            {"command": "addParagraph", "args": {"inlines": ["see ", {"ref": "test-fields:nope"}]}}
+            {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": ["see ", {"ref": "test-fields:nope"}]}]}}
         ])
     assert store.get_page(workspace.id, doc.id).sections["body"]["body"] == []
     # A ref to an existing page is accepted and stored verbatim.
     store.mutate_page_batch(workspace.id, doc.id, [
-        {"command": "addParagraph", "args": {"inlines": [{"ref": target.id}]}}
+        {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": [{"ref": target.id}]}]}}
     ])
     assert store.get_page(workspace.id, doc.id).sections["body"]["body"][0]["inlines"] == [{"ref": target.id}]
     # A self-ref (the page referencing itself) resolves.
     store.mutate_page_batch(workspace.id, doc.id, [
-        {"command": "addParagraph", "args": {"inlines": [{"ref": doc.id}]}}
+        {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": [{"ref": doc.id}]}]}}
     ])
     # A ref to an archived page still resolves - archived pages remain in the workspace.
     store.archive_page(workspace.id, target.id)
     store.mutate_page_batch(workspace.id, doc.id, [
-        {"command": "addParagraph", "args": {"inlines": [{"ref": target.id}]}}
+        {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": [{"ref": target.id}]}]}}
     ])
     assert len(store.get_page(workspace.id, doc.id).sections["body"]["body"]) == 3
 
@@ -200,14 +200,14 @@ def test_inline_ref_integrity_batch_all_or_nothing(store):
     # A dangling ref anywhere in the batch aborts the whole batch - nothing commits.
     with pytest.raises(ValidationError):
         store.mutate_page_batch(workspace.id, doc.id, [
-            {"command": "addParagraph", "args": {"inlines": [{"ref": target.id}]}},
-            {"command": "addParagraph", "args": {"inlines": [{"ref": "test-fields:nope"}]}},
+            {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": [{"ref": target.id}]}]}},
+            {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": [{"ref": "test-fields:nope"}]}]}},
         ])
     assert store.get_page(workspace.id, doc.id).sections["body"]["body"] == []
     # An all-valid batch commits every command.
     store.mutate_page_batch(workspace.id, doc.id, [
-        {"command": "addParagraph", "args": {"inlines": [{"ref": target.id}]}},
-        {"command": "addHeading", "args": {"level": 2, "inlines": ["ok ", {"ref": target.id}]}},
+        {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": [{"ref": target.id}]}]}},
+        {"command": "addBody", "args": {"blocks": [{"kind": "heading", "level": 2, "inlines": ["ok ", {"ref": target.id}]}]}},
     ])
     assert len(store.get_page(workspace.id, doc.id).sections["body"]["body"]) == 2
 
@@ -217,7 +217,7 @@ def test_render_markdown_resolves_ref_title(store):
     target = store.create_page(workspace.id, "test-fields", "Page title").page
     doc = store.create_page(workspace.id, "test-blocks", "Doc").page
     store.mutate_page_batch(workspace.id, doc.id, [
-        {"command": "addParagraph", "args": {"inlines": ["see ", {"ref": target.id}]}}
+        {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": ["see ", {"ref": target.id}]}]}}
     ])
     # render_markdown resolves the ref to the target title and the real page route.
     md = store.render_markdown(workspace.id, doc.id)
@@ -449,7 +449,7 @@ def test_next_actions_partitions_edges(store):
     # In draft: beginPlanning is blocked (needs summary); abandon is an agent/either `do`. Every `do`
     # edge (transition or field-setter) carries a `commands` array - the singular `command` is gone.
     actions = store.next_actions(workspace.id, parent.id)
-    do_commands = {c for edge in actions["do"] for c in edge["commands"]}
+    do_commands = {edge["command"] for edge in actions["do"]}
     assert "abandon" in do_commands
     blocked = {edge["command"]: edge for edge in actions["blocked"]}   # blocked keeps singular `command`
     assert "beginPlanning" in blocked and "summary.body" in blocked["beginPlanning"]["reason"]
@@ -458,7 +458,7 @@ def test_next_actions_partitions_edges(store):
         {"command": "setSummary", "args": {"text": "x"}}
     ])
     do_after = store.next_actions(workspace.id, parent.id)["do"]
-    assert "beginPlanning" in {c for edge in do_after for c in edge["commands"]}
+    assert "beginPlanning" in {edge["command"] for edge in do_after}
 
 
 def test_next_actions_ship_is_a_gated_human_gate(store):
@@ -488,23 +488,25 @@ def test_next_actions_do_lists_stage_field_setters_with_shape(store):
     workspace = store.create_workspace("demo")
     parent = store.create_page(workspace.id, "test-lifecycle", "F").page
     do = store.next_actions(workspace.id, parent.id)["do"]
-    # Every `do` edge carries a `commands` array and a `kind` (the singular `command` is gone from `do`).
-    assert all(isinstance(edge.get("commands"), list) and "command" not in edge for edge in do)
+    # Every `do` edge carries a singular `command` string and a `kind` - the same shape `blocked`,
+    # `humanGates` and `attention` use, so all four rollup lists read alike. The `commands` array is
+    # gone: after the block commands collapsed, every edge names exactly one command.
+    assert all(isinstance(edge.get("command"), str) and "commands" not in edge for edge in do)
     by_kind: dict[str, list] = {}
     for edge in do:
         by_kind.setdefault(edge["kind"], []).append(edge)
     # The stage-required prose field surfaces as a self-instructing kind='field' edge (section/field/
-    # instruction/commands inline).
-    field_edges = {edge["commands"][0]: edge for edge in by_kind.get("field", [])}
+    # instruction/command inline).
+    field_edges = {edge["command"]: edge for edge in by_kind.get("field", [])}
     assert "setSummary" in field_edges
     set_summary = field_edges["setSummary"]
     assert set_summary["section"] == "summary" and set_summary["field"] == "body" and set_summary["instruction"]
-    # A transition edge is kind='transition' commands=[event] and carries no section/field.
-    transitions = {edge["commands"][0]: edge for edge in by_kind.get("transition", [])}
+    # A transition edge is kind='transition' command=<event> and carries no section/field.
+    transitions = {edge["command"]: edge for edge in by_kind.get("transition", [])}
     assert "abandon" in transitions and "section" not in transitions["abandon"]
     # Excluded from `do`: remove/reorder, flag setters, element transitions, addLink/setTitle, and
     # setters whose field is not a requirement of a transition legal in `draft` (addPart, askQuestion).
-    do_commands = {c for edge in do for c in edge["commands"]}
+    do_commands = {edge["command"] for edge in do}
     assert do_commands.isdisjoint({
         "removePart", "reorderPart", "escalateQuestion", "answerQuestion",
         "addLink", "setTitle", "addPart", "askQuestion",
@@ -528,7 +530,7 @@ def test_next_actions_withholds_child_field_setters_until_parent_unlocks(store):
     reason = {e["command"]: e["reason"] for e in actions["blocked"] if e["pageId"] == child.id}["markReady"]
     assert "planning or later" in reason and "steps.items" not in reason
     # The PARENT's own stage setter is untouched - only the parent-gated child went quiet.
-    assert "setSummary" in {c for e in actions["do"] if e["pageId"] == parent.id for c in e["commands"]}
+    assert "setSummary" in {e["command"] for e in actions["do"] if e["pageId"] == parent.id}
 
     # Reaching `planning` satisfies the guard: the child's addStep appears, and its blocked reason
     # switches to the content that is now genuinely the next thing to author.
@@ -537,7 +539,7 @@ def test_next_actions_withholds_child_field_setters_until_parent_unlocks(store):
         {"command": "beginPlanning"},
     ])
     actions = store.next_actions(workspace.id, parent.id)
-    assert "addStep" in {c for e in actions["do"] if e["pageId"] == child.id for c in e["commands"]}
+    assert "addStep" in {e["command"] for e in actions["do"] if e["pageId"] == child.id}
     reason = {e["command"]: e["reason"] for e in actions["blocked"] if e["pageId"] == child.id}["markReady"]
     assert "steps.items" in reason
 
@@ -559,7 +561,7 @@ def test_next_actions_child_guard_does_not_withhold_field_setters(store):
     ])
     assert store.get_page(workspace.id, child.id).status == "draft"   # the guard's unmet condition
     actions = store.next_actions(workspace.id, parent.id)
-    assert "addPart" in {c for e in actions["do"] if e["pageId"] == parent.id for c in e["commands"]}
+    assert "addPart" in {e["command"] for e in actions["do"] if e["pageId"] == parent.id}
 
 
 def test_next_actions_terminal_state_has_no_field_setters(store):
@@ -574,7 +576,7 @@ def test_next_actions_terminal_state_has_no_field_setters(store):
     ])
     do = store.next_actions(workspace.id, page.id)["do"]
     assert all(edge["kind"] != "field" for edge in do)                        # no field setters when terminal
-    assert "reopen" in {c for edge in do for c in edge["commands"]}           # the transition still shows
+    assert "reopen" in {edge["command"] for edge in do}           # the transition still shows
 
 
 def test_attention_lists_escalated_open_questions(store):
@@ -1299,3 +1301,241 @@ def test_cleanup_leaves_an_archived_workspace_alone(store):
 
     assert report.stamped == 0 and report.pruned == []
     assert store.get_page(workspace.id, page.id).expires_at is None
+
+
+def test_render_html_returns_structured_html_for_one_page(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Page title").page
+    store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItem", "args": {"text": "Item one", "note": "a note"}},
+    ])
+    out = store.render_html(workspace.id, page.id)
+    assert '<article class="pasta-page">' in out
+    assert '<h1 class="page-title">Page title</h1>' in out
+    assert "<dt>text</dt><dd><p>Item one</p></dd>" in out
+
+
+def test_render_html_rejects_an_unknown_page(store):
+    workspace = store.create_workspace("demo")
+    with pytest.raises(NotFoundError):
+        store.render_html(workspace.id, "test-fields:nope")
+
+
+# --- block-bearing element fields --------------------------------------------
+def _page_with_one_item(store, workspace_id):
+    """A test-element-blocks page holding one item, and that item's id."""
+    page = store.create_page(workspace_id, "test-element-blocks", "Plan").page
+    _, created = store.mutate_page_batch(workspace_id, page.id, [
+        {"command": "addItem", "args": {"text": "one"}},
+    ])
+    return page, created[0]
+
+
+def _detail(store, workspace_id, page_id):
+    return store.get_page(workspace_id, page_id).sections["items"]["items"][0]["detail"]
+
+
+def test_one_batch_authors_two_complete_elements(store):
+    """The shape the do edge advertises, run as one batch with no read-back in the middle."""
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-element-blocks", "Plan").page
+    _, created = store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItem", "args": {"text": "one", "detail": [
+            {"kind": "paragraph", "inlines": ["first"]},
+            {"kind": "code", "language": "python", "source": "x = 1"}]}},
+        {"command": "addItem", "args": {"text": "two", "detail": [
+            {"kind": "paragraph", "inlines": ["second"]}]}},
+    ])
+    items = store.get_page(workspace.id, page.id).sections["items"]["items"]
+    assert created == [item["id"] for item in items]         # the two ELEMENT ids, in order
+    assert [block["kind"] for block in items[0]["detail"]] == ["paragraph", "code"]
+    assert [block["kind"] for block in items[1]["detail"]] == ["paragraph"]
+    assert items[1]["detail"][0]["inlines"] == ["second"]
+
+
+def test_a_dangling_ref_in_a_created_element_block_aborts_the_batch(store):
+    """collect_ref_ids reaches into a block created with its element, so the store's existing
+    precheck still sees it - without that branch the ref would be written dangling."""
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-element-blocks", "Plan").page
+    with pytest.raises(ValidationError, match="inline reference"):
+        store.mutate_page_batch(workspace.id, page.id, [
+            {"command": "addItem", "args": {"text": "one", "detail": [
+                {"kind": "paragraph", "inlines": [{"ref": "test-fields:nope"}]}]}},
+        ])
+    assert store.get_page(workspace.id, page.id).sections["items"]["items"] == []
+
+
+def test_a_dangling_ref_in_an_element_block_aborts_the_batch(store):
+    """The store needs no change for the new commands: _check_inline_refs walks every arg by its
+    declared content shape, so an element-scoped paragraph is checked like a page-level one."""
+    workspace = store.create_workspace("demo")
+    page, item_id = _page_with_one_item(store, workspace.id)
+    with pytest.raises(ValidationError, match="inline reference"):
+        store.mutate_page_batch(workspace.id, page.id, [
+            {"command": "addItemDetail", "args": {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["ok"]}]}},
+            {"command": "addItemDetail",
+             "args": {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": [{"ref": "test-fields:nope"}]}]}},
+        ])
+    # All-or-nothing: neither paragraph was written.
+    assert _detail(store, workspace.id, page.id) == []
+    # A ref to a real page is accepted and stored verbatim.
+    target = store.create_page(workspace.id, "test-fields", "Target").page
+    store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItemDetail",
+         "args": {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["see ", {"ref": target.id}]}]}},
+    ])
+    assert _detail(store, workspace.id, page.id)[0]["inlines"] == ["see ", {"ref": target.id}]
+
+
+def test_element_block_inserts_compose_within_one_batch(store):
+    """Two positioned inserts anchored on the SAME committed id compose in command order: the
+    batch guard walks left past the id the batch itself just created."""
+    workspace = store.create_workspace("demo")
+    page, item_id = _page_with_one_item(store, workspace.id)
+    _, first = store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItemDetail", "args": {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["anchor"]}]}},
+    ])
+    anchor = first[0]
+    _, created = store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItemDetail",
+         "args": {"itemId": item_id, "blocks": [{"kind": "code", "language": "python", "source": "x = 1"}], "index": 1, "precedingId": anchor}},
+        {"command": "addItemDetail",
+         "args": {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["second"]}], "index": 1, "precedingId": anchor}},
+    ])
+    code_id, paragraph_id = created
+    assert [block["id"] for block in _detail(store, workspace.id, page.id)] == [
+        anchor, paragraph_id, code_id
+    ]
+
+
+def test_a_multi_block_add_composes_within_one_batch(store):
+    """Every id a command creates enters the batch's anchored-slot context, not just the reported one.
+
+    A block add returns the first of the run positionally, so if mutate_page_batch tracked only
+    result.created_id the guard could not skip the rest - and a later positioned insert anchored
+    on a committed block would be rejected as a stale read.
+    """
+    workspace = store.create_workspace("demo")
+    doc = store.create_page(workspace.id, "test-blocks", "Doc").page
+    page, _ = store.mutate_page_batch(workspace.id, doc.id, [
+        {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": ["anchor"]}]}}
+    ])
+    anchor = page.sections["body"]["body"][0]["id"]
+    # One batch: a run of three blocks, then an insert anchored on the committed block. The three
+    # ids the first command created are not nameable by the caller, so the guard must skip them.
+    page, _ = store.mutate_page_batch(workspace.id, doc.id, [
+        {"command": "addBody", "args": {"blocks": [
+            {"kind": "paragraph", "inlines": ["a"]},
+            {"kind": "paragraph", "inlines": ["b"]},
+            {"kind": "paragraph", "inlines": ["c"]},
+        ]}},
+        {"command": "addBody", "args": {
+            "blocks": [{"kind": "paragraph", "inlines": ["d"]}],
+            "index": 1, "precedingId": anchor}},
+    ])
+    body = page.sections["body"]["body"]
+    assert [block["inlines"][0] for block in body] == ["anchor", "d", "a", "b", "c"]
+
+
+def test_createdids_stays_one_id_per_command(store):
+    """The response contract is unchanged: one id per command, positionally - a block add that
+    creates a run reports the first, exactly as an element add reports the element."""
+    workspace = store.create_workspace("demo")
+    doc = store.create_page(workspace.id, "test-blocks", "Doc").page
+    page, created = store.mutate_page_batch(workspace.id, doc.id, [
+        {"command": "addBody", "args": {"blocks": [
+            {"kind": "paragraph", "inlines": ["a"]},
+            {"kind": "paragraph", "inlines": ["b"]},
+        ]}},
+        {"command": "addBody", "args": {"blocks": [{"kind": "divider"}]}},
+    ])
+    assert len(created) == 2
+    body = page.sections["body"]["body"]
+    assert created[0] == body[0]["id"]      # the first of the run
+    assert created[1] == body[2]["id"]
+
+
+def test_a_ref_checked_block_is_checked_when_created_with_its_element(store):
+    """Integrity the command-level check could never give.
+
+    store._check_ref reads args[ref.arg] as one scalar, so a questionId buried in an array entry
+    was invisible to it. With the ref check on the kind, a block created together with its
+    element is checked too - this case fails on the per-kind surface.
+    """
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
+    parent, child = result.page, _child(result, "test-child")
+    # A dangling questionId inside a block argument aborts the whole commit.
+    with pytest.raises(ValidationError, match="does not reference an existing element"):
+        store.mutate_page_batch(workspace.id, child.id, [
+            {"command": "addDecisions", "args": {"blocks": [
+                {"kind": "decision", "questionId": "nope", "text": "x"}]}}
+        ])
+    assert store.get_page(workspace.id, child.id).sections["decisions"]["body"] == []
+    # The same block resolves once the parent has the question.
+    _, asked = store.mutate_page_batch(workspace.id, parent.id, [
+        {"command": "askQuestion", "args": {"text": "contrast?"}}
+    ])
+    page, _ = store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "addDecisions", "args": {"blocks": [
+            {"kind": "decision", "questionId": asked[0], "text": "WCAG AA"}]}}
+    ])
+    assert page.sections["decisions"]["body"][0]["questionId"] == asked[0]
+
+
+def test_a_dangling_ref_in_a_set_block_aborts_the_batch(store):
+    """The generalized set carries a block too, so it gets the same per-block check."""
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
+    parent, child = result.page, _child(result, "test-child")
+    _, asked = store.mutate_page_batch(workspace.id, parent.id, [
+        {"command": "askQuestion", "args": {"text": "contrast?"}}
+    ])
+    page, created = store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "addDecisions", "args": {"blocks": [
+            {"kind": "decision", "questionId": asked[0], "text": "first"}]}}
+    ])
+    block_id = page.sections["decisions"]["body"][0]["id"]
+    with pytest.raises(ValidationError, match="does not reference an existing element"):
+        store.mutate_page_batch(workspace.id, child.id, [
+            {"command": "setDecisionsBlock", "args": {
+                "blockId": block_id,
+                "block": {"kind": "decision", "questionId": "nope", "text": "x"}}}
+        ])
+    # Nothing was written: the original block is untouched.
+    assert store.get_page(workspace.id, child.id).sections["decisions"]["body"][0]["text"] == "first"
+
+
+def test_a_ref_checked_block_created_with_its_element_is_checked(store):
+    """The strictly-new integrity, and the case that fails on the per-kind surface.
+
+    addStep(note=[...]) creates the element and its blocks in one command, so the questionId
+    lives inside an array entry. store._check_ref reads args[ref.arg] as one scalar and cannot
+    see it; _check_block_refs walks the block argument and resolves the ref carried by the kind.
+    """
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
+    parent, child = result.page, _child(result, "test-child")
+    with pytest.raises(ValidationError, match="does not reference an existing element"):
+        store.mutate_page_batch(workspace.id, child.id, [
+            {"command": "addStep", "args": {"text": "one", "note": [
+                {"kind": "decision", "questionId": "nope", "text": "x"}]}}
+        ])
+    assert store.get_page(workspace.id, child.id).sections["steps"]["items"] == []
+    # The same element commits once the parent carries the question.
+    _, asked = store.mutate_page_batch(workspace.id, parent.id, [
+        {"command": "askQuestion", "args": {"text": "contrast?"}}
+    ])
+    page, _ = store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "addStep", "args": {"text": "one", "note": [
+            {"kind": "decision", "questionId": asked[0], "text": "WCAG AA"}]}}
+    ])
+    step = page.sections["steps"]["items"][0]
+    assert step["note"][0]["questionId"] == asked[0]
+    # And the element-scoped add gets the same check.
+    with pytest.raises(ValidationError, match="does not reference an existing element"):
+        store.mutate_page_batch(workspace.id, child.id, [
+            {"command": "addStepNote", "args": {"stepId": step["id"], "blocks": [
+                {"kind": "decision", "questionId": "nope", "text": "x"}]}}
+        ])

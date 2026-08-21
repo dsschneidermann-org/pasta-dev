@@ -1,6 +1,6 @@
 """Manual end-to-end probe of the feature-brief workflow over MCP.
 
-Drives ONE real feature-brief through its whole lifecycle against a running
+Drives a real feature-brief through its whole lifecycle against a running
 pasta MCP endpoint - draft -> grounding -> spec -> planning -> planReview ->
 building -> review - authoring the content each stage gates on, then archives the
 page. After every step it prints the `do` / `blocked` / `humanGates` / `attention`
@@ -19,7 +19,9 @@ stage at a time:
 
     grounding  ->  the brief's four grounding setters, all three children silent
     spec       ->  the feature-spec's setters (+ askQuestion); NO addStep/addCase
-    planning   ->  addStep and addCase; the sealed spec has locked itself
+    planning   ->  addStep (carrying the step's own detail blocks) and addCase; the spec has
+                   locked itself. addStepDetail, which appends to a step that already exists,
+                   is deliberately not offered - the element must exist before it can be filled
 
 The closing summary tallies the edge count per stage, so a regression shows up as
 a stage that got noisy - most usefully, an addStep appearing during `spec`.
@@ -169,13 +171,13 @@ def show(probe: Probe, step: str, brief_id: str, width: int) -> int:
 
     print(f"  do ({len(do)}):" if do else "  do: (none)")
     for edge in do:
-        commands = ",".join(edge["commands"])
+        command = edge["command"]
         if edge["kind"] == "field":
             target = f"{edge['section']}.{edge['field']}"
-            print(f"    {'field':<{_KIND_W}}{edge['pageType']:<{_TYPE_W}}{commands:<{_CMDS_W}}"
+            print(f"    {'field':<{_KIND_W}}{edge['pageType']:<{_TYPE_W}}{command:<{_CMDS_W}}"
                   f"{target:<{_TARGET_W}}{elide(edge.get('instruction'), width)}")
         else:
-            print(f"    {'transition':<{_KIND_W}}{edge['pageType']:<{_TYPE_W}}{commands}")
+            print(f"    {'transition':<{_KIND_W}}{edge['pageType']:<{_TYPE_W}}{command}")
 
     print(f"  blocked ({len(blocked)}):" if blocked else "  blocked: (none)")
     for edge in blocked:
@@ -241,7 +243,7 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
         # 3. planning - the grounded base lets the brief advance, which unlocks all three children.
         probe.mutate(
             brief,
-            cmd("addComponent", name="scripts/feature_brief_probe.py"),
+            cmd("addComponent", name="scripts/feature_brief_probe.py", text="Component description."),
             cmd("addConstraint", text="Python >=3.14; the probe must not cross a human gate."),
             cmd("addConflict", text="None - a new script, no existing prober covers the lifecycle."),
             cmd("addDocumentation", text="Self-direction: its `do` invariants describe this rollup."),
@@ -261,15 +263,19 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
             cmd("setOverview", text=(
                 "A manual probe of the feature-brief lifecycle. Covers the stage rollups; excludes "
                 "the ship gate, which is a human edge.")),
-            cmd("addHeading", level=2, text="Output"),
-            cmd("addParagraph", text=(
-                "One block per stage: the do/blocked/humanGates/attention rollup for the brief's "
-                "whole subtree, with field instructions elided.")),
-            cmd("addDesignCode", language="text",
-                source="field  implementation-plan  addStep  steps.items  Each ONE action an imp..."),
-            cmd("addDecision", questionId=question_ids[0], text=(
-                "A failed run leaves the brief un-archived and prints its id, so the failure can "
-                "be inspected in place.")),
+            cmd("addDesign", blocks=[
+                {"kind": "heading", "level": 2, "text": "Output"},
+                {"kind": "paragraph", "text": (
+                    "One block per stage: the do/blocked/humanGates/attention rollup for the "
+                    "brief's whole subtree, with field instructions elided.")},
+                {"kind": "code", "language": "text",
+                 "source": "field  implementation-plan  addStep  steps.items  Each one action..."},
+            ]),
+            cmd("addDecisions", blocks=[
+                {"kind": "decision", "questionId": question_ids[0], "text": (
+                    "A failed run leaves the brief un-archived and prints its id, so the failure "
+                    "can be inspected in place.")},
+            ]),
         )
         record("6. SPEC authored (markSealed now legal)", brief)
         probe.mutate(spec, cmd("markSealed"))
@@ -279,10 +285,23 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
         #    own setters are gone here: `sealed` is terminal, so its authoring locks itself.
         probe.mutate(brief, cmd("beginPlanning"))
         record("8. PLANNING (plans unlocked, sealed spec locked)", brief)
+        # A step is created complete: the add carries its content, so one batch writes both steps
+        # and nothing has to name an id the batch has not committed. Both kinds the field accepts
+        # are exercised - a paragraph, whose inline runs let a code span ride inside prose, and a
+        # code block. createdIds stays one id per command, so `step_ids` is still the two steps.
         step_ids = probe.mutate(
             plan,
-            cmd("addStep", text="Add scripts/feature_brief_probe.py with the MCP session plumbing."),
-            cmd("addStep", text="Drive the lifecycle and print each stage's rollup."),
+            cmd("addStep", detail=[
+                {"kind": "paragraph", "inlines": [
+                    "Add ", {"code": "scripts/feature_brief_probe.py"},
+                    " with the MCP session plumbing, reusing the sibling probe's transport."]},
+                {"kind": "code", "language": "bash",
+                 "source": "uv run python scripts/feature_brief_probe.py"},
+            ]),
+            cmd("addStep", detail=[
+                {"kind": "paragraph", "inlines": [
+                    "Drive the lifecycle and print each stage's rollup, then archive the brief."]},
+            ]),
         )
         probe.mutate(plan, cmd("markReady"))
         case_ids = probe.mutate(

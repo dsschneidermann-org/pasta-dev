@@ -27,17 +27,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, final
 
-from . import cleanup, commands, fsm, render
+from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, default_id_factory, new_id
 from .model import Page, Workspace
 from .pagetypes import (
     ADD_LINK,
+    BLOCK,
+    BLOCK_ARRAY,
     COMPOUND,
     LIST,
     TRANSITION,
     CommandSpec,
     PageType,
+    RefCheck,
     collect_ref_ids,
     get_page_type,
     is_auto_child_type,
@@ -113,7 +116,11 @@ class Store:
         with open(tmp, "w", encoding="utf-8") as handle:
             _ = handle.write(text)
         with self._rw_lock_for(workspace.id).write():  # atomic replace but guarded with the lock
-            os.replace(tmp, path)
+            try:
+                os.replace(tmp, path)
+            except Exception:
+                time.sleep(0.1) # Permission error moving the tmp file can be retried.
+                os.replace(tmp, path)
 
     def _touch_and_save(self, workspace: Workspace) -> None:
         workspace.updated_at = _now()
@@ -253,6 +260,24 @@ class Store:
         ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text)
         return render.render_page(page, page_type, ref_context=ref_context)
 
+    def render_html(self, workspace_id: str, page_id: str, show_archived: bool = False) -> str:
+        """One page as structured HTML for the web view. Its Markdown sibling, `render_markdown`,
+        is what the renderPage MCP tool returns and is unchanged.
+
+        `show_archived` reaches the child and reference lists exactly as it does on the Markdown
+        path: it decides whether an archived target is hidden or flagged, and rides onto the links
+        as a query parameter.
+        """
+        workspace = self.load_workspace(workspace_id)
+        page = workspace.get_page(page_id)
+        if page is None:
+            raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
+        page_type = get_page_type(page.type)
+        if page_type is None:
+            raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
+        ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text=True)
+        return render_html.render_page_html(page, page_type, ref_context)
+
     def search(self, workspace_id: str, query: str, limit: int = 20) -> dict[str, Any]:
         """Rank live pages by a case-insensitive word-prefix match of `query`'s terms against
         their content. A page is live when neither it nor any ancestor is archived, which is the
@@ -362,11 +387,15 @@ class Store:
         `do` (agent edges to drive now), `blocked` (agent transitions with the unmet precondition to
         fix), `humanGates` (sign-off transitions - stop), and `attention` (items awaiting a human).
 
-        `do` holds two edge shapes, each carrying a `commands` array (the singular `command` field is
-        gone from `do`; `blocked`/`humanGates` keep it): a status TRANSITION (`kind='transition'`,
-        `commands=[event]`) and a stage-relevant FIELD setter (`kind='field'` with section/field/
-        instruction and `commands` inline - the field setters whose field must be authored to advance
-        this stage; see `commands.field_setter_edges`)."""
+        `do` holds two edge shapes, each carrying a singular `command` - the same key `blocked`,
+        `humanGates` and `attention` use, so all four lists read alike: a status TRANSITION
+        (`kind='transition'`, `command=<event>`) and a stage-relevant field setter (`kind='field'`
+        with section/field/instruction inline - the field setters whose field must be authored to
+        advance this stage; see `commands.field_setter_edges`).
+
+        A field is one edge naming one command, because a field's whole authoring content is
+        reachable in a single command: a blocks field takes an array of kinded blocks, and a list
+        add carries the blocks its element is created holding."""
         workspace = self.load_workspace(workspace_id)
         do: list[dict[str, Any]] = []
         blocked: list[dict[str, Any]] = []
@@ -402,7 +431,7 @@ class Store:
                     human_gates.append(edge)
                 elif legal.get(command.name) and guard_reason is None:
                     do.append({"pageId": page.id, "pageType": page.type,
-                               "kind": "transition", "commands": [command.name]})
+                               "kind": "transition", "command": command.name})
                 else:
                     unmet = commands.unmet_requirements(page, command)
                     if parent_reason is not None:
@@ -453,7 +482,7 @@ class Store:
                 workspace.root_page_ids.append(page.id)
             else:
                 workspace.pages[parent_id].child_ids.append(page.id)
-            # Some types (feature-brief) mint pinned children in the same commit.
+            # Some types (feature-brief) create pinned children in the same commit.
             children = self._create_auto_children(workspace, page, page_type)
             self._touch_and_save(workspace)
             return CreatePageResult(page=page, children=children)
@@ -461,7 +490,7 @@ class Store:
     def mutate_page_batch(
         self, workspace_id: str, page_id: str, batch: list[dict[str, Any]]
     ) -> tuple[Page, list[str | None]]:
-        """Apply an ordered batch of commands to ONE page as a single atomic commit.
+        """Apply an ordered batch of commands to a page as a single atomic commit.
 
         Each command is decided against the state left by the previous one; if any is rejected the
         whole batch aborts and nothing is written (the error names the failing index + command).
@@ -491,6 +520,7 @@ class Store:
                         raise ValidationError("Unknown command None.")
                     if command_spec is not None:
                         self._check_ref(workspace, working, command_spec, args)
+                        self._check_block_refs(workspace, working, command_spec, args)
                         self._check_inline_refs(workspace, command_spec, args)
                         self._check_guards(workspace, working, command_spec)
                         self._check_link(workspace, workspace_id, working, command_spec, args)
@@ -505,7 +535,7 @@ class Store:
                 working = result.page
                 created_ids.append(result.created_id)
                 if result.created_id is not None:
-                    created_so_far.add(result.created_id)
+                    created_so_far.update(result.created_ids)
 
             workspace.pages[page_id] = working
             self._touch_and_save(workspace)
@@ -807,16 +837,14 @@ class Store:
         return children
 
     @staticmethod
-    def _check_ref(workspace: Workspace, page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
-        """Enforce a command's cross-page ref: the referenced id must exist on the target page.
+    def _resolve_ref(workspace: Workspace, page: Page, ref: RefCheck, ref_value: Any,
+                     command_name: str) -> None:
+        """Enforce one cross-page ref: the referenced id must exist on the target page.
 
-        A missing/None arg is left to `apply_command`'s arg validation; a present-but-dangling
-        id aborts here before anything is written.
+        A missing/None value is left to `apply_command`'s arg validation; a present-but-dangling
+        id aborts here before anything is written. Shared by the command-level check and the
+        per-block one, so the rule and its message live once.
         """
-        ref = command.ref_check
-        if ref is None:
-            return
-        ref_value = args.get(ref.arg)
         if ref_value is None:
             return
         target = workspace.pages.get(page.parent_id) if page.parent_id and ref.scope == "parent" else None
@@ -824,9 +852,41 @@ class Store:
         if ref_value not in {element.get("id") for element in candidates}:
             where = f"{ref.scope} page's {ref.section}.{ref.field}"
             raise ValidationError(
-                f"Command '{command.name}': '{ref.arg}={ref_value}' does not reference an " +
+                f"Command '{command_name}': '{ref.arg}={ref_value}' does not reference an " +
                 f"existing element in the {where} - the commit is aborted."
             )
+
+    @staticmethod
+    def _check_ref(workspace: Workspace, page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
+        """Enforce a command's cross-page ref - a list add naming an element on the parent."""
+        if command.ref_check is not None:
+            Store._resolve_ref(workspace, page, command.ref_check,
+                               args.get(command.ref_check.arg), command.name)
+
+    @staticmethod
+    def _check_block_refs(workspace: Workspace, page: Page, command: CommandSpec,
+                          args: dict[str, Any]) -> None:
+        """Enforce every cross-page ref carried inside a block argument.
+
+        A block kind declares its own ref_check, because the referencing argument lives in the
+        block rather than flat on the command. Covers the array add and the single-block set, and
+        - through a list add's block arguments - blocks created together with their element, which
+        the command-level check could never see: it reads one scalar arg and cannot reach into an
+        array entry.
+        """
+        for arg in command.args:
+            if arg.content not in (BLOCK, BLOCK_ARRAY) or arg.block_kinds is None:
+                continue
+            value = args.get(arg.name)
+            entries = value if arg.content == BLOCK_ARRAY else [value]
+            for entry in entries or []:
+                if not isinstance(entry, dict):
+                    continue                  # left for the grammar validation to reject
+                spec = next((kind for kind in arg.block_kinds
+                             if kind.kind == entry.get("kind")), None)
+                if spec is not None and spec.ref_check is not None:
+                    Store._resolve_ref(workspace, page, spec.ref_check,
+                                       entry.get(spec.ref_check.arg), command.name)
 
     @staticmethod
     def _check_inline_refs(workspace: Workspace, command: CommandSpec, args: dict[str, Any]) -> None:
@@ -841,7 +901,7 @@ class Store:
         for arg in command.args:
             if arg.content is None:
                 continue
-            for ref_id in collect_ref_ids(arg.content, args.get(arg.name)):
+            for ref_id in collect_ref_ids(arg.content, args.get(arg.name), arg.block_kinds):
                 if ref_id not in workspace.pages:
                     raise ValidationError(
                         f"Command '{command.name}': inline reference '{ref_id}' does not match " +

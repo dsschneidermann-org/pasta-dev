@@ -8,7 +8,7 @@ from src.commands import apply_command, create_page
 from src.errors import ConflictError, ValidationError
 from src.model import Page
 from src.pagetypes import FSMSpec, PageType, get_page_type
-from src.render import (RefContext, escape_markdown, page_text, render_page,
+from src.render import (RefContext, checkbox_state, escape_markdown, page_text, render_page,
                             render_workspace_links)
 
 # Hand-authored capability fixtures (src.testtypes): test-fields for scalar/prose/list content,
@@ -44,8 +44,8 @@ def test_render_fields_markdown():
 def test_render_blocks_heading_and_code():
     factory = make_counter()
     page = create_page(BLOCKS, "Doc", None, factory)
-    page = apply_command(page, BLOCKS, "addHeading", {"level": 2, "inlines": ["Overview"]}, factory).page
-    page = apply_command(page, BLOCKS, "addCode", {"language": "py", "source": "x = 1"}, factory).page
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "heading", "level": 2, "inlines": ["Overview"]}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "code", "language": "py", "source": "x = 1"}]}, factory).page
     md = render_page(page, BLOCKS)
     assert "## Body" in md            # the section heading
     assert "## Overview" in md        # the heading block
@@ -112,14 +112,14 @@ def new_blocks(factory):
 def test_render_blocks_inline_runs():
     factory = make_counter()
     page = new_blocks(factory)
-    page = apply_command(page, BLOCKS, "addParagraph", {"inlines": [
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "paragraph", "inlines": [
         "plain ",
         {"text": "bold", "bold": True}, " ",
         {"text": "ital", "italic": True}, " ",
         {"code": "x=1"}, " ",
         {"text": "site", "href": "https://x"}, " ",
         {"ref": "test-fields:abc"},
-    ]}, factory).page
+    ]}]}, factory).page
     md = render_page(page, BLOCKS)
     assert "plain " in md
     assert "**bold**" in md
@@ -134,8 +134,8 @@ def test_render_blocks_inline_runs():
 def test_render_ref_titled_link_and_show_archived():
     factory = make_counter()
     page = new_blocks(factory)
-    page = apply_command(page, BLOCKS, "addParagraph",
-                         {"inlines": ["see ", {"ref": "test-fields:abc"}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody",
+                         {"blocks": [{"kind": "paragraph", "inlines": ["see ", {"ref": "test-fields:abc"}]}]}, factory).page
     titles = {"test-fields:abc": "Page title"}
     # A ref resolves to the target's title, linked to the real /<workspaceId>/page/<id> route.
     md = render_page(page, BLOCKS, ref_context=RefContext("ws:demo", titles, {}, {}))
@@ -148,8 +148,8 @@ def test_render_ref_titled_link_and_show_archived():
 def test_render_ref_fallback_when_unresolved():
     factory = make_counter()
     page = new_blocks(factory)
-    page = apply_command(page, BLOCKS, "addParagraph",
-                         {"inlines": [{"ref": "test-fields:missing"}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody",
+                         {"blocks": [{"kind": "paragraph", "inlines": [{"ref": "test-fields:missing"}]}]}, factory).page
     # A RefContext whose title map lacks the id falls back to the bare id, with no link emitted.
     md = render_page(page, BLOCKS, ref_context=RefContext("ws:demo", {"test-fields:other": "Other"}, {}, {}))
     assert "test-fields:missing" in md
@@ -159,16 +159,12 @@ def test_render_ref_fallback_when_unresolved():
 def test_render_blocks_block_kinds():
     factory = make_counter()
     page = new_blocks(factory)
-    page = apply_command(page, BLOCKS, "addHeading", {"level": 2, "inlines": ["Setup"]}, factory).page
-    page = apply_command(page, BLOCKS, "addList", {"ordered": True, "items": [["first"], ["second"]]}, factory).page
-    page = apply_command(page, BLOCKS, "addList", {"ordered": False, "items": [["a"], ["b"]]}, factory).page
-    page = apply_command(page, BLOCKS, "addQuote", {"paragraphs": [["to be"], ["or not"]]}, factory).page
-    page = apply_command(page, BLOCKS, "addTable", {
-        "header": [["Name"], ["Role"]],
-        "rows": [[["Ann"], ["Lead"]]],
-        "align": ["left", "center"],
-    }, factory).page
-    page = apply_command(page, BLOCKS, "addDivider", {}, factory).page
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "heading", "level": 2, "inlines": ["Setup"]}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "list", "ordered": True, "items": [["first"], ["second"]]}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "list", "ordered": False, "items": [["a"], ["b"]]}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "quote", "paragraphs": [["to be"], ["or not"]]}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "table", "header": [["Name"], ["Role"]], "rows": [[["Ann"], ["Lead"]]], "align": ["left", "center"]}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "divider"}]}, factory).page
     md = render_page(page, BLOCKS)
     assert "## Setup" in md
     assert "1. first" in md and "2. second" in md          # ordered list
@@ -182,13 +178,13 @@ def test_render_blocks_block_kinds():
 
 def test_blocks_block_editing_in_place_and_move():
     factory = make_counter()
-    p = apply_command(new_blocks(factory), BLOCKS, "addParagraph", {"inlines": ["first"]}, factory)
+    p = apply_command(new_blocks(factory), BLOCKS, "addBody", {"blocks": [{"kind": "paragraph", "inlines": ["first"]}]}, factory)
     first_id = p.created_id
-    h = apply_command(p.page, BLOCKS, "addHeading", {"level": 1, "inlines": ["Title"]}, factory)
+    h = apply_command(p.page, BLOCKS, "addBody", {"blocks": [{"kind": "heading", "level": 1, "inlines": ["Title"]}]}, factory)
     heading_id = h.created_id
-    # setParagraph edits in place: same block id, runs replaced, no new id minted
-    edited = apply_command(h.page, BLOCKS, "setParagraph",
-                           {"blockId": first_id, "inlines": ["updated"]}, factory)
+    # setParagraph edits in place: same block id, runs replaced, no new id created
+    edited = apply_command(h.page, BLOCKS, "setBodyBlock",
+                           {"blockId": first_id, "block": {"kind": "paragraph", "inlines": ["updated"]}}, factory)
     body = edited.page.sections["body"]["body"]
     assert body[0]["id"] == first_id and body[0]["inlines"] == ["updated"]
     assert edited.created_id is None
@@ -207,38 +203,51 @@ def test_blocks_block_editing_in_place_and_move():
 
 def test_blocks_add_block_index_insertion():
     factory = make_counter()
-    a = apply_command(new_blocks(factory), BLOCKS, "addParagraph", {"inlines": ["A"]}, factory)
-    b = apply_command(a.page, BLOCKS, "addParagraph", {"inlines": ["B"]}, factory)
-    c = apply_command(b.page, BLOCKS, "addParagraph",
-                      {"inlines": ["C"], "index": 1, "precedingId": a.created_id}, factory)  # between A and B
+    a = apply_command(new_blocks(factory), BLOCKS, "addBody", {"blocks": [{"kind": "paragraph", "inlines": ["A"]}]}, factory)
+    b = apply_command(a.page, BLOCKS, "addBody", {"blocks": [{"kind": "paragraph", "inlines": ["B"]}]}, factory)
+    c = apply_command(b.page, BLOCKS, "addBody",
+                      {"blocks": [{"kind": "paragraph", "inlines": ["C"]}], "index": 1, "precedingId": a.created_id}, factory)  # between A and B
     assert [blk["inlines"] for blk in c.page.sections["body"]["body"]] == [["A"], ["C"], ["B"]]
 
 
-def test_blocks_set_rejects_wrong_block_kind():
+def test_blocks_set_may_change_a_block_kind():
+    """A generalized set overwrites the block whatever its kind, keeping its id and its slot.
+
+    The per-kind guard this replaces ('setParagraph edits a paragraph block, but block X is a
+    heading') existed only because the command carried its kind; a set that could not change the
+    kind would leave an in-place retype expressible only as remove + positioned add, creating a
+    new id.
+    """
     factory = make_counter()
-    p = apply_command(new_blocks(factory), BLOCKS, "addParagraph", {"inlines": ["x"]}, factory)
-    with pytest.raises(ValidationError):
-        _ = apply_command(p.page, BLOCKS, "setHeading",
-                      {"blockId": p.created_id, "level": 1, "inlines": ["y"]}, factory)
+    p = apply_command(new_blocks(factory), BLOCKS, "addBody",
+                      {"blocks": [{"kind": "paragraph", "inlines": ["x"]}]}, factory)
+    edited = apply_command(p.page, BLOCKS, "setBodyBlock",
+                           {"blockId": p.created_id,
+                            "block": {"kind": "heading", "level": 1, "inlines": ["y"]}}, factory)
+    assert edited.page.sections["body"]["body"] == [
+        {"id": p.created_id, "kind": "heading", "level": 1, "inlines": ["y"]}
+    ]
+    assert "## y" not in render_page(edited.page, BLOCKS)   # level 1, so a single hash
+    assert "# y" in render_page(edited.page, BLOCKS)
 
 
 def test_blocks_reject_markdown_and_bad_table_at_apply_time():
     factory = make_counter()
     page = new_blocks(factory)
     with pytest.raises(ValidationError):
-        _ = apply_command(page, BLOCKS, "addParagraph", {"inlines": ["**bold**"]}, factory)
+        _ = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "paragraph", "inlines": ["**bold**"]}]}, factory)
     with pytest.raises(ValidationError):
-        _ = apply_command(page, BLOCKS, "addTable",
-                      {"header": [["A"], ["B"]], "rows": [[["only-one"]]]}, factory)  # width mismatch
+        _ = apply_command(page, BLOCKS, "addBody",
+                      {"blocks": [{"kind": "table", "header": [["A"], ["B"]], "rows": [[["only-one"]]]}]}, factory)  # width mismatch
 
 
 def test_blocks_page_text_includes_inline_content():
     factory = make_counter()
     page = new_blocks(factory)
-    page = apply_command(page, BLOCKS, "addParagraph",
-                         {"inlines": ["restart the ", {"text": "scheduler", "bold": True}]}, factory).page
-    page = apply_command(page, BLOCKS, "addList",
-                         {"ordered": False, "items": [["check disk"], [{"code": "df -h"}]]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody",
+                         {"blocks": [{"kind": "paragraph", "inlines": ["restart the ", {"text": "scheduler", "bold": True}]}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody",
+                         {"blocks": [{"kind": "list", "ordered": False, "items": [["check disk"], [{"code": "df -h"}]]}]}, factory).page
     text = page_text(page, BLOCKS)
     assert "scheduler" in text     # marked run
     assert "check disk" in text    # list item
@@ -538,8 +547,8 @@ def test_render_page_web_escapes_scalar_value():
 def test_render_page_web_escapes_inline_run_text_keeps_decoration():
     factory = make_counter()
     page = create_page(BLOCKS, "Doc", None, factory)
-    page = apply_command(page, BLOCKS, "addParagraph",
-                         {"inlines": [{"text": "a*b", "bold": True}, " ", {"code": "x_y"}]}, factory).page
+    page = apply_command(page, BLOCKS, "addBody",
+                         {"blocks": [{"kind": "paragraph", "inlines": [{"text": "a*b", "bold": True}, " ", {"code": "x_y"}]}]}, factory).page
     md_web = render_page(page, BLOCKS, ref_context=_web_ctx())
     assert "**a\\*b**" in md_web                        # inner * escaped, bold markers intact
     assert "`x_y`" in md_web                            # code run rendered verbatim
@@ -552,8 +561,8 @@ def test_render_page_web_escapes_inline_run_text_keeps_decoration():
 def test_render_page_web_leaves_code_block_source_verbatim():
     factory = make_counter()
     page = create_page(BLOCKS, "Doc", None, factory)
-    page = apply_command(page, BLOCKS, "addCode",
-                         {"language": "py", "source": "x = 1  # *keep* _me_"}, factory).page
+    page = apply_command(page, BLOCKS, "addBody",
+                         {"blocks": [{"kind": "code", "language": "py", "source": "x = 1  # *keep* _me_"}]}, factory).page
     md_web = render_page(page, BLOCKS, ref_context=_web_ctx())
     assert "```py" in md_web
     assert "x = 1  # *keep* _me_" in md_web             # fenced code source is not escaped
@@ -621,3 +630,59 @@ def test_render_toc_empty_shows_none_without_headings():
     assert "*toc* · `active`" in md
     assert "## References" not in md and "## Child pages" not in md
     assert md.rstrip().endswith("*None.*")
+
+
+def test_checkbox_state_maps_element_fsm_states():
+    child = get_page_type("test-child")
+    steps = child.field_spec("steps", "items")
+    checks = child.field_spec("checks", "items")
+    questions = get_page_type("test-lifecycle").field_spec("questions", "items")
+    items = FIELDS.field_spec("items", "items")
+    assert checkbox_state("done", steps.element_fsm) == "done"
+    assert checkbox_state("todo", steps.element_fsm) == "todo"
+    assert checkbox_state("passed", checks.element_fsm) == "done"
+    assert checkbox_state("pending", checks.element_fsm) == "todo"
+    assert checkbox_state("failed", checks.element_fsm) is None   # neither done nor initial
+    assert checkbox_state("open", questions.element_fsm) is None  # FSM declares no checkmark_done
+    assert checkbox_state(None, items.element_fsm) is None        # field has no element FSM
+
+
+# --- block-bearing element fields --------------------------------------------
+ELEMENT_BLOCKS = get_page_type("test-element-blocks")
+
+
+def _page_with_one_item(factory):
+    page = create_page(ELEMENT_BLOCKS, "Plan", None, factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItem", {"text": "one"}, factory)
+    return added.page, added.created_id
+
+
+def test_an_element_block_field_renders_indented_under_its_bullet():
+    factory = make_counter()
+    page, item_id = _page_with_one_item(factory)
+    page = apply_command(page, ELEMENT_BLOCKS, "addItemDetail",
+                         {"itemId": item_id, "blocks": [{"kind": "code", "language": "python", "source": "x = 1"}]}, factory).page
+    md = render_page(page, ELEMENT_BLOCKS)
+    assert "- [ ] one _[todo]_\n\n  ```python\n  x = 1\n  ```" in md
+    # A block list str()-ed into the bullet would show its dicts.
+    assert "{'id':" not in md
+
+
+def test_an_element_with_no_blocks_renders_exactly_as_before():
+    factory = make_counter()
+    page, _ = _page_with_one_item(factory)
+    md = render_page(page, ELEMENT_BLOCKS)
+    # An empty declared block field adds nothing at all - no blank line, no indented content.
+    assert "## Items\n\n- [ ] one _[todo]_\n\n## References" in md
+
+
+def test_page_text_finds_text_inside_an_element_block():
+    factory = make_counter()
+    page, item_id = _page_with_one_item(factory)
+    page = apply_command(page, ELEMENT_BLOCKS, "addItemDetail",
+                         {"itemId": item_id, "blocks": [{"kind": "code", "language": "python", "source": "needle_in_source"}]}, factory).page
+    page = apply_command(page, ELEMENT_BLOCKS, "addItemDetail",
+                         {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["prose ", {"code": "needle_in_code_run"}]}]}, factory).page
+    text = page_text(page, ELEMENT_BLOCKS)
+    assert "needle_in_source" in text
+    assert "needle_in_code_run" in text

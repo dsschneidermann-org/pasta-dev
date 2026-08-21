@@ -29,6 +29,7 @@ from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
 from .pagetypes import get_page_type, registered_tags
 from .render import escape_markdown, render_workspace_links
+from .render_html import md2html
 from .serialize import page_to_dict
 from .store import Store
 
@@ -102,7 +103,7 @@ def _guard_http() -> Generator[None]:
 @app.get("/", response_class=HTMLResponse)
 async def route_index(request: Request, archived: str | None = None):
     with _guard_http():
-        show_archived = True if archived else False
+        show_archived = True if archived == "true" else False
         body = md2html.render("\n\n".join(f"[{escape_markdown(x['name'])}](/{x['id']})" for x in STORE.list_workspaces()))
         return templates.TemplateResponse(
             request=request,
@@ -115,11 +116,11 @@ async def route_index(request: Request, archived: str | None = None):
 
 
 @app.get("/ws:{workspaceIdPart}", response_class=HTMLResponse)
-async def route_tree(request: Request, workspaceIdPart : str, archived: str | None = None):
+async def route_tree(request: Request, workspaceIdPart : str, archived: str | None = None, markdown: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
-        show_archived = True if archived else False
+        show_archived = True if archived == "true" else False
         pages_tree = STORE.tree(workspace_id, show_archived)
         body = md2html.render(render_workspace_links(pages_tree, show_archived, show_meta=True, escape_plain_text=True))
         return templates.TemplateResponse(
@@ -135,15 +136,17 @@ async def route_tree(request: Request, workspaceIdPart : str, archived: str | No
 
 
 @app.get("/ws:{workspaceIdPart}/page/{pageId}", response_class=HTMLResponse)
-async def route_page(request: Request, workspaceIdPart: str, pageId: str, archived: str | None = None):
+async def route_page(request: Request, workspaceIdPart: str, pageId: str, archived: str | None = None, markdown: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
         page = STORE.get_page(workspace_id, pageId)
         page_type = get_page_type(page.type)
-        show_archived = True if archived else False
+        show_archived = True if archived == "true" else False
         nav = md2html.render(render_workspace_links(STORE.tree(workspace_id, show_archived), show_archived, show_meta=False, escape_plain_text=True))
-        body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived, escape_plain_text=True))
+        body = STORE.render_html(workspace_id, pageId, show_archived)
+        if markdown == "true":
+            body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived, escape_plain_text=True))
         return templates.TemplateResponse(
             request=request,
             name="page.html",
@@ -278,7 +281,7 @@ These thoughts mean STOP — you're rationalizing how to continue without using 
 If calling `tree` reveals an empty workspace, no project overview doc or the `toc` pages: Documentation, ADRs, Features and Bug Reports - suggest to create and setup the workspace with these `toc` pages and a "Project Overview" page at the users request. The workspace page structure is:
 
 - Project Overview + `architecture` and `document` pages go under the Documentation `toc` page.
-- `adr` pages go under the ADRs `toc` page.
+- `decision-record` pages go under the ADRs `toc` page.
 - `feature-brief`, `simple-change` and `epic` pages go under the Features `toc` page.
 - An `epic`'s `feature-brief` children are created under the epic itself, NOT under the Features `toc` page - the epic's ship gate only sees briefs that are its own children.
 - `bug-report` pages go under the Bug Reports `toc` page.
@@ -308,9 +311,9 @@ document: A general-purpose prose page for content that doesn't fit a typed page
 
 toc: A table-of-contents container whose only content is the child pages placed under it. It holds no subject matter of its own and has no authoring commands - pages are filed by reparenting them beneath the toc, and its Child pages list IS the table of contents.
 
-bug-report: Tracks ONE defect in existing behavior - what's wrong, how to reproduce it, and its resolution.
+bug-report: Tracks a defect in existing behavior - what's wrong, how to reproduce it, and its resolution.
 
-simple-change: Tracks ONE small, self-contained change or minor feature. Use this page type ONLY when the user specifically asks to make a small/simple change or a small/simple feature; for larger work create a feature-brief, and for a defect in existing behavior use a bug-report.
+simple-change: Tracks a small, self-contained change or minor feature. Use this page type ONLY when the user specifically asks to make a small/simple change or a small/simple feature; for larger work create a feature-brief, and for a defect in existing behavior use a bug-report.
 
 feature-brief: The root of a feature the user intends to build - drives new work from intent through grounding, planning, and a plan review to build and a human ship gate. Lifecycle transitions are gated on the required content for that stage being present first.
 
@@ -399,7 +402,7 @@ async def renderPage(workspaceId: str, pageId: str | None = None) -> dict[str, s
 
 @mcp.tool
 async def search(workspaceId: str, query: str, limit: int = 20) -> dict[str, Any]:
-    """Full-text search over page content in ONE workspace: ranked hits with a snippet each.
+    """Full-text search over page content in a workspace: ranked hits with a snippet each.
     Case-insensitive, matches by word prefix, and excludes archived pages AND their descendants -
     the same subtree rule `tree` applies, so the two agree on what is live. Prefix the query
     with `id:` to resolve a full or partial page id instead (e.g. `id:msakene4`); id search
@@ -471,7 +474,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
 async def mutatePageBatch(
     workspaceId: str, pageId: str, commands: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Run an ordered batch of commands on ONE page as a single atomic commit (each `{command, args?}`
+    """Run an ordered batch of commands on a page as a single atomic commit (each `{command, args?}`
     decided against the state left by the previous). All-or-nothing: any rejection aborts the whole
     batch and nothing commits - the error names the failing index and command. Echoes the new status
     and next actions."""

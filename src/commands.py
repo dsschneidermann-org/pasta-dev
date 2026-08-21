@@ -9,7 +9,7 @@ the in-memory "copy-edit" half of the storage pattern in `store.py`.
 from __future__ import annotations
 
 from collections.abc import Collection
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from . import fsm
@@ -20,24 +20,31 @@ from .pagetypes import (
     ADD_BLOCK,
     ADD_ELEMENT,
     ADD_LINK,
+    BLOCK,
+    BLOCK_ARRAY,
     COMPOUND,
     ELEMENT_TRANSITION,
-    REORDER_BLOCK,
-    REORDER_ELEMENT,
     REMOVE_BLOCK,
     REMOVE_ELEMENT,
+    REORDER_BLOCK,
+    REORDER_ELEMENT,
     SET_BLOCK,
     SET_ELEMENT_FIELD,
     SET_PROSE,
     SET_SCALAR,
     SET_TITLE,
     TRANSITION,
+    ArgSpec,
+    BlockKindSpec,
     CommandSpec,
+    FieldSpec,
     PageType,
     guard_production_type,
     initial_sections,
+    is_field_setter,
+    validate_block,
+    validate_blocks,
     validate_inline_content,
-    validate_table,
 )
 
 _PYTHON_TYPE = {
@@ -61,6 +68,9 @@ class BatchContext:
 class CommandResult:
     page: Page
     created_id: str | None = None   # the new element id for add_* commands, else None
+    # An add of a run of blocks creates several ids while reporting only the first, and the
+    # batch's anchored-slot guard has to know the rest.
+    created_ids: list[str] = field(default_factory=list)
 
 
 def create_page(page_type: PageType, title: str, parent_id: str | None, id_factory: IdFactory) -> Page:
@@ -112,21 +122,6 @@ def _is_status_transition(command: CommandSpec) -> bool:
     own FSM, not the page's) - is an AUTHORING command from the page's point of view.
     """
     return command.kind in (TRANSITION, COMPOUND) and command.event is not None
-
-
-def is_field_setter(command: CommandSpec) -> bool:
-    """Whether `command` writes typed FIELD content into a (section, field): a SET_SCALAR, SET_PROSE,
-    or ADD_ELEMENT (the add of a LIST field - including the element-FSM adds addStep/addCase/askQuestion).
-
-    The shared, page-type-agnostic classifier behind the self-direction `do` list: a field setter gets
-    its own entry carrying its field's instruction, while a blocks field is grouped into one entry per
-    field. Deliberately kind-based, no per-type knowledge.
-    NOT field setters: ADD_BLOCK / SET_BLOCK (freeform blocks - grouped in `do`, never exploded),
-    REMOVE_* / REORDER_* (structure, not content), SET_ELEMENT_FIELD (a flag on an existing element),
-    ELEMENT_TRANSITION (fires an element's own FSM), TRANSITION / COMPOUND (page-status edges), and the
-    universal ADD_LINK / SET_TITLE.
-    """
-    return command.kind in (SET_SCALAR, SET_PROSE, ADD_ELEMENT)
 
 
 def _topology_ok(command: CommandSpec, allowed_events: set[str]) -> bool:
@@ -185,16 +180,16 @@ def legal_commands(page: Page, page_type: PageType, ignore_requirements: bool = 
 
 
 def _field_setter_edge(page: Page, page_type: PageType, section: str, field: str,
-                       command_names: list[str]) -> dict[str, Any]:
-    """One self-instructing `do` FIELD edge: kind='field' with the (section, field), the field's
-    instruction (its FieldSpec.description) and the `commands` that write it, all inline - so a `next`
-    consumer needs no describePageType round-trip to know what to author."""
+                       command_name: str) -> dict[str, Any]:
+    """One self-instructing `do` field edge: kind='field' with the (section, field), the field's
+    instruction (its FieldSpec.description) and the single `command` that writes it, all inline -
+    so a `next` consumer needs no describePageType round-trip to know what to author."""
     field_spec = page_type.field_spec(section, field)
     return {
         "pageId": page.id, "pageType": page.type, "kind": "field",
         "section": section, "field": field,
         "instruction": field_spec.description.strip() if field_spec is not None else "",
-        "commands": command_names,
+        "command": command_name,
     }
 
 
@@ -218,10 +213,12 @@ def field_setter_edges(page: Page, page_type: PageType,
     NOT passed - 'my children are unfinished' does not make my own authoring premature (a brief in
     `planning` must still surface askQuestion while its plan children are unready).
 
-    Two entry shapes, both carrying a `commands` array and `kind='field'` (see `_field_setter_edge`):
-      - a scalar/prose/list FIELD SETTER -> one entry, commands=[the setter];
-      - a BLOCKS field                   -> ONE grouped entry, commands=[its add-block variants]
-        (SET_BLOCK edit-in-place, remove, and reorder are never surfaced here - describeMutations only).
+    Every entry has one shape: `kind='field'` with the (section, field), the instruction, and the
+    single `command` that authors it (see `_field_setter_edge`). A field is one edge naming one
+    command, because a field's whole authoring content is reachable in a single command - a blocks
+    field takes its blocks as an array, and a list field's add carries the blocks its element is
+    created holding. SET_BLOCK, remove, reorder and the element-scoped block adds are never
+    surfaced here; describeMutations reports them.
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status) - set(blocked_events)
     required = {
@@ -233,8 +230,9 @@ def field_setter_edges(page: Page, page_type: PageType,
     if not required:
         return []
     legal = legal_commands(page, page_type)
-    edges: list[dict[str, Any]] = []
-    block_variants: dict[tuple[str, str], list[str]] = {}
+    # PageType's post-init rejects a type declaring two setters for one field, so the first
+    # legal one found is the only one there is.
+    setters: dict[tuple[str, str], str] = {}
     for command in page_type.commands:
         section, field = command.section, command.field
         if section is None or field is None:      # transitions / addLink / setTitle target no field
@@ -243,12 +241,9 @@ def field_setter_edges(page: Page, page_type: PageType,
         if target not in required or not legal.get(command.name):
             continue
         if is_field_setter(command):
-            edges.append(_field_setter_edge(page, page_type, section, field, [command.name]))
-        elif command.kind == ADD_BLOCK:
-            block_variants.setdefault(target, []).append(command.name)
-    for (section, field), variants in block_variants.items():
-        edges.append(_field_setter_edge(page, page_type, section, field, variants))
-    return edges
+            setters.setdefault(target, command.name)
+    return [_field_setter_edge(page, page_type, section, field, command_name)
+            for (section, field), command_name in setters.items()]
 
 
 def transition_guidance(
@@ -288,8 +283,8 @@ def apply_command(
     _check_legal(page, page_type, command)
 
     working = page.copy()
-    created_id = _apply(working, page_type, command, args, id_factory, batch_context)
-    return CommandResult(page=working, created_id=created_id)
+    created_id, created_ids = _apply(working, page_type, command, args, id_factory, batch_context)
+    return CommandResult(page=working, created_id=created_id, created_ids=created_ids)
 
 
 # --- validation --------------------------------------------------------------
@@ -317,12 +312,12 @@ def _validate_args(command: CommandSpec, args: dict[str, Any]) -> None:
             raise ValidationError(
                 f"Argument '{arg.name}' must be one of {list(arg.choices)}, got {value!r}."
             )
-        # Structurally validate an inline-run array arg against its declared shape.
-        if arg.content is not None:
+        if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
+            validate_blocks(value, arg.block_kinds)
+        elif arg.content == BLOCK and arg.block_kinds is not None:
+            validate_block(value, arg.block_kinds)
+        elif arg.content is not None:
             validate_inline_content(arg.content, value)
-    # A table's rows (and align, if given) must match the header width - a cross-arg check.
-    if command.block_kind == "table":
-        validate_table(args.get("header", []), args.get("rows", []), args.get("align"))
 
 
 def _check_legal(page: Page, page_type: PageType, command: CommandSpec) -> None:
@@ -355,33 +350,40 @@ def _apply(
     args: dict[str, Any],
     id_factory: IdFactory,
     batch_context: BatchContext | None = None,
-) -> str | None:
+) -> tuple[str | None, list[str]]:
+    """Apply one command, returning (the id reported positionally, every id it created).
+
+    The two differ only for a block add, which creates a whole run while `createdIds` stays one
+    id per command; every other command creates at most one and reports it as both.
+    """
     if command.kind == SET_SCALAR:
         page.sections[command.section][command.field] = args[command.args[0].name]
-        return None
+        return None, []
     if command.kind == SET_PROSE:
         page.sections[command.section][command.field] = args[command.args[0].name]
-        return None
+        return None, []
     if command.kind == ADD_ELEMENT:
-        return _add_element(page, page_type, command, args, id_factory, batch_context)
+        created, created_ids = _add_element(page, page_type, command, args, id_factory,
+                                            batch_context)
+        return created, created_ids
     if command.kind == SET_ELEMENT_FIELD:
         _set_element_field(page, command, args)
-        return None
+        return None, []
     if command.kind == ELEMENT_TRANSITION:
         _element_transition(page, page_type, command, args)
-        return None
+        return None, []
     if command.kind in (REORDER_ELEMENT, REORDER_BLOCK):
         _reorder_entry(page, command, args, batch_context)
-        return None
+        return None, []
     if command.kind in (REMOVE_ELEMENT, REMOVE_BLOCK):
         _remove_by_id(page, command, args)
-        return None
+        return None, []
     if command.kind == ADD_LINK:
         # Append a typed outgoing edge to Page.links. The cross-page rules (target exists, source
         # non-archived, no self-link, no duplicate edge) are enforced in the store's _check_link
         # precheck before this runs - the pure core, like inline-ref handling, trusts that check.
         page.links.append({"to": args["toId"], "role": args["role"].strip()})
-        return None
+        return None, []
     if command.kind == SET_TITLE:
         # Rename the page in place - the page-command alias for the top-level renamePage tool. Reject a
         # blank title with the SAME message as store.rename_page / create_page (a title is a display
@@ -390,37 +392,76 @@ def _apply(
         if not isinstance(title, str) or not title.strip():
             raise ValidationError("Page title must be a non-empty string.")
         page.title = title
-        return None
+        return None, []
     if command.kind == ADD_BLOCK:
         return _add_block(page, command, args, id_factory, batch_context)
     if command.kind == SET_BLOCK:
         _set_block(page, command, args)
-        return None
+        return None, []
     if command.kind == TRANSITION:
         page.status = fsm.fire(page_type.fsm, page.status, command.event)
-        return None
+        return None, []
     if command.kind == COMPOUND:
         created_id: str | None = None
+        created_ids: list[str] = []
         for step in command.steps:
-            step_created = _apply(page, page_type, step, args, id_factory, batch_context)
+            step_created, step_ids = _apply(page, page_type, step, args, id_factory, batch_context)
             if step_created is not None:
                 created_id = step_created
-        return created_id
+            created_ids.extend(step_ids)
+        return created_id, created_ids
     raise ValidationError(f"Unsupported command kind '{command.kind}'.")
+
+
+def _create_blocks(entries: list[dict[str, Any]], kinds: tuple[BlockKindSpec, ...],
+                 id_factory: IdFactory) -> list[dict[str, Any]]:
+    """Id'd blocks from validated argument entries - the one place a block is built.
+
+    Every path goes through here - a page-level add, an element-scoped add, and an element
+    created holding its blocks - so a block is indistinguishable key for key whichever command
+    made it. The kind is known to be one the field declares: validate_block ran before this.
+    """
+    made: list[dict[str, Any]] = []
+    for entry in entries:
+        spec = next(kind for kind in kinds if kind.kind == entry["kind"])
+        block: dict[str, Any] = {"id": id_factory(""), "kind": spec.kind}
+        for body in spec.body_args():
+            block[body.name] = entry.get(body.name)
+        made.append(block)
+    return made
+
+
+def _element_blocks_from_args(field_spec: FieldSpec, args: dict[str, Any],
+                              id_factory: IdFactory) -> dict[str, list[dict[str, Any]]]:
+    """The id'd block arrays for an element being created: one per declared block field, read from
+    the same-named optional argument. A field with no argument starts empty."""
+    return {spec.field: _create_blocks(args.get(spec.field) or [], spec.vocabulary(), id_factory)
+            for spec in field_spec.element_blocks}
 
 
 def _add_element(page: Page, page_type: PageType, command: CommandSpec,
                  args: dict[str, Any], id_factory: IdFactory,
-                 batch_context: BatchContext | None = None) -> str:
+                 batch_context: BatchContext | None = None) -> tuple[str, list[str]]:
+    """Create a list element, returning its id and every id the command created.
+
+    An element created holding blocks creates those blocks' ids too. They are reported so the
+    batch's anchored-slot guard can skip ids the caller had no way to name.
+    """
     element: dict[str, Any] = {"id": id_factory("")}
     for element_field, arg_name in command.element_map:
         element[element_field] = args.get(arg_name)   # optional args default to None
     # If the list has an element-FSM, the new element starts at that FSM's initial status.
     field_spec = page_type.field_spec(command.section, command.field)
-    if field_spec is not None and field_spec.element_fsm is not None:
-        element["status"] = field_spec.element_fsm.initial
+    created: list[str] = [element["id"]]
+    if field_spec is not None:
+        if field_spec.element_fsm is not None:
+            element["status"] = field_spec.element_fsm.initial
+        # A declared block field is created from its own argument, or empty when none was given.
+        blocks = _element_blocks_from_args(field_spec, args, id_factory)
+        element.update(blocks)
+        created.extend(block["id"] for made in blocks.values() for block in made)
     _place_entry(page.sections[command.section][command.field], element, command, args, batch_context)
-    return element["id"]
+    return element["id"], created
 
 
 def _apply_element_writes(element: dict[str, Any], command: CommandSpec, args: dict[str, Any]) -> None:
@@ -432,12 +473,53 @@ def _apply_element_writes(element: dict[str, Any], command: CommandSpec, args: d
         element[element_field] = value
 
 
-def _find_element(page: Page, command: CommandSpec, args: dict[str, Any]) -> dict[str, Any]:
-    target_id = args[command.args[0].name]   # args[0] is the id by convention
-    for element in page.sections[command.section][command.field]:
+def _find_element_by_id(entries: list[dict[str, Any]], target_id: str, context: str) -> dict[str, Any]:
+    """The list element with `target_id` in `entries`, under the wording elements have always
+    used, so an author can tell which of the two ids - element or block - was wrong."""
+    for element in entries:
         if element.get("id") == target_id:
             return element
-    raise NotFoundError(f"No element with id '{target_id}' in {command.section}.{command.field}.")
+    raise NotFoundError(f"No element with id '{target_id}' in {context}.")
+
+
+def _entry_context(command: CommandSpec, args: dict[str, Any]) -> str:
+    """The list a command addresses, named for an error message: `steps.items`, or
+    `steps.items[<elementId>].detail` when the command is element-scoped."""
+    base = f"{command.section}.{command.field}"
+    if command.element_field is None:
+        return base
+    return f"{base}[{args[command.args[0].name]}].{command.element_field}"
+
+
+def _target_entries(page: Page, command: CommandSpec, args: dict[str, Any]) -> list[dict[str, Any]]:
+    """The entry list a list/blocks command operates on: the section's own field, or - when the
+    command is element-scoped - the block array on the element named by args[0].
+
+    The array is created when the element does not carry it yet, which is what lets an element
+    stored before the field was declared accept its first block.
+    """
+    entries: list[dict[str, Any]] = page.sections[command.section][command.field]
+    if command.element_field is None:
+        return entries
+    element = _find_element_by_id(entries, args[command.args[0].name],
+                                  f"{command.section}.{command.field}")
+    blocks = element.get(command.element_field)
+    if not isinstance(blocks, list):
+        blocks = []
+        element[command.element_field] = blocks
+    return blocks
+
+
+def _entry_id(command: CommandSpec, args: dict[str, Any]) -> str:
+    """The id of the entry a command targets. args[0] is the id by convention; an element-scoped
+    block command spends args[0] on the element that holds the field, so its entry id is args[1]."""
+    return args[command.args[1 if command.element_field is not None else 0].name]
+
+
+def _find_element(page: Page, command: CommandSpec, args: dict[str, Any]) -> dict[str, Any]:
+    return _find_element_by_id(page.sections[command.section][command.field],
+                               args[command.args[0].name],   # args[0] is the id by convention
+                               f"{command.section}.{command.field}")
 
 
 def _set_element_field(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
@@ -488,35 +570,52 @@ def resolve_anchored_slot(ids: list[str], index: int, preceding_id: str | None, 
 
 
 def _resolve_slot(entries: list[dict[str, Any]], index: int, preceding_id: str | None,
-                  section: str, field: str, batch_context: BatchContext | None = None) -> int:
+                  context: str, batch_context: BatchContext | None = None) -> int:
     """The anchored slot for a positioned add or a block/element reorder (see resolve_anchored_slot).
 
     `entries` is the list[dict] the item will occupy - for a reorder, with the moving item already
-    removed. Delegates to the shared id-list guard on the entries' ids.
+    removed - and `context` names that list, so an element-scoped block reports the element it
+    happened in. Delegates to the shared id-list guard on the entries' ids.
     """
     return resolve_anchored_slot([entry["id"] for entry in entries], index, preceding_id,
-                                 f"{section}.{field}", batch_context)
+                                 context, batch_context)
+
+
+def _reject_dangling_preceding(command: CommandSpec, args: dict[str, Any]) -> None:
+    """`precedingId` anchors a positioned insert, so it is meaningless without an `index`."""
+    if args.get("index") is None and args.get("precedingId") is not None:
+        raise ValidationError(
+            f"Command '{command.name}': precedingId requires an index - it anchors a positioned insert."
+        )
 
 
 def _place_entry(entries: list[dict[str, Any]], entry: dict[str, Any],
                  command: CommandSpec, args: dict[str, Any],
-                 batch_context: BatchContext | None = None) -> None:
+                 batch_context: BatchContext | None = None, offset: int = 0) -> None:
     """Append `entry`, or insert it at a guarded position when the command was given an `index`.
 
     `index` / `precedingId` are positional args (never in `element_map`), so they never leak into
     the entry body. Omit `index` -> append (and `precedingId` must be omitted too); give `index` ->
     the shared anchor guard runs against the current list before inserting.
+
+    `offset` places a run of entries contiguously from one anchored slot: the guard resolves once,
+    against the slot the run starts at, and each later member lands immediately after the one
+    before it. Without it, N positioned inserts would each resolve the same index and the run
+    would come out reversed.
     """
     index = args.get("index")
     preceding_id = args.get("precedingId")
     if index is None:
-        if preceding_id is not None:
-            raise ValidationError(
-                f"Command '{command.name}': precedingId requires an index - it anchors a positioned insert."
-            )
+        _reject_dangling_preceding(command, args)
         entries.append(entry)
         return
-    slot = _resolve_slot(entries, index, preceding_id, command.section, command.field, batch_context)
+    if offset == 0:
+        slot = _resolve_slot(entries, index, preceding_id, _entry_context(command, args),
+                             batch_context)
+    else:
+        # _resolve_slot returns `index` itself once the anchor checks out, so the run continues
+        # from there rather than re-resolving an anchor that its own earlier members have moved.
+        slot = index + offset
     entries.insert(slot, entry)
 
 
@@ -530,52 +629,83 @@ def _reorder_entry(page: Page, command: CommandSpec, args: dict[str, Any],
     (the old whole-list reorder's failure) nor let the item land in a stale slot (the old index-only
     move's failure). `toIndex` is the resting index in the list *after* the item is removed.
     """
-    target_id = args[command.args[0].name]       # args[0] is the id by convention
+    target_id = _entry_id(command, args)
     to_index = args["toIndex"]
     preceding_id = args.get("precedingId")
-    entries: list[dict[str, Any]] = page.sections[command.section][command.field]
+    context = _entry_context(command, args)
+    entries = _target_entries(page, command, args)
     for index, entry in enumerate(entries):
         if entry.get("id") == target_id:
             moving = entries.pop(index)
-            slot = _resolve_slot(entries, to_index, preceding_id, command.section, command.field,
-                                 batch_context)
+            slot = _resolve_slot(entries, to_index, preceding_id, context, batch_context)
             entries.insert(slot, moving)
             return
-    raise NotFoundError(f"No entry with id '{target_id}' in {command.section}.{command.field}.")
+    raise NotFoundError(f"No entry with id '{target_id}' in {context}.")
+
+
+def _block_array_arg(command: CommandSpec) -> ArgSpec | None:
+    """The array argument a block add carries its run in."""
+    return next((arg for arg in command.args if arg.content == BLOCK_ARRAY), None)
+
+
+def _block_object_arg(command: CommandSpec) -> ArgSpec | None:
+    """The object argument a block set carries its replacement in."""
+    return next((arg for arg in command.args if arg.content == BLOCK), None)
 
 
 def _add_block(page: Page, command: CommandSpec, args: dict[str, Any], id_factory: IdFactory,
-               batch_context: BatchContext | None = None) -> str:
-    """Add a typed block to a blocks field; append, or insert at a guarded `index` (see _place_entry)."""
-    block: dict[str, Any] = {"id": id_factory(""), "kind": command.block_kind}
-    for block_field, arg_name in command.element_map:
-        block[block_field] = args.get(arg_name)
-    _place_entry(page.sections[command.section][command.field], block, command, args, batch_context)
-    return block["id"]
+               batch_context: BatchContext | None = None) -> tuple[str | None, list[str]]:
+    """Add a run of blocks to a blocks field - the section's own, or an element's when the command
+    carries element_field. Appends, or inserts the whole run contiguously at a guarded `index`.
+
+    Returns the first id created (None for an empty run) and every id created. An empty
+    `blocks` array is legal and writes nothing.
+    """
+    array_arg = _block_array_arg(command)
+    if array_arg is None:                            # unreachable: every add declares one
+        raise ValidationError(f"Command '{command.name}' declares no blocks argument.")
+    _reject_dangling_preceding(command, args)
+    blocks = _create_blocks(args.get(array_arg.name) or [], array_arg.block_kinds or (), id_factory)
+    entries = _target_entries(page, command, args)
+    for offset, block in enumerate(blocks):
+        _place_entry(entries, block, command, args, batch_context, offset=offset)
+    created = [block["id"] for block in blocks]
+    return (created[0] if created else None), created
 
 
 def _set_block(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
-    """Replace a block's fields in place by id, preserving its id and kind.
+    """Replace one block by id, preserving its id and its position and nothing else.
 
-    Rejects if the target block is a different kind (e.g. `setParagraph` on a heading), matching
-    the reference behaviour. The mapped fields are fully replaced (an omitted optional -> None).
+    A generalized set is a true overwrite: the supplied block's kind replaces the stored one, so
+    the entry is rebuilt rather than updated in place and no body key from the previous kind
+    survives the change. The only kind rule is that the supplied kind is one the field declares,
+    which validate_block enforced in _validate_args before this ran.
     """
-    block = _find_element(page, command, args)   # args[0] is the blockId
-    if block.get("kind") != command.block_kind:
-        raise ValidationError(
-            f"Command '{command.name}' edits a '{command.block_kind}' block, but block " +
-            f"'{block.get('id')}' is a '{block.get('kind')}'."
-        )
-    for block_field, arg_name in command.element_map:
-        block[block_field] = args.get(arg_name)
+    object_arg = _block_object_arg(command)
+    if object_arg is None:                           # unreachable: every set declares one
+        raise ValidationError(f"Command '{command.name}' declares no block argument.")
+    entries = _target_entries(page, command, args)
+    context = _entry_context(command, args)
+    target_id = _entry_id(command, args)
+    supplied = args[object_arg.name]
+    spec = next(kind for kind in (object_arg.block_kinds or ()) if kind.kind == supplied["kind"])
+    for index, entry in enumerate(entries):
+        if entry.get("id") == target_id:
+            rebuilt: dict[str, Any] = {"id": target_id, "kind": spec.kind}
+            for body in spec.body_args():
+                rebuilt[body.name] = supplied.get(body.name)
+            entries[index] = rebuilt
+            return
+    raise NotFoundError(f"No entry with id '{target_id}' in {context}.")
 
 
 def _remove_by_id(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
     """Remove an id'd entry (list element or block) from a list/blocks field."""
-    target_id = args[command.args[0].name]
-    entries: list[dict[str, Any]] = page.sections[command.section][command.field]
+    target_id = _entry_id(command, args)
+    context = _entry_context(command, args)
+    entries = _target_entries(page, command, args)
     for index, entry in enumerate(entries):
         if entry.get("id") == target_id:
             del entries[index]
             return
-    raise NotFoundError(f"No entry with id '{target_id}' in {command.section}.{command.field}.")
+    raise NotFoundError(f"No entry with id '{target_id}' in {context}.")

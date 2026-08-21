@@ -11,7 +11,26 @@ from typing import Any
 
 from .commands import legal_commands
 from .model import Page
-from .pagetypes import COMPOUND, TRANSITION, CommandSpec, PageType
+from .pagetypes import (BLOCK, BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION, BlockKindSpec, CommandSpec,
+                        PageType)
+
+
+def _block_schema(kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
+    """The schema for one block: a oneOf branch per accepted kind, each built from that kind's
+    declared body args - the same source validate_block reads, so the schema and the grammar
+    agree. A caller learns a field's whole vocabulary from this alone, which is what replaces
+    reading the kind off a per-kind command name."""
+    branches: list[dict[str, Any]] = []
+    for spec in kinds:
+        properties: dict[str, Any] = {"kind": {"const": spec.kind}}
+        required = ["kind"]
+        for body in spec.body_args():
+            properties[body.name] = {"type": body.type}
+            if body.required:
+                required.append(body.name)
+        branches.append({"type": "object", "properties": properties,
+                         "required": required, "additionalProperties": False})
+    return {"oneOf": branches}
 
 
 def command_arg_schema(command: CommandSpec) -> dict[str, Any]:
@@ -20,6 +39,10 @@ def command_arg_schema(command: CommandSpec) -> dict[str, Any]:
     required: list[str] = []
     for arg in command.args:
         prop: dict[str, Any] = {"type": arg.type}
+        if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
+            prop = {"type": "array", "items": _block_schema(arg.block_kinds)}
+        elif arg.content == BLOCK and arg.block_kinds is not None:
+            prop = _block_schema(arg.block_kinds)
         if arg.choices is not None:
             prop["enum"] = list(arg.choices)
         if arg.description:
@@ -46,7 +69,6 @@ def _command_summary(command: CommandSpec) -> dict[str, Any]:
         "field": command.field,
         "event": command.event,
         "agency": command.agency,
-        "blockKind": command.block_kind,        # for add-block commands: paragraph/heading/code/decision
         # statuses a CONTENT command is allowed in. Suppressed for a transition/compound command:
         # there `legal_in` is the edge's SOURCE state, already reported in the FSM transition list,
         # so hiding it here keeps the describe output unclobbered.
@@ -89,6 +111,14 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         "elementFields": list(field_spec.element_fields) if field_spec.element_fields else None,
                         # for a list with a per-element lifecycle: its states (e.g. todo/done)
                         "elementStates": list(field_spec.element_fsm.states) if field_spec.element_fsm else None,
+                        # for a list whose element fields hold blocks: each field and the kinds it accepts
+                        "elementBlocks": ([{"field": spec.field,
+                                            "kinds": [kind.kind for kind in spec.vocabulary()]}
+                                           for spec in field_spec.element_blocks] or None),
+                        # for a blocks field: the kinds it accepts. The only place a caller can
+                        # read a page-level field's vocabulary, now that no command name carries it.
+                        "blockKinds": ([kind.kind for kind in field_spec.block_vocabulary()]
+                                       if field_spec.kind == BLOCKS else None),
                         "description": field_spec.description,
                     }
                     for field_spec in section.fields

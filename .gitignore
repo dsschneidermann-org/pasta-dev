@@ -8,6 +8,7 @@ __pycache__/
 
 # test / tooling caches
 .pytest_cache/
+.testmondata
 
 # Claude worktrees and settings
 .claude/worktrees
@@ -19,3 +20,7 @@ docsite/_build/html/**
 docsite/apidocs/
 docsite/page-types/
 
+# graphify output
+graphify-out/cost.json
+graphify-out/cache/
+graphify-out/.*

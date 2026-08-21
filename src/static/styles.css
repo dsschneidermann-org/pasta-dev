@@ -21,3 +21,68 @@ body.dark {
   --text-error: #cf6679;
   --text-on-error: #000;
 }
+
+/* Structured page render (src/render_html.py). Scoped under .pasta-page so it cannot reach the
+   sidebar, the workspace index or the tree view. Every colour is a water.css custom property,
+   which both its light and dark sheets define, so the whole block follows the theme. */
+.pasta-page .page-head { margin-bottom: 1rem; }
+.pasta-page .page-title { margin: 0 0 0.2rem; }
+.pasta-page .page-meta { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+.pasta-page .page-type { font-style: italic; }
+.pasta-page .page-status { font-family: monospace; color: var(--code);
+    background: var(--background-alt); border-radius: 3px; padding: 0.05rem 0.2rem; }
+
+.pasta-page .page-contents { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem;
+    padding: 0.6rem 0.8rem; margin-bottom: 1.8rem; font-size: 0.85rem;
+    background: var(--background-alt); border-radius: 6px; }
+
+.pasta-page .page-section { margin: 0 0 2rem; }
+.pasta-page .section-title { margin: 0 0 0.7rem; padding-bottom: 0.3rem;
+    border-bottom: 2px solid var(--border); }
+.pasta-page .count { font-size: 0.75rem; font-weight: normal;
+    color: var(--text-muted); background: var(--background);
+    border-radius: 999px; padding: 0 0.5rem; margin-left: 0.2rem; }
+.pasta-page a:hover .count { display: inline-block; }
+
+.pasta-page .field { margin: 0 0 1rem; }
+.pasta-page .field:last-child { margin-bottom: 0; }
+.pasta-page .empty { color: var(--text-muted); font-style: italic; }
+
+.pasta-page .field-rows { display: grid; gap: 0.25rem 1rem; margin: 0;
+    grid-template-columns: minmax(5rem, max-content) 1fr; }
+.pasta-page .field-rows dt { color: var(--text-muted); font-size: 0.8rem;
+    letter-spacing: 0.03em; text-transform: uppercase; padding-top: 0.2rem; }
+.pasta-page .field-rows dd { margin: 0; min-width: 0; }
+.pasta-page .field-rows dd p { margin: 0 0 0.4rem; }
+.pasta-page .field-rows dd p:last-child { margin-bottom: 0; }
+/* Blocks rendered inside an element sit on the row baseline, and a long code line scrolls
+   rather than widening the element card. */
+.pasta-page .field-rows dd.element-blocks > :first-child { margin-top: 0; }
+.pasta-page .field-rows dd.element-blocks > :last-child { margin-bottom: 0; }
+.pasta-page .field-rows dd.element-blocks pre { overflow-x: auto; max-width: 100%; }
+
+.pasta-page .element-list { list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 0.7rem; }
+.pasta-page .element { padding: 0.7rem 0.9rem; background: var(--background);
+    border: 1px solid var(--border); border-radius: 6px; }
+.pasta-page .element:target { border-color: var(--links); }
+.pasta-page .element-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; }
+.pasta-page .element-index { min-width: 1.4rem; font-family: monospace;
+    font-size: 0.8rem; color: var(--text-muted); }
+/* The ordinal doubles as the element's own anchor link; keep it as quiet as the span form. */
+.pasta-page a.element-index { text-decoration: none; }
+.pasta-page a.element-index:hover { color: var(--links); }
+.pasta-page .element-title { margin: 0; font-size: 1rem; flex: 1 1 auto; min-width: 0; }
+/* An element titled by a page reads as a link; its annotations stay annotation-sized. */
+.pasta-page .element-title .link-type,
+.pasta-page .element-title .link-status { font-size: 0.75rem; font-weight: normal; }
+.pasta-page .element-status { font-family: monospace; font-size: 0.75rem;
+    background: var(--background-alt); border-radius: 999px; padding: 0.1rem 0.5rem; }
+.pasta-page .element-head + .field-rows { margin-top: 0.55rem; }
+
+.pasta-page .link-list { list-style: none; margin: 0; padding: 0; }
+.pasta-page .link-list li { margin: 0.25rem 0; }
+.pasta-page .link-type { font-style: italic; color: var(--text-muted); }
+.pasta-page .link-status { font-family: monospace; color: var(--code);
+    background: var(--background-alt); border-radius: 3px; padding: 0 0.2rem; }
+.pasta-page .link-role { color: var(--text-muted); }

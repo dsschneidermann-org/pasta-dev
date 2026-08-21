@@ -87,32 +87,55 @@ def _plain(text: str, ref_context: RefContext | None) -> str:
     return text
 
 
-def _checkbox(status: str | None, element_fsm: ElementFSMSpec | None) -> str:
-    """The task checkbox for an element's status, taken from its FSM: `[x] ` for the checkmark_done
-    state, `[ ] ` for the FSM's initial (unchecked) state, and `` for any other state or a
+def checkbox_state(status: str | None, element_fsm: ElementFSMSpec | None) -> str | None:
+    """An element's checkbox state, taken from its FSM: `"done"` for the checkmark_done state,
+    `"todo"` for the FSM's initial (unchecked) state, and None for any other state or a
     non-checkbox FSM (one with no checkmark_done, or a list field with no element FSM at all).
+
+    Public so every renderer answers this question the same way and then spells it its own.
     """
     if element_fsm is None or element_fsm.checkmark_done is None:
-        return ""
+        return None
     if status == element_fsm.checkmark_done:
-        return "[x] "
+        return "done"
     if status == element_fsm.initial:
-        return "[ ] "
-    return ""
+        return "todo"
+    return None
 
 
-def _render_list(elements: list[dict[str, Any]], element_fsm: ElementFSMSpec | None = None,
+def _checkbox(status: str | None, element_fsm: ElementFSMSpec | None) -> str:
+    """The task checkbox for an element's status: `[x] ` for a done element, `[ ] ` for an
+    unchecked one, and `` where the element carries no checkbox at all."""
+    state = checkbox_state(status, element_fsm)
+    return "[x] " if state == "done" else "[ ] " if state == "todo" else ""
+
+
+def _indent_list_content(markdown: str) -> str:
+    """Block Markdown indented to sit inside its list item - without it a fenced code block or a
+    nested list would close the item. A blank line stays blank: the repo trims trailing whitespace.
+    """
+    return "\n".join(f"  {line}" if line else "" for line in markdown.splitlines())
+
+
+def _render_list(elements: list[dict[str, Any]], field_spec: FieldSpec | None = None,
                  ref_context: RefContext | None = None) -> str | None:
+    element_fsm = field_spec.element_fsm if field_spec is not None else None
+    block_fields = field_spec.block_element_fields() if field_spec is not None else ()
     lines: list[str] = []
     for element in elements:
+        # A block-bearing field is rendered below the bullet, never flattened into it.
         fields = {key: value for key, value in element.items()
-                  if key != "id" and value is not None}
+                  if key != "id" and value is not None and key not in block_fields}
         status = fields.pop("status", None)
         text = _plain(str(fields.pop("text", "")), ref_context)
         body = "; ".join(f"{key}: {_plain(str(value), ref_context)}" for key, value in fields.items())
         bodysep = "; " if text and body else ""
         mark = _checkbox(status, element_fsm)
         lines.append(f"- {mark}{text}{bodysep}{body}" + (f" _[{status}]_" if status else ""))
+        for block_field in block_fields:
+            rendered = render_blocks(element.get(block_field) or [], ref_context)
+            if rendered:
+                lines += ["", _indent_list_content(rendered)]
     return "\n".join(lines) if lines else None
 
 
@@ -169,7 +192,7 @@ def _render_table(block: dict[str, Any], ref_context: RefContext | None = None) 
     return "\n".join(lines)
 
 
-def _render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None = None) -> str | None:
+def render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None = None) -> str | None:
     out: list[str] = []
     for block in blocks:
         kind = block.get("kind")
@@ -215,10 +238,10 @@ def _field_content(field_spec: FieldSpec, value, ref_context: RefContext | None 
     if field_spec.kind == PROSE:
         return _plain(str(value), ref_context) if value else _NONE
     if field_spec.kind == LIST:
-        rendered = _render_list(value, field_spec.element_fsm, ref_context) if value else None
+        rendered = _render_list(value, field_spec, ref_context) if value else None
         return rendered if rendered else _NONE
     if field_spec.kind == BLOCKS:
-        rendered = _render_blocks(value, ref_context) if value else None
+        rendered = render_blocks(value, ref_context) if value else None
         return rendered if rendered else _NONE
     return _NONE
 
@@ -426,4 +449,12 @@ def page_text(page: Page, page_type: PageType) -> str:
                     # inline-run blocks keep their text nested in runs, not as top-level strings
                     if field_spec.kind == BLOCKS:
                         parts.append(_block_inline_text(entry))
+                    # an element's block fields carry their text one level deeper again
+                    for block_field in field_spec.block_element_fields():
+                        for block in entry.get(block_field) or []:
+                            if not isinstance(block, dict):
+                                continue
+                            parts += [str(v) for k, v in block.items()
+                                      if k != "id" and isinstance(v, str)]
+                            parts.append(_block_inline_text(block))
     return " ".join(part for part in parts if part)
