@@ -1,4 +1,4 @@
-"""The `decision-record` page type: the reasoning a piece of architecture cannot show."""
+"""The `decision-record` page type."""
 
 from __future__ import annotations
 

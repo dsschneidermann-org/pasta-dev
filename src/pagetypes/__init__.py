@@ -4,11 +4,8 @@ A `PageType` fixes a page's sections, field kinds, legal commands, and status FS
 `createPage` initializes from it, `commands.py` enforces it, and `describePageType`
 reports it.
 
-Each production type is declared in its own module beside this one, so a type can be
-read and changed without the other eleven in the way; the feature-brief family shares
-one module because those four types are designed against each other. This module keeps
-what they all draw on - the spec dataclasses, the declaration and command helpers, the
-inline-run grammar - plus the registry they are assembled into and the test seams.
+Each page type is declared in its own module beside this one, so it can be read and
+changed on its own. This module holds what they share and the registry they go into.
 """
 
 from __future__ import annotations
@@ -882,7 +879,7 @@ _FEATURE_IN_PLANNING_OR_LATER = ParentStateGuard(
 
 # An epic's pinned agent plan may only be finalized once the epic has reached `decomposition` or
 # later - not while it is still in `draft` or `grounding` (the base is still being established),
-# nor once `abandoned`. Attached to the agent plan's markReady and enforced in the store.
+# nor once `abandoned`. Enforced in the store.
 _EPIC_IN_DECOMPOSITION_OR_LATER = ParentStateGuard(
     parent_type="epic",
     required_statuses=("decomposition", "planReview", "executing", "review", "shipped"),
@@ -891,8 +888,8 @@ _EPIC_IN_DECOMPOSITION_OR_LATER = ParentStateGuard(
 
 
 # --- The page types ----------------------------------------------------------
-# Imported last: each module reads the declarations above back out of this package while it
-# builds its literal, so anything a page type uses must be declared before this point.
+# Imported last: a page-type module reads these declarations back out of the package as it
+# builds, so anything it uses has to be declared above this point.
 from .architecture import _ARCHITECTURE
 from .decision_record import _DECISION_RECORD
 from .bug_report import _BUG_REPORT

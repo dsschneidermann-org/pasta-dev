@@ -1,4 +1,4 @@
-"""The `agent-plan` page type: an epic's pinned plan for which subagents it dispatches."""
+"""The `agent-plan` page type."""
 
 from __future__ import annotations
 

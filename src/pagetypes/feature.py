@@ -1,9 +1,7 @@
 """The feature lifecycle: a `feature-brief` and the three children pinned under it.
 
-The four types are declared together because they are designed against each other rather
-than on their own - the brief's guards read its children's states, the children's guards
-read the brief's, and the ordering between the pinned siblings is expressed as a state on
-the brief. Reading one without the other three would hide the mechanism.
+The four are declared together because they are designed against each other rather than
+on their own, and reading one without the others would hide the coupling.
 """
 
 from __future__ import annotations

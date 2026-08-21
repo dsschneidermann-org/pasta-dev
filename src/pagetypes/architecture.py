@@ -1,4 +1,4 @@
-"""The `architecture` page type: documents a part of the system that already exists."""
+"""The `architecture` page type."""
 
 from __future__ import annotations
 

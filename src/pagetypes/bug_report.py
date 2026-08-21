@@ -1,4 +1,4 @@
-"""The `bug-report` page type: one defect in existing behavior, its repro and its resolution."""
+"""The `bug-report` page type."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""The `toc` page type: a container whose only content is the pages filed under it."""
+"""The `toc` page type."""
 
 from __future__ import annotations
 

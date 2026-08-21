@@ -1,4 +1,4 @@
-"""The `epic` page type: work too large for one brief, decomposed into child briefs."""
+"""The `epic` page type."""
 
 from __future__ import annotations
 

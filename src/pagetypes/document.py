@@ -1,4 +1,4 @@
-"""The `document` page type: general-purpose prose for content no typed page holds."""
+"""The `document` page type."""
 
 from __future__ import annotations
 

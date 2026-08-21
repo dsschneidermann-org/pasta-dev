@@ -1,4 +1,4 @@
-"""The `simple-change` page type: one small, self-contained change tracked end to end."""
+"""The `simple-change` page type."""
 
 from __future__ import annotations
 
