@@ -854,9 +854,6 @@ def initial_sections(page_type: PageType) -> dict[str, dict[str, Any]]:
     return sections
 
 
-# ============================================================================
-# architecture - FSM current <-> stale
-# ============================================================================
 _ARCHITECTURE = PageType(
     tag="architecture",
     name="Architecture node",
@@ -962,17 +959,18 @@ _ARCHITECTURE = PageType(
                              _text("note", required=False))),
         *list_cmds("invariants", add_args=(_text("statement"),)),
         set_scalar_cmd("sync", "commit", name="recordSync", label="sync commit"),
-        transition_cmd("markStale", "current -> stale"),
-        transition_cmd("markCurrent", "stale -> current"),
+        transition_cmd("markCurrent", "authoring -> current"),
+        transition_cmd("author", "current -> authoring"),
         add_link_cmd(),
         set_title_cmd(),
     ),
     fsm=FSMSpec(
         name="Architecture",
-        initial="current",
-        states=("current", "stale"),
-        state_guidance=(("current", """
-            current - documents a part of the system that already exists, written by reading
+        initial="authoring",
+        states=("authoring", "current"),
+        terminal_states=("current",),
+        state_guidance=(("authoring", """
+            authoring - documents a part of the system that already exists, written by reading
             that code rather than recalling it. The work of it:
 
             - Fix the boundary first: one part, one granularity, a job stated in one line. If
@@ -991,16 +989,13 @@ _ARCHITECTURE = PageType(
 
             Why it is shaped this way belongs in a decision record, linked from here. Keep the
             page at the scale of its siblings, and when the code moves on mark it stale rather
-            than leave it describing an older system.
+            than leave it describing an older system - a stale page is locked until markCurrent
+            brings it back here.
             """),),
     ),
 )
 
 
-# ============================================================================
-# decision-record - ONE architectural decision and the reasoning behind it. FSM:
-#   proposed -> accepted -> superseded | deprecated;  proposed -> rejected
-# ============================================================================
 _DECISION_RECORD = PageType(
     tag="decision-record",
     name="Decision record",
@@ -1056,10 +1051,11 @@ _DECISION_RECORD = PageType(
         )),
         SectionSpec("relations", "Relations", (
             _scalar("supersededBy", description="""
-                The page id of the decision record that replaces this one, recorded when this
-                decision is superseded. A record is never edited to reverse itself - the reasoning
-                that held at the time has to stay readable - so this pointer is what carries a
-                reader forward to the reasoning that replaced it.
+                The page id of the decision record that replaces this one, recorded whenever a
+                later decision overtakes it. A record is never edited to reverse itself - the
+                reasoning that held at the time has to stay readable - so this pointer is what
+                carries a reader forward to the reasoning that replaced it, and it is the one
+                field that stays writable after the record is accepted.
                 """),
         )),
     ),
@@ -1082,23 +1078,22 @@ _DECISION_RECORD = PageType(
             remove_name="removeConsequence", remove_desc="remove a consequence",
             reorder_name="reorderConsequence",
             reorder_desc="move a consequence to an anchored position (precedingId guards a stale read)"),
-        set_scalar_cmd("relations", "supersededBy", label="superseding record"),
-        transition_cmd("accept", "proposed -> accepted"),
-        transition_cmd("reject", "proposed -> rejected"),
-        transition_cmd("deprecate", "accepted -> deprecated"),
-        # `supersede` needs the replacement recorded first: a superseded record whose pointer is
-        # empty strands the reader at the reasoning it was meant to carry them forward from.
-        transition_cmd("supersede", "accepted -> superseded",
-                       requires=(("relations", "supersededBy"),)),
+        # The one authoring command that opts back into the terminal state: a record is
+        # overtaken by a later one long after it was accepted.
+        set_scalar_cmd("relations", "supersededBy", label="superseding record",
+                       legal_in=("authoring", "accepted")),
+        transition_cmd("markAccepted", "authoring -> accepted"),
+        transition_cmd("author", "accepted -> authoring"),
         add_link_cmd(),
         set_title_cmd(),
     ),
     fsm=FSMSpec(
         name="DecisionRecord",
-        initial="proposed",
-        states=("proposed", "accepted", "rejected", "superseded", "deprecated"),
-        state_guidance=(("proposed", """
-            proposed - captures why one decision was taken, while the reasons are still in
+        initial="authoring",
+        states=("authoring", "accepted"),
+        terminal_states=("accepted",),
+        state_guidance=(("authoring", """
+            authoring - captures why one decision was taken, while the reasons are still in
             someone's head. The shape it produces belongs on an architecture page; the reasoning
             that shape cannot show belongs here. The work of it:
 
@@ -1117,18 +1112,11 @@ _DECISION_RECORD = PageType(
               architecture page can show that boundary but not explain it.
             - Fill in date, scope and deciders, so a later reader can weigh how much still
               applies.
-
-            Accepting or rejecting is a real decision point, not a formality. Once accepted,
-            never edit a record to reverse it: supersede it with a new one and point this at
-            that, so the reasoning that held at the time stays readable.
             """),),
     ),
 )
 
 
-# ============================================================================
-# bug-report - FSM draft -> open -> done -> closed (close is a human gate); closed -> open
-# ============================================================================
 _BUG_REPORT = PageType(
     tag="bug-report",
     name="Bug report",
@@ -1217,9 +1205,6 @@ _BUG_REPORT = PageType(
 )
 
 
-# ============================================================================
-# simple-change - FSM draft -> open -> done -> closed (close is a human gate); closed -> open
-# ============================================================================
 _SIMPLE_CHANGE = PageType(
     tag="simple-change",
     name="Simple change",
@@ -1293,11 +1278,6 @@ _SIMPLE_CHANGE = PageType(
     ),
 )
 
-
-# ============================================================================
-# feature-brief - the feature lifecycle. FSM:
-#   draft -> grounding -> spec -> planning -> planReview -> building -> review -> shipped
-# ============================================================================
 
 # States allowing modifications to the commit log.
 _COMMIT_LOG_STATES = ("building", "review", "shipped")
@@ -1644,9 +1624,6 @@ _FEATURE_IN_PLANNING_OR_LATER = ParentStateGuard(
 )
 
 
-# ============================================================================
-# feature-spec - a feature-brief's pinned spec child. FSM draft <-> sealed.
-# ============================================================================
 _FEATURE_SPEC = PageType(
     tag="feature-spec",
     name="Spec",
@@ -1725,9 +1702,6 @@ _FEATURE_SPEC = PageType(
 )
 
 
-# ============================================================================
-# implementation-plan - a feature-brief's pinned plan child. FSM draft <-> ready.
-# ============================================================================
 _IMPLEMENTATION_PLAN = PageType(
     tag="implementation-plan",
     name="Implementation plan",
@@ -1802,9 +1776,6 @@ _IMPLEMENTATION_PLAN = PageType(
 )
 
 
-# ============================================================================
-# testing-plan - a feature-brief's pinned testing child. FSM draft <-> ready.
-# ============================================================================
 _TESTING_PLAN = PageType(
     tag="testing-plan",
     name="Testing plan",
@@ -1846,10 +1817,6 @@ _TESTING_PLAN = PageType(
 )
 
 
-# ============================================================================
-# epic - a major feature built as several feature-briefs. FSM:
-#   draft -> grounding -> decomposition -> planReview -> executing -> review -> shipped
-# ============================================================================
 _EPIC = PageType(
     tag="epic",
     name="Epic (major feature)",
@@ -2043,9 +2010,6 @@ _EPIC_IN_DECOMPOSITION_OR_LATER = ParentStateGuard(
 )
 
 
-# ============================================================================
-# agent-plan - an epic's pinned orchestration child. FSM draft <-> ready.
-# ============================================================================
 _AGENT_PLAN = PageType(
     tag="agent-plan",
     name="Agent plan",
@@ -2140,9 +2104,6 @@ _AGENT_PLAN = PageType(
 )
 
 
-# ============================================================================
-# document - a general-purpose prose page. FSM: active and no transitions.
-# ============================================================================
 _DOCUMENT = PageType(
     tag="document",
     name="Document",
@@ -2170,9 +2131,6 @@ _DOCUMENT = PageType(
 )
 
 
-# ============================================================================
-# toc - a table-of-contents container. FSM: active and no transitions.
-# ============================================================================
 _TOC = PageType(
     tag="toc",
     name="Table of contents",
