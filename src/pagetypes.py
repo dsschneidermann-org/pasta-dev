@@ -1157,14 +1157,19 @@ _FEATURE_BRIEF = PageType(
     description=(
         "The root of a feature you intend to build - drives new work from intent through "
         "grounding, planning, and a plan review to a human review gate. Lifecycle transitions "
-        "are gated on the required content for that stage being present first."
+        "are gated on the required content for that stage being present first. Every stage "
+        "biases toward caution over speed: surface a confusion rather than assume past it, and "
+        "keep what you write to the smallest thing that solves the stated problem."
     ),
     sections=(
         SectionSpec("summary", "Summary", (
             _prose("body", description="""
                 The feature intent in a sentence or two: what you want to build and why it is worth
-                building. Write it before reading any code, because grounding searches the repo from
-                this line. State the outcome you want, not the implementation you imagine.
+                building, restated in your own words rather than echoed back - where your
+                restatement and the ask diverge is the first thing to settle. Write it before
+                reading any code, because grounding searches the repo from this line. State the
+                outcome you want, not the implementation you imagine, and say so here if the ask
+                itself looks wrong or underspecified rather than quietly building past it.
                 """),
         )),
         SectionSpec("components", "Components", (
@@ -1172,7 +1177,11 @@ _FEATURE_BRIEF = PageType(
                 Each one part of the system this feature touches, named as a real file, module, or
                 subsystem path you CONFIRMED exists while grounding. One per element. List only what
                 the work will actually read or change: a guessed component sends the whole plan down
-                the wrong path, and a missing one is discovered mid-build.
+                the wrong path, and a missing one is discovered mid-build. Reach each one by
+                following callers and imports rather than by guessing from names, so the list is the
+                real blast radius. Say for each whether it holds pure logic or performs effects -
+                I/O, storage, network, clock, randomness - because that is what decides where new
+                code belongs.
                 """),
         )),
         SectionSpec("constraints", "Constraints", (
@@ -1180,7 +1189,9 @@ _FEATURE_BRIEF = PageType(
                 Each one project-wide requirement the work must respect, with its exact values copied
                 verbatim: version floors, dependency limits, naming and copy rules, platform and
                 performance targets. Every plan step and every review inherits these, so a constraint
-                recorded vaguely is a constraint that gets violated.
+                recorded vaguely is a constraint that gets violated. Copy each value from where it is
+                actually declared rather than from memory, and mark one you inferred rather than
+                read, so a guess is not later spent as a fact.
                 """),
         )),
         SectionSpec("conflicts", "Conflicts", (
@@ -1188,22 +1199,27 @@ _FEATURE_BRIEF = PageType(
                 Each one collision with what already exists, found while grounding: prior art that
                 already solves part of this, an interface this feature would break, or a competing
                 in-flight change. Name the file or page it collides with and say what has to give.
+                Code that looks wrong, dead, or redundant belongs here as a collision to raise, not
+                as something the build quietly deletes on its way past.
                 """),
         )),
         SectionSpec("documentation", "Documentation", (
             _list("items", element_fields=("text",), description="""
-                Each an existing pasta doc or architecture page this feature will make stale, found
-                while grounding. Name the page and the specific part of it that will need to change,
-                so reconciling it when the work lands is mechanical rather than a fresh investigation.
+                Each an existing pasta doc, architecture page or ADR this feature will make stale,
+                found while grounding. Name the page and the specific part of it that will need to
+                change, so reconciling it is mechanical rather than an investigation.
                 """),
         )),
         SectionSpec("questions", "Questions", (
             _list("items", element_fields=("text", "answer", "needsHuman", "status"), element_fsm=_QUESTION_FSM, description="""
                 Each one open question that blocks or reshapes the plan, asked as a single decidable
-                question rather than a topic. Set needsHuman when only a person can settle it: a
-                product call, a trade-off with no technically correct answer, or anything carrying
-                cost or policy consequences. Answer it here once decided, then record the settled
-                decision in the spec so it is not reopened during the build.
+                question rather than a topic. A judgment call the user might reasonably disagree
+                with is a question, not a decision to make quietly, and where the ask carries
+                several readings all of them go here rather than one being picked in silence. Set
+                needsHuman when only a person can settle it: a product call, a trade-off with no
+                technically correct answer, or anything carrying cost or policy consequences.
+                Answer it here once decided, then record the settled decision in the spec so it is
+                not reopened during the build.
                 """),
         )),
         # The plan review's outcome (populated in the `planReview` state): a verdict plus a summary
@@ -1215,8 +1231,10 @@ _FEATURE_BRIEF = PageType(
                 without getting stuck. needs-changes: at least one blocking finding must be applied
                 before building. needs-human-decision: the plan cannot proceed until a person settles
                 a question. Approve unless there are serious gaps, meaning a spec requirement no task
-                covers, contradictory steps, placeholder content, or steps too vague to act on. Minor
-                wording and style preferences are never a reason to withhold build-ready.
+                covers, contradictory steps, placeholder content, or steps too vague to act on. A
+                plan that builds more than the spec asked for, or abstracts something used once, is a
+                serious gap too and not a matter of taste. Minor wording and style preferences are
+                never a reason to withhold build-ready.
                 """),
             _list("findings", element_fields=("issue", "severity", "action"), description="""
                 Each one plan-review finding: what is wrong, why it matters for implementation, its
@@ -1316,30 +1334,143 @@ _FEATURE_BRIEF = PageType(
         states=("draft", "grounding", "spec", "planning", "planReview", "building", "review",
                 "shipped", "abandoned"),
         terminal_states=("shipped", "abandoned"),
-        # The only documented state; every other one keeps the placeholder intro.
-        state_guidance=(("review", """
-            review - the build is done, and this is the last stop before the human ship gate.
-            This state is for verifying, not for finishing off. The work of it:
+        state_guidance=(
+            ("grounding", """
+                grounding - the summary is written and nothing else is known yet. This state is for
+                reading the real repository and recording what is actually there. The work of it:
 
-            1. Re-read the spec's design section and confirm every requirement it states is
-               actually implemented, not merely planned.
-            2. Confirm every implementation-plan step is done and every testing-plan case passed
-               against a test that genuinely ran. The ship gate is guarded on exactly that, and a
-               case marked passed without running is a major failure.
-            3. Rewrite the comments the change added. Remove overly verbose comments and avoid
-               specific detail that depend on other parts of code staying the same. Remove any
-               uppercase words and other emphasis markers.
-            4. Summarize for the user what changed, what you verified, and what you left out.
+                - Find the code this feature touches and read it: the function, the file, the
+                  callers. Understand why it exists, not just what it does. A component whose
+                  purpose you cannot state is one you are not ready to plan against.
+                - Record only what you confirmed by opening it. Every component, constraint,
+                  conflict and stale doc here is read out of this repository, never inferred from a
+                  name or remembered from somewhere else.
+                - Follow callers and imports outward until the blast radius stops growing, and note
+                  as you go which components hold pure logic and which perform effects.
+                - Turn whatever reading could not settle into a question rather than an assumption.
+                  An unsurfaced assumption is the most expensive thing to carry out of this state.
 
-            Three things are deliberately not part of this state, so do not start them here:
-            rebasing onto main happens at ship, not before; recording commits happens after ship,
-            once the shas are final; and reconciling the documentation pages the brief named as
-            going stale also happens at ship. Doing any of them now means redoing them, because a
-            rebase rewrites the very shas you would have recorded.
+                No code is edited here and no design is started. If the summary turns out to be
+                wrong or underspecified once you can see the code, say so now, while nothing has
+                been built on it.
+            """),
+            ("spec", """
+                spec - the grounded base is recorded, and the design is settled once, in the
+                feature-spec child, before a single step or case exists. The work of it:
 
-            Shipping is a human gate: drive up to it and stop. If work is still outstanding, use
-            requestChanges to go back to building rather than shipping with a known gap.
-            """),),
+                - Author the spec from the grounded base: the behaviour, the interfaces with their
+                  exact signatures, the data shapes, the states, the error paths. Decide everything
+                  a plan would otherwise have to decide for itself.
+                - Draw the line between pure logic and effects while designing rather than after.
+                  Decide what is a function of its inputs alone and what needs I/O, storage, the
+                  clock or randomness, and give each side its own interfaces. The rules live on the
+                  pure side; the effectful side stays thin enough to hold none of its own.
+                - Spec the smallest thing that delivers the summary. No configurability, extension
+                  points or generality nobody asked for, and no abstraction over a single use.
+                - Answer the brief's questions and record each decision with the alternatives it
+                  rejected and why, so a settled question is not reopened mid-build.
+                - Escalate what only a person can settle instead of settling it on their behalf.
+
+                Seal the spec once it is settled; sealing is what unlocks planning. Steps and cases
+                are not written here, because a design still moving is not one to plan against.
+            """),
+            ("planning", """
+                planning - the spec is sealed and is now turned into an implementation plan and a
+                testing plan detailed enough to build from without deciding anything further. The
+                work of it:
+
+                - Write each step as one action a skilled stranger to this codebase could finish in
+                  a few minutes, naming the exact files and carrying the real content it needs.
+                  Steps are read out of order and alone, so repeat detail rather than refer back.
+                - Give every step its verification: what will be run, and what it should print or
+                  return. A step with no way to tell whether it worked is not yet a step.
+                - Order the work so the pure logic is built and tested before the effectful code
+                  that calls it, and keep a step on one side of that line: a step that adds a rule
+                  changes pure logic, a step that wires it to storage or the network changes the
+                  shell around it.
+                - Plan the failure paths the spec implies alongside the happy one - empty inputs,
+                  missing values, malformed data, boundaries - and say what the volume this will
+                  really see does to the approach.
+                - Ask rather than guess. A question is cheap here and expensive once code exists.
+
+                Keep both plans to what the spec asks for and nothing besides. Mark each ready when
+                it is complete; submitting the plan needs both plans ready and the spec still
+                sealed.
+            """),
+            ("planReview", """
+                plan-review - the plan is written, and this is the last point at which fixing it is
+                still cheap. This state is for reading the plan against the spec, not for building.
+                The work of it:
+
+                - Check every spec requirement against a step that delivers it, and every step
+                  against a spec requirement that asked for it. A requirement no step covers and a
+                  step nothing asked for are both findings.
+                - Check that the testing plan can actually fail: cases that assert real behaviour,
+                  that cover the spec's error paths, and that reach the pure logic directly instead
+                  of through a mock.
+                - Check that the plan is not larger than the problem, and that the pure and
+                  effectful sides stayed separate in it.
+                - Record each finding AND make the edit its action names, so the plan and this
+                  record agree. A finding recorded but never applied is worse than one never
+                  raised.
+
+                Set the verdict honestly: needs-changes when an implementer would build the wrong
+                thing or get stuck, needs-human-decision when a question has to go to a person.
+                Wording and style preferences are not grounds to withhold build-ready.
+            """),
+            ("building", """
+                building - the plan is approved, and this is where code is written. Work the steps
+                in their order and let the plan, not improvisation, decide what gets built. The work
+                of it:
+
+                - Work test-first: write the failing test, watch it fail, write the least code that
+                  passes it, watch it pass, commit. Mark a step done or a case passed only from a
+                  run you actually saw.
+                - Keep the pure logic pure. Decisions, derivations and transformations are functions
+                  of their arguments, with no I/O, no clock, no randomness and no reaching into
+                  shared mutable state, and the code that performs effects stays a thin shell that
+                  calls them and applies what they return. Where a step tangles the two, split them
+                  rather than reach for a mock.
+                - Name things for what they mean. A longer name that carries intent beats a short
+                  one that loses it, and an argument keeps its caller's name unless renaming
+                  genuinely clarifies. Comments say why, not what.
+                - Stay surgical. Touch only what the step needs; leave adjacent code, comments and
+                  formatting exactly as found, and match the style already there even where you
+                  would have chosen otherwise. Remove only the imports and helpers your own change
+                  orphaned, and raise anything else you notice as a conflict or a question instead
+                  of fixing it in passing.
+                - Handle the realistic failure cases the plan named, and flag a limitation you are
+                  knowingly leaving in rather than let it be discovered later.
+
+                Anything the plan did not anticipate is a question, or a reopened plan, not a quiet
+                improvisation. Record each commit as you make it.
+            """),
+            ("review", """
+                review - the build is done, and this is the last stop before the human ship gate.
+                This state is for verifying, not for finishing off. The work of it:
+
+                - Re-read the spec's design section and confirm every requirement it states is
+                  actually implemented, not merely planned.
+                - Confirm every implementation-plan step is done and every testing-plan case passed
+                  against a test that genuinely ran. A case marked passed without a run you saw is
+                  the one failure this gate exists to catch.
+                - Confirm nothing that worked before is broken now, and that the diff carries only
+                  what the plan called for: an unrelated change here is a change nobody reviewed.
+                - Confirm the pure logic stayed free of effects and the shell around it stayed free
+                  of rules.
+                - Review the comments added for the change. Avoid verbosity of comments and avoid
+                  naming the specifics of other parts of code and instead keep comments to general
+                  principles and intents. Remove uppercase words and other emphasis.
+
+                Three things are deliberately not part of this state, so do not start them here:
+                rebasing onto main happens at ship, not before; recording commits happens after ship,
+                once the shas are final; and reconciling the documentation pages the brief named as
+                going stale also happens at ship.
+
+                If any of this turns up outstanding work, use requestChanges to go back to building
+                rather than ship with a known gap.
+            """),
+        ),
     ),
     # On createPage, mint the three pinned children in the same commit; author into those.
     auto_children=(AutoChildSpec("implementation-plan"), AutoChildSpec("testing-plan"),
@@ -1387,10 +1518,14 @@ _FEATURE_SPEC = PageType(
             _blocks("body", description="""
                 The design in enough detail that a plan can be written from it without making further
                 decisions: the behaviour, the interfaces with their exact signatures and types, the
-                data shapes, the states, and the error paths. Use a heading per area and a code block
-                for anything with a precise shape. No TBDs and no 'handle edge cases' placeholders,
-                nothing that contradicts another part of the spec, and nothing that was not asked for.
-                Emphasis and links are structured inline runs, not markdown syntax.
+                data shapes, the states, and the error paths. Separate the pure logic from the code
+                that performs effects and give each its own interfaces: what is a function of its
+                inputs alone, and what needs I/O, storage, the clock or randomness. The rules belong
+                on the pure side, and the effectful side should be thin enough to hold none of them.
+                Use a heading per area and a code block for anything with a precise shape. No TBDs
+                and no 'handle edge cases' placeholders, nothing that contradicts another part of the
+                spec, and nothing that was not asked for. Emphasis and links are structured inline
+                runs, not markdown syntax.
                 """),
         )),
         SectionSpec("decisions", "Decisions", (
@@ -1452,11 +1587,15 @@ _IMPLEMENTATION_PLAN = PageType(
                 Each ONE action an implementer can finish in a few minutes, ordered, written for a
                 skilled developer who knows nothing about this codebase or its domain. Name the exact
                 files to create or modify. Work test-first: write the failing test, run it and see it
-                fail, write the minimal code to pass, run it and see it pass, commit. Put the actual
-                content the step needs in the step: real code, the exact command to run, the output to
-                expect. Never write 'TBD', 'add error handling', 'write tests for the above', or 'same
-                as step N' - repeat the detail instead, because steps are read out of order and in
-                isolation. Mark a step done only once its test passes (element-FSM todo <-> done).
+                fail, write the minimal code to pass, run it and see it pass, commit. Keep a step on
+                one side of the pure/effectful line - a step that adds a rule changes pure logic, a
+                step that wires it to storage, the network or the clock changes the shell around it -
+                and order the pure side first, so what depends on it has something settled to call.
+                Put the actual content the step needs in the step: real code, the exact command to
+                run, the output to expect. Never write 'TBD', 'add error handling', 'write tests for
+                the above', or 'same as step N' - repeat the detail instead, because steps are read
+                out of order and in isolation. Mark a step done only once its test passes
+                (element-FSM todo <-> done).
                 """),
         )),
         SectionSpec("questions", "Questions", (
@@ -1525,10 +1664,12 @@ _TESTING_PLAN = PageType(
                 Each ONE concrete check that proves the feature works, written so its outcome is
                 unambiguous: the setup, the action, and the expected result. Verify real behaviour
                 rather than mocked behaviour, and cover the failure and edge paths the spec implies,
-                not just the happy one. Name the test that carries the case where one exists. A case
-                that cannot fail proves nothing. Mark a case passed only from a run you actually saw,
-                and failed rather than quietly leaving it pending (element-FSM pending ->
-                passed/failed).
+                not just the happy one. Check pure logic directly - inputs in, result out, no setup
+                and no test doubles - and keep the heavier setup for the thin effectful shell, where
+                a few cases usually cover it. Name the test that carries the case where one exists.
+                A case that cannot fail proves nothing. Mark a case passed only from a run you
+                actually saw, and failed rather than quietly leaving it pending (element-FSM pending
+                -> passed/failed).
                 """),
         )),
     ),

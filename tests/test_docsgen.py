@@ -149,7 +149,7 @@ def test_state_page_opens_with_its_state_guidance():
     # The text an agent gets on entering a state is the text a human reads on its page.
     pagetypes.set_test_mode(False)
     guidance = get_page_type("feature-brief").fsm.guidance_for("review")
-    assert guidance                                        # the one documented state
+    assert guidance                                        # one of the documented states
     docs = state_docs(get_page_type("feature-brief"))
     for line in guidance.splitlines():
         assert line in docs["feature-brief-review"]
@@ -160,7 +160,7 @@ def test_state_page_without_guidance_keeps_the_placeholder():
     # Pins the narrow scope: a sibling state, and a type with no guidance at all.
     pagetypes.set_test_mode(False)
     brief = state_docs(get_page_type("feature-brief"))
-    assert "The `building` state of the `feature-brief` page type." in brief["feature-brief-building"]
+    assert "The `draft` state of the `feature-brief` page type." in brief["feature-brief-draft"]
     document = state_docs(get_page_type("document"))
     assert "The `active` state of the `document` page type." in document["document-active"]
 
