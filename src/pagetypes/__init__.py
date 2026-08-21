@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any
 
-from .errors import ProductionTypeInTestError, ValidationError
+from ..errors import ProductionTypeInTestError, ValidationError
 
 # --- Command kinds -----------------------------------------------------------
 SET_SCALAR = "set_scalar"
@@ -2182,7 +2182,7 @@ _expose_test_types = False
 def _test_registry() -> dict[str, PageType]:
     # Lazy import: src.testtypes imports the spec classes from THIS module, so importing it
     # at top level would be a cycle. Resolved here at call time, once both modules are loaded.
-    from .testtypes import TEST_REGISTRY
+    from ..testtypes import TEST_REGISTRY
 
     return TEST_REGISTRY
 
