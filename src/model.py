@@ -1,7 +1,7 @@
 """Pure domain dataclasses: `Workspace` and `Page`.
 
 Field *values* are plain JSON-able Python (str / None / list[dict]); the *shape*
-of a page's sections is defined by its page type (`pagetypes.py`), not here. That
+of a page's sections is defined by its page type (`src/pagetypes/`), not here. That
 keeps this model tiny and makes serialization a near-identity mapping.
 """
 
