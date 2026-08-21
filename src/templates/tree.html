@@ -1,0 +1,14 @@
+{% extends "_base.html" %}
+
+{% block title %}{{ workspace_name }}{% endblock %}
+
+{% block content %}
+{{d}}
+    {% if show_archived %}
+    <a href="{{ request.url.path }}">Hide archived</a>
+    {% else %}
+    <a href="{{ request.url.path }}?archived=true">Show archived</a>
+    {% endif %}
+
+    {{ body | safe }}
+{% endblock %}

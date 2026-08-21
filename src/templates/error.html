@@ -1,0 +1,20 @@
+{% extends "_base.html" %}
+
+{% block head %}
+{{ super() }}
+<style>
+    #title { color: var(--text-error); }
+    #error { position: fixed; padding: 0.5rem; font-size: 0.9rem; background: var(--background-alt);}
+</style>
+{% endblock %}
+
+{% block title %}<div id="title">Error</div>{% endblock %}
+
+{% block content %}
+<pre id="error">
+{{ trace }}
+</pre>
+{% endblock %}
+
+{% block footer %}
+{% endblock %}

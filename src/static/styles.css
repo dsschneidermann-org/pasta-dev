@@ -1,0 +1,23 @@
+/* Water.css overrides. */
+body.page {
+  max-width: 1000px;
+}
+
+button:disabled, input:disabled, select:disabled, textarea:disabled {
+    cursor: default;
+    opacity: 1;
+}
+
+li:has(> button), li:has(> input), li:has(> select), li:has(> textarea) {
+    list-style-type: none;
+}
+
+/* Theme color additions. */
+body.light {
+  --text-error: #b00020;
+  --text-on-error: #fff;
+}
+body.dark {
+  --text-error: #cf6679;
+  --text-on-error: #000;
+}
