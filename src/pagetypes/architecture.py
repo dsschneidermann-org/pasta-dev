@@ -6,9 +6,6 @@ from . import (
     FSMSpec,
     PageType,
     SectionSpec,
-    _CODE_REF_KINDS,
-    _DEP_ROLES,
-    _NODE_KINDS,
     _blocks,
     _list,
     _prose,
@@ -23,6 +20,11 @@ from . import (
     set_title_cmd,
     transition_cmd,
 )
+
+_NODE_KINDS = ("module", "component", "subsystem", "service", "layer", "package")
+_CODE_REF_KINDS = ("file", "function", "class", "type", "interface", "constant")
+_DEP_ROLES = ("depends-on", "exposes", "implements", "owns", "calls")
+
 
 _ARCHITECTURE = PageType(
     tag="architecture",

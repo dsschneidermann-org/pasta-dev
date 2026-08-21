@@ -344,42 +344,6 @@ def status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], 
     return tuple(edges)
 
 
-# --- Element-level FSMs (a list element's own tiny lifecycle) -----------------
-_STEP_FSM = ElementFSMSpec(
-    name="Step",
-    initial="todo", states=("todo", "done"),
-    transitions=(("markDone", "todo", "done", "agent"), ("reopen", "done", "todo", "agent")),
-    checkmark_done="done",                       # a step is a checkbox: initial "todo" -> [ ], "done" -> [x]
-)
-_CASE_FSM = ElementFSMSpec(
-    name="Case",
-    initial="pending", states=("pending", "passed", "failed"),
-    transitions=(("pass", "pending", "passed", "agent"), ("fail", "pending", "failed", "agent")),
-    checkmark_done="passed",                     # initial "pending" -> [ ], "passed" -> [x], "failed" -> no box
-)
-_QUESTION_FSM = ElementFSMSpec(
-    name="Question",
-    initial="open", states=("open", "answered"),
-    transitions=(("answer", "open", "answered", "agent"),),
-)                                                # no checkmark_done -> open/answered render without a box
-# One run of one agent against one workstream. `accepted` is the SINGLE success terminal, which is
-# what lets an epic's `submitForReview` be a ChildStateGuard (that guard compares every element
-# against exactly one required status). A fix round is a `redispatch` of the same element, not a new
-# one, so the element itself records how many attempts a workstream took.
-_DISPATCH_FSM = ElementFSMSpec(
-    name="Dispatch",
-    initial="pending", states=("pending", "dispatched", "reported", "accepted", "blocked"),
-    transitions=(("dispatch", "pending", "dispatched", "agent"),
-                 ("report", "dispatched", "reported", "agent"),
-                 ("accept", "reported", "accepted", "agent"),
-                 ("redispatch", "reported", "dispatched", "agent"),   # a fix round
-                 ("redispatch", "blocked", "dispatched", "agent"),    # unblocked, try again
-                 ("block", "dispatched", "blocked", "agent"),
-                 ("block", "reported", "blocked", "agent")),
-    checkmark_done="accepted",                   # pending -> [ ], accepted -> [x], the rest no box
-)
-
-
 # --- Declaration helpers (readability only) ----------------------------------
 def _scalar(key: str, *, choices: tuple[str, ...] | None = None, description: str = "") -> FieldSpec:
     return FieldSpec(key=key, kind=SCALAR, choices=choices, description=description)
@@ -475,19 +439,6 @@ _PRECEDING = _text("precedingId", required=False,
 # override preserves a name the derivation would not produce. A flow-populated list asks list_cmds for
 # a subset (e.g. reorder only, add=False/remove=False); an add-only list drops remove/reorder the same
 # way.
-
-# Enum choice tuples shared by a field's `choices` and its set/add command's arg `choices`, so the
-# allowed set lives in exactly one place instead of being written twice (field + command).
-_NODE_KINDS = ("module", "component", "subsystem", "service", "layer", "package")
-_CODE_REF_KINDS = ("file", "function", "class", "type", "interface", "constant")
-_DEP_ROLES = ("depends-on", "exposes", "implements", "owns", "calls")
-_VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
-_SEVERITIES = ("blocking", "should-fix", "nit")
-_FINDING_ACTIONS = ("addStep", "addCase", "addConstraint", "askQuestion", "edit")
-# Tiers rather than model ids: an id rots between releases, and a stale enum rejects valid input.
-_MODEL_TIERS = ("cheap", "standard", "capable")
-_EPIC_FINDING_ACTIONS = ("addWorkstream", "addAgent", "addDispatch", "addContract",
-                         "addConstraint", "askQuestion", "edit")
 
 
 def _cap(word: str) -> str:
@@ -857,36 +808,6 @@ def initial_sections(page_type: PageType) -> dict[str, dict[str, Any]]:
     return sections
 
 
-# --- Shared page-type declarations -------------------------------------------
-# States allowing modifications to the commit log.
-_COMMIT_LOG_STATES = ("building", "review", "shipped")
-
-
-# The two guards that stage the pinned children, both enforced in the store: the spec is unlocked
-# a stage before the plans are.
-_FEATURE_IN_SPEC_OR_LATER = ParentStateGuard(
-    parent_type="feature-brief",
-    required_statuses=("spec", "planning", "planReview", "building", "review", "shipped"),
-    message="the feature-brief must be in spec or later",
-)
-
-_FEATURE_IN_PLANNING_OR_LATER = ParentStateGuard(
-    parent_type="feature-brief",
-    required_statuses=("planning", "planReview", "building", "review", "shipped"),
-    message="the feature-brief must be in planning or later",
-)
-
-
-# An epic's pinned agent plan may only be finalized once the epic has reached `decomposition` or
-# later - not while it is still in `draft` or `grounding` (the base is still being established),
-# nor once `abandoned`. Enforced in the store.
-_EPIC_IN_DECOMPOSITION_OR_LATER = ParentStateGuard(
-    parent_type="epic",
-    required_statuses=("decomposition", "planReview", "executing", "review", "shipped"),
-    message="the epic must be in decomposition or later",
-)
-
-
 # --- The page types ----------------------------------------------------------
 # Imported last: a page-type module reads these declarations back out of the package as it
 # builds, so anything it uses has to be declared above this point.
@@ -900,8 +821,7 @@ from .feature import (
     _IMPLEMENTATION_PLAN,
     _TESTING_PLAN,
 )
-from .epic import _EPIC
-from .agent_plan import _AGENT_PLAN
+from .epic import _AGENT_PLAN, _EPIC
 from .document import _DOCUMENT
 from .toc import _TOC
 

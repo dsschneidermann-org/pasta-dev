@@ -9,19 +9,12 @@ from __future__ import annotations
 from . import (
     AutoChildSpec,
     ChildStateGuard,
+    ElementFSMSpec,
     FSMSpec,
     PageType,
+    ParentStateGuard,
     RefCheck,
     SectionSpec,
-    _CASE_FSM,
-    _COMMIT_LOG_STATES,
-    _FEATURE_IN_PLANNING_OR_LATER,
-    _FEATURE_IN_SPEC_OR_LATER,
-    _FINDING_ACTIONS,
-    _QUESTION_FSM,
-    _SEVERITIES,
-    _STEP_FSM,
-    _VERDICTS,
     _blocks,
     _boolean,
     _integer,
@@ -40,6 +33,34 @@ from . import (
     set_title_cmd,
     transition_cmd,
 )
+
+_STEP_FSM = ElementFSMSpec(
+    name="Step",
+    initial="todo", states=("todo", "done"),
+    transitions=(("markDone", "todo", "done", "agent"), ("reopen", "done", "todo", "agent")),
+    checkmark_done="done",                       # a step is a checkbox: initial "todo" -> [ ], "done" -> [x]
+)
+_CASE_FSM = ElementFSMSpec(
+    name="Case",
+    initial="pending", states=("pending", "passed", "failed"),
+    transitions=(("pass", "pending", "passed", "agent"), ("fail", "pending", "failed", "agent")),
+    checkmark_done="passed",                     # initial "pending" -> [ ], "passed" -> [x], "failed" -> no box
+)
+_QUESTION_FSM = ElementFSMSpec(
+    name="Question",
+    initial="open", states=("open", "answered"),
+    transitions=(("answer", "open", "answered", "agent"),),
+)                                                # no checkmark_done -> open/answered render without a box
+
+
+_VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
+_SEVERITIES = ("blocking", "should-fix", "nit")
+_FINDING_ACTIONS = ("addStep", "addCase", "addConstraint", "askQuestion", "edit")
+
+
+# States allowing modifications to the commit log.
+_COMMIT_LOG_STATES = ("building", "review", "shipped")
+
 
 _FEATURE_BRIEF = PageType(
     tag="feature-brief",
@@ -365,6 +386,21 @@ _FEATURE_BRIEF = PageType(
     # On createPage, mint the three pinned children in the same commit; author into those.
     auto_children=(AutoChildSpec("implementation-plan"), AutoChildSpec("testing-plan"),
                    AutoChildSpec("feature-spec")),
+)
+
+
+# The two guards that stage the pinned children, both enforced in the store: the spec is unlocked
+# a stage before the plans are.
+_FEATURE_IN_SPEC_OR_LATER = ParentStateGuard(
+    parent_type="feature-brief",
+    required_statuses=("spec", "planning", "planReview", "building", "review", "shipped"),
+    message="the feature-brief must be in spec or later",
+)
+
+_FEATURE_IN_PLANNING_OR_LATER = ParentStateGuard(
+    parent_type="feature-brief",
+    required_statuses=("planning", "planReview", "building", "review", "shipped"),
+    message="the feature-brief must be in planning or later",
 )
 
 

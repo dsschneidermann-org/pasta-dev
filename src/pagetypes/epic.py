@@ -1,18 +1,22 @@
-"""The `epic` page type."""
+"""The `epic` page type, and the `agent-plan` pinned under it.
+
+The two are declared together because they are designed against each other rather than
+on their own, and reading one without the other would hide the coupling.
+"""
 
 from __future__ import annotations
 
 from . import (
     AutoChildSpec,
     ChildStateGuard,
+    ElementFSMSpec,
     FSMSpec,
     PageType,
+    ParentStateGuard,
+    RefCheck,
     SectionSpec,
-    _EPIC_FINDING_ACTIONS,
-    _QUESTION_FSM,
-    _SEVERITIES,
-    _VERDICTS,
     _boolean,
+    _integer,
     _list,
     _prose,
     _scalar,
@@ -26,6 +30,19 @@ from . import (
     set_title_cmd,
     transition_cmd,
 )
+
+_QUESTION_FSM = ElementFSMSpec(
+    name="Question",
+    initial="open", states=("open", "answered"),
+    transitions=(("answer", "open", "answered", "agent"),),
+)                                                # no checkmark_done -> open/answered render without a box
+
+
+_VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
+_SEVERITIES = ("blocking", "should-fix", "nit")
+_EPIC_FINDING_ACTIONS = ("addWorkstream", "addAgent", "addDispatch", "addContract",
+                         "addConstraint", "askQuestion", "edit")
+
 
 _EPIC = PageType(
     tag="epic",
@@ -207,4 +224,130 @@ _EPIC = PageType(
     ),
     # On createPage, mint the pinned agent plan in the same commit; author into it.
     auto_children=(AutoChildSpec("agent-plan"),),
+)
+
+
+# An epic's pinned agent plan may only be finalized once the epic has reached `decomposition` or
+# later - not while it is still in `draft` or `grounding` (the base is still being established),
+# nor once `abandoned`. Enforced in the store.
+_EPIC_IN_DECOMPOSITION_OR_LATER = ParentStateGuard(
+    parent_type="epic",
+    required_statuses=("decomposition", "planReview", "executing", "review", "shipped"),
+    message="the epic must be in decomposition or later",
+)
+
+
+# Tiers rather than model ids: an id rots between releases, and a stale enum rejects valid input.
+_MODEL_TIERS = ("cheap", "standard", "capable")
+
+
+# One run of one agent against one workstream. `accepted` is the SINGLE success terminal, which is
+# what lets an epic's `submitForReview` be a ChildStateGuard (that guard compares every element
+# against exactly one required status). A fix round is a `redispatch` of the same element, not a new
+# one, so the element itself records how many attempts a workstream took.
+_DISPATCH_FSM = ElementFSMSpec(
+    name="Dispatch",
+    initial="pending", states=("pending", "dispatched", "reported", "accepted", "blocked"),
+    transitions=(("dispatch", "pending", "dispatched", "agent"),
+                 ("report", "dispatched", "reported", "agent"),
+                 ("accept", "reported", "accepted", "agent"),
+                 ("redispatch", "reported", "dispatched", "agent"),   # a fix round
+                 ("redispatch", "blocked", "dispatched", "agent"),    # unblocked, try again
+                 ("block", "dispatched", "blocked", "agent"),
+                 ("block", "reported", "blocked", "agent")),
+    checkmark_done="accepted",                   # pending -> [ ], accepted -> [x], the rest no box
+)
+
+
+_AGENT_PLAN = PageType(
+    tag="agent-plan",
+    name="Agent plan",
+    description=(
+        "Which subagents an epic creates, the order they are dispatched in, and how their results "
+        "are reported back onto the feature-briefs. Auto-created as a child of an epic."
+    ),
+    sections=(
+        SectionSpec("agents", "Agents", (
+            _list("items", element_fields=("role", "model", "mission", "reports"), description="""
+                Each ONE subagent this epic creates: the role it plays, the model tier it runs on,
+                the mission it is given, and what it must hand back. Write the mission for a fresh
+                agent with no history, because a dispatched agent is given exactly this and never
+                inherits the controller's context. Name the tier on every agent: an omitted model
+                silently inherits the session's most capable and most expensive one. Use cheap for
+                mechanical single-file work whose content is already written down, standard for
+                multi-file integration and judgement, and capable for architecture and final review.
+                Define a role once and dispatch it many times rather than writing a near-identical
+                agent per workstream.
+                """),
+        )),
+        SectionSpec("dispatches", "Dispatches", (
+            _list("items",
+                  element_fields=("agentId", "workstreamId", "wave", "worktree", "handoff",
+                                  "outcome", "blocker", "status"),
+                  element_fsm=_DISPATCH_FSM, description="""
+                Each ONE run of one agent against one workstream, in the order they are sent: the
+                agent element id in agentId, the parent epic's workstream element id in
+                workstreamId, the parallel group in wave, the checkout it works in in worktree, and
+                in handoff the facts this run needs that neither the agent definition nor the target
+                brief can know. Dispatches sharing a wave may run at once; a higher wave starts only
+                once every lower one is accepted. Give every dispatch in a wave a DIFFERENT
+                worktree - concurrent runs in one checkout overwrite each other's edits - and record
+                it here rather than on the agent, because a role is defined once and dispatched many
+                times, so it is the run that occupies a checkout and not the definition. Keep
+                handoff to the contracts and decisions this run actually touches, never the
+                session's accumulated history, and point at large artifacts such as diffs and
+                reports by file path so they stay out of the controller's context. Record what came
+                back in outcome and what stopped it in blocker. A fix round is a redispatch of this
+                element, not a new one, so the element stays the record of how many attempts the
+                workstream took (element-FSM pending -> dispatched -> reported -> accepted).
+                """),
+        )),
+        SectionSpec("reporting", "Reporting contract", (
+            _prose("body", description="""
+                How a finished agent's work lands back on its feature-brief, written as a checklist
+                the controller can verify before accepting a dispatch: which of the brief's own
+                commands must have been run, what status the brief and its plans must be left in,
+                and where the agent's full written report lives. An agent reports by driving its own
+                brief, not by handing prose back, so name the page state you expect rather than the
+                summary you want to read. Accepting a dispatch without this check is how a
+                workstream comes to be believed done while its brief still says otherwise.
+                """),
+        )),
+    ),
+    commands=(
+        *list_cmds("agents", label="agent", legal_in=("draft",),
+                   add_args=(_text("role"), _text("model", choices=_MODEL_TIERS),
+                             _text("mission"), _text("reports"))),
+        # `singular=` is required on both list_cmds and element_cmds here: the plural rule would
+        # derive 'dispatche' from 'dispatches' and name the commands addDispatche / dispatcheId.
+        # workstreamId is integrity-checked against the PARENT epic's workstreams list.
+        # `worktree` is required like agentId/workstreamId/wave: a run without a named checkout is
+        # the one gap that turns a same-wave parallel dispatch into two agents editing one copy.
+        *list_cmds("dispatches", singular="dispatch", label="dispatch", legal_in=("draft",),
+                   add_args=(_text("agentId"), _text("workstreamId"), _integer("wave"),
+                             _text("worktree"), _text("handoff", required=False)),
+                   ref_check=RefCheck(arg="workstreamId", scope="parent",
+                                      section="workstreams", field="items")),
+        # Run marks stay legal once the plan is `ready`: the record moves while the plan does not.
+        # Only the structural edits above are `draft`-only.
+        *element_cmds("dispatches", singular="dispatch", legal_in=("draft", "ready"), marks=(
+            ("markDispatched", "dispatch", "mark a dispatch as sent to its agent"),
+            ("reportDispatch", "report", "record what the agent returned", (_text("outcome"),)),
+            ("acceptDispatch", "accept", "accept a reported dispatch as done"),
+            ("redispatch", "redispatch", "send a reported or blocked dispatch back to an agent"),
+            ("blockDispatch", "block", "record a dispatch as blocked", (_text("blocker"),)),
+        )),
+        set_prose_cmd("reporting", label="reporting contract", legal_in=("draft",)),
+        transition_cmd("markReady", "draft -> ready",
+                       requires=(("agents", "items"), ("dispatches", "items"), ("reporting", "body")),
+                       parent_guards=(_EPIC_IN_DECOMPOSITION_OR_LATER,)),
+        transition_cmd("reopen", "ready -> draft (unlocks structural edits)"),
+        add_link_cmd(),
+        set_title_cmd(),
+    ),
+    fsm=FSMSpec(
+        name="AgentPlan",
+        initial="draft",
+        states=("draft", "ready"),
+    ),
 )
