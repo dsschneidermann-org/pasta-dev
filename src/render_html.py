@@ -198,7 +198,7 @@ def _page_link(page_id: str, ref_context: RefContext | None) -> str | None:
     return (f"{flag}" +
             f'<a href="/{_escape(ref_context.workspace_id)}/page/{_escape(page_id)}{query}">' +
             f"{_escape(ref_context.titles[page_id])}</a>" +
-            f' <span class="link-type">{_escape(ref_context.types[page_id])}</span>' +
+            f' <span class="link-type">{_escape(ref_context.types[page_id])}&nbsp;·</span>' +
             f' <span class="link-status">{_escape(ref_context.statuses[page_id])}</span>')
 
 
@@ -283,7 +283,7 @@ def render_page_html(page: Page, page_type: PageType,
     its child list alone: that list IS the table of contents.
     """
     head = (f'<header class="page-head"><h1 class="page-title">{_escape(page.title)}</h1>'
-            f'<p class="page-meta"><span class="page-type">{_escape(page.type)}</span>'
+            f'<p class="page-meta"><span class="page-type">{_escape(page.type)}&nbsp;·&nbsp;</span>'
             f'<span class="page-status">{_escape(page.status)}</span></p></header>')
     if page_type.tag == "toc":
         return f'<article class="pasta-page">{head}{_children_html(page, ref_context)}</article>'

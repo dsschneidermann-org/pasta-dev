@@ -16,6 +16,11 @@ from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
 
+from wenmode import Wenmode
+from wenmode.presets import github
+
+md2html = Wenmode(github)
+
 from . import cleanup
 # Named import, not `from . import commands`: mutatePageBatch's own parameter would shadow it.
 from .commands import transition_guidance
@@ -98,7 +103,7 @@ def _guard_http() -> Generator[None]:
 @app.get("/", response_class=HTMLResponse)
 async def route_index(request: Request, archived: str | None = None):
     with _guard_http():
-        show_archived = True if archived else False
+        show_archived = True if archived == "true" else False
         body = md2html.render("\n\n".join(f"[{escape_markdown(x['name'])}](/{x['id']})" for x in STORE.list_workspaces()))
         return templates.TemplateResponse(
             request=request,
@@ -111,11 +116,11 @@ async def route_index(request: Request, archived: str | None = None):
 
 
 @app.get("/ws:{workspaceIdPart}", response_class=HTMLResponse)
-async def route_tree(request: Request, workspaceIdPart : str, archived: str | None = None):
+async def route_tree(request: Request, workspaceIdPart : str, archived: str | None = None, markdown: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
-        show_archived = True if archived else False
+        show_archived = True if archived == "true" else False
         pages_tree = STORE.tree(workspace_id, show_archived)
         body = md2html.render(render_workspace_links(pages_tree, show_archived, show_meta=True, escape_plain_text=True))
         return templates.TemplateResponse(
@@ -131,15 +136,17 @@ async def route_tree(request: Request, workspaceIdPart : str, archived: str | No
 
 
 @app.get("/ws:{workspaceIdPart}/page/{pageId}", response_class=HTMLResponse)
-async def route_page(request: Request, workspaceIdPart: str, pageId: str, archived: str | None = None):
+async def route_page(request: Request, workspaceIdPart: str, pageId: str, archived: str | None = None, markdown: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
         page = STORE.get_page(workspace_id, pageId)
         page_type = get_page_type(page.type)
-        show_archived = True if archived else False
+        show_archived = True if archived == "true" else False
         nav = md2html.render(render_workspace_links(STORE.tree(workspace_id, show_archived), show_archived, show_meta=False, escape_plain_text=True))
         body = STORE.render_html(workspace_id, pageId, show_archived)
+        if markdown == "true":
+            body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived, escape_plain_text=True))
         return templates.TemplateResponse(
             request=request,
             name="page.html",

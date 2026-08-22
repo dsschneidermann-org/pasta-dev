@@ -29,8 +29,8 @@ body.dark {
 .pasta-page .page-title { margin: 0 0 0.2rem; }
 .pasta-page .page-meta { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
 .pasta-page .page-type { font-style: italic; }
-.pasta-page .page-status { font-family: monospace; background: var(--background-alt);
-    border-radius: 3px; padding: 0.05rem 0.4rem; margin-left: 0.4rem; }
+.pasta-page .page-status { font-family: monospace; color: var(--code);
+    background: var(--background-alt); border-radius: 3px; padding: 0.05rem 0.2rem; }
 
 .pasta-page .page-contents { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem;
     padding: 0.6rem 0.8rem; margin-bottom: 1.8rem; font-size: 0.85rem;
@@ -82,5 +82,6 @@ body.dark {
 .pasta-page .link-list { list-style: none; margin: 0; padding: 0; }
 .pasta-page .link-list li { margin: 0.25rem 0; }
 .pasta-page .link-type { font-style: italic; color: var(--text-muted); }
-.pasta-page .link-status { font-family: monospace; color: var(--text-muted); }
+.pasta-page .link-status { font-family: monospace; color: var(--code);
+    background: var(--background-alt); border-radius: 3px; padding: 0 0.2rem; }
 .pasta-page .link-role { color: var(--text-muted); }
