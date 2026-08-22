@@ -159,3 +159,21 @@ def test_responses_disable_caching(client):
     # No-cache is stamped by middleware, so it covers both HTML routes and - the real target -
     # the /static mount where image/asset files are served.
     assert client.get("/").headers["cache-control"] == "no-cache, no-store, must-revalidate"
+
+
+def test_page_view_renders_the_structured_body(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    server.STORE.mutate_page_batch(workspace.id, page.id, [
+        {"command": "setBody", "args": {"text": "The body."}},
+        {"command": "addItem", "args": {"text": "Item one", "note": "a note"}},
+    ])
+    part = workspace.id.removeprefix("ws:")
+    response = client.get(f"/ws:{part}/page/{page.id}")
+    assert response.status_code == 200
+    assert '<article class="pasta-page">' in response.text
+    assert '<h3 class="element-title">Item one</h3>' in response.text
+    assert "<dt>note</dt><dd><p>a note</p></dd>" in response.text
+    assert '<nav class="page-contents"' in response.text
+    assert "The body." in response.text                 # the prose field still reaches the page
+    assert 'id="sidebar"' in response.text              # the Markdown-rendered nav is untouched

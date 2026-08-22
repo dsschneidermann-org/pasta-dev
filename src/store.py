@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, final
 
-from . import cleanup, commands, fsm, render
+from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, default_id_factory, new_id
 from .model import Page, Workspace
@@ -252,6 +252,24 @@ class Store:
             raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
         ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text)
         return render.render_page(page, page_type, ref_context=ref_context)
+
+    def render_html(self, workspace_id: str, page_id: str, show_archived: bool = False) -> str:
+        """One page as structured HTML for the web view. Its Markdown sibling, `render_markdown`,
+        is what the renderPage MCP tool returns and is unchanged.
+
+        `show_archived` reaches the child and reference lists exactly as it does on the Markdown
+        path: it decides whether an archived target is hidden or flagged, and rides onto the links
+        as a query parameter.
+        """
+        workspace = self.load_workspace(workspace_id)
+        page = workspace.get_page(page_id)
+        if page is None:
+            raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
+        page_type = get_page_type(page.type)
+        if page_type is None:
+            raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
+        ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text=True)
+        return render_html.render_page_html(page, page_type, ref_context)
 
     def search(self, workspace_id: str, query: str, limit: int = 20) -> dict[str, Any]:
         """Rank live pages by a case-insensitive word-prefix match of `query`'s terms against

@@ -1299,3 +1299,21 @@ def test_cleanup_leaves_an_archived_workspace_alone(store):
 
     assert report.stamped == 0 and report.pruned == []
     assert store.get_page(workspace.id, page.id).expires_at is None
+
+
+def test_render_html_returns_structured_html_for_one_page(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Page title").page
+    store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItem", "args": {"text": "Item one", "note": "a note"}},
+    ])
+    out = store.render_html(workspace.id, page.id)
+    assert '<article class="pasta-page">' in out
+    assert '<h1 class="page-title">Page title</h1>' in out
+    assert '<h3 class="element-title">Item one</h3>' in out
+
+
+def test_render_html_rejects_an_unknown_page(store):
+    workspace = store.create_workspace("demo")
+    with pytest.raises(NotFoundError):
+        store.render_html(workspace.id, "test-fields:nope")

@@ -87,18 +87,27 @@ def _plain(text: str, ref_context: RefContext | None) -> str:
     return text
 
 
-def _checkbox(status: str | None, element_fsm: ElementFSMSpec | None) -> str:
-    """The task checkbox for an element's status, taken from its FSM: `[x] ` for the checkmark_done
-    state, `[ ] ` for the FSM's initial (unchecked) state, and `` for any other state or a
+def checkbox_state(status: str | None, element_fsm: ElementFSMSpec | None) -> str | None:
+    """An element's checkbox state, taken from its FSM: `"done"` for the checkmark_done state,
+    `"todo"` for the FSM's initial (unchecked) state, and None for any other state or a
     non-checkbox FSM (one with no checkmark_done, or a list field with no element FSM at all).
+
+    Public so every renderer answers this question the same way and then spells it its own.
     """
     if element_fsm is None or element_fsm.checkmark_done is None:
-        return ""
+        return None
     if status == element_fsm.checkmark_done:
-        return "[x] "
+        return "done"
     if status == element_fsm.initial:
-        return "[ ] "
-    return ""
+        return "todo"
+    return None
+
+
+def _checkbox(status: str | None, element_fsm: ElementFSMSpec | None) -> str:
+    """The task checkbox for an element's status: `[x] ` for a done element, `[ ] ` for an
+    unchecked one, and `` where the element carries no checkbox at all."""
+    state = checkbox_state(status, element_fsm)
+    return "[x] " if state == "done" else "[ ] " if state == "todo" else ""
 
 
 def _render_list(elements: list[dict[str, Any]], element_fsm: ElementFSMSpec | None = None,
@@ -169,7 +178,7 @@ def _render_table(block: dict[str, Any], ref_context: RefContext | None = None) 
     return "\n".join(lines)
 
 
-def _render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None = None) -> str | None:
+def render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None = None) -> str | None:
     out: list[str] = []
     for block in blocks:
         kind = block.get("kind")
@@ -218,7 +227,7 @@ def _field_content(field_spec: FieldSpec, value, ref_context: RefContext | None 
         rendered = _render_list(value, field_spec.element_fsm, ref_context) if value else None
         return rendered if rendered else _NONE
     if field_spec.kind == BLOCKS:
-        rendered = _render_blocks(value, ref_context) if value else None
+        rendered = render_blocks(value, ref_context) if value else None
         return rendered if rendered else _NONE
     return _NONE
 

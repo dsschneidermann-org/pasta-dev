@@ -16,11 +16,6 @@ from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
 
-from wenmode import Wenmode
-from wenmode.presets import github
-
-md2html = Wenmode(github)
-
 from . import cleanup
 # Named import, not `from . import commands`: mutatePageBatch's own parameter would shadow it.
 from .commands import transition_guidance
@@ -29,6 +24,7 @@ from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
 from .pagetypes import get_page_type, registered_tags
 from .render import escape_markdown, render_workspace_links
+from .render_html import md2html
 from .serialize import page_to_dict
 from .store import Store
 
@@ -143,7 +139,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
         page_type = get_page_type(page.type)
         show_archived = True if archived else False
         nav = md2html.render(render_workspace_links(STORE.tree(workspace_id, show_archived), show_archived, show_meta=False, escape_plain_text=True))
-        body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived, escape_plain_text=True))
+        body = STORE.render_html(workspace_id, pageId, show_archived)
         return templates.TemplateResponse(
             request=request,
             name="page.html",

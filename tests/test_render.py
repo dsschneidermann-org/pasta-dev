@@ -8,7 +8,7 @@ from src.commands import apply_command, create_page
 from src.errors import ConflictError, ValidationError
 from src.model import Page
 from src.pagetypes import FSMSpec, PageType, get_page_type
-from src.render import (RefContext, escape_markdown, page_text, render_page,
+from src.render import (RefContext, checkbox_state, escape_markdown, page_text, render_page,
                             render_workspace_links)
 
 # Hand-authored capability fixtures (src.testtypes): test-fields for scalar/prose/list content,
@@ -621,3 +621,18 @@ def test_render_toc_empty_shows_none_without_headings():
     assert "*toc* · `active`" in md
     assert "## References" not in md and "## Child pages" not in md
     assert md.rstrip().endswith("*None.*")
+
+
+def test_checkbox_state_maps_element_fsm_states():
+    child = get_page_type("test-child")
+    steps = child.field_spec("steps", "items")
+    checks = child.field_spec("checks", "items")
+    questions = get_page_type("test-lifecycle").field_spec("questions", "items")
+    items = FIELDS.field_spec("items", "items")
+    assert checkbox_state("done", steps.element_fsm) == "done"
+    assert checkbox_state("todo", steps.element_fsm) == "todo"
+    assert checkbox_state("passed", checks.element_fsm) == "done"
+    assert checkbox_state("pending", checks.element_fsm) == "todo"
+    assert checkbox_state("failed", checks.element_fsm) is None   # neither done nor initial
+    assert checkbox_state("open", questions.element_fsm) is None  # FSM declares no checkmark_done
+    assert checkbox_state(None, items.element_fsm) is None        # field has no element FSM
