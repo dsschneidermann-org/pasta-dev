@@ -23,7 +23,7 @@ _SIMPLE_CHANGE = PageType(
     tag="simple-change",
     name="Simple change",
     description=(
-        "Tracks ONE small, self-contained change or minor feature through a lightweight flow "
+        "Tracks a small, self-contained change or minor feature through a lightweight flow "
         "(draft -> open -> done -> closed) - no planning, spec, testing, or review gates. Use this "
         "page type ONLY when the user specifically asks to make a small/simple change or a small/simple "
         "feature; for larger work create a feature-brief, and for a defect in existing behavior use "

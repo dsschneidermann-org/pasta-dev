@@ -22,7 +22,7 @@ from . import (
 _BUG_REPORT = PageType(
     tag="bug-report",
     name="Bug report",
-    description="Tracks ONE defect in existing behavior - what's wrong, how to reproduce it, and its resolution.",
+    description="Tracks a defect in existing behavior - what's wrong, how to reproduce it, and its resolution.",
     sections=(
         SectionSpec("report", "Report", (
             _scalar("component", description="""

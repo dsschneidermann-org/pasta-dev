@@ -304,9 +304,9 @@ document: A general-purpose prose page for content that doesn't fit a typed page
 
 toc: A table-of-contents container whose only content is the child pages placed under it. It holds no subject matter of its own and has no authoring commands - pages are filed by reparenting them beneath the toc, and its Child pages list IS the table of contents.
 
-bug-report: Tracks ONE defect in existing behavior - what's wrong, how to reproduce it, and its resolution.
+bug-report: Tracks a defect in existing behavior - what's wrong, how to reproduce it, and its resolution.
 
-simple-change: Tracks ONE small, self-contained change or minor feature. Use this page type ONLY when the user specifically asks to make a small/simple change or a small/simple feature; for larger work create a feature-brief, and for a defect in existing behavior use a bug-report.
+simple-change: Tracks a small, self-contained change or minor feature. Use this page type ONLY when the user specifically asks to make a small/simple change or a small/simple feature; for larger work create a feature-brief, and for a defect in existing behavior use a bug-report.
 
 feature-brief: The root of a feature the user intends to build - drives new work from intent through grounding, planning, and a plan review to build and a human ship gate. Lifecycle transitions are gated on the required content for that stage being present first.
 
@@ -395,7 +395,7 @@ async def renderPage(workspaceId: str, pageId: str | None = None) -> dict[str, s
 
 @mcp.tool
 async def search(workspaceId: str, query: str, limit: int = 20) -> dict[str, Any]:
-    """Full-text search over page content in ONE workspace: ranked hits with a snippet each.
+    """Full-text search over page content in a workspace: ranked hits with a snippet each.
     Case-insensitive, matches by word prefix, and excludes archived pages AND their descendants -
     the same subtree rule `tree` applies, so the two agree on what is live. Prefix the query
     with `id:` to resolve a full or partial page id instead (e.g. `id:msakene4`); id search
@@ -467,7 +467,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
 async def mutatePageBatch(
     workspaceId: str, pageId: str, commands: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Run an ordered batch of commands on ONE page as a single atomic commit (each `{command, args?}`
+    """Run an ordered batch of commands on a page as a single atomic commit (each `{command, args?}`
     decided against the state left by the previous). All-or-nothing: any rejection aborts the whole
     batch and nothing commits - the error names the failing index and command. Echoes the new status
     and next actions."""

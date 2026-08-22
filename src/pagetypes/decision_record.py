@@ -25,7 +25,7 @@ _DECISION_RECORD = PageType(
     tag="decision-record",
     name="Decision record",
     description=(
-        "Records ONE architectural decision - its context, the options weighed, the choice made, "
+        "Records an architectural decision - its context, the options weighed, the choice made, "
         "and the consequences - as a durable dated rationale. Captures WHY the system is shaped "
         "the way it is; the shape itself belongs on an architecture page."
     ),

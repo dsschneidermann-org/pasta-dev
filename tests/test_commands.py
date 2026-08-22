@@ -662,7 +662,7 @@ def _field_setter_page(seal: PageType, status: str) -> Page:
 
 
 def test_field_setter_edges_group_blocks_and_carry_instructions():
-    """A blocks field surfaces as ONE grouped `do` entry listing its add-block variants (never
+    """A blocks field surfaces as one grouped `do` entry listing its add-block variants (never
     SET_BLOCK/remove/reorder); a prose/scalar setter surfaces as its own entry. Each carries the
     field's FieldSpec instruction inline."""
     seal = _field_setter_page_type()

@@ -479,7 +479,7 @@ class Store:
     def mutate_page_batch(
         self, workspace_id: str, page_id: str, batch: list[dict[str, Any]]
     ) -> tuple[Page, list[str | None]]:
-        """Apply an ordered batch of commands to ONE page as a single atomic commit.
+        """Apply an ordered batch of commands to a page as a single atomic commit.
 
         Each command is decided against the state left by the previous one; if any is rejected the
         whole batch aborts and nothing is written (the error names the failing index + command).

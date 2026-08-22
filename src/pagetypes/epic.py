@@ -99,7 +99,7 @@ _EPIC = PageType(
         )),
         SectionSpec("workstreams", "Workstreams", (
             _list("items", element_fields=("name", "briefId", "scope", "dependsOn"), description="""
-                Each ONE child feature-brief of this epic: its name, the page id of that brief in
+                Each one child feature-brief of this epic: its name, the page id of that brief in
                 briefId, the slice of the epic it owns in scope, and the workstreams that must finish
                 before it in dependsOn. CREATE the feature-brief as a child of this epic and record
                 its id here. The ship gate can only check briefs that exist, so a workstream listed
@@ -269,7 +269,7 @@ _AGENT_PLAN = PageType(
     sections=(
         SectionSpec("agents", "Agents", (
             _list("items", element_fields=("role", "model", "mission", "reports"), description="""
-                Each ONE subagent this epic creates: the role it plays, the model tier it runs on,
+                Each one subagent this epic creates: the role it plays, the model tier it runs on,
                 the mission it is given, and what it must hand back. Write the mission for a fresh
                 agent with no history, because a dispatched agent is given exactly this and never
                 inherits the controller's context. Name the tier on every agent: an omitted model
@@ -285,7 +285,7 @@ _AGENT_PLAN = PageType(
                   element_fields=("agentId", "workstreamId", "wave", "worktree", "handoff",
                                   "outcome", "blocker", "status"),
                   element_fsm=_DISPATCH_FSM, description="""
-                Each ONE run of one agent against one workstream, in the order they are sent: the
+                Each one run of one agent against one workstream, in the order they are sent: the
                 agent element id in agentId, the parent epic's workstream element id in
                 workstreamId, the parallel group in wave, the checkout it works in in worktree, and
                 in handoff the facts this run needs that neither the agent definition nor the target

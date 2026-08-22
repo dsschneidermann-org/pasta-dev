@@ -1,6 +1,6 @@
 """Manual end-to-end probe of the feature-brief workflow over MCP.
 
-Drives ONE real feature-brief through its whole lifecycle against a running
+Drives a real feature-brief through its whole lifecycle against a running
 pasta MCP endpoint - draft -> grounding -> spec -> planning -> planReview ->
 building -> review - authoring the content each stage gates on, then archives the
 page. After every step it prints the `do` / `blocked` / `humanGates` / `attention`
@@ -266,7 +266,7 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
                 "One block per stage: the do/blocked/humanGates/attention rollup for the brief's "
                 "whole subtree, with field instructions elided.")),
             cmd("addDesignCode", language="text",
-                source="field  implementation-plan  addStep  steps.items  Each ONE action an imp..."),
+                source="field  implementation-plan  addStep  steps.items  Each one action an imp..."),
             cmd("addDecision", questionId=question_ids[0], text=(
                 "A failed run leaves the brief un-archived and prints its id, so the failure can "
                 "be inspected in place.")),

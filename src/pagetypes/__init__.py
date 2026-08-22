@@ -28,8 +28,8 @@ ELEMENT_TRANSITION = "element_transition"   # fire a list element's own FSM (tod
 ADD_BLOCK = "add_block"                      # append to a `blocks` field, or positioned insert (index + precedingId)
 SET_BLOCK = "set_block"                      # replace a block in place by id (id + kind preserved)
 REMOVE_BLOCK = "remove_block"
-REORDER_ELEMENT = "reorder_element"          # move ONE element to an anchored position in a `list` field
-REORDER_BLOCK = "reorder_block"              # move ONE block to an anchored position in a `blocks` field
+REORDER_ELEMENT = "reorder_element"          # move one element to an anchored position in a `list` field
+REORDER_BLOCK = "reorder_block"              # move one block to an anchored position in a `blocks` field
 TRANSITION = "transition"
 COMPOUND = "compound"
 ADD_LINK = "add_link"                        # append a typed edge to Page.links (the universal authoring link)
@@ -323,7 +323,7 @@ class PageType:
     sections: tuple[SectionSpec, ...]
     commands: tuple[CommandSpec, ...]
     fsm: FSMSpec
-    # auto-created pinned children minted in the same commit as this page (see AutoChildSpec)
+    # auto-created pinned children created in the same commit as this page (see AutoChildSpec)
     auto_children: tuple[AutoChildSpec, ...] = ()
 
     def __post_init__(self):
@@ -629,7 +629,7 @@ def add_block_cmd(section: str, kind: str, *, add_name: str | None = None, set_n
     the add carries positioned-insert args, the set takes a leading `blockId`. `add_name` defaults to
     add<Kind>, `set_name` to that add_name with 'add'->'set' (so add<Kind>->set<Kind>).
 
-    With `element_field` given, both commands address that field on ONE element of the list field
+    With `element_field` given, both commands address that field on one element of the list field
     `field` rather than the section's own blocks field: `id_arg` (required with it) is prepended as
     args[0], the element id. The body args keep their declared inline-run shape either way, which is
     what keeps the run grammar enforced one level deeper."""
@@ -671,7 +671,7 @@ def block_cmds(section: str, *adds: CommandSpec, field: str = "body",
 def element_block_cmds(section: str, element_field: str, kinds: tuple[str, ...], *,
                        field: str = "items", singular: str | None = None,
                        legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
-    """The authoring surface for ONE block-bearing element field: an add (+ in-place set where the
+    """The authoring surface for one block-bearing element field: an add (+ in-place set where the
     kind carries body args) per allowed kind, plus that field's remove and reorder.
 
     Names derive from the ELEMENT FIELD, as a page-level blocks surface derives from its section

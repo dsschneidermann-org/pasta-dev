@@ -1,6 +1,6 @@
 """Combined hot-module-reload dev server for pasta.
 
-Runs ONE uvicorn server, ONE file watcher and ONE reactive (HMR) context that serve
+Runs one uvicorn server, one file watcher and one reactive (HMR) context that serve
 both surfaces of ``src.server`` with in-process hot reload - no process respawn:
 
 * FastMCP tools  -> a stable proxy (``base_app``). The reloaded ``src.server.mcp``

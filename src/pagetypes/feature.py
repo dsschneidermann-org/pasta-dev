@@ -490,23 +490,21 @@ _IMPLEMENTATION_PLAN = PageType(
     description="The step-by-step build plan for a feature. Auto-created as a child of a feature-brief.",
     sections=(
         SectionSpec("steps", "Steps", (
-            _list("items", element_fields=("text", "detail", "status"), element_fsm=_STEP_FSM,
-                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code", "list")),),
+            _list("items", element_fields=("detail", "status"), element_fsm=_STEP_FSM,
+                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),),
                   description="""
-                Each ONE action an implementer can finish in a few minutes, ordered, written for a
-                skilled developer who knows nothing about this codebase or its domain. `text` is the
-                one-line action the step is titled by - name the exact files to create or modify -
-                and everything the step actually needs goes in `detail` as blocks: a code block for
+                Each one action an implementer can finish in a few minutes, ordered, written for a
+                skilled developer who knows nothing about this codebase or its domain. Name the exact
+                files to create or modify. Work test-first: write the failing test, run it and see it
+                fail, write the minimal code to pass, run it and see it pass, commit. Keep a step on
+                one side of the pure/effectful line - a step that adds a rule changes pure logic, a
+                step that wires it to storage, the network or the clock changes the shell around it -
+                and order the pure side first, so what depends on it has something settled to call.
+                Put the actual content the step needs in the step as blocks: a code block for
                 a snippet or the exact command to run and the output to expect, a paragraph for
-                prose (it carries inline code spans and page references), a list for sub-points.
-                Work test-first: write the failing test, run it and see it fail, write the minimal
-                code to pass, run it and see it pass, commit. Keep a step on one side of the
-                pure/effectful line - a step that adds a rule changes pure logic, a step that wires
-                it to storage, the network or the clock changes the shell around it - and order the
-                pure side first, so what depends on it has something settled to call. Never write
-                'TBD', 'add error handling', 'write tests for the above', or 'same as step N' -
-                repeat the detail instead, because steps are read out of order and in isolation.
-                Mark a step done only once its test passes (element-FSM todo <-> done).
+                prose. Never write 'TBD', 'add error handling', 'write tests for the above', or 'same
+                as step N' - repeat the detail instead, because steps are read out of order and in
+                isolation. Mark a step done only once its test passes (element-FSM todo <-> done).
                 """),
         )),
         SectionSpec("questions", "Questions", (
@@ -570,7 +568,7 @@ _TESTING_PLAN = PageType(
     sections=(
         SectionSpec("cases", "Cases", (
             _list("items", element_fields=("text", "status"), element_fsm=_CASE_FSM, description="""
-                Each ONE concrete check that proves the feature works, written so its outcome is
+                Each one concrete check that proves the feature works, written so its outcome is
                 unambiguous: the setup, the action, and the expected result. Verify real behaviour
                 rather than mocked behaviour, and cover the failure and edge paths the spec implies,
                 not just the happy one. Check pure logic directly - inputs in, result out, no setup

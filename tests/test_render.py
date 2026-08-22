@@ -186,7 +186,7 @@ def test_blocks_block_editing_in_place_and_move():
     first_id = p.created_id
     h = apply_command(p.page, BLOCKS, "addHeading", {"level": 1, "inlines": ["Title"]}, factory)
     heading_id = h.created_id
-    # setParagraph edits in place: same block id, runs replaced, no new id minted
+    # setParagraph edits in place: same block id, runs replaced, no new id created
     edited = apply_command(h.page, BLOCKS, "setParagraph",
                            {"blockId": first_id, "inlines": ["updated"]}, factory)
     body = edited.page.sections["body"]["body"]

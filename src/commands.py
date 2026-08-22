@@ -220,7 +220,7 @@ def field_setter_edges(page: Page, page_type: PageType,
 
     Two entry shapes, both carrying a `commands` array and `kind='field'` (see `_field_setter_edge`):
       - a scalar/prose/list FIELD SETTER -> one entry, commands=[the setter];
-      - a BLOCKS field                   -> ONE grouped entry, commands=[its add-block variants]
+      - a BLOCKS field                   -> one grouped entry, commands=[its add-block variants]
         (SET_BLOCK edit-in-place, remove, and reorder are never surfaced here - describeMutations only).
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status) - set(blocked_events)

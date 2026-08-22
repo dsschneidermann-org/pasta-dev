@@ -1,6 +1,6 @@
 """Hand-authored, minimal test-only page types - capability fixtures, NOT clones.
 
-Each type here is a purpose-built demonstration of ONE capability cluster of the page-type
+Each type here is a purpose-built demonstration of one capability cluster of the page-type
 system, deliberately small and named for the mechanic it exercises rather than any production
 role:
 

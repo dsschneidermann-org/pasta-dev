@@ -320,5 +320,5 @@ def test_create_page_echoes_initial_state_guidance_and_children_do_not(mcp):
     parent = call(mcp, "createPage",
                   {"workspaceId": workspace_id, "type": "test-lifecycle", "title": "Parent"})
     assert "guidance" not in parent
-    assert parent["children"]                                   # the pinned child was minted
+    assert parent["children"]                                   # the pinned child was created
     assert all("guidance" not in entry for entry in parent["children"])
