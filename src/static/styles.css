@@ -54,6 +54,11 @@ body.dark {
 .pasta-page .field-rows dd { margin: 0; min-width: 0; }
 .pasta-page .field-rows dd p { margin: 0 0 0.4rem; }
 .pasta-page .field-rows dd p:last-child { margin-bottom: 0; }
+/* Blocks rendered inside an element sit on the row baseline, and a long code line scrolls
+   rather than widening the element card. */
+.pasta-page .field-rows dd.element-blocks > :first-child { margin-top: 0; }
+.pasta-page .field-rows dd.element-blocks > :last-child { margin-bottom: 0; }
+.pasta-page .field-rows dd.element-blocks pre { overflow-x: auto; max-width: 100%; }
 
 .pasta-page .element-list { list-style: none; margin: 0; padding: 0;
     display: flex; flex-direction: column; gap: 0.7rem; }

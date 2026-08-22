@@ -241,7 +241,7 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
         # 3. planning - the grounded base lets the brief advance, which unlocks all three children.
         probe.mutate(
             brief,
-            cmd("addComponent", name="scripts/feature_brief_probe.py"),
+            cmd("addComponent", name="scripts/feature_brief_probe.py", text="Component description."),
             cmd("addConstraint", text="Python >=3.14; the probe must not cross a human gate."),
             cmd("addConflict", text="None - a new script, no existing prober covers the lifecycle."),
             cmd("addDocumentation", text="Self-direction: its `do` invariants describe this rollup."),
@@ -281,8 +281,8 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
         record("8. PLANNING (plans unlocked, sealed spec locked)", brief)
         step_ids = probe.mutate(
             plan,
-            cmd("addStep", text="Add scripts/feature_brief_probe.py with the MCP session plumbing."),
-            cmd("addStep", text="Drive the lifecycle and print each stage's rollup."),
+            cmd("addStep"),
+            cmd("addStep"),
         )
         probe.mutate(plan, cmd("markReady"))
         case_ids = probe.mutate(

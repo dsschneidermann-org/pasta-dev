@@ -244,7 +244,9 @@ def field_setter_edges(page: Page, page_type: PageType,
             continue
         if is_field_setter(command):
             edges.append(_field_setter_edge(page, page_type, section, field, [command.name]))
-        elif command.kind == ADD_BLOCK:
+        elif command.kind == ADD_BLOCK and command.element_field is None:
+            # An element-scoped add cannot run until the element exists, so it is authored from
+            # describeMutations, never advertised as this stage's work.
             block_variants.setdefault(target, []).append(command.name)
     for (section, field), variants in block_variants.items():
         edges.append(_field_setter_edge(page, page_type, section, field, variants))
@@ -417,8 +419,12 @@ def _add_element(page: Page, page_type: PageType, command: CommandSpec,
         element[element_field] = args.get(arg_name)   # optional args default to None
     # If the list has an element-FSM, the new element starts at that FSM's initial status.
     field_spec = page_type.field_spec(command.section, command.field)
-    if field_spec is not None and field_spec.element_fsm is not None:
-        element["status"] = field_spec.element_fsm.initial
+    if field_spec is not None:
+        if field_spec.element_fsm is not None:
+            element["status"] = field_spec.element_fsm.initial
+        # A declared block field starts as an empty array, so the element carries its shape.
+        for block_field in field_spec.block_element_fields():
+            element[block_field] = []
     _place_entry(page.sections[command.section][command.field], element, command, args, batch_context)
     return element["id"]
 
@@ -432,12 +438,61 @@ def _apply_element_writes(element: dict[str, Any], command: CommandSpec, args: d
         element[element_field] = value
 
 
-def _find_element(page: Page, command: CommandSpec, args: dict[str, Any]) -> dict[str, Any]:
-    target_id = args[command.args[0].name]   # args[0] is the id by convention
-    for element in page.sections[command.section][command.field]:
+def _find_entry(entries: list[dict[str, Any]], target_id: str, context: str) -> dict[str, Any]:
+    """The block with `target_id` in `entries`; `context` names the list for the error message."""
+    for entry in entries:
+        if entry.get("id") == target_id:
+            return entry
+    raise NotFoundError(f"No entry with id '{target_id}' in {context}.")
+
+
+def _find_element_by_id(entries: list[dict[str, Any]], target_id: str, context: str) -> dict[str, Any]:
+    """The list element with `target_id` in `entries`. The same scan as `_find_entry` under the
+    wording elements have always used, so an author can tell which of the two ids was wrong."""
+    for element in entries:
         if element.get("id") == target_id:
             return element
-    raise NotFoundError(f"No element with id '{target_id}' in {command.section}.{command.field}.")
+    raise NotFoundError(f"No element with id '{target_id}' in {context}.")
+
+
+def _entry_context(command: CommandSpec, args: dict[str, Any]) -> str:
+    """The list a command addresses, named for an error message: `steps.items`, or
+    `steps.items[<elementId>].detail` when the command is element-scoped."""
+    base = f"{command.section}.{command.field}"
+    if command.element_field is None:
+        return base
+    return f"{base}[{args[command.args[0].name]}].{command.element_field}"
+
+
+def _target_entries(page: Page, command: CommandSpec, args: dict[str, Any]) -> list[dict[str, Any]]:
+    """The entry list a list/blocks command operates on: the section's own field, or - when the
+    command is element-scoped - the block array on the element named by args[0].
+
+    The array is created when the element does not carry it yet, which is what lets an element
+    stored before the field was declared accept its first block.
+    """
+    entries: list[dict[str, Any]] = page.sections[command.section][command.field]
+    if command.element_field is None:
+        return entries
+    element = _find_element_by_id(entries, args[command.args[0].name],
+                                  f"{command.section}.{command.field}")
+    blocks = element.get(command.element_field)
+    if not isinstance(blocks, list):
+        blocks = []
+        element[command.element_field] = blocks
+    return blocks
+
+
+def _entry_id(command: CommandSpec, args: dict[str, Any]) -> str:
+    """The id of the entry a command targets. args[0] is the id by convention; an element-scoped
+    block command spends args[0] on the element that holds the field, so its entry id is args[1]."""
+    return args[command.args[1 if command.element_field is not None else 0].name]
+
+
+def _find_element(page: Page, command: CommandSpec, args: dict[str, Any]) -> dict[str, Any]:
+    return _find_element_by_id(page.sections[command.section][command.field],
+                               args[command.args[0].name],   # args[0] is the id by convention
+                               f"{command.section}.{command.field}")
 
 
 def _set_element_field(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
@@ -488,14 +543,15 @@ def resolve_anchored_slot(ids: list[str], index: int, preceding_id: str | None, 
 
 
 def _resolve_slot(entries: list[dict[str, Any]], index: int, preceding_id: str | None,
-                  section: str, field: str, batch_context: BatchContext | None = None) -> int:
+                  context: str, batch_context: BatchContext | None = None) -> int:
     """The anchored slot for a positioned add or a block/element reorder (see resolve_anchored_slot).
 
     `entries` is the list[dict] the item will occupy - for a reorder, with the moving item already
-    removed. Delegates to the shared id-list guard on the entries' ids.
+    removed - and `context` names that list, so an element-scoped block reports the element it
+    happened in. Delegates to the shared id-list guard on the entries' ids.
     """
     return resolve_anchored_slot([entry["id"] for entry in entries], index, preceding_id,
-                                 f"{section}.{field}", batch_context)
+                                 context, batch_context)
 
 
 def _place_entry(entries: list[dict[str, Any]], entry: dict[str, Any],
@@ -516,7 +572,7 @@ def _place_entry(entries: list[dict[str, Any]], entry: dict[str, Any],
             )
         entries.append(entry)
         return
-    slot = _resolve_slot(entries, index, preceding_id, command.section, command.field, batch_context)
+    slot = _resolve_slot(entries, index, preceding_id, _entry_context(command, args), batch_context)
     entries.insert(slot, entry)
 
 
@@ -530,27 +586,28 @@ def _reorder_entry(page: Page, command: CommandSpec, args: dict[str, Any],
     (the old whole-list reorder's failure) nor let the item land in a stale slot (the old index-only
     move's failure). `toIndex` is the resting index in the list *after* the item is removed.
     """
-    target_id = args[command.args[0].name]       # args[0] is the id by convention
+    target_id = _entry_id(command, args)
     to_index = args["toIndex"]
     preceding_id = args.get("precedingId")
-    entries: list[dict[str, Any]] = page.sections[command.section][command.field]
+    context = _entry_context(command, args)
+    entries = _target_entries(page, command, args)
     for index, entry in enumerate(entries):
         if entry.get("id") == target_id:
             moving = entries.pop(index)
-            slot = _resolve_slot(entries, to_index, preceding_id, command.section, command.field,
-                                 batch_context)
+            slot = _resolve_slot(entries, to_index, preceding_id, context, batch_context)
             entries.insert(slot, moving)
             return
-    raise NotFoundError(f"No entry with id '{target_id}' in {command.section}.{command.field}.")
+    raise NotFoundError(f"No entry with id '{target_id}' in {context}.")
 
 
 def _add_block(page: Page, command: CommandSpec, args: dict[str, Any], id_factory: IdFactory,
                batch_context: BatchContext | None = None) -> str:
-    """Add a typed block to a blocks field; append, or insert at a guarded `index` (see _place_entry)."""
+    """Add a typed block to a blocks field - the section's own, or an element's when the command is
+    element-scoped; append, or insert at a guarded `index` (see _place_entry)."""
     block: dict[str, Any] = {"id": id_factory(""), "kind": command.block_kind}
     for block_field, arg_name in command.element_map:
         block[block_field] = args.get(arg_name)
-    _place_entry(page.sections[command.section][command.field], block, command, args, batch_context)
+    _place_entry(_target_entries(page, command, args), block, command, args, batch_context)
     return block["id"]
 
 
@@ -560,7 +617,8 @@ def _set_block(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
     Rejects if the target block is a different kind (e.g. `setParagraph` on a heading), matching
     the reference behaviour. The mapped fields are fully replaced (an omitted optional -> None).
     """
-    block = _find_element(page, command, args)   # args[0] is the blockId
+    block = _find_entry(_target_entries(page, command, args), _entry_id(command, args),
+                        _entry_context(command, args))
     if block.get("kind") != command.block_kind:
         raise ValidationError(
             f"Command '{command.name}' edits a '{command.block_kind}' block, but block " +
@@ -572,10 +630,11 @@ def _set_block(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
 
 def _remove_by_id(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
     """Remove an id'd entry (list element or block) from a list/blocks field."""
-    target_id = args[command.args[0].name]
-    entries: list[dict[str, Any]] = page.sections[command.section][command.field]
+    target_id = _entry_id(command, args)
+    context = _entry_context(command, args)
+    entries = _target_entries(page, command, args)
     for index, entry in enumerate(entries):
         if entry.get("id") == target_id:
             del entries[index]
             return
-    raise NotFoundError(f"No entry with id '{target_id}' in {command.section}.{command.field}.")
+    raise NotFoundError(f"No entry with id '{target_id}' in {context}.")

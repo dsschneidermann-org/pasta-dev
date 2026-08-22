@@ -1317,3 +1317,61 @@ def test_render_html_rejects_an_unknown_page(store):
     workspace = store.create_workspace("demo")
     with pytest.raises(NotFoundError):
         store.render_html(workspace.id, "test-fields:nope")
+
+
+# --- block-bearing element fields --------------------------------------------
+def _page_with_one_item(store, workspace_id):
+    """A test-element-blocks page holding one item, and that item's id."""
+    page = store.create_page(workspace_id, "test-element-blocks", "Plan").page
+    _, created = store.mutate_page_batch(workspace_id, page.id, [
+        {"command": "addItem", "args": {"text": "one"}},
+    ])
+    return page, created[0]
+
+
+def _detail(store, workspace_id, page_id):
+    return store.get_page(workspace_id, page_id).sections["items"]["items"][0]["detail"]
+
+
+def test_a_dangling_ref_in_an_element_block_aborts_the_batch(store):
+    """The store needs no change for the new commands: _check_inline_refs walks every arg by its
+    declared content shape, so an element-scoped paragraph is checked like a page-level one."""
+    workspace = store.create_workspace("demo")
+    page, item_id = _page_with_one_item(store, workspace.id)
+    with pytest.raises(ValidationError, match="inline reference"):
+        store.mutate_page_batch(workspace.id, page.id, [
+            {"command": "addDetailParagraph", "args": {"itemId": item_id, "inlines": ["ok"]}},
+            {"command": "addDetailParagraph",
+             "args": {"itemId": item_id, "inlines": [{"ref": "test-fields:nope"}]}},
+        ])
+    # All-or-nothing: neither paragraph was written.
+    assert _detail(store, workspace.id, page.id) == []
+    # A ref to a real page is accepted and stored verbatim.
+    target = store.create_page(workspace.id, "test-fields", "Target").page
+    store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addDetailParagraph",
+         "args": {"itemId": item_id, "inlines": ["see ", {"ref": target.id}]}},
+    ])
+    assert _detail(store, workspace.id, page.id)[0]["inlines"] == ["see ", {"ref": target.id}]
+
+
+def test_element_block_inserts_compose_within_one_batch(store):
+    """Two positioned inserts anchored on the SAME committed id compose in command order: the
+    batch guard walks left past the id the batch itself just created."""
+    workspace = store.create_workspace("demo")
+    page, item_id = _page_with_one_item(store, workspace.id)
+    _, first = store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addDetailParagraph", "args": {"itemId": item_id, "inlines": ["anchor"]}},
+    ])
+    anchor = first[0]
+    _, created = store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addDetailCode",
+         "args": {"itemId": item_id, "language": "python", "source": "x = 1",
+                  "index": 1, "precedingId": anchor}},
+        {"command": "addDetailParagraph",
+         "args": {"itemId": item_id, "inlines": ["second"], "index": 1, "precedingId": anchor}},
+    ])
+    code_id, paragraph_id = created
+    assert [block["id"] for block in _detail(store, workspace.id, page.id)] == [
+        anchor, paragraph_id, code_id
+    ]

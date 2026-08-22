@@ -188,5 +188,16 @@ def test_bullet_keeps_notes_on_the_header_line():
 def test_field_line_renders_a_descriptionless_field_as_a_bare_bullet():
     # No description means no continuation block and no trailing separator.
     field = {"key": "commit", "kind": "scalar", "description": "",
-             "choices": None, "elementFields": None, "elementStates": None}
+             "choices": None, "elementFields": None, "elementStates": None,
+             "elementBlocks": None}
     assert _field_line(field) == "  - `commit` *(scalar)*"
+
+
+def test_field_line_notes_block_element_fields():
+    field = {"key": "items", "kind": "list", "description": "",
+             "choices": None, "elementFields": ["text", "detail"], "elementStates": None,
+             "elementBlocks": [{"field": "detail", "kinds": ["paragraph", "code"]}]}
+    assert _field_line(field) == (
+        "  - `items` *(list)* · element fields: `text`, `detail` · "
+        "block element fields: `detail` (paragraph, code)"
+    )

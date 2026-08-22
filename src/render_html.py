@@ -62,6 +62,8 @@ class ElementView:
     check: str | None
     status: str | None
     rows: tuple[tuple[str, str | None], ...]
+    # declared block fields, in declared order, rendered after the plain rows
+    block_rows: tuple[tuple[str, tuple[dict[str, Any], ...]], ...] = ()
 
 
 def element_view(element: dict[str, Any], index: int, field_spec: FieldSpec) -> ElementView:
@@ -69,10 +71,12 @@ def element_view(element: dict[str, Any], index: int, field_spec: FieldSpec) -> 
     rules: an element is titled by its first declared field, and only while that value still
     reads as a title."""
     declared = field_spec.element_fields or ()
+    # A block-bearing field is neither a title candidate nor a row - it has its own tuple.
+    block_fields = field_spec.block_element_fields()
     # Declared order first, then any stored key the type does not declare, so nothing on the
     # element is hidden. `id` is structural and `status` has its own chip.
     extra = [key for key in element if key not in ("id", "status") and key not in declared]
-    keys = [key for key in declared if key != "status"] + extra
+    keys = [key for key in declared if key != "status" and key not in block_fields] + extra
 
     raw_status = element.get("status")
     status = raw_status if isinstance(raw_status, str) else None
@@ -99,6 +103,8 @@ def element_view(element: dict[str, Any], index: int, field_spec: FieldSpec) -> 
         check=checkbox_state(status, field_spec.element_fsm),
         status=status,
         rows=tuple((key, row_value(key)) for key in keys),
+        block_rows=tuple((key, tuple(element.get(key) or ()))
+                         for key in declared if key in block_fields),
     )
 
 
@@ -133,6 +139,13 @@ def _element_html(view: ElementView, ref_context: RefContext | None) -> str:
         else:
             linked = _page_link(value, ref_context)
             cell = f"<dd><p>{linked}</p></dd>" if linked else f"<dd>{_text_html(value)}</dd>"
+        cells.append(f"<dt>{_escape(label)}</dt>" + cell)
+    for label, blocks in view.block_rows:
+        # Rich content takes the same Markdown route a page-level blocks field takes, so a code
+        # block, a nested list and an inline page ref all read the same wherever they are written.
+        markdown = render_blocks(list(blocks), ref_context) if blocks else None
+        cell = (f'<dd class="element-blocks">{md2html.render(markdown)}</dd>' if markdown
+                else '<dd class="empty">&mdash;</dd>')
         cells.append(f"<dt>{_escape(label)}</dt>" + cell)
     rows = "".join(cells)
     body = f'<dl class="field-rows">{rows}</dl>' if rows else ""

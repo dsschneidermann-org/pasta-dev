@@ -9,6 +9,7 @@ from __future__ import annotations
 from . import (
     AutoChildSpec,
     ChildStateGuard,
+    ElementBlocksSpec,
     ElementFSMSpec,
     FSMSpec,
     PageType,
@@ -25,6 +26,7 @@ from . import (
     add_block_cmd,
     add_link_cmd,
     block_cmds,
+    element_block_cmds,
     element_cmds,
     list_cmds,
     set_element_field_cmd,
@@ -488,19 +490,23 @@ _IMPLEMENTATION_PLAN = PageType(
     description="The step-by-step build plan for a feature. Auto-created as a child of a feature-brief.",
     sections=(
         SectionSpec("steps", "Steps", (
-            _list("items", element_fields=("text", "status"), element_fsm=_STEP_FSM, description="""
+            _list("items", element_fields=("text", "detail", "status"), element_fsm=_STEP_FSM,
+                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code", "list")),),
+                  description="""
                 Each ONE action an implementer can finish in a few minutes, ordered, written for a
-                skilled developer who knows nothing about this codebase or its domain. Name the exact
-                files to create or modify. Work test-first: write the failing test, run it and see it
-                fail, write the minimal code to pass, run it and see it pass, commit. Keep a step on
-                one side of the pure/effectful line - a step that adds a rule changes pure logic, a
-                step that wires it to storage, the network or the clock changes the shell around it -
-                and order the pure side first, so what depends on it has something settled to call.
-                Put the actual content the step needs in the step: real code, the exact command to
-                run, the output to expect. Never write 'TBD', 'add error handling', 'write tests for
-                the above', or 'same as step N' - repeat the detail instead, because steps are read
-                out of order and in isolation. Mark a step done only once its test passes
-                (element-FSM todo <-> done).
+                skilled developer who knows nothing about this codebase or its domain. `text` is the
+                one-line action the step is titled by - name the exact files to create or modify -
+                and everything the step actually needs goes in `detail` as blocks: a code block for
+                a snippet or the exact command to run and the output to expect, a paragraph for
+                prose (it carries inline code spans and page references), a list for sub-points.
+                Work test-first: write the failing test, run it and see it fail, write the minimal
+                code to pass, run it and see it pass, commit. Keep a step on one side of the
+                pure/effectful line - a step that adds a rule changes pure logic, a step that wires
+                it to storage, the network or the clock changes the shell around it - and order the
+                pure side first, so what depends on it has something settled to call. Never write
+                'TBD', 'add error handling', 'write tests for the above', or 'same as step N' -
+                repeat the detail instead, because steps are read out of order and in isolation.
+                Mark a step done only once its test passes (element-FSM todo <-> done).
                 """),
         )),
         SectionSpec("questions", "Questions", (
@@ -522,8 +528,9 @@ _IMPLEMENTATION_PLAN = PageType(
         )),
     ),
     commands=(
-        *list_cmds("steps", label="step", legal_in=("draft",),
-                   add_args=(_text(),)),
+        *list_cmds("steps", label="step", legal_in=("draft",), add_args=()),
+        # The step's detail: real content as blocks rather than prose crushed into `text`.
+        *element_block_cmds("steps", "detail", ("paragraph", "code", "list"), legal_in=("draft",)),
         # Execution-status marks stay legal once the plan is `ready`: progress is recorded while
         # building against a finalized plan. Only the structural edits above are `draft`-only.
         *element_cmds("steps", legal_in=("draft", "ready"),

@@ -116,3 +116,19 @@ def test_describe_fsm_projects_state_guidance():
     assert described["initial"] == "draft" and described["states"] == ["draft", "open", "closed"]
     # A type declaring none projects an empty mapping rather than omitting the key.
     assert describe_page_type(get_page_type("test-blocks"))["fsm"]["stateGuidance"] == {}
+
+
+def test_describe_reports_block_bearing_element_fields():
+    """An agent authors from this surface, so a capability missing here does not exist."""
+    described = describe_page_type(get_page_type("test-element-blocks"))
+    field = described["sections"][0]["fields"][0]
+    assert field["elementBlocks"] == [
+        {"field": "snippet", "kinds": ["code"]},
+        {"field": "detail", "kinds": ["paragraph", "code", "list"]},
+    ]
+    # The pre-existing keys are untouched beside it.
+    assert field["elementFields"] == ["text", "snippet", "detail", "status"]
+    assert field["elementStates"] == ["todo", "done"]
+    # A list declaring none reports None rather than an empty list.
+    plain = describe_page_type(get_page_type("test-fields"))["sections"][1]["fields"][0]
+    assert plain["elementBlocks"] is None

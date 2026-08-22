@@ -743,3 +743,157 @@ def test_transition_guidance_is_none_for_a_content_only_batch():
 def test_transition_guidance_is_none_when_the_state_declares_none():
     # A real transition, but `draft` declares no guidance.
     assert transition_guidance(FLOW, [{"command": "reopen"}], "draft") is None
+
+
+# --- block-bearing element fields --------------------------------------------
+ELEMENT_BLOCKS = get_page_type("test-element-blocks")
+
+
+def new_item(factory):
+    """A test-element-blocks page holding one item, and that item's id."""
+    page = create_page(ELEMENT_BLOCKS, "A fixture", None, factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItem", {"text": "one"}, factory)
+    assert added.created_id is not None
+    return added.page, added.created_id
+
+
+def items_of(page):
+    return page.sections["items"]["items"]
+
+
+def test_a_new_element_carries_its_declared_block_fields_empty():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    assert items_of(page) == [
+        {"id": item_id, "text": "one", "snippet": [], "detail": [], "status": "todo"}
+    ]
+
+
+def test_add_and_set_a_block_on_an_element():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addDetailCode",
+                          {"itemId": item_id, "language": "python", "source": "x = 1"}, factory)
+    element = items_of(added.page)[0]
+    assert element["detail"] == [
+        {"id": added.created_id, "kind": "code", "language": "python", "source": "x = 1"}
+    ]
+    # The block landed on the element, not in a section field of its own.
+    assert list(added.page.sections["items"]) == ["items"]
+    assert element["snippet"] == []
+
+
+def test_set_a_block_on_an_element_preserves_id_and_kind():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addDetailCode",
+                          {"itemId": item_id, "language": "python", "source": "x = 1"}, factory)
+    block_id = added.created_id
+    edited = apply_command(added.page, ELEMENT_BLOCKS, "setDetailCode",
+                           {"itemId": item_id, "blockId": block_id,
+                            "language": "python", "source": "x = 2"}, factory)
+    assert items_of(edited.page)[0]["detail"] == [
+        {"id": block_id, "kind": "code", "language": "python", "source": "x = 2"}
+    ]
+    # The kind guard still fires one level deeper.
+    with pytest.raises(ValidationError, match="is a 'code'"):
+        _ = apply_command(edited.page, ELEMENT_BLOCKS, "setDetailParagraph",
+                          {"itemId": item_id, "blockId": block_id, "inlines": ["nope"]}, factory)
+
+
+def test_remove_and_reorder_blocks_on_an_element():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    first = apply_command(page, ELEMENT_BLOCKS, "addDetailParagraph",
+                          {"itemId": item_id, "inlines": ["p"]}, factory)
+    second = apply_command(first.page, ELEMENT_BLOCKS, "addDetailCode",
+                           {"itemId": item_id, "language": "python", "source": "a"}, factory)
+    third = apply_command(second.page, ELEMENT_BLOCKS, "addDetailCode",
+                          {"itemId": item_id, "language": "python", "source": "b"}, factory)
+    moved = apply_command(third.page, ELEMENT_BLOCKS, "reorderDetailBlock",
+                          {"itemId": item_id, "blockId": third.created_id, "toIndex": 0}, factory)
+    assert [block["id"] for block in items_of(moved.page)[0]["detail"]] == [
+        third.created_id, first.created_id, second.created_id
+    ]
+    removed = apply_command(moved.page, ELEMENT_BLOCKS, "removeDetailBlock",
+                            {"itemId": item_id, "blockId": first.created_id}, factory)
+    assert [block["id"] for block in items_of(removed.page)[0]["detail"]] == [
+        third.created_id, second.created_id
+    ]
+    assert len(items_of(removed.page)) == 1          # the element itself is untouched
+
+
+def test_element_scoped_stale_read_names_the_element():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addDetailParagraph",
+                          {"itemId": item_id, "inlines": ["p"]}, factory)
+    with pytest.raises(ConflictError, match=r"Stale read.*items\.items\[.*\]\.detail"):
+        _ = apply_command(added.page, ELEMENT_BLOCKS, "addDetailCode",
+                          {"itemId": item_id, "language": "python", "source": "x",
+                           "index": 1, "precedingId": "not-the-real-id"}, factory)
+    with pytest.raises(ValidationError, match="precedingId requires an index"):
+        _ = apply_command(added.page, ELEMENT_BLOCKS, "addDetailCode",
+                          {"itemId": item_id, "language": "python", "source": "x",
+                           "precedingId": added.created_id}, factory)
+
+
+def test_unknown_element_and_block_ids_name_different_lists():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addDetailParagraph",
+                          {"itemId": item_id, "inlines": ["p"]}, factory)
+    # The ELEMENT lookup failed - the list named is the list field itself.
+    with pytest.raises(NotFoundError, match=r"No element with id 'nope' in items\.items\."):
+        _ = apply_command(added.page, ELEMENT_BLOCKS, "addDetailCode",
+                          {"itemId": "nope", "language": "python", "source": "x"}, factory)
+    # The BLOCK lookup failed - the list named is that element's block field.
+    with pytest.raises(NotFoundError, match=r"No entry with id 'nope' in items\.items\[.*\]\.detail\."):
+        _ = apply_command(added.page, ELEMENT_BLOCKS, "removeDetailBlock",
+                          {"itemId": item_id, "blockId": "nope"}, factory)
+
+
+def test_an_element_without_the_block_key_accepts_its_first_block():
+    # The shape an element stored before the field was declared has: no snippet, no detail.
+    factory = make_counter()
+    page = create_page(ELEMENT_BLOCKS, "A fixture", None, factory)
+    page.sections["items"]["items"] = [{"id": "legacy", "text": "old", "status": "todo"}]
+    added = apply_command(page, ELEMENT_BLOCKS, "addDetailCode",
+                          {"itemId": "legacy", "language": "python", "source": "x = 1"}, factory)
+    assert items_of(added.page)[0]["detail"] == [
+        {"id": added.created_id, "kind": "code", "language": "python", "source": "x = 1"}
+    ]
+
+
+def test_element_scoped_blocks_still_enforce_the_inline_grammar():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    with pytest.raises(ValidationError, match="unknown keys"):
+        _ = apply_command(page, ELEMENT_BLOCKS, "addDetailParagraph",
+                          {"itemId": item_id, "inlines": [{"text": "hi", "nope": 1}]}, factory)
+    with pytest.raises(ValidationError, match="Markdown syntax"):
+        _ = apply_command(page, ELEMENT_BLOCKS, "addDetailParagraph",
+                          {"itemId": item_id, "inlines": ["a **bold** word"]}, factory)
+
+
+def test_element_block_commands_are_locked_once_ready():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    ready = apply_command(page, ELEMENT_BLOCKS, "markReady", {}, factory)
+    assert ready.page.status == "ready"
+    with pytest.raises(IllegalCommandError, match="'ready'"):
+        _ = apply_command(ready.page, ELEMENT_BLOCKS, "addDetailCode",
+                          {"itemId": item_id, "language": "python", "source": "x"}, factory)
+    # An element-status mark stays legal - only the structural edits are draft-only.
+    marked = apply_command(ready.page, ELEMENT_BLOCKS, "markItemDone", {"itemId": item_id}, factory)
+    assert items_of(marked.page)[0]["status"] == "done"
+
+
+def test_element_scoped_block_adds_are_not_in_the_do_list():
+    # markReady requires items.items, so authoring that field IS this stage's work.
+    factory = make_counter()
+    page, _ = new_item(factory)
+    edges = field_setter_edges(page, ELEMENT_BLOCKS)
+    assert [(edge["section"], edge["field"], edge["commands"]) for edge in edges] == [
+        ("items", "items", ["addItem"])
+    ]

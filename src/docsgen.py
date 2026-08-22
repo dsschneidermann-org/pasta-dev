@@ -144,6 +144,9 @@ def _field_line(field: dict[str, Any]) -> str:
         notes.append("element fields: " + ", ".join(f"`{name}`" for name in field["elementFields"]))
     if field["elementStates"]:
         notes.append("element states: " + ", ".join(f"`{name}`" for name in field["elementStates"]))
+    if field["elementBlocks"]:
+        notes.append("block element fields: " + ", ".join(
+            f"`{spec['field']}` ({', '.join(spec['kinds'])})" for spec in field["elementBlocks"]))
     return _bullet(f"  - `{field['key']}` *({field['kind']})*", field["description"], notes)
 
 

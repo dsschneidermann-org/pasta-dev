@@ -310,3 +310,43 @@ def test_render_page_html_toc_is_its_child_list_alone():
     assert "section-references" not in out
     assert "section-children" not in out
     assert "page-contents" not in out
+
+
+# --- block-bearing element fields --------------------------------------------
+ELEMENT_BLOCKS = get_page_type("test-element-blocks")
+
+CODE_BLOCK = {"id": "b1", "kind": "code", "language": "python", "source": "x = 1"}
+
+
+def test_element_view_keeps_block_fields_out_of_the_rows():
+    element = {"id": "e1", "text": "one", "snippet": [], "detail": [CODE_BLOCK], "status": "todo"}
+    view = element_view(element, 1, _spec(ELEMENT_BLOCKS, "items", "items"))
+    assert view.title == "one"                       # still the first declared NON-block field
+    assert view.check == "todo"
+    assert [label for label, _ in view.rows] == []   # text became the title; blocks are not rows
+    assert view.block_rows == (("snippet", ()), ("detail", (CODE_BLOCK,)))
+
+
+def test_element_block_field_renders_through_the_markdown_pipeline():
+    factory = _counter()
+    page = create_page(ELEMENT_BLOCKS, "Plan", None, factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItem", {"text": "one"}, factory)
+    page = apply_command(added.page, ELEMENT_BLOCKS, "addDetailCode",
+                         {"itemId": added.created_id, "language": "python",
+                          "source": "x = 1"}, factory).page
+    out = render_page_html(page, ELEMENT_BLOCKS, _context())
+    assert '<dt>detail</dt><dd class="element-blocks">' in out
+    assert "<code" in out and "x = 1" in out          # went through render_blocks + md2html
+    # An empty declared block field keeps the same em-dash cell an empty plain row uses.
+    assert '<dt>snippet</dt><dd class="empty">&mdash;</dd>' in out
+
+
+def test_an_element_block_ref_resolves_to_a_titled_link():
+    factory = _counter()
+    page = create_page(ELEMENT_BLOCKS, "Plan", None, factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItem", {"text": "one"}, factory)
+    page = apply_command(added.page, ELEMENT_BLOCKS, "addDetailParagraph",
+                         {"itemId": added.created_id,
+                          "inlines": ["see ", {"ref": "a:1"}]}, factory).page
+    out = render_page_html(page, ELEMENT_BLOCKS, _context())
+    assert '<a href="/ws:demo/page/a:1">Alpha</a>' in out

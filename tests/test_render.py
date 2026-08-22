@@ -636,3 +636,46 @@ def test_checkbox_state_maps_element_fsm_states():
     assert checkbox_state("failed", checks.element_fsm) is None   # neither done nor initial
     assert checkbox_state("open", questions.element_fsm) is None  # FSM declares no checkmark_done
     assert checkbox_state(None, items.element_fsm) is None        # field has no element FSM
+
+
+# --- block-bearing element fields --------------------------------------------
+ELEMENT_BLOCKS = get_page_type("test-element-blocks")
+
+
+def _page_with_one_item(factory):
+    page = create_page(ELEMENT_BLOCKS, "Plan", None, factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItem", {"text": "one"}, factory)
+    return added.page, added.created_id
+
+
+def test_an_element_block_field_renders_indented_under_its_bullet():
+    factory = make_counter()
+    page, item_id = _page_with_one_item(factory)
+    page = apply_command(page, ELEMENT_BLOCKS, "addDetailCode",
+                         {"itemId": item_id, "language": "python", "source": "x = 1"}, factory).page
+    md = render_page(page, ELEMENT_BLOCKS)
+    assert "- [ ] one _[todo]_\n\n  ```python\n  x = 1\n  ```" in md
+    # A block list str()-ed into the bullet would show its dicts.
+    assert "{'id':" not in md
+
+
+def test_an_element_with_no_blocks_renders_exactly_as_before():
+    factory = make_counter()
+    page, _ = _page_with_one_item(factory)
+    md = render_page(page, ELEMENT_BLOCKS)
+    # An empty declared block field adds nothing at all - no blank line, no indented content.
+    assert "## Items\n\n- [ ] one _[todo]_\n\n## References" in md
+
+
+def test_page_text_finds_text_inside_an_element_block():
+    factory = make_counter()
+    page, item_id = _page_with_one_item(factory)
+    page = apply_command(page, ELEMENT_BLOCKS, "addDetailCode",
+                         {"itemId": item_id, "language": "python",
+                          "source": "needle_in_source"}, factory).page
+    page = apply_command(page, ELEMENT_BLOCKS, "addDetailParagraph",
+                         {"itemId": item_id,
+                          "inlines": ["prose ", {"code": "needle_in_code_run"}]}, factory).page
+    text = page_text(page, ELEMENT_BLOCKS)
+    assert "needle_in_source" in text
+    assert "needle_in_code_run" in text

@@ -89,6 +89,9 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         "elementFields": list(field_spec.element_fields) if field_spec.element_fields else None,
                         # for a list with a per-element lifecycle: its states (e.g. todo/done)
                         "elementStates": list(field_spec.element_fsm.states) if field_spec.element_fsm else None,
+                        # for a list whose element fields hold blocks: each field and the kinds it accepts
+                        "elementBlocks": ([{"field": spec.field, "kinds": list(spec.kinds)}
+                                           for spec in field_spec.element_blocks] or None),
                         "description": field_spec.description,
                     }
                     for field_spec in section.fields
