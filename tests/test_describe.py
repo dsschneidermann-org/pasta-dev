@@ -118,6 +118,22 @@ def test_describe_fsm_projects_state_guidance():
     assert describe_page_type(get_page_type("test-blocks"))["fsm"]["stateGuidance"] == {}
 
 
+def test_add_reports_its_block_argument_shape():
+    """A caller reads the create-with-content shape off the schema rather than learning a rule."""
+    described = describe_page_type(get_page_type("test-element-blocks"))
+    add = next(c for c in described["commands"] if c["name"] == "addItem")
+    detail = add["args"]["properties"]["detail"]
+    assert detail["type"] == "array"
+    branches = detail["items"]["oneOf"]
+    assert [b["properties"]["kind"]["const"] for b in branches] == ["paragraph", "code", "list"]
+    code = next(b for b in branches if b["properties"]["kind"]["const"] == "code")
+    assert code["required"] == ["kind", "language", "source"]
+    # snippet accepts code only, and neither argument is required to create an item.
+    snippet = add["args"]["properties"]["snippet"]
+    assert [b["properties"]["kind"]["const"] for b in snippet["items"]["oneOf"]] == ["code"]
+    assert "detail" not in add["args"]["required"] and "snippet" not in add["args"]["required"]
+
+
 def test_describe_reports_block_bearing_element_fields():
     """An agent authors from this surface, so a capability missing here does not exist."""
     described = describe_page_type(get_page_type("test-element-blocks"))

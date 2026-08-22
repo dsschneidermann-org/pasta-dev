@@ -1333,6 +1333,37 @@ def _detail(store, workspace_id, page_id):
     return store.get_page(workspace_id, page_id).sections["items"]["items"][0]["detail"]
 
 
+def test_one_batch_authors_two_complete_elements(store):
+    """The shape the do edge advertises, run as one batch with no read-back in the middle."""
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-element-blocks", "Plan").page
+    _, created = store.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItem", "args": {"text": "one", "detail": [
+            {"kind": "paragraph", "inlines": ["first"]},
+            {"kind": "code", "language": "python", "source": "x = 1"}]}},
+        {"command": "addItem", "args": {"text": "two", "detail": [
+            {"kind": "paragraph", "inlines": ["second"]}]}},
+    ])
+    items = store.get_page(workspace.id, page.id).sections["items"]["items"]
+    assert created == [item["id"] for item in items]         # the two ELEMENT ids, in order
+    assert [block["kind"] for block in items[0]["detail"]] == ["paragraph", "code"]
+    assert [block["kind"] for block in items[1]["detail"]] == ["paragraph"]
+    assert items[1]["detail"][0]["inlines"] == ["second"]
+
+
+def test_a_dangling_ref_in_a_created_element_block_aborts_the_batch(store):
+    """collect_ref_ids reaches into a block created with its element, so the store's existing
+    precheck still sees it - without that branch the ref would be written dangling."""
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-element-blocks", "Plan").page
+    with pytest.raises(ValidationError, match="inline reference"):
+        store.mutate_page_batch(workspace.id, page.id, [
+            {"command": "addItem", "args": {"text": "one", "detail": [
+                {"kind": "paragraph", "inlines": [{"ref": "test-fields:nope"}]}]}},
+        ])
+    assert store.get_page(workspace.id, page.id).sections["items"]["items"] == []
+
+
 def test_a_dangling_ref_in_an_element_block_aborts_the_batch(store):
     """The store needs no change for the new commands: _check_inline_refs walks every arg by its
     declared content shape, so an element-scoped paragraph is checked like a page-level one."""

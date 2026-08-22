@@ -32,18 +32,22 @@ from src.pagetypes import (
     TABLE_ALIGN,
     TRANSITION,
     BLOCKS,
+    ELEMENT_BLOCKS,
     LIST,
     PROSE,
     REGISTRY,
     ElementBlocksSpec,
     FieldSpec,
     _list,
+    _text,
     add_block_cmd,
     collect_ref_ids,
     element_block_cmds,
+    list_cmds,
     get_page_type,
     initial_sections,
     status_transitions,
+    validate_element_blocks,
     validate_inline_content,
     validate_table,
     FSMSpec,
@@ -507,8 +511,55 @@ def test_block_element_fields_names_the_declared_fields():
     assert _list("items", element_fields=("text",)).block_element_fields() == ()
 
 
+def test_validate_element_blocks_accepts_declared_kinds():
+    validate_element_blocks([{"kind": "code", "language": "py", "source": "x = 1"}], ("code",))
+    validate_element_blocks([], ("code",))                       # an empty array is legal
+    validate_element_blocks(
+        [{"kind": "paragraph", "inlines": ["prose ", {"code": "x"}, {"ref": "a:1"}]}],
+        ("paragraph", "code"))
+
+
+def test_validate_element_blocks_rejects_a_bad_entry():
+    with pytest.raises(ValidationError, match="array of blocks"):
+        validate_element_blocks("nope", ("code",))
+    with pytest.raises(ValidationError, match="must be an object"):
+        validate_element_blocks(["nope"], ("code",))
+    with pytest.raises(ValidationError, match="not accepted here"):
+        validate_element_blocks([{"kind": "table"}], ("code",))
+    with pytest.raises(ValidationError, match="unknown keys"):
+        validate_element_blocks([{"kind": "code", "language": "py", "source": "x", "nope": 1}],
+                                ("code",))
+    with pytest.raises(ValidationError, match="requires 'source'"):
+        validate_element_blocks([{"kind": "code", "language": "py"}], ("code",))
+    # The same inline grammar the per-kind command enforces, reached through the same validator.
+    with pytest.raises(ValidationError, match="Markdown syntax"):
+        validate_element_blocks([{"kind": "paragraph", "inlines": ["a **bold** word"]}],
+                                ("paragraph",))
+
+
+def test_collect_ref_ids_finds_a_ref_inside_an_element_block():
+    # Without this the store's inline-ref precheck cannot see a ref created with its element.
+    assert collect_ref_ids(ELEMENT_BLOCKS, [
+        {"kind": "paragraph", "inlines": ["see ", {"ref": "a:1"}]},
+        {"kind": "code", "language": "py", "source": "x = 1"},
+    ]) == ["a:1"]
+    assert collect_ref_ids(ELEMENT_BLOCKS, "not-a-list") == []
+
+
 def _arg_names(command):
     return tuple(arg.name for arg in command.args)
+
+
+def test_list_cmds_adds_an_optional_blocks_arg_per_declared_field():
+    add, _remove, _reorder = list_cmds(
+        "steps", label="step", add_args=(_text(),),
+        element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),))
+    assert _arg_names(add) == ("text", "detail", "index", "precedingId")
+    detail = add.args[1]
+    assert detail.required is False and detail.type == "array"
+    assert detail.content == ELEMENT_BLOCKS and detail.block_kinds == ("paragraph", "code")
+    # Never written raw onto the element - the add converts it into id'd blocks instead.
+    assert "detail" not in dict(add.element_map)
 
 
 def test_add_block_cmd_element_scoped_prepends_the_element_id():

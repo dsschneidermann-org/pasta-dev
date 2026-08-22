@@ -11,7 +11,24 @@ from typing import Any
 
 from .commands import legal_commands
 from .model import Page
-from .pagetypes import COMPOUND, TRANSITION, CommandSpec, PageType
+from .pagetypes import (BLOCK_ARGS, COMPOUND, ELEMENT_BLOCKS, TRANSITION, CommandSpec,
+                        PageType)
+
+
+def _element_blocks_schema(kinds: tuple[str, ...]) -> dict[str, Any]:
+    """The items schema for a create-with-content block argument: one branch per accepted kind,
+    built from the same BLOCK_ARGS the validator reads, so the schema and the grammar agree."""
+    branches: list[dict[str, Any]] = []
+    for kind in kinds:
+        properties: dict[str, Any] = {"kind": {"const": kind}}
+        required = ["kind"]
+        for body in BLOCK_ARGS[kind]:
+            properties[body.name] = {"type": body.type}
+            if body.required:
+                required.append(body.name)
+        branches.append({"type": "object", "properties": properties,
+                         "required": required, "additionalProperties": False})
+    return {"type": "array", "items": {"oneOf": branches}}
 
 
 def command_arg_schema(command: CommandSpec) -> dict[str, Any]:
@@ -20,6 +37,8 @@ def command_arg_schema(command: CommandSpec) -> dict[str, Any]:
     required: list[str] = []
     for arg in command.args:
         prop: dict[str, Any] = {"type": arg.type}
+        if arg.content == ELEMENT_BLOCKS and arg.block_kinds is not None:
+            prop = _element_blocks_schema(arg.block_kinds)
         if arg.choices is not None:
             prop["enum"] = list(arg.choices)
         if arg.description:

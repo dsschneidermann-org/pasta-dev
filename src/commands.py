@@ -20,7 +20,9 @@ from .pagetypes import (
     ADD_BLOCK,
     ADD_ELEMENT,
     ADD_LINK,
+    BLOCK_ARGS,
     COMPOUND,
+    ELEMENT_BLOCKS,
     ELEMENT_TRANSITION,
     REORDER_BLOCK,
     REORDER_ELEMENT,
@@ -33,9 +35,11 @@ from .pagetypes import (
     SET_TITLE,
     TRANSITION,
     CommandSpec,
+    FieldSpec,
     PageType,
     guard_production_type,
     initial_sections,
+    validate_element_blocks,
     validate_inline_content,
     validate_table,
 )
@@ -319,8 +323,10 @@ def _validate_args(command: CommandSpec, args: dict[str, Any]) -> None:
             raise ValidationError(
                 f"Argument '{arg.name}' must be one of {list(arg.choices)}, got {value!r}."
             )
-        # Structurally validate an inline-run array arg against its declared shape.
-        if arg.content is not None:
+        # Structurally validate an array arg against its declared shape.
+        if arg.content == ELEMENT_BLOCKS and arg.block_kinds is not None:
+            validate_element_blocks(value, arg.block_kinds)
+        elif arg.content is not None:
             validate_inline_content(arg.content, value)
     # A table's rows (and align, if given) must match the header width - a cross-arg check.
     if command.block_kind == "table":
@@ -411,6 +417,27 @@ def _apply(
     raise ValidationError(f"Unsupported command kind '{command.kind}'.")
 
 
+def _element_blocks_from_args(field_spec: FieldSpec, args: dict[str, Any],
+                              id_factory: IdFactory) -> dict[str, list[dict[str, Any]]]:
+    """The id'd block arrays for an element being created: one per declared block field, read from
+    the same-named optional argument. A field with no argument starts empty.
+
+    Each block is built the way `_add_block` builds one - a minted id, its kind, then every declared
+    body arg with an omitted optional stored as None - so a block created with its element is
+    indistinguishable from one added afterwards by its per-kind command.
+    """
+    blocks: dict[str, list[dict[str, Any]]] = {}
+    for spec in field_spec.element_blocks:
+        made: list[dict[str, Any]] = []
+        for entry in args.get(spec.field) or []:
+            block: dict[str, Any] = {"id": id_factory(""), "kind": entry["kind"]}
+            for body in BLOCK_ARGS[entry["kind"]]:
+                block[body.name] = entry.get(body.name)
+            made.append(block)
+        blocks[spec.field] = made
+    return blocks
+
+
 def _add_element(page: Page, page_type: PageType, command: CommandSpec,
                  args: dict[str, Any], id_factory: IdFactory,
                  batch_context: BatchContext | None = None) -> str:
@@ -422,9 +449,8 @@ def _add_element(page: Page, page_type: PageType, command: CommandSpec,
     if field_spec is not None:
         if field_spec.element_fsm is not None:
             element["status"] = field_spec.element_fsm.initial
-        # A declared block field starts as an empty array, so the element carries its shape.
-        for block_field in field_spec.block_element_fields():
-            element[block_field] = []
+        # A declared block field is created from its own argument, or empty when none was given.
+        element.update(_element_blocks_from_args(field_spec, args, id_factory))
     _place_entry(page.sections[command.section][command.field], element, command, args, batch_context)
     return element["id"]
 

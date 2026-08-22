@@ -207,7 +207,10 @@ TEST_ELEMENT_BLOCKS = PageType(
     ),
     commands=(
         # Structural edits are draft-only; the element-status marks stay legal once ready.
-        *list_cmds("items", legal_in=("draft",), add_args=(_text("text"),)),
+        # The add carries the element's content, so one command creates a complete item.
+        *list_cmds("items", legal_in=("draft",), add_args=(_text("text"),),
+                   element_blocks=(ElementBlocksSpec("snippet", ("code",)),
+                                   ElementBlocksSpec("detail", ("paragraph", "code", "list")))),
         *element_cmds("items", legal_in=("draft", "ready"),
                       marks=(("markItemDone", "markDone", "mark an item done"),
                              ("markItemTodo", "reopen", "reopen an item"))),

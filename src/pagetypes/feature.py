@@ -516,8 +516,11 @@ _IMPLEMENTATION_PLAN = PageType(
         )),
     ),
     commands=(
-        *list_cmds("steps", label="step", legal_in=("draft",), add_args=()),
-        # The step's detail: real content as blocks rather than prose crushed into `text`.
+        # The add carries the step's content, so one command writes a whole step and a batch of
+        # them never has to name an id it has not committed.
+        *list_cmds("steps", label="step", legal_in=("draft",), add_args=(),
+                   element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),)),
+        # The step's detail, edited once the step exists: real content as blocks rather than prose.
         *element_block_cmds("steps", "detail", ("paragraph", "code"), legal_in=("draft",)),
         # Execution-status marks stay legal once the plan is `ready`: progress is recorded while
         # building against a finalized plan. Only the structural edits above are `draft`-only.

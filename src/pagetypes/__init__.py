@@ -54,6 +54,9 @@ INLINE_RUNS = "inline_runs"            # value: [run, ...]                      
 INLINE_RUN_LISTS = "inline_run_lists"  # value: [[run, ...], ...]                (list items / quote paragraphs / table header cells)
 INLINE_RUN_GRID = "inline_run_grid"    # value: [[[run, ...], ...], ...]         (table rows of cells)
 TABLE_ALIGN = "table_align"            # value: ["left"|"center"|"right"|None, ...]
+# A LIST add's create-with-content argument: the blocks an element is created holding, so making
+# an element and filling it is one command and a batch never names an id it has not committed.
+ELEMENT_BLOCKS = "element_blocks"      # value: [{"kind": <kind>, ...that kind's body args}, ...]
 
 _ALIGN_VALUES = ("left", "center", "right", None)
 # Markdown emphasis/code/link tokens rejected inside a plain-text run. Kept deliberately narrow
@@ -254,8 +257,12 @@ class ArgSpec:
     choices: tuple[str, ...] | None = None
     description: str = ""
     # for an `array` arg carrying inline runs: which inline-run shape it must satisfy
-    # (INLINE_RUNS / INLINE_RUN_LISTS / INLINE_RUN_GRID / TABLE_ALIGN). None = no shape check.
+    # (INLINE_RUNS / INLINE_RUN_LISTS / INLINE_RUN_GRID / TABLE_ALIGN / ELEMENT_BLOCKS).
+    # None = no shape check.
     content: str | None = None
+    # for an ELEMENT_BLOCKS arg: the block kinds it accepts, copied from the field's declaration -
+    # what makes the shape checkable, and what describe reports so a caller reads it off the schema
+    block_kinds: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -461,8 +468,10 @@ def _boolean(name: str, *, required: bool = True, description: str = "") -> ArgS
     return ArgSpec(name, type="boolean", required=required, description=description)
 
 
-def _array(name: str, *, content: str | None = None, required: bool = True, description: str = "") -> ArgSpec:
-    return ArgSpec(name, type="array", required=required, content=content, description=description)
+def _array(name: str, *, content: str | None = None, required: bool = True, description: str = "",
+           block_kinds: tuple[str, ...] | None = None) -> ArgSpec:
+    return ArgSpec(name, type="array", required=required, content=content, description=description,
+                   block_kinds=block_kinds)
 
 
 def _same_named(args: tuple[ArgSpec, ...]) -> tuple[tuple[str, str], ...]:
@@ -544,6 +553,7 @@ def set_scalar_cmd(section: str, field: str, *, name: str | None = None,
 
 def list_cmds(section: str, *, field: str = "items", singular: str | None = None,
               label: str | None = None, add_args: tuple[ArgSpec, ...] | None = None,
+              element_blocks: tuple[ElementBlocksSpec, ...] = (),
               legal_in: tuple[str, ...] | None = None, ref_check: RefCheck | None = None,
               add: bool = True, remove: bool = True, reorder: bool = True,
               add_name: str | None = None, remove_name: str | None = None,
@@ -557,13 +567,24 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
     stale-read guard - so the 'every list field has a reorder' and 'every add supports positioned
     insert' invariants hold by construction. An add that references another page carries a
     `ref_check`, as `add_block_cmd` does; the remove and reorder name an element already on this
-    page, so they do not."""
+    page, so they do not.
+
+    `element_blocks` mirrors the LIST field's own declaration: for each entry the ADD gains an
+    optional array arg named after that element field, carrying the blocks the element is created
+    holding - so creating an element and giving it content is one command, and a batch never has to
+    name an id it has not committed. Those args stay out of element_map, because the raw argument is
+    never written onto the element; the add converts it into id'd blocks."""
     noun = singular or _singular(field if field != "items" else section)
     cap, id_arg, label = _cap(noun), f"{noun}Id", label or noun
+    block_args = tuple(
+        _array(spec.field, content=ELEMENT_BLOCKS, required=False, block_kinds=spec.kinds,
+               description=f"the {spec.field} blocks to create the {noun} with")
+        for spec in element_blocks)
     out: list[CommandSpec] = []
     if add:
         out.append(CommandSpec(add_name or f"add{cap}", ADD_ELEMENT, f"add {_a(label)} {label}",
-                               section=section, field=field, args=(*(add_args or tuple()), _INDEX, _PRECEDING),
+                               section=section, field=field,
+                               args=(*(add_args or tuple()), *block_args, _INDEX, _PRECEDING),
                                element_map=_same_named(add_args or tuple()),
                                ref_check=ref_check, legal_in=legal_in))
     if remove:
@@ -606,7 +627,7 @@ def set_element_field_cmd(section: str, *, name: str, const: tuple[str, Any], de
 
 
 # Standard args per block kind, so add_block_cmd fills them in from the kind alone (override via args=).
-_BLOCK_ARGS: dict[str, tuple[ArgSpec, ...]] = {
+BLOCK_ARGS: dict[str, tuple[ArgSpec, ...]] = {
     "paragraph": (_array("inlines", content=INLINE_RUNS),),
     "heading": (_integer("level"), _array("inlines", content=INLINE_RUNS)),
     "code": (_text("language"), _text("source")),
@@ -625,7 +646,7 @@ def add_block_cmd(section: str, kind: str, *, add_name: str | None = None, set_n
                   element_field: str | None = None, id_arg: str | None = None) -> tuple[CommandSpec, ...]:
     """The ADD_BLOCK and matching in-place SET_BLOCK for one block kind (the set is skipped only for a
     kind with no body args, e.g. divider - there is nothing to replace). Body args default to
-    `_BLOCK_ARGS[kind]` (override with args=) and the element_map is derived from them (same-named);
+    `BLOCK_ARGS[kind]` (override with args=) and the element_map is derived from them (same-named);
     the add carries positioned-insert args, the set takes a leading `blockId`. `add_name` defaults to
     add<Kind>, `set_name` to that add_name with 'add'->'set' (so add<Kind>->set<Kind>).
 
@@ -635,7 +656,7 @@ def add_block_cmd(section: str, kind: str, *, add_name: str | None = None, set_n
     what keeps the run grammar enforced one level deeper."""
     if element_field is not None and id_arg is None:
         raise ValueError(f"add_block_cmd({section!r}, {kind!r}): element_field needs an id_arg.")
-    body_args = _BLOCK_ARGS[kind] if args is None else args
+    body_args = BLOCK_ARGS[kind] if args is None else args
     emap = _same_named(body_args)
     lead = (_text(id_arg),) if element_field is not None and id_arg is not None else ()
     add_name = add_name or f"add{_cap(kind)}"
@@ -844,6 +865,39 @@ def validate_inline_content(content: str, value: Any) -> None:
                 )
 
 
+def validate_element_blocks(value: Any, kinds: tuple[str, ...]) -> None:
+    """Validate a create-with-content block array against the kinds its field accepts.
+
+    Each entry is one block: a `kind` the field declares, plus exactly that kind's body args, each
+    checked the way the per-kind command checks it - so a block that is legal to create is legal to
+    edit, and the reverse. The two paths share this grammar rather than restating it.
+    """
+    if not isinstance(value, list):
+        raise ValidationError("An element-blocks value must be an array of blocks.")
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ValidationError(
+                f"Each element block must be an object with a 'kind', got {type(entry).__name__}."
+            )
+        kind = entry.get("kind")
+        if kind not in kinds:
+            raise ValidationError(
+                f"Block kind {kind!r} is not accepted here - one of {list(kinds)}."
+            )
+        specs = BLOCK_ARGS[kind]
+        extra = set(entry) - {spec.name for spec in specs} - {"kind"}
+        if extra:
+            raise ValidationError(f"A '{kind}' block has unknown keys: {sorted(extra)}.")
+        for spec in specs:
+            present = spec.name in entry and entry[spec.name] is not None
+            if spec.required and not present:
+                raise ValidationError(f"A '{kind}' block requires '{spec.name}'.")
+            if present and spec.content is not None:
+                validate_inline_content(spec.content, entry[spec.name])
+        if kind == "table":
+            validate_table(entry.get("header", []), entry.get("rows", []), entry.get("align"))
+
+
 def collect_ref_ids(content: str, value: Any) -> list[str]:
     """Every `{ref: pageId}` page id carried by an inline-run arg `value` of the given `content` shape.
 
@@ -869,6 +923,18 @@ def collect_ref_ids(content: str, value: Any) -> list[str]:
         for row in value if isinstance(value, list) else []:
             for cell in row if isinstance(row, list) else []:
                 from_runs(cell)
+    elif content == ELEMENT_BLOCKS:
+        # A block created with its element carries its runs one level deeper; without this the
+        # store's precheck could not see them and a dangling ref would be written.
+        for entry in value if isinstance(value, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            kind = entry.get("kind")
+            if not isinstance(kind, str):
+                continue                      # left for the grammar validation to reject
+            for spec in BLOCK_ARGS.get(kind, ()):
+                if spec.content is not None:
+                    ids.extend(collect_ref_ids(spec.content, entry.get(spec.name)))
     return ids
 
 

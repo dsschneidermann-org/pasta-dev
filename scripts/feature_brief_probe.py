@@ -19,8 +19,8 @@ stage at a time:
 
     grounding  ->  the brief's four grounding setters, all three children silent
     spec       ->  the feature-spec's setters (+ askQuestion); NO addStep/addCase
-    planning   ->  addStep (with the addDetail* commands that fill a step, on the one
-                   steps.items edge) and addCase; the sealed spec has locked itself
+    planning   ->  addStep (carrying the step's own detail blocks, beside the addDetail*
+                   commands that edit one afterwards) and addCase; the spec has locked itself
 
 The closing summary tallies the edge count per stage, so a regression shows up as
 a stage that got noisy - most usefully, an addStep appearing during `spec`.
@@ -280,20 +280,23 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
         #    own setters are gone here: `sealed` is terminal, so its authoring locks itself.
         probe.mutate(brief, cmd("beginPlanning"))
         record("8. PLANNING (plans unlocked, sealed spec locked)", brief)
+        # A step is created complete: the add carries its content, so one batch writes both steps
+        # and nothing has to name an id the batch has not committed. Both kinds the field accepts
+        # are exercised - a paragraph, whose inline runs let a code span ride inside prose, and a
+        # code block. createdIds stays one id per command, so `step_ids` is still the two steps.
         step_ids = probe.mutate(
             plan,
-            cmd("addStep"),
-            cmd("addStep"),
-        )
-        probe.mutate(
-            plan,
-            cmd("addDetailParagraph", stepId=step_ids[0], inlines=[
-                "Add ", {"code": "scripts/feature_brief_probe.py"},
-                " with the MCP session plumbing, reusing the sibling probe's transport."]),
-            cmd("addDetailCode", stepId=step_ids[0], language="bash",
-                source="uv run python scripts/feature_brief_probe.py"),
-            cmd("addDetailParagraph", stepId=step_ids[1], inlines=[
-                "Drive the lifecycle and print each stage's rollup, then archive the brief."]),
+            cmd("addStep", detail=[
+                {"kind": "paragraph", "inlines": [
+                    "Add ", {"code": "scripts/feature_brief_probe.py"},
+                    " with the MCP session plumbing, reusing the sibling probe's transport."]},
+                {"kind": "code", "language": "bash",
+                 "source": "uv run python scripts/feature_brief_probe.py"},
+            ]),
+            cmd("addStep", detail=[
+                {"kind": "paragraph", "inlines": [
+                    "Drive the lifecycle and print each stage's rollup, then archive the brief."]},
+            ]),
         )
         probe.mutate(plan, cmd("markReady"))
         case_ids = probe.mutate(

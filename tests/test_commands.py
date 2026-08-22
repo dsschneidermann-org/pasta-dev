@@ -761,6 +761,65 @@ def items_of(page):
     return page.sections["items"]["items"]
 
 
+def test_an_add_creates_an_element_with_its_blocks():
+    factory = make_counter()
+    page = create_page(ELEMENT_BLOCKS, "A fixture", None, factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItem", {
+        "text": "one",
+        "detail": [{"kind": "paragraph", "inlines": ["prose"]},
+                   {"kind": "code", "language": "python", "source": "x = 1"}],
+        "snippet": [{"kind": "code", "language": "bash", "source": "ls"}],
+    }, factory)
+    element = items_of(added.page)[0]
+    assert added.created_id == element["id"]          # the ELEMENT's id, not a block's
+    assert element["status"] == "todo"
+    assert [block["kind"] for block in element["detail"]] == ["paragraph", "code"]
+    assert element["detail"][1]["source"] == "x = 1"
+    assert [block["kind"] for block in element["snippet"]] == ["code"]
+    # Every block carries its own minted id, distinct from the element's and from each other's.
+    ids = [block["id"] for block in element["detail"] + element["snippet"]]
+    assert len(set(ids)) == 3 and element["id"] not in ids
+
+
+def test_a_block_created_with_its_element_matches_one_added_after():
+    # The two paths must not drift into two dialects: same keys, same values, ids aside.
+    made_with = apply_command(
+        create_page(ELEMENT_BLOCKS, "A", None, make_counter()), ELEMENT_BLOCKS, "addItem",
+        {"text": "one", "detail": [{"kind": "code", "language": "python", "source": "x = 1"}]},
+        make_counter())
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    added_after = apply_command(page, ELEMENT_BLOCKS, "addDetailCode",
+                                {"itemId": item_id, "language": "python", "source": "x = 1"},
+                                factory)
+    first = items_of(made_with.page)[0]["detail"][0]
+    second = items_of(added_after.page)[0]["detail"][0]
+    assert {k: v for k, v in first.items() if k != "id"} == \
+           {k: v for k, v in second.items() if k != "id"}
+
+
+def test_creating_with_blocks_enforces_the_same_grammar():
+    factory = make_counter()
+    page = create_page(ELEMENT_BLOCKS, "A fixture", None, factory)
+
+    def add(**args):
+        return apply_command(page, ELEMENT_BLOCKS, "addItem", {"text": "one", **args}, factory)
+
+    # The declared arg type is checked first, so a non-array never reaches the block grammar.
+    with pytest.raises(ValidationError, match="must be of type 'array'"):
+        _ = add(detail="nope")
+    with pytest.raises(ValidationError, match="must be an object"):
+        _ = add(detail=["nope"])
+    with pytest.raises(ValidationError, match="not accepted here"):
+        _ = add(snippet=[{"kind": "paragraph", "inlines": []}])     # snippet takes code only
+    with pytest.raises(ValidationError, match="unknown keys"):
+        _ = add(detail=[{"kind": "code", "language": "py", "source": "x", "nope": 1}])
+    with pytest.raises(ValidationError, match="requires 'source'"):
+        _ = add(detail=[{"kind": "code", "language": "py"}])
+    with pytest.raises(ValidationError, match="Markdown syntax"):
+        _ = add(detail=[{"kind": "paragraph", "inlines": ["a **bold** word"]}])
+
+
 def test_a_new_element_carries_its_declared_block_fields_empty():
     factory = make_counter()
     page, item_id = new_item(factory)
