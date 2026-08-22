@@ -1310,7 +1310,7 @@ def test_render_html_returns_structured_html_for_one_page(store):
     out = store.render_html(workspace.id, page.id)
     assert '<article class="pasta-page">' in out
     assert '<h1 class="page-title">Page title</h1>' in out
-    assert '<h3 class="element-title">Item one</h3>' in out
+    assert "<dt>text</dt><dd><p>Item one</p></dd>" in out
 
 
 def test_render_html_rejects_an_unknown_page(store):

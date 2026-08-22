@@ -41,6 +41,13 @@ PROSE = "prose"
 LIST = "list"
 BLOCKS = "blocks"                            # ordered typed blocks (paragraph/heading/code/list/table/quote/...)
 
+# --- Element headings --------------------------------------------------------
+# The element field names that title their element, in precedence order. A heading is DECLARED,
+# never inferred from what an author typed: a list field naming one of these renders every one of
+# its elements with a heading, and a field naming neither renders none of them with one, so an
+# element's shape is a property of its type rather than of its values.
+TITLE_ELEMENT_FIELDS = ("title", "name")
+
 # --- Inline-run content shapes (for `blocks` fields) -------------------------
 # The rich text inside a block is an ordered array of **inline runs**. An `ArgSpec` may
 # declare which inline shape its (array) value must satisfy so the command layer can
@@ -195,6 +202,18 @@ class FieldSpec:
         """The element field names that hold blocks - what every consumer skips when it is
         treating an element's fields as scalar text."""
         return tuple(spec.field for spec in self.element_blocks)
+
+    def title_element_field(self) -> str | None:
+        """The element field whose value heads each of this list's elements, or None when the
+        type declares no heading and every element renders as its ordinal plus labelled rows.
+        Read from the declaration alone, so every element of one field renders the same shape.
+        A block-bearing field is not a heading candidate - a heading is one line of text."""
+        declared = self.element_fields or ()
+        blocks = self.block_element_fields()
+        for key in TITLE_ELEMENT_FIELDS:
+            if key in declared and key not in blocks:
+                return key
+        return None
 
 
 @dataclass(frozen=True)

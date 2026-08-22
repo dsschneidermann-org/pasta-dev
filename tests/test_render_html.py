@@ -4,8 +4,8 @@ from src.commands import apply_command, create_page
 from src.model import Page
 from src.pagetypes import FSMSpec, PageType, get_page_type
 from src.render import RefContext
-from src.render_html import (TITLE_MAX_CHARS, _children_html, _field_html, _list_html,
-                             _references_html, _text_html, element_view, render_page_html)
+from src.render_html import (_children_html, _field_html, _list_html, _references_html,
+                             _text_html, element_view, render_page_html)
 
 CHILD = get_page_type("test-child")
 FIELDS = get_page_type("test-fields")
@@ -45,36 +45,57 @@ def _page(**kwargs):
     return Page(**base)
 
 
-def test_element_view_titles_on_short_first_field():
+def test_element_view_heads_on_the_declared_name_field():
+    spec = _spec(LIFECYCLE, "parts", "items")      # element_fields ('name',)
+    view = element_view({"id": "c1", "name": "src/render_html.py"}, 1, spec)
+    assert view.title == "src/render_html.py"
+    assert view.index == 1 and view.element_id == "c1"
+    assert view.rows == ()                          # the heading field is never also a row
+
+
+def test_element_view_gives_no_heading_when_the_type_declares_none():
     spec = _spec(FIELDS, "items", "items")          # element_fields ('text', 'note', 'flagged')
-    view = element_view({"id": "el1", "text": "Short title", "note": "a note"}, 1, spec)
-    assert view.title == "Short title"
-    assert view.index == 1 and view.element_id == "el1"
-    assert view.rows == (("note", "a note"), ("flagged", None))
-
-
-def test_element_view_long_first_field_becomes_a_row_not_a_title():
-    spec = _spec(FIELDS, "items", "items")
-    long_text = "x" * (TITLE_MAX_CHARS + 1)
-    view = element_view({"id": "el2", "text": long_text}, 2, spec)
+    view = element_view({"id": "el1", "text": "Short enough to look like a title",
+                         "note": "a note"}, 1, spec)
     assert view.title is None
-    assert view.rows[0] == ("text", long_text)
+    assert view.rows == (("text", "Short enough to look like a title"),
+                         ("note", "a note"), ("flagged", None))
 
 
-def test_element_view_multiline_first_field_is_not_a_title():
+def test_element_view_shape_does_not_move_with_the_length_of_a_value():
+    # The defect this rule replaced: a short value was promoted to a heading and disappeared from
+    # the rows, so two elements of ONE list rendered with different structure.
     spec = _spec(FIELDS, "items", "items")
-    view = element_view({"id": "el3", "text": "line one\nline two"}, 1, spec)
+    short = element_view({"id": "el2", "text": "short"}, 1, spec)
+    sprawling = element_view({"id": "el3", "text": "x" * 400}, 2, spec)
+    assert short.title is sprawling.title is None
+    assert [key for key, _ in short.rows] == [key for key, _ in sprawling.rows]
+
+
+def test_element_view_heads_on_a_value_no_length_rule_would_accept():
+    # 400 characters and a newline: neither length nor shape is consulted, only the declaration.
+    spec = _spec(LIFECYCLE, "parts", "items")
+    value = "line one" + chr(10) + "y" * 400
+    view = element_view({"id": "c2", "name": value}, 1, spec)
+    assert view.title == value
+    assert view.rows == ()
+
+
+def test_element_view_empty_heading_value_leaves_the_ordinal_and_no_row():
+    spec = _spec(LIFECYCLE, "parts", "items")
+    view = element_view({"id": "c3", "name": "   "}, 1, spec)
     assert view.title is None
-    assert view.rows[0] == ("text", "line one\nline two")
+    assert view.rows == ()
 
 
-def test_element_view_never_advances_past_the_first_declared_field():
-    # (text, answer, needsHuman, status): a rule that scanned for the first SHORT field would
-    # skip the two long ones and title this element "True".
+def test_element_view_never_heads_on_an_undeclared_field():
+    # (text, answer, needsHuman, status): no declared heading field, so nothing is promoted - in
+    # particular not `needsHuman`, which a scan for the first short value would title "True".
     spec = _spec(LIFECYCLE, "questions", "items")
-    view = element_view({"id": "q1", "text": "y" * (TITLE_MAX_CHARS + 1), "answer": "",
+    view = element_view({"id": "q1", "text": "y" * 400, "answer": "",
                          "needsHuman": True, "status": "open"}, 1, spec)
     assert view.title is None
+    assert view.rows[0] == ("text", "y" * 400)
     assert ("needsHuman", "True") in view.rows
 
 
@@ -84,13 +105,14 @@ def test_element_view_reads_status_and_checkbox_from_the_element_fsm():
     todo = element_view({"id": "s2", "text": "Ship it", "status": "todo"}, 2, spec)
     assert (done.check, done.status) == ("done", "done")
     assert (todo.check, todo.status) == ("todo", "todo")
-    assert done.rows == () and todo.rows == ()      # status is a chip, never a row
+    # status is a chip, never a row; `text` is a row because the type declares no heading
+    assert done.rows == (("text", "Write it"),) and todo.rows == (("text", "Ship it"),)
 
 
 def test_element_view_keeps_an_undeclared_key_after_the_declared_ones():
     spec = _spec(FIELDS, "items", "items")
     view = element_view({"id": "el4", "text": "t", "note": "n", "extra": "kept"}, 1, spec)
-    assert view.rows == (("note", "n"), ("flagged", None), ("extra", "kept"))
+    assert view.rows == (("text", "t"), ("note", "n"), ("flagged", None), ("extra", "kept"))
 
 
 def test_text_html_escapes_and_splits_on_blank_lines():
@@ -131,7 +153,9 @@ def test_list_html_gives_each_element_an_ordinal_title_and_rows():
     ], None)
     assert out.count('<li class="element"') == 2
     assert 'id="element-el1"' in out and 'id="element-el2"' in out
-    assert '<h3 class="element-title">First item</h3>' in out
+    # test-fields declares no heading field, so `text` is a labelled row on every element
+    assert '<h3 class="element-title">' not in out
+    assert "<dt>text</dt><dd><p>First item</p></dd>" in out
     assert "<dt>note</dt><dd><p>a note</p></dd>" in out
     assert '<dd class="empty">&mdash;</dd>' in out       # flagged: declared, empty
 
@@ -259,11 +283,10 @@ def test_render_page_html_escapes_the_page_title():
     assert "a &lt;b&gt; &amp; c" in out and "<b>" not in out
 
 
-def test_list_element_page_id_title_becomes_a_titled_link():
-    spec = _spec(FIELDS, "items", "items")
-    out = _list_html(spec, [{"id": "el1", "text": "a:1", "note": "why it depends"}], _context())
+def test_list_element_page_id_heading_becomes_a_titled_link():
+    spec = _spec(LIFECYCLE, "parts", "items")                   # declares a `name` heading
+    out = _list_html(spec, [{"id": "el1", "name": "a:1"}], _context())
     assert '<a href="/ws:demo/page/a:1">Alpha</a>' in out       # the title, not the raw id
-    assert '<span class="link-type">test-fields</span>' in out
     assert "a:1</h3>" not in out                                # the raw id is not the heading
 
 
@@ -321,9 +344,9 @@ CODE_BLOCK = {"id": "b1", "kind": "code", "language": "python", "source": "x = 1
 def test_element_view_keeps_block_fields_out_of_the_rows():
     element = {"id": "e1", "text": "one", "snippet": [], "detail": [CODE_BLOCK], "status": "todo"}
     view = element_view(element, 1, _spec(ELEMENT_BLOCKS, "items", "items"))
-    assert view.title == "one"                       # still the first declared NON-block field
+    assert view.title is None                        # the type declares no heading field
     assert view.check == "todo"
-    assert [label for label, _ in view.rows] == []   # text became the title; blocks are not rows
+    assert [label for label, _ in view.rows] == ["text"]   # blocks are never plain rows
     assert view.block_rows == (("snippet", ()), ("detail", (CODE_BLOCK,)))
 
 

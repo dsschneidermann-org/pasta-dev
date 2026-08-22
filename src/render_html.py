@@ -23,10 +23,6 @@ from .render import RefContext, checkbox_state, render_blocks
 # The one Markdown-to-HTML engine, defined here because this is where HTML is produced.
 md2html = Wenmode(github)
 
-# The longest first-field value still usable as an element heading. Beyond it the value is a
-# paragraph, not a title, and the element falls back to its ordinal alone.
-TITLE_MAX_CHARS = 80
-
 
 # Shown for an empty field, so a page's shape is visible before it is filled.
 _NONE_HTML = '<p class="empty">None.</p>'
@@ -68,26 +64,28 @@ class ElementView:
 
 def element_view(element: dict[str, Any], index: int, field_spec: FieldSpec) -> ElementView:
     """Decompose one stored element for display. The single home of the title, row and checkbox
-    rules: an element is titled by its first declared field, and only while that value still
-    reads as a title."""
+    rules: an element is headed by the field its type declares as the heading (`title` or `name`)
+    and by no other, so every element of one field renders with the same shape whatever its
+    values are - a list whose type declares neither is headed by its ordinal alone."""
     declared = field_spec.element_fields or ()
-    # A block-bearing field is neither a title candidate nor a row - it has its own tuple.
+    # A block-bearing field is neither a heading nor a plain row - it has its own tuple.
     block_fields = field_spec.block_element_fields()
+    # The declared heading field, consumed by the heading and never repeated as a row - so a
+    # field's row set is fixed by its declaration and does not move with an author's edits.
+    title_key = field_spec.title_element_field()
     # Declared order first, then any stored key the type does not declare, so nothing on the
     # element is hidden. `id` is structural and `status` has its own chip.
     extra = [key for key in element if key not in ("id", "status") and key not in declared]
-    keys = [key for key in declared if key != "status" and key not in block_fields] + extra
+    keys = [key for key in declared
+            if key not in ("status", title_key) and key not in block_fields] + extra
 
     raw_status = element.get("status")
     status = raw_status if isinstance(raw_status, str) else None
 
-    title = None
-    if keys:
-        head = element.get(keys[0])
-        candidate = str(head).strip() if head is not None else ""
-        if candidate and "\n" not in candidate and len(candidate) <= TITLE_MAX_CHARS:
-            title = candidate
-            keys = keys[1:]
+    # An empty heading value leaves the element with its ordinal alone; the field stays the
+    # heading either way, so it never reappears as a row.
+    head = element.get(title_key) if title_key is not None else None
+    title = (str(head).strip() or None) if head is not None else None
 
     def row_value(key: str) -> str | None:
         value = element.get(key)

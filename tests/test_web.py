@@ -172,7 +172,7 @@ def test_page_view_renders_the_structured_body(client):
     response = client.get(f"/ws:{part}/page/{page.id}")
     assert response.status_code == 200
     assert '<article class="pasta-page">' in response.text
-    assert '<h3 class="element-title">Item one</h3>' in response.text
+    assert "<dt>text</dt><dd><p>Item one</p></dd>" in response.text
     assert "<dt>note</dt><dd><p>a note</p></dd>" in response.text
     assert '<nav class="page-contents"' in response.text
     assert "The body." in response.text                 # the prose field still reaches the page
