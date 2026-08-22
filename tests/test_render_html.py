@@ -214,7 +214,7 @@ def test_empty_blocks_field_renders_the_none_fallback():
 def test_children_html_links_each_child_with_its_type_and_status():
     out = _children_html(_page(child_ids=["a:1"]), _context())
     assert '<a href="/ws:demo/page/a:1">Alpha</a>' in out
-    assert '<span class="link-type">test-fields</span>' in out
+    assert '<span class="link-type">test-fields&nbsp;·</span>' in out
     assert '<span class="link-status">active</span>' in out
 
 
@@ -250,7 +250,7 @@ def test_render_page_html_emits_header_sections_and_both_link_lists():
     page = apply_command(page, FIELDS, "addItem", {"text": "Item text."}, factory).page
     out = render_page_html(page, FIELDS)
     assert '<h1 class="page-title">Page title</h1>' in out
-    assert '<span class="page-type">test-fields</span>' in out
+    assert '<span class="page-type">test-fields&nbsp;·&nbsp;</span>' in out
     assert '<span class="page-status">active</span>' in out
     assert 'id="section-basics"' in out and 'id="section-items"' in out
     assert 'id="section-references"' in out and 'id="section-children"' in out
