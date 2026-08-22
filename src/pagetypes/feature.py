@@ -84,7 +84,7 @@ _FEATURE_BRIEF = PageType(
                 """),
         )),
         SectionSpec("components", "Components", (
-            _list("items", element_fields=("name",), description="""
+            _list("items", element_fields=("name", "text"), description="""
                 Each one part of the system this feature touches, named as a real file, module, or
                 subsystem path you CONFIRMED exists while grounding. One per element. List only what
                 the work will actually read or change: a guessed component sends the whole plan down
@@ -165,7 +165,7 @@ _FEATURE_BRIEF = PageType(
     ),
     commands=(
         set_prose_cmd("summary"),
-        *list_cmds("components", add_args=(_text("name"),)),
+        *list_cmds("components", add_args=(_text("name"), _text())),
         *list_cmds("constraints", add_args=(_text(),)),
         *list_cmds("conflicts", add_args=(_text(),)),
         *list_cmds("documentation", add_args=(_text(),)),
