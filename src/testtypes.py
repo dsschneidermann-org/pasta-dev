@@ -9,6 +9,12 @@ role:
                          them (set, add + positioned insert, remove, reorder, set-element-field).
   - ``test-blocks``    - the ``blocks`` field: every block kind, the inline-run grammar, in-place
                          set, reorder, remove; a single terminal ``active`` state.
+  - ``test-element-blocks`` - block-bearing element fields: a list whose elements carry blocks
+                         under a per-field kind restriction (``snippet`` code-only, ``detail``
+                         paragraph/code/list), an element FSM, and a draft→ready FSM whose
+                         ``markReady`` requires the list - so the draft-only lock on the
+                         element-scoped block commands and their absence from the ``do`` list are
+                         both observable.
   - ``test-flow``      - a simple status FSM (draft → open → closed → open) with a state and event
                          that share the name ``open``, and a COMPOUND ``close`` that records a
                          commit AND transitions.
@@ -54,6 +60,7 @@ from .pagetypes import (
     SCALAR,
     AutoChildSpec,
     ChildStateGuard,
+    ElementBlocksSpec,
     ElementFSMSpec,
     FieldSpec,
     FSMSpec,
@@ -66,6 +73,7 @@ from .pagetypes import (
     add_block_cmd,
     all_block_cmds,
     block_cmds,
+    element_block_cmds,
     element_cmds,
     list_cmds,
     set_element_field_cmd,
@@ -111,9 +119,10 @@ def _prose(key: str, description: str = "") -> FieldSpec:
 
 
 def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec | None = None,
-          description: str = "") -> FieldSpec:
+          description: str = "", element_blocks: tuple[ElementBlocksSpec, ...] = ()) -> FieldSpec:
     return FieldSpec(key=key, kind=LIST, element_fields=element_fields,
-                     element_fsm=element_fsm, description=description)
+                     element_fsm=element_fsm, element_blocks=element_blocks,
+                     description=description)
 
 
 def _blocks(key: str, description: str = "") -> FieldSpec:
@@ -172,6 +181,44 @@ TEST_BLOCKS = PageType(
     # The full rich blocks surface - add + in-place set per kind, plus remove/reorder - in one call.
     commands=(*all_block_cmds("body"), add_link_cmd(), set_title_cmd()),
     fsm=FSMSpec(name="TestBlocks", initial="active", states=("active",)),
+)
+
+
+# ============================================================================
+# test-element-blocks - block-bearing element fields: a list whose elements carry blocks, under a
+# per-field kind restriction. Both restriction cases are present - `snippet` accepts code only,
+# `detail` accepts paragraph/code/list - beside an element FSM, so a checkbox, a title and blocks
+# render together. The two-state FSM whose `markReady` REQUIRES the list field is deliberate: it is
+# the only way to observe both the draft-only content lock on the element-scoped commands and their
+# absence from the self-direction `do` list.
+# ============================================================================
+TEST_ELEMENT_BLOCKS = PageType(
+    tag="test-element-blocks",
+    name="Element blocks fixture",
+    description="Test fixture: list elements whose fields hold blocks, restricted per field.",
+    sections=(
+        SectionSpec("items", "Items", (
+            _list("items", element_fields=("text", "snippet", "detail", "status"),
+                  element_fsm=_STEP_FSM,
+                  element_blocks=(ElementBlocksSpec("snippet", ("code",)),
+                                  ElementBlocksSpec("detail", ("paragraph", "code", "list"))),
+                  description="a list whose elements carry a code-only field and a rich one"),
+        )),
+    ),
+    commands=(
+        # Structural edits are draft-only; the element-status marks stay legal once ready.
+        *list_cmds("items", legal_in=("draft",), add_args=(_text("text"),)),
+        *element_cmds("items", legal_in=("draft", "ready"),
+                      marks=(("markItemDone", "markDone", "mark an item done"),
+                             ("markItemTodo", "reopen", "reopen an item"))),
+        *element_block_cmds("items", "snippet", ("code",), legal_in=("draft",)),
+        *element_block_cmds("items", "detail", ("paragraph", "code", "list"), legal_in=("draft",)),
+        transition_cmd("markReady", "draft -> ready", requires=(("items", "items"),)),
+        transition_cmd("reopen", "ready -> draft"),
+        add_link_cmd(),
+        set_title_cmd(),
+    ),
+    fsm=FSMSpec(name="TestElementBlocks", initial="draft", states=("draft", "ready")),
 )
 
 
@@ -373,5 +420,6 @@ TEST_CHILD = PageType(
 
 TEST_REGISTRY: dict[str, PageType] = {
     page_type.tag: page_type
-    for page_type in (TEST_FIELDS, TEST_BLOCKS, TEST_FLOW, TEST_LIFECYCLE, TEST_CHILD)
+    for page_type in (TEST_FIELDS, TEST_BLOCKS, TEST_ELEMENT_BLOCKS, TEST_FLOW, TEST_LIFECYCLE,
+                      TEST_CHILD)
 }

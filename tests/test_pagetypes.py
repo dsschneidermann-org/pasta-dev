@@ -33,8 +33,14 @@ from src.pagetypes import (
     TRANSITION,
     BLOCKS,
     LIST,
+    PROSE,
     REGISTRY,
+    ElementBlocksSpec,
+    FieldSpec,
+    _list,
+    add_block_cmd,
     collect_ref_ids,
+    element_block_cmds,
     get_page_type,
     initial_sections,
     status_transitions,
@@ -149,24 +155,48 @@ def test_element_transitions_reference_real_element_events(tag: str):
 
 @pytest.mark.parametrize("tag", list(ALL_TYPES))
 def test_block_commands_target_blocks_fields(tag: str):
-    """add/set/move/remove-block commands must target a `blocks` field."""
+    """add/set/move/remove-block commands must target a `blocks` field - or, when element-scoped, a
+    `list` field declaring that element field as block-bearing, for a kind that field accepts."""
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
-        if command.kind in BLOCK_TARGETING:
-            field_spec = page_type.field_spec(command.section, command.field)
+        if command.kind not in BLOCK_TARGETING:
+            continue
+        field_spec = page_type.field_spec(command.section, command.field)
+        if command.element_field is None:
             assert field_spec is not None and field_spec.kind == BLOCKS, (
                 f"{tag}.{command.name} targets {command.section}.{command.field}, which is not a blocks field"
             )
+            continue
+        assert field_spec is not None and field_spec.kind == LIST, (
+            f"{tag}.{command.name} is element-scoped but {command.section}.{command.field} is not a list field"
+        )
+        blocks_spec = field_spec.element_blocks_spec(command.element_field)
+        assert blocks_spec is not None, (
+            f"{tag}.{command.name} targets element field {command.element_field}, "
+            f"which {command.section}.{command.field} does not declare as block-bearing"
+        )
+        assert command.block_kind is None or command.block_kind in blocks_spec.kinds, (
+            f"{tag}.{command.name} writes a '{command.block_kind}' block, which "
+            f"{command.element_field} does not accept"
+        )
 
 
 @pytest.mark.parametrize("tag", list(ALL_TYPES))
 def test_every_ordered_field_has_a_reorder_command(tag: str):
-    """The 'extend to all fields' contract: every list field exposes a reorder_element command and
-    every blocks field a reorder_block command - targeting that exact field."""
+    """The 'extend to all fields' contract: every list field exposes a reorder_element command,
+    every blocks field a reorder_block command, and every block-bearing element field its own
+    element-scoped reorder_block - each targeting that exact field."""
     page_type = ALL_TYPES[tag]
+    # An element-scoped reorder belongs to its element field, not to the list field it sits on.
     reorder_kind_by_target = {
         (command.section, command.field): command.kind
-        for command in page_type.commands if command.kind in (REORDER_ELEMENT, REORDER_BLOCK)
+        for command in page_type.commands
+        if command.kind in (REORDER_ELEMENT, REORDER_BLOCK) and command.element_field is None
+    }
+    element_block_reorders = {
+        (command.section, command.field, command.element_field)
+        for command in page_type.commands
+        if command.kind == REORDER_BLOCK and command.element_field is not None
     }
     for section in page_type.sections:
         for field_spec in section.fields:
@@ -174,6 +204,11 @@ def test_every_ordered_field_has_a_reorder_command(tag: str):
             if field_spec.kind == LIST:
                 assert reorder_kind_by_target.get(target) == REORDER_ELEMENT, \
                     f"{tag}.{section.key}.{field_spec.key} (list) has no reorder_element command"
+                for element_field in field_spec.block_element_fields():
+                    assert (*target, element_field) in element_block_reorders, (
+                        f"{tag}.{section.key}.{field_spec.key}.{element_field} (element blocks) "
+                        f"has no reorder_block command"
+                    )
             elif field_spec.kind == BLOCKS:
                 assert reorder_kind_by_target.get(target) == REORDER_BLOCK, \
                     f"{tag}.{section.key}.{field_spec.key} (blocks) has no reorder_block command"
@@ -427,3 +462,81 @@ def test_state_guidance_rejects_duplicate_state():
     with pytest.raises(ValueError, match="twice"):
         FSMSpec(name="G", initial="a", states=("a",),
                 state_guidance=(("a", "x"), ("a", "y")))
+
+
+# --- Block-bearing element fields --------------------------------------------
+def test_element_blocks_spec_is_hashable():
+    # FieldSpec is reachable from the FSMSpec that keys fsm._machine_class's lru_cache, so a
+    # declaration that cannot be hashed would break every page type at once.
+    assert {ElementBlocksSpec("detail", ("code",))} == {ElementBlocksSpec("detail", ("code",))}
+    field = FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
+                      element_blocks=(ElementBlocksSpec("detail", ("code",)),))
+    assert len({field, field}) == 1
+
+
+def test_element_blocks_rejects_a_bad_declaration():
+    # Every defect fails where the type is declared, not when someone tries to author the field.
+    with pytest.raises(ValueError, match="only valid on a list field"):
+        FieldSpec(key="body", kind=PROSE,
+                  element_blocks=(ElementBlocksSpec("detail", ("code",)),))
+    with pytest.raises(ValueError, match="not one of element_fields"):
+        FieldSpec(key="items", kind=LIST, element_fields=("text",),
+                  element_blocks=(ElementBlocksSpec("nope", ("code",)),))
+    with pytest.raises(ValueError, match="twice"):
+        FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
+                  element_blocks=(ElementBlocksSpec("detail", ("code",)),
+                                  ElementBlocksSpec("detail", ("paragraph",))))
+    with pytest.raises(ValueError, match="unknown block kind"):
+        FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
+                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "nope")),))
+    # A field declared to hold blocks but accepting none could never be authored.
+    with pytest.raises(ValueError, match="no block kinds"):
+        FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
+                  element_blocks=(ElementBlocksSpec("detail", ()),))
+
+
+def test_block_element_fields_names_the_declared_fields():
+    field = _list("items", element_fields=("text", "snippet", "detail"),
+                  element_blocks=(ElementBlocksSpec("snippet", ("code",)),
+                                  ElementBlocksSpec("detail", ("paragraph",))))
+    assert field.block_element_fields() == ("snippet", "detail")     # declared order
+    snippet = field.element_blocks_spec("snippet")
+    assert snippet is not None and snippet.kinds == ("code",)
+    assert field.element_blocks_spec("text") is None                 # a scalar element field
+    # A list declaring none reports an empty tuple - what keeps every consumer's scalar path intact.
+    assert _list("items", element_fields=("text",)).block_element_fields() == ()
+
+
+def _arg_names(command):
+    return tuple(arg.name for arg in command.args)
+
+
+def test_add_block_cmd_element_scoped_prepends_the_element_id():
+    add, set_cmd = add_block_cmd("steps", "code", field="items",
+                                 element_field="detail", id_arg="stepId")
+    assert add.element_field == set_cmd.element_field == "detail"
+    assert (add.section, add.field) == ("steps", "items")
+    assert _arg_names(add) == ("stepId", "language", "source", "index", "precedingId")
+    assert _arg_names(set_cmd) == ("stepId", "blockId", "language", "source")
+    # The element id and blockId are addressing, never block content.
+    assert add.element_map == set_cmd.element_map == (("language", "language"), ("source", "source"))
+
+
+def test_element_block_cmds_derives_names_from_the_element_field():
+    commands = element_block_cmds("steps", "detail", ("paragraph", "code"))
+    assert [command.name for command in commands] == [
+        "addDetailParagraph", "setDetailParagraph", "addDetailCode", "setDetailCode",
+        "removeDetailBlock", "reorderDetailBlock",
+    ]
+    assert all(command.element_field == "detail" for command in commands)
+    assert all((command.section, command.field) == ("steps", "items") for command in commands)
+    by_name = {command.name: command for command in commands}
+    assert _arg_names(by_name["addDetailCode"]) == ("stepId", "language", "source",
+                                                    "index", "precedingId")
+    assert _arg_names(by_name["setDetailCode"]) == ("stepId", "blockId", "language", "source")
+    assert _arg_names(by_name["removeDetailBlock"]) == ("stepId", "blockId")
+    assert _arg_names(by_name["reorderDetailBlock"]) == ("stepId", "blockId", "toIndex",
+                                                         "precedingId")
+    # The body args keep their declared inline-run shape, which is what still validates the runs.
+    inlines = by_name["addDetailParagraph"].args[1]
+    assert inlines.name == "inlines" and inlines.content == INLINE_RUNS

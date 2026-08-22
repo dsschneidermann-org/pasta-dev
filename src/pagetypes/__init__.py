@@ -134,12 +134,26 @@ class ElementFSMSpec:
 
 
 @dataclass(frozen=True)
+class ElementBlocksSpec:
+    """A LIST element field that holds an ordered array of blocks instead of a scalar value.
+
+    `kinds` is the closed set of block kinds the field accepts - the element-scoped form of the
+    restriction a page-level blocks field already expresses by declaring only the add-block
+    commands it wants (feature-spec's code-only design surface).
+    """
+    field: str
+    kinds: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FieldSpec:
     key: str
     kind: str                                   # SCALAR | PROSE | LIST | BLOCKS
     choices: tuple[str, ...] | None = None      # allowed values for a scalar enum
     element_fields: tuple[str, ...] | None = None  # for LIST: each element's field names
     element_fsm: ElementFSMSpec | None = None   # for LIST: a per-element lifecycle (todo/done, ...)
+    # for LIST: element fields that hold blocks rather than a scalar value
+    element_blocks: tuple[ElementBlocksSpec, ...] = ()
     description: str = ""
 
     def __post_init__(self):
@@ -147,6 +161,37 @@ class FieldSpec:
         # margin; strip that shared indentation so consumers get the text as authored. The wrap
         # breaks are kept - markdown reflows a paragraph's newlines away.
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
+        # A block-bearing element field is checked where it is declared, so a typo fails at import
+        # rather than producing a field nothing can ever author.
+        seen: set[str] = set()
+        for spec in self.element_blocks:
+            if self.kind != LIST:
+                raise ValueError(f"{self.key}: element_blocks is only valid on a list field.")
+            if spec.field not in (self.element_fields or ()):
+                raise ValueError(
+                    f"{self.key}: element_blocks names '{spec.field}', which is not one of " +
+                    f"element_fields."
+                )
+            if spec.field in seen:
+                raise ValueError(f"{self.key}: element_blocks names '{spec.field}' twice.")
+            if not spec.kinds:
+                raise ValueError(f"{self.key}.{spec.field}: element_blocks declares no block kinds.")
+            for kind in spec.kinds:
+                if kind not in _ALL_BLOCK_KINDS:
+                    raise ValueError(f"{self.key}.{spec.field}: unknown block kind '{kind}'.")
+            seen.add(spec.field)
+
+    def element_blocks_spec(self, element_field: str) -> ElementBlocksSpec | None:
+        """The block declaration for `element_field`, or None when it holds a scalar value."""
+        for spec in self.element_blocks:
+            if spec.field == element_field:
+                return spec
+        return None
+
+    def block_element_fields(self) -> tuple[str, ...]:
+        """The element field names that hold blocks - what every consumer skips when it is
+        treating an element's fields as scalar text."""
+        return tuple(spec.field for spec in self.element_blocks)
 
 
 @dataclass(frozen=True)
@@ -234,6 +279,10 @@ class CommandSpec:
     element_const: tuple[tuple[str, Any], ...] = ()
     # for ADD_BLOCK: the block's kind (paragraph | heading | code | decision)
     block_kind: str | None = None
+    # for ADD_BLOCK / SET_BLOCK / REMOVE_BLOCK / REORDER_BLOCK: the LIST element field holding the
+    # blocks. None = the section's own blocks field. When set, args[0] is the element id and - for
+    # set/remove/reorder - args[1] is the block id.
+    element_field: str | None = None
     # for COMPOUND: ordered sub-commands applied atomically. (ELEMENT_TRANSITION fires the
     # element-FSM event named in `event` on the target element.)
     steps: tuple["CommandSpec", ...] = ()
@@ -354,9 +403,10 @@ def _prose(key: str, *, description: str = "") -> FieldSpec:
 
 
 def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec | None = None,
-          *, description: str = "") -> FieldSpec:
+          *, element_blocks: tuple[ElementBlocksSpec, ...] = (), description: str = "") -> FieldSpec:
     return FieldSpec(key=key, kind=LIST, element_fields=element_fields,
-                     element_fsm=element_fsm, description=description)
+                     element_fsm=element_fsm, element_blocks=element_blocks,
+                     description=description)
 
 
 def _blocks(key: str, *, description: str = "") -> FieldSpec:
@@ -571,26 +621,35 @@ _BLOCK_ARGS: dict[str, tuple[ArgSpec, ...]] = {
 def add_block_cmd(section: str, kind: str, *, add_name: str | None = None, set_name: str | None = None,
                   add_description: str | None = None, set_description: str | None = None, field: str = "body",
                   args: tuple[ArgSpec, ...] | None = None, ref_check: RefCheck | None = None,
-                  legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
+                  legal_in: tuple[str, ...] | None = None,
+                  element_field: str | None = None, id_arg: str | None = None) -> tuple[CommandSpec, ...]:
     """The ADD_BLOCK and matching in-place SET_BLOCK for one block kind (the set is skipped only for a
     kind with no body args, e.g. divider - there is nothing to replace). Body args default to
     `_BLOCK_ARGS[kind]` (override with args=) and the element_map is derived from them (same-named);
     the add carries positioned-insert args, the set takes a leading `blockId`. `add_name` defaults to
-    add<Kind>, `set_name` to that add_name with 'add'->'set' (so add<Kind>->set<Kind>)."""
+    add<Kind>, `set_name` to that add_name with 'add'->'set' (so add<Kind>->set<Kind>).
+
+    With `element_field` given, both commands address that field on ONE element of the list field
+    `field` rather than the section's own blocks field: `id_arg` (required with it) is prepended as
+    args[0], the element id. The body args keep their declared inline-run shape either way, which is
+    what keeps the run grammar enforced one level deeper."""
+    if element_field is not None and id_arg is None:
+        raise ValueError(f"add_block_cmd({section!r}, {kind!r}): element_field needs an id_arg.")
     body_args = _BLOCK_ARGS[kind] if args is None else args
     emap = _same_named(body_args)
+    lead = (_text(id_arg),) if element_field is not None and id_arg is not None else ()
     add_name = add_name or f"add{_cap(kind)}"
     add = CommandSpec(add_name, ADD_BLOCK, add_description or f"add {_a(kind)} {kind} block to {section}",
                       section=section, field=field, block_kind=kind,
-                      args=(*body_args, _INDEX, _PRECEDING), element_map=emap,
-                      ref_check=ref_check, legal_in=legal_in)
+                      args=(*lead, *body_args, _INDEX, _PRECEDING), element_map=emap,
+                      ref_check=ref_check, legal_in=legal_in, element_field=element_field)
     if not body_args:
         return (add,)
     set_name = set_name or (f"set{add_name[3:]}" if add_name.startswith("add") else f"set{_cap(kind)}")
     set_cmd = CommandSpec(set_name, SET_BLOCK, set_description or f"replace {_a(kind)} {kind} block in {section}",
                           section=section, field=field, block_kind=kind,
-                          args=(_text("blockId"), *body_args), element_map=emap,
-                          ref_check=ref_check, legal_in=legal_in)
+                          args=(*lead, _text("blockId"), *body_args), element_map=emap,
+                          ref_check=ref_check, legal_in=legal_in, element_field=element_field)
     return (add, set_cmd)
 
 
@@ -607,6 +666,41 @@ def block_cmds(section: str, *adds: CommandSpec, field: str = "body",
     reorder = CommandSpec(reorder_name, REORDER_BLOCK, reorder_desc, section=section, field=field,
                           args=(_text("blockId"), _integer("toIndex"), _PRECEDING), legal_in=legal_in)
     return (*adds, remove, reorder)
+
+
+def element_block_cmds(section: str, element_field: str, kinds: tuple[str, ...], *,
+                       field: str = "items", singular: str | None = None,
+                       legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
+    """The authoring surface for ONE block-bearing element field: an add (+ in-place set where the
+    kind carries body args) per allowed kind, plus that field's remove and reorder.
+
+    Names derive from the ELEMENT FIELD, as a page-level blocks surface derives from its section
+    (addDesignCode, addDataModel): add<Field><Kind> / set<Field><Kind> / remove<Field>Block /
+    reorder<Field>Block. The element-id arg derives from the list noun, as list_cmds derives its
+    own, so a step's commands take `stepId` and every one of them names the element first.
+    """
+    noun = singular or _singular(field if field != "items" else section)
+    id_arg, cap = f"{noun}Id", _cap(element_field)
+    out: list[CommandSpec] = []
+    for kind in kinds:
+        out.extend(add_block_cmd(
+            section, kind, field=field, element_field=element_field, id_arg=id_arg,
+            add_name=f"add{cap}{_cap(kind)}", set_name=f"set{cap}{_cap(kind)}",
+            add_description=f"add {_a(kind)} {kind} block to {_a(noun)} {noun}'s {element_field}",
+            set_description=f"replace {_a(kind)} {kind} block in {_a(noun)} {noun}'s {element_field}",
+            legal_in=legal_in))
+    out.append(CommandSpec(
+        f"remove{cap}Block", REMOVE_BLOCK,
+        f"remove a block from {_a(noun)} {noun}'s {element_field}",
+        section=section, field=field, element_field=element_field,
+        args=(_text(id_arg), _text("blockId")), legal_in=legal_in))
+    out.append(CommandSpec(
+        f"reorder{cap}Block", REORDER_BLOCK,
+        f"move a block in {_a(noun)} {noun}'s {element_field} to an anchored position " +
+        f"(precedingId guards a stale read)",
+        section=section, field=field, element_field=element_field,
+        args=(_text(id_arg), _text("blockId"), _integer("toIndex"), _PRECEDING), legal_in=legal_in))
+    return tuple(out)
 
 
 # The full rich blocks surface - one add (+ in-place set) per block kind, plus the universal

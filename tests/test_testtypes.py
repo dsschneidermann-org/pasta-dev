@@ -22,7 +22,8 @@ from src.testtypes import TEST_REGISTRY
 
 # The five capability fixtures - each demonstrates one part of the page-type system. This set is
 # deliberately NOT derived from production: the fixtures are purpose-built, not clones.
-TEST_TAGS = {"test-fields", "test-blocks", "test-flow", "test-lifecycle", "test-child"}
+TEST_TAGS = {"test-fields", "test-blocks", "test-element-blocks", "test-flow", "test-lifecycle",
+             "test-child"}
 
 
 # --- the fixture set ---------------------------------------------------------
