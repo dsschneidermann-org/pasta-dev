@@ -136,8 +136,7 @@ _FEATURE_BRIEF = PageType(
                 """),
         )),
         # The plan review's outcome (populated in the `planReview` state): a verdict plus a summary
-        # of the findings the review raised. The findings themselves are ALSO applied as real edits
-        # (addStep / addCase / addConstraint / askQuestion); this section records what the review found.
+        # of the findings the review raised. The findings themselves must also be applied as edits.
         SectionSpec("review", "Plan review", (
             _scalar("verdict", choices=_VERDICTS, description="""
                 The plan-review outcome. build-ready: an implementer could follow the plan end to end
@@ -507,15 +506,6 @@ _IMPLEMENTATION_PLAN = PageType(
                 isolation. Mark a step done only once its test passes (element-FSM todo <-> done).
                 """),
         )),
-        SectionSpec("questions", "Questions", (
-            _list("items", element_fields=("text", "answer", "status"), element_fsm=_QUESTION_FSM, description="""
-                Each one question about this plan that must be settled before or during the build,
-                asked as a single decidable question. Prefer asking over guessing: a wrong assumption
-                is cheap here and expensive once code is written. Record the answer here when it is
-                settled, so an implementer sees the resolution beside the steps it affects
-                (element-FSM open -> answered).
-                """),
-        )),
         SectionSpec("dataModels", "Data models", (
             _blocks("models", description="""
                 One code block per data shape this feature introduces or changes, written as real
@@ -534,12 +524,6 @@ _IMPLEMENTATION_PLAN = PageType(
         *element_cmds("steps", legal_in=("draft", "ready"),
                       marks=(("markStepDone", "markDone", "mark a step done"),
                              ("markStepTodo", "reopen", "reopen a step"))),
-        # Questions: askQuestion (special add name, no remove) + a reorder, plus an answer transition.
-        *list_cmds("questions", add_name="askQuestion", label="question", remove=False,
-                   legal_in=("draft",),
-                   add_args=(_text(),)),
-        *element_cmds("questions", legal_in=("draft",), marks=(
-            ("answerQuestion", "answer", "answer a question (open -> answered)", (_text("answer"),)),)),
         *block_cmds(
             "dataModels",
             *add_block_cmd("dataModels", "code", field="models", add_name="addDataModel", legal_in=("draft",)),
