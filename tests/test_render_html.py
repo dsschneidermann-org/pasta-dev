@@ -128,7 +128,7 @@ def test_list_html_gives_each_element_an_ordinal_title_and_rows():
     out = _list_html(spec, [
         {"id": "el1", "text": "First item", "note": "a note"},
         {"id": "el2", "text": "Second item"},
-    ])
+    ], None)
     assert out.count('<li class="element"') == 2
     assert 'id="element-el1"' in out and 'id="element-el2"' in out
     assert '<h3 class="element-title">First item</h3>' in out
@@ -138,33 +138,33 @@ def test_list_html_gives_each_element_an_ordinal_title_and_rows():
 
 def test_list_html_ordinal_links_to_the_element_anchor():
     spec = _spec(FIELDS, "items", "items")
-    out = _list_html(spec, [{"id": "el1", "text": "First"}, {"id": "el2", "text": "Second"}])
+    out = _list_html(spec, [{"id": "el1", "text": "First"}, {"id": "el2", "text": "Second"}], None)
     assert '<a class="element-index" href="#element-el1">1</a>' in out
     assert '<a class="element-index" href="#element-el2">2</a>' in out
 
 
 def test_list_html_shows_a_checkbox_and_status_chip_when_the_field_has_an_element_fsm():
     spec = _spec(CHILD, "steps", "items")
-    out = _list_html(spec, [{"id": "s1", "text": "Write it", "status": "done"}])
+    out = _list_html(spec, [{"id": "s1", "text": "Write it", "status": "done"}], None)
     assert 'data-check="done"' in out
     assert '<span class="element-status">done</span>' in out
 
 
 def test_list_html_omits_the_checkbox_for_a_field_with_no_element_fsm():
     spec = _spec(FIELDS, "items", "items")
-    out = _list_html(spec, [{"id": "el1", "text": "Plain"}])
+    out = _list_html(spec, [{"id": "el1", "text": "Plain"}], None)
     assert "element-check" not in out and "element-status" not in out
 
 
 def test_list_html_escapes_element_text():
     spec = _spec(FIELDS, "items", "items")
-    out = _list_html(spec, [{"id": "el1", "text": "a <b> & c"}])
+    out = _list_html(spec, [{"id": "el1", "text": "a <b> & c"}], None)
     assert "a &lt;b&gt; &amp; c" in out and "<b>" not in out
 
 
 def test_list_html_omits_the_anchor_when_an_element_has_no_id():
     spec = _spec(FIELDS, "items", "items")
-    out = _list_html(spec, [{"text": "No id"}])
+    out = _list_html(spec, [{"text": "No id"}], None)
     assert 'id="element-"' not in out and '<li class="element">' in out
     assert '<span class="element-index">1</span>' in out      # a plain ordinal, not a link
 
@@ -257,6 +257,44 @@ def test_render_page_html_escapes_the_page_title():
     page = create_page(FIELDS, "a <b> & c", None, factory)
     out = render_page_html(page, FIELDS)
     assert "a &lt;b&gt; &amp; c" in out and "<b>" not in out
+
+
+def test_list_element_page_id_title_becomes_a_titled_link():
+    spec = _spec(FIELDS, "items", "items")
+    out = _list_html(spec, [{"id": "el1", "text": "a:1", "note": "why it depends"}], _context())
+    assert '<a href="/ws:demo/page/a:1">Alpha</a>' in out       # the title, not the raw id
+    assert '<span class="link-type">test-fields</span>' in out
+    assert "a:1</h3>" not in out                                # the raw id is not the heading
+
+
+def test_list_element_page_id_row_value_becomes_a_titled_link():
+    spec = _spec(FIELDS, "items", "items")
+    out = _list_html(spec, [{"id": "el1", "text": "Depends", "note": "b:2"}], _context())
+    assert '<a href="/ws:demo/page/b:2">Beta</a>' in out
+
+
+def test_list_element_value_that_is_not_a_page_id_stays_text():
+    spec = _spec(FIELDS, "items", "items")
+    out = _list_html(spec, [{"id": "el1", "text": "z:9", "note": "plain"}], _context())
+    assert 'href="/ws:demo' not in out          # no page link; the ordinal self-link remains
+    assert "z:9" in out and "plain" in out
+
+
+def test_list_element_link_to_an_archived_page_is_flagged_before_the_link():
+    spec = _spec(FIELDS, "items", "items")
+    out = _list_html(spec, [{"id": "el1", "text": "b:2", "note": "a:1"}],
+                     _context(archived=["b:2"]))
+    assert "<strong class=\"archived-flag\">(A)</strong>" in out
+    assert out.index("archived-flag") < out.index('<a href="/ws:demo/page/b:2"')
+    # An element field is this page's own content, so it is flagged, never hidden.
+    assert '<a href="/ws:demo/page/b:2">Beta</a>' in out
+    assert out.count("archived-flag") == 1        # a:1 is not archived
+
+
+def test_list_element_links_are_absent_without_a_context():
+    spec = _spec(FIELDS, "items", "items")
+    out = _list_html(spec, [{"id": "el1", "text": "a:1"}], None)
+    assert "a:1" in out and '<a href="/ws:demo' not in out
 
 
 def test_render_page_html_toc_is_its_child_list_alone():

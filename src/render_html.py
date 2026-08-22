@@ -106,10 +106,11 @@ def element_view(element: dict[str, Any], index: int, field_spec: FieldSpec) -> 
 _CHECK_GLYPH = {"done": "&#9745;", "todo": "&#9744;"}
 
 
-def _element_html(view: ElementView) -> str:
+def _element_html(view: ElementView, ref_context: RefContext | None) -> str:
     """One decomposed element: an ordinal, an optional checkbox and title, an optional status
     chip, and a labelled row per remaining field. The ordinal links to the element's own anchor,
-    so one item of a long list can be pointed at."""
+    so one item of a long list can be pointed at, and any value naming a page becomes a link to
+    it rather than a bare id."""
     anchor = f' id="element-{_escape(view.element_id)}"' if view.element_id else ""
     if view.element_id:
         index = (f'<a class="element-index" href="#element-{_escape(view.element_id)}">'
@@ -121,23 +122,28 @@ def _element_html(view: ElementView) -> str:
         head.append(f'<span class="element-check" data-check="{view.check}">' +
                     f'{_CHECK_GLYPH[view.check]}</span>')
     if view.title is not None:
-        head.append(f'<h3 class="element-title">{_escape(view.title)}</h3>')
+        titled = _page_link(view.title, ref_context)
+        head.append(f'<h3 class="element-title">{titled or _escape(view.title)}</h3>')
     if view.status is not None:
         head.append(f'<span class="element-status">{_escape(view.status)}</span>')
-    rows = "".join(
-        f"<dt>{_escape(label)}</dt>" +
-        (f"<dd>{_text_html(value)}</dd>" if value is not None
-         else '<dd class="empty">&mdash;</dd>')
-        for label, value in view.rows
-    )
+    cells: list[str] = []
+    for label, value in view.rows:
+        if value is None:
+            cell = '<dd class="empty">&mdash;</dd>'
+        else:
+            linked = _page_link(value, ref_context)
+            cell = f"<dd><p>{linked}</p></dd>" if linked else f"<dd>{_text_html(value)}</dd>"
+        cells.append(f"<dt>{_escape(label)}</dt>" + cell)
+    rows = "".join(cells)
     body = f'<dl class="field-rows">{rows}</dl>' if rows else ""
     return (f'<li class="element"{anchor}>'
             f'<div class="element-head">{"".join(head)}</div>{body}</li>')
 
 
-def _list_html(field_spec: FieldSpec, elements: list[dict[str, Any]]) -> str:
+def _list_html(field_spec: FieldSpec, elements: list[dict[str, Any]],
+               ref_context: RefContext | None) -> str:
     """A list field as an ordered stack of element blocks."""
-    items = "".join(_element_html(element_view(element, index, field_spec))
+    items = "".join(_element_html(element_view(element, index, field_spec), ref_context)
                     for index, element in enumerate(elements, start=1))
     return f'<ol class="element-list">{items}</ol>'
 
@@ -152,7 +158,7 @@ def _field_html(field_spec: FieldSpec, value: Any, ref_context: RefContext | Non
     if field_spec.kind == PROSE:
         return _text_html(str(value)) if value else _NONE_HTML
     if field_spec.kind == LIST:
-        return _list_html(field_spec, value) if value else _NONE_HTML
+        return _list_html(field_spec, value, ref_context) if value else _NONE_HTML
     if field_spec.kind == BLOCKS:
         # Rich content - headings, code, tables, quotes, inline page refs - keeps the Markdown
         # pipeline, applied to a fragment for this one field rather than the whole document.
@@ -161,21 +167,34 @@ def _field_html(field_spec: FieldSpec, value: Any, ref_context: RefContext | Non
     return _NONE_HTML
 
 
-def _link_html(page_id: str, ref_context: RefContext | None, archived: bool,
-               role: str | None = None) -> str:
-    """One link row: the target page as a titled `type · status` link, an archived marker before
-    it, and an optional edge role after it. Without a resolvable context the id stands alone."""
-    flag = '<span class="archived-flag">(A)</span> ' if archived else ""
-    suffix = f' <span class="link-role">{_escape(role)}</span>' if role is not None else ""
+def _page_link(page_id: str, ref_context: RefContext | None) -> str | None:
+    """The titled `type · status` link for a page id, or None when it resolves to no page.
+
+    A page id reaches the reader in more places than a child or a reference edge: a list element
+    field can hold one too, and there it is stored as ordinary text. Resolving on the value rather
+    than on a declared field kind means any such field reads as its target rather than as an id.
+
+    An archived target is marked before the link, so wherever a page is named the reader can see
+    that it has been archived without following it.
+    """
     if ref_context is None or page_id not in ref_context.titles:
-        return f"<li>{flag}{_escape(page_id)}{suffix}</li>"
+        return None
+    flag = ('<strong class="archived-flag">(A)</strong> '
+            if page_id in ref_context.archived_ids else "")
     query = "?archived=true" if ref_context.show_archived else ""
-    return (f"<li>{flag}"
-            f'<a href="/{_escape(ref_context.workspace_id)}/page/{_escape(page_id)}{query}">'
-            f"{_escape(ref_context.titles[page_id])}</a>"
-            f' <span class="link-type">{_escape(ref_context.types[page_id])}</span>'
-            f' <span class="link-status">{_escape(ref_context.statuses[page_id])}</span>'
-            f"{suffix}</li>")
+    return (f"{flag}" +
+            f'<a href="/{_escape(ref_context.workspace_id)}/page/{_escape(page_id)}{query}">' +
+            f"{_escape(ref_context.titles[page_id])}</a>" +
+            f' <span class="link-type">{_escape(ref_context.types[page_id])}</span>' +
+            f' <span class="link-status">{_escape(ref_context.statuses[page_id])}</span>')
+
+
+def _link_html(page_id: str, ref_context: RefContext | None,
+               role: str | None = None) -> str:
+    """One link row: the target page as a titled link, with an optional edge role after it.
+    Without a resolvable context the id stands alone."""
+    suffix = f' <span class="link-role">{_escape(role)}</span>' if role is not None else ""
+    return f"<li>{_page_link(page_id, ref_context) or _escape(page_id)}{suffix}</li>"
 
 
 def _children_html(page: Page, ref_context: RefContext | None) -> str:
@@ -189,7 +208,7 @@ def _children_html(page: Page, ref_context: RefContext | None) -> str:
         archived = is_archived(child_id)
         if archived and not page.archived and ref_context and not ref_context.show_archived:
             continue
-        rows.append(_link_html(child_id, ref_context, archived))
+        rows.append(_link_html(child_id, ref_context))
     return f'<ul class="link-list">{"".join(rows)}</ul>' if rows else _NONE_HTML
 
 
@@ -201,7 +220,7 @@ def _references_html(page: Page, ref_context: RefContext | None) -> str:
         archived = ref_context is not None and to_id in ref_context.archived_ids
         if archived and ref_context and not ref_context.show_archived:
             continue
-        rows.append(_link_html(to_id, ref_context, archived, role))
+        rows.append(_link_html(to_id, ref_context, role))
     return f'<ul class="link-list">{"".join(rows)}</ul>' if rows else _NONE_HTML
 
 

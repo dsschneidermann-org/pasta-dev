@@ -67,6 +67,9 @@ body.dark {
 .pasta-page a.element-index { text-decoration: none; }
 .pasta-page a.element-index:hover { color: var(--links); }
 .pasta-page .element-title { margin: 0; font-size: 1rem; flex: 1 1 auto; min-width: 0; }
+/* An element titled by a page reads as a link; its annotations stay annotation-sized. */
+.pasta-page .element-title .link-type,
+.pasta-page .element-title .link-status { font-size: 0.75rem; font-weight: normal; }
 .pasta-page .element-status { font-family: monospace; font-size: 0.75rem;
     background: var(--background-alt); border-radius: 999px; padding: 0.1rem 0.5rem; }
 .pasta-page .element-head + .field-rows { margin-top: 0.55rem; }
@@ -76,4 +79,3 @@ body.dark {
 .pasta-page .link-type { font-style: italic; color: var(--text-muted); }
 .pasta-page .link-status { font-family: monospace; color: var(--text-muted); }
 .pasta-page .link-role { color: var(--text-muted); }
-.pasta-page .archived-flag { font-weight: bold; }
