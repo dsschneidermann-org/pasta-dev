@@ -776,7 +776,7 @@ def test_an_add_creates_an_element_with_its_blocks():
     assert [block["kind"] for block in element["detail"]] == ["paragraph", "code"]
     assert element["detail"][1]["source"] == "x = 1"
     assert [block["kind"] for block in element["snippet"]] == ["code"]
-    # Every block carries its own minted id, distinct from the element's and from each other's.
+    # Every block carries its own created id, distinct from the element's and from each other's.
     ids = [block["id"] for block in element["detail"] + element["snippet"]]
     assert len(set(ids)) == 3 and element["id"] not in ids
 

@@ -222,7 +222,7 @@ _EPIC = PageType(
                 "executing", "review", "shipped", "abandoned"),
         terminal_states=("shipped", "abandoned"),
     ),
-    # On createPage, mint the pinned agent plan in the same commit; author into it.
+    # On createPage, create the pinned agent plan in the same commit; author into it.
     auto_children=(AutoChildSpec("agent-plan"),),
 )
 

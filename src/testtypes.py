@@ -333,7 +333,7 @@ TEST_LIFECYCLE = PageType(
             Check the child steps and checks before the ship gate.
             """),),
     ),
-    # On createPage, mint the pinned child in the same commit; author into it.
+    # On createPage, create the pinned child in the same commit; author into it.
     auto_children=(AutoChildSpec("test-child"),),
 )
 

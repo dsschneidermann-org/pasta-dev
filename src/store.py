@@ -471,7 +471,7 @@ class Store:
                 workspace.root_page_ids.append(page.id)
             else:
                 workspace.pages[parent_id].child_ids.append(page.id)
-            # Some types (feature-brief) mint pinned children in the same commit.
+            # Some types (feature-brief) create pinned children in the same commit.
             children = self._create_auto_children(workspace, page, page_type)
             self._touch_and_save(workspace)
             return CreatePageResult(page=page, children=children)

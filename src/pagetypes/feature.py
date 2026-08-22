@@ -384,7 +384,7 @@ _FEATURE_BRIEF = PageType(
             """),
         ),
     ),
-    # On createPage, mint the three pinned children in the same commit; author into those.
+    # On createPage, create the three pinned children in the same commit; author into those.
     auto_children=(AutoChildSpec("implementation-plan"), AutoChildSpec("testing-plan"),
                    AutoChildSpec("feature-spec")),
 )

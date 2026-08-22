@@ -422,7 +422,7 @@ def _element_blocks_from_args(field_spec: FieldSpec, args: dict[str, Any],
     """The id'd block arrays for an element being created: one per declared block field, read from
     the same-named optional argument. A field with no argument starts empty.
 
-    Each block is built the way `_add_block` builds one - a minted id, its kind, then every declared
+    Each block is built the way `_add_block` builds one - a created id, its kind, then every declared
     body arg with an omitted optional stored as None - so a block created with its element is
     indistinguishable from one added afterwards by its per-kind command.
     """
