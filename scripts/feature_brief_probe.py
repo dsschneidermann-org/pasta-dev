@@ -19,7 +19,8 @@ stage at a time:
 
     grounding  ->  the brief's four grounding setters, all three children silent
     spec       ->  the feature-spec's setters (+ askQuestion); NO addStep/addCase
-    planning   ->  addStep and addCase; the sealed spec has locked itself
+    planning   ->  addStep (with the addDetail* commands that fill a step, on the one
+                   steps.items edge) and addCase; the sealed spec has locked itself
 
 The closing summary tallies the edge count per stage, so a regression shows up as
 a stage that got noisy - most usefully, an addStep appearing during `spec`.
@@ -283,6 +284,16 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
             plan,
             cmd("addStep"),
             cmd("addStep"),
+        )
+        probe.mutate(
+            plan,
+            cmd("addDetailParagraph", stepId=step_ids[0], inlines=[
+                "Add ", {"code": "scripts/feature_brief_probe.py"},
+                " with the MCP session plumbing, reusing the sibling probe's transport."]),
+            cmd("addDetailCode", stepId=step_ids[0], language="bash",
+                source="uv run python scripts/feature_brief_probe.py"),
+            cmd("addDetailParagraph", stepId=step_ids[1], inlines=[
+                "Drive the lifecycle and print each stage's rollup, then archive the brief."]),
         )
         probe.mutate(plan, cmd("markReady"))
         case_ids = probe.mutate(

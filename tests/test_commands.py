@@ -889,11 +889,16 @@ def test_element_block_commands_are_locked_once_ready():
     assert items_of(marked.page)[0]["status"] == "done"
 
 
-def test_element_scoped_block_adds_are_not_in_the_do_list():
-    # markReady requires items.items, so authoring that field IS this stage's work.
+def test_element_scoped_block_adds_join_their_list_fields_edge():
+    # markReady requires items.items, so authoring that field is this stage's work. The element's
+    # block adds are part of authoring it, so they ride on the same edge - the element add first,
+    # then the blocks that go inside it, in declaration order.
     factory = make_counter()
     page, _ = new_item(factory)
     edges = field_setter_edges(page, ELEMENT_BLOCKS)
     assert [(edge["section"], edge["field"], edge["commands"]) for edge in edges] == [
-        ("items", "items", ["addItem"])
+        ("items", "items",
+         ["addItem", "addSnippetCode", "addDetailParagraph", "addDetailCode", "addDetailList"])
     ]
+    # One edge, carrying the field's own instruction once.
+    assert edges[0]["instruction"] == ELEMENT_BLOCKS.field_spec("items", "items").description

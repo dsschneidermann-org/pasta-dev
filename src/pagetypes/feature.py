@@ -528,7 +528,7 @@ _IMPLEMENTATION_PLAN = PageType(
     commands=(
         *list_cmds("steps", label="step", legal_in=("draft",), add_args=()),
         # The step's detail: real content as blocks rather than prose crushed into `text`.
-        *element_block_cmds("steps", "detail", ("paragraph", "code", "list"), legal_in=("draft",)),
+        *element_block_cmds("steps", "detail", ("paragraph", "code"), legal_in=("draft",)),
         # Execution-status marks stay legal once the plan is `ready`: progress is recorded while
         # building against a finalized plan. Only the structural edits above are `draft`-only.
         *element_cmds("steps", legal_in=("draft", "ready"),

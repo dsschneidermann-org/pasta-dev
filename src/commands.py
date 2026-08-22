@@ -222,6 +222,10 @@ def field_setter_edges(page: Page, page_type: PageType,
       - a scalar/prose/list FIELD SETTER -> one entry, commands=[the setter];
       - a BLOCKS field                   -> one grouped entry, commands=[its add-block variants]
         (SET_BLOCK edit-in-place, remove, and reorder are never surfaced here - describeMutations only).
+    A list field whose elements carry blocks keeps one entry for the whole field: its element add
+    leads, and that field's element-scoped block adds follow in declaration order. Authoring such a
+    field means adding the element and then filling it, so the guidance names both in the order they
+    are run rather than stopping at the add and leaving the content to be discovered elsewhere.
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status) - set(blocked_events)
     required = {
@@ -233,8 +237,9 @@ def field_setter_edges(page: Page, page_type: PageType,
     if not required:
         return []
     legal = legal_commands(page, page_type)
-    edges: list[dict[str, Any]] = []
-    block_variants: dict[tuple[str, str], list[str]] = {}
+    # One command list per (section, field), in declaration order: a field is one edge however many
+    # commands author it, so an element add and the block adds that fill that element stay together.
+    variants: dict[tuple[str, str], list[str]] = {}
     for command in page_type.commands:
         section, field = command.section, command.field
         if section is None or field is None:      # transitions / addLink / setTitle target no field
@@ -242,15 +247,10 @@ def field_setter_edges(page: Page, page_type: PageType,
         target = (section, field)
         if target not in required or not legal.get(command.name):
             continue
-        if is_field_setter(command):
-            edges.append(_field_setter_edge(page, page_type, section, field, [command.name]))
-        elif command.kind == ADD_BLOCK and command.element_field is None:
-            # An element-scoped add cannot run until the element exists, so it is authored from
-            # describeMutations, never advertised as this stage's work.
-            block_variants.setdefault(target, []).append(command.name)
-    for (section, field), variants in block_variants.items():
-        edges.append(_field_setter_edge(page, page_type, section, field, variants))
-    return edges
+        if is_field_setter(command) or command.kind == ADD_BLOCK:
+            variants.setdefault(target, []).append(command.name)
+    return [_field_setter_edge(page, page_type, section, field, commands)
+            for (section, field), commands in variants.items()]
 
 
 def transition_guidance(
