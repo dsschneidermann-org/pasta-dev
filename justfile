@@ -28,9 +28,9 @@ klaus:
     klaus --host 0.0.0.0 .
 
 sphinx:
-    uv run sphinx-autobuild docsite -b html docsite/_build/html \
+    uv run sphinx-autobuild docsite -q -b html docsite/_build/html \
     --watch src --port 8081 \
     --pre-build 'uv run python scripts/gen_page_type_docs.py'
 
 [parallel]
-dev: main klaus
+dev: main klaus sphinx
