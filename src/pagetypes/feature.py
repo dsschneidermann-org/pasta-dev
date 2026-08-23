@@ -23,10 +23,10 @@ from . import (
     _prose,
     _scalar,
     _text,
-    add_block_cmd,
+    BlockKindSpec,
     add_link_cmd,
-    block_cmds,
-    element_block_cmds,
+    blocks_cmds,
+    element_blocks_cmds,
     element_cmds,
     list_cmds,
     set_element_field_cmd,
@@ -413,6 +413,35 @@ _FEATURE_IN_PLANNING_OR_LATER = ParentStateGuard(
 )
 
 
+_DESIGN = _blocks("body", block_kinds=(
+    BlockKindSpec("paragraph", args=(_text(),)),
+    BlockKindSpec("heading", args=(_integer("level"), _text())),
+    "code",
+), description="""
+                The design in enough detail that a plan can be written from it without making further
+                decisions: the behaviour, the interfaces with their exact signatures and types, the
+                data shapes, the states, and the error paths. Separate the pure logic from the code
+                that performs effects and give each its own interfaces: what is a function of its
+                inputs alone, and what needs I/O, storage, the clock or randomness. The rules belong
+                on the pure side, and the effectful side should be thin enough to hold none of them.
+                Use a heading per area and a code block for anything with a precise shape. No TBDs
+                and no 'handle edge cases' placeholders, nothing that contradicts another part of the
+                spec, and nothing that was not asked for. Emphasis and links are structured inline
+                runs, not markdown syntax.
+                """)
+
+
+_SPEC_DECISIONS = _blocks("body", block_kinds=(
+    BlockKindSpec("decision", args=(_text("questionId"), _text()),
+                  ref_check=RefCheck(arg="questionId", scope="parent",
+                                     section="questions", field="items")),
+), description="""
+                One decision block per resolved question, linking the brief question it answers: the
+                decision taken, the alternatives rejected, and why. This is what keeps a settled
+                question from being reopened mid-build, so record the reasoning, not just the outcome.
+                """)
+
+
 _FEATURE_SPEC = PageType(
     tag="feature-spec",
     name="Spec",
@@ -431,47 +460,21 @@ _FEATURE_SPEC = PageType(
                 separate features, each able to ship on its own.
                 """),
         )),
-        SectionSpec("design", "Design", (
-            _blocks("body", description="""
-                The design in enough detail that a plan can be written from it without making further
-                decisions: the behaviour, the interfaces with their exact signatures and types, the
-                data shapes, the states, and the error paths. Separate the pure logic from the code
-                that performs effects and give each its own interfaces: what is a function of its
-                inputs alone, and what needs I/O, storage, the clock or randomness. The rules belong
-                on the pure side, and the effectful side should be thin enough to hold none of them.
-                Use a heading per area and a code block for anything with a precise shape. No TBDs
-                and no 'handle edge cases' placeholders, nothing that contradicts another part of the
-                spec, and nothing that was not asked for. Emphasis and links are structured inline
-                runs, not markdown syntax.
-                """),
-        )),
-        SectionSpec("decisions", "Decisions", (
-            _blocks("body", description="""
-                One decision block per resolved question, linking the brief question it answers: the
-                decision taken, the alternatives rejected, and why. This is what keeps a settled
-                question from being reopened mid-build, so record the reasoning, not just the outcome.
-                """),
-        )),
+        SectionSpec("design", "Design", (_DESIGN,)),
+        SectionSpec("decisions", "Decisions", (_SPEC_DECISIONS,)),
     ),
     # Every authoring command is allowed in `draft`: sealing the spec locks ALL edits, so a
     # `sealed` spec is frozen and must be `reopen`ed to change.
     commands=(
         set_prose_cmd("overview"),
-        # design blocks use a plain `text` arg (not the inline-run `inlines`), so override _BLOCK_ARGS.
-        *block_cmds(
-            "design",
-            *add_block_cmd("design", "paragraph", add_name="addParagraph", args=(_text(),)),
-            *add_block_cmd("design", "heading", add_name="addHeading",
-                           args=(_integer("level"), _text())),
-            *add_block_cmd("design", "code", add_name="addDesignCode"),
+        # Each field's add and set are generated from the same declaration the validator reads.
+        *blocks_cmds(
+            "design", _DESIGN,
             remove_name="removeDesignBlock", remove_desc="remove a design block",
             reorder_name="reorderDesignBlock",
             reorder_desc="move a design block to an anchored position (precedingId guards a stale read)"),
-        *block_cmds(
-            "decisions",
-            *add_block_cmd("decisions", "decision", add_name="addDecision",
-                           args=(_text("questionId"), _text()),
-                           ref_check=RefCheck(arg="questionId", scope="parent", section="questions", field="items")),
+        *blocks_cmds(
+            "decisions", _SPEC_DECISIONS,
             remove_name="removeDecision", remove_desc="remove a decision",
             reorder_name="reorderDecision",
             reorder_desc="move a decision to an anchored position (precedingId guards a stale read)"),
@@ -491,13 +494,7 @@ _FEATURE_SPEC = PageType(
 )
 
 
-_IMPLEMENTATION_PLAN = PageType(
-    tag="implementation-plan",
-    name="Implementation plan",
-    description="The step-by-step build plan for a feature. Auto-created as a child of a feature-brief.",
-    sections=(
-        SectionSpec("steps", "Steps", (
-            _list("items", element_fields=("detail", "status"), element_fsm=_STEP_FSM,
+_STEPS = _list("items", element_fields=("detail", "status"), element_fsm=_STEP_FSM,
                   element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),),
                   description="""
                 Each one action an implementer can finish in a few minutes, ordered, written for a
@@ -512,33 +509,42 @@ _IMPLEMENTATION_PLAN = PageType(
                 prose. Never write 'TBD', 'add error handling', 'write tests for the above', or 'same
                 as step N' - repeat the detail instead, because steps are read out of order and in
                 isolation. Mark a step done only once its test passes (element-FSM todo <-> done).
-                """),
-        )),
-        SectionSpec("dataModels", "Data models", (
-            _blocks("models", description="""
+                """)
+
+_MODELS = _blocks("models", block_kinds=("code",), description="""
                 One code block per data shape this feature introduces or changes, written as real
                 declarations rather than prose: field names, types, and which are optional. Steps
                 refer to these by name, so the names and types here must match the ones the steps use
                 exactly - a shape called one thing here and another in a step is a bug.
-                """),
-        )),
+                """)
+
+
+_IMPLEMENTATION_PLAN = PageType(
+    tag="implementation-plan",
+    name="Implementation plan",
+    description="The step-by-step build plan for a feature. Auto-created as a child of a feature-brief.",
+    sections=(
+        SectionSpec("steps", "Steps", (_STEPS,)),
+        SectionSpec("dataModels", "Data models", (_MODELS,)),
     ),
     commands=(
         # The add carries the step's content, so one command writes a whole step and a batch of
         # them never has to name an id it has not committed.
         *list_cmds("steps", label="step", legal_in=("draft",), add_args=(),
-                   element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),)),
-        # The step's detail, edited once the step exists: real content as blocks rather than prose.
-        *element_block_cmds("steps", "detail", ("paragraph", "code"), legal_in=("draft",)),
+                   field_spec=_STEPS),
+        # The step's detail, appended to once the step exists - without this an element's blocks
+        # would be write-once, and fixing one would cost the step its id and its todo/done status.
+        *element_blocks_cmds("steps", _STEPS, "detail", legal_in=("draft",)),
         # Execution-status marks stay legal once the plan is `ready`: progress is recorded while
         # building against a finalized plan. Only the structural edits above are `draft`-only.
         *element_cmds("steps", legal_in=("draft", "ready"),
                       marks=(("markStepDone", "markDone", "mark a step done"),
                              ("markStepTodo", "reopen", "reopen a step"))),
-        *block_cmds(
-            "dataModels",
-            *add_block_cmd("dataModels", "code", field="models", add_name="addDataModel", legal_in=("draft",)),
-            field="models", remove_name="removeDataModel", remove_desc="remove a data-model block",
+        # The field key is `models` under section `dataModels`, so the derived label would be
+        # `models`; label= keeps the name the surface already reads with.
+        *blocks_cmds(
+            "dataModels", _MODELS, label="dataModels",
+            remove_name="removeDataModel", remove_desc="remove a data-model block",
             reorder_name="reorderDataModel",
             reorder_desc="move a data-model block to an anchored position (precedingId guards a stale read)",
             legal_in=("draft",)),

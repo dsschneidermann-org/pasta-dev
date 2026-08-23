@@ -196,10 +196,10 @@ def test_list_html_omits_the_anchor_when_an_element_has_no_id():
 def test_blocks_field_keeps_the_markdown_to_html_pipeline():
     factory = _counter()
     page = create_page(BLOCKS_TYPE, "Doc", None, factory)
-    page = apply_command(page, BLOCKS_TYPE, "addHeading",
-                         {"level": 2, "inlines": ["Overview"]}, factory).page
-    page = apply_command(page, BLOCKS_TYPE, "addCode",
-                         {"language": "py", "source": "x = 1"}, factory).page
+    page = apply_command(page, BLOCKS_TYPE, "addBody",
+                         {"blocks": [{"kind": "heading", "level": 2, "inlines": ["Overview"]}]}, factory).page
+    page = apply_command(page, BLOCKS_TYPE, "addBody",
+                         {"blocks": [{"kind": "code", "language": "py", "source": "x = 1"}]}, factory).page
     spec = _spec(BLOCKS_TYPE, "body", "body")
     out = _field_html(spec, page.sections["body"]["body"], None)
     assert "<h2>Overview</h2>" in out
@@ -354,9 +354,8 @@ def test_element_block_field_renders_through_the_markdown_pipeline():
     factory = _counter()
     page = create_page(ELEMENT_BLOCKS, "Plan", None, factory)
     added = apply_command(page, ELEMENT_BLOCKS, "addItem", {"text": "one"}, factory)
-    page = apply_command(added.page, ELEMENT_BLOCKS, "addDetailCode",
-                         {"itemId": added.created_id, "language": "python",
-                          "source": "x = 1"}, factory).page
+    page = apply_command(added.page, ELEMENT_BLOCKS, "addItemDetail",
+                         {"itemId": added.created_id, "blocks": [{"kind": "code", "language": "python", "source": "x = 1"}]}, factory).page
     out = render_page_html(page, ELEMENT_BLOCKS, _context())
     assert '<dt>detail</dt><dd class="element-blocks">' in out
     assert "<code" in out and "x = 1" in out          # went through render_blocks + md2html
@@ -368,8 +367,7 @@ def test_an_element_block_ref_resolves_to_a_titled_link():
     factory = _counter()
     page = create_page(ELEMENT_BLOCKS, "Plan", None, factory)
     added = apply_command(page, ELEMENT_BLOCKS, "addItem", {"text": "one"}, factory)
-    page = apply_command(added.page, ELEMENT_BLOCKS, "addDetailParagraph",
-                         {"itemId": added.created_id,
-                          "inlines": ["see ", {"ref": "a:1"}]}, factory).page
+    page = apply_command(added.page, ELEMENT_BLOCKS, "addItemDetail",
+                         {"itemId": added.created_id, "blocks": [{"kind": "paragraph", "inlines": ["see ", {"ref": "a:1"}]}]}, factory).page
     out = render_page_html(page, ELEMENT_BLOCKS, _context())
     assert '<a href="/ws:demo/page/a:1">Alpha</a>' in out

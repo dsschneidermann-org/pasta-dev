@@ -201,3 +201,36 @@ def test_field_line_notes_block_element_fields():
         "  - `items` *(list)* · element fields: `text`, `detail` · "
         "block element fields: `detail` (paragraph, code)"
     )
+
+
+def test_field_line_notes_block_kinds():
+    """A blocks field teaches its vocabulary in the generated docs, because a reader can no
+    longer infer it from a list of per-kind command names."""
+    field = {"key": "body", "kind": "blocks", "description": "",
+             "choices": None, "elementFields": None, "elementStates": None,
+             "elementBlocks": None,
+             "blockKinds": ["paragraph", "heading", "code"]}
+    assert _field_line(field) == (
+        "  - `body` *(blocks)* · block kinds: `paragraph`, `heading`, `code`"
+    )
+
+
+def test_field_line_omits_block_kinds_for_a_non_blocks_field():
+    field = {"key": "items", "kind": "list", "description": "",
+             "choices": None, "elementFields": ["text"], "elementStates": None,
+             "elementBlocks": None, "blockKinds": None}
+    assert _field_line(field) == "  - `items` *(list)* · element fields: `text`"
+
+
+def test_generated_docs_name_no_deleted_block_command():
+    """The per-kind commands are gone; a generated page still naming one would send an authoring
+    agent at a command that does not exist."""
+    deleted = ("addParagraph", "addHeading", "addDivider", "addQuote", "addTable",
+               "addDetailParagraph", "addDetailCode", "addNoteCode", "addDesignCode",
+               "addDecisionCode", "addDecisionBlock", "setParagraph", "setHeading",
+               "setDetailParagraph", "setDetailCode")
+    pages = all_state_docs()
+    assert pages
+    for name, text in pages.items():
+        for command in deleted:
+            assert command not in text, f"{name} still names {command}"

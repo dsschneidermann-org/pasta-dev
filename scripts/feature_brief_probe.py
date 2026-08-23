@@ -19,8 +19,9 @@ stage at a time:
 
     grounding  ->  the brief's four grounding setters, all three children silent
     spec       ->  the feature-spec's setters (+ askQuestion); NO addStep/addCase
-    planning   ->  addStep (carrying the step's own detail blocks, beside the addDetail*
-                   commands that edit one afterwards) and addCase; the spec has locked itself
+    planning   ->  addStep (carrying the step's own detail blocks) and addCase; the spec has
+                   locked itself. addStepDetail, which appends to a step that already exists,
+                   is deliberately not offered - the element must exist before it can be filled
 
 The closing summary tallies the edge count per stage, so a regression shows up as
 a stage that got noisy - most usefully, an addStep appearing during `spec`.
@@ -170,13 +171,13 @@ def show(probe: Probe, step: str, brief_id: str, width: int) -> int:
 
     print(f"  do ({len(do)}):" if do else "  do: (none)")
     for edge in do:
-        commands = ",".join(edge["commands"])
+        command = edge["command"]
         if edge["kind"] == "field":
             target = f"{edge['section']}.{edge['field']}"
-            print(f"    {'field':<{_KIND_W}}{edge['pageType']:<{_TYPE_W}}{commands:<{_CMDS_W}}"
+            print(f"    {'field':<{_KIND_W}}{edge['pageType']:<{_TYPE_W}}{command:<{_CMDS_W}}"
                   f"{target:<{_TARGET_W}}{elide(edge.get('instruction'), width)}")
         else:
-            print(f"    {'transition':<{_KIND_W}}{edge['pageType']:<{_TYPE_W}}{commands}")
+            print(f"    {'transition':<{_KIND_W}}{edge['pageType']:<{_TYPE_W}}{command}")
 
     print(f"  blocked ({len(blocked)}):" if blocked else "  blocked: (none)")
     for edge in blocked:
@@ -262,15 +263,19 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
             cmd("setOverview", text=(
                 "A manual probe of the feature-brief lifecycle. Covers the stage rollups; excludes "
                 "the ship gate, which is a human edge.")),
-            cmd("addHeading", level=2, text="Output"),
-            cmd("addParagraph", text=(
-                "One block per stage: the do/blocked/humanGates/attention rollup for the brief's "
-                "whole subtree, with field instructions elided.")),
-            cmd("addDesignCode", language="text",
-                source="field  implementation-plan  addStep  steps.items  Each one action an imp..."),
-            cmd("addDecision", questionId=question_ids[0], text=(
-                "A failed run leaves the brief un-archived and prints its id, so the failure can "
-                "be inspected in place.")),
+            cmd("addDesign", blocks=[
+                {"kind": "heading", "level": 2, "text": "Output"},
+                {"kind": "paragraph", "text": (
+                    "One block per stage: the do/blocked/humanGates/attention rollup for the "
+                    "brief's whole subtree, with field instructions elided.")},
+                {"kind": "code", "language": "text",
+                 "source": "field  implementation-plan  addStep  steps.items  Each one action..."},
+            ]),
+            cmd("addDecisions", blocks=[
+                {"kind": "decision", "questionId": question_ids[0], "text": (
+                    "A failed run leaves the brief un-archived and prints its id, so the failure "
+                    "can be inspected in place.")},
+            ]),
         )
         record("6. SPEC authored (markSealed now legal)", brief)
         probe.mutate(spec, cmd("markSealed"))

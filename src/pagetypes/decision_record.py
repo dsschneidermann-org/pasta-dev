@@ -11,9 +11,9 @@ from . import (
     _prose,
     _scalar,
     _text,
-    add_block_cmd,
+    BlockKindSpec,
     add_link_cmd,
-    block_cmds,
+    blocks_cmds,
     list_cmds,
     set_prose_cmd,
     set_scalar_cmd,
@@ -21,6 +21,19 @@ from . import (
     transition_cmd,
 )
 
+_DECISION = _blocks("body", block_kinds=(BlockKindSpec("paragraph", args=(_text(),)), "code"), description="""
+                What was decided, in the active voice and stated before any supporting detail, then
+                the options that were seriously weighed and what ruled each one out. Use a code
+                block for anything with a precise shape: an interface, a schema, a config. A record
+                that names no rejected option is a note rather than a decision, because nothing in
+                it explains why the alternatives are not still open.
+                """)
+_CONSEQUENCES = _blocks("body", block_kinds=(BlockKindSpec("paragraph", args=(_text(),)),), description="""
+                What this decision makes easy and what it makes hard, including the costs now to be
+                lived with, what it forecloses, and the follow-on work it creates. Consequences
+                that are all benefits mean the trade-off has not been thought through yet - the
+                reader inheriting the cost is the one this section is written for.
+                """)
 _DECISION_RECORD = PageType(
     tag="decision-record",
     name="Decision record",
@@ -57,23 +70,8 @@ _DECISION_RECORD = PageType(
                 finished.
                 """),
         )),
-        SectionSpec("decision", "Decision", (
-            _blocks("body", description="""
-                What was decided, in the active voice and stated before any supporting detail, then
-                the options that were seriously weighed and what ruled each one out. Use a code
-                block for anything with a precise shape: an interface, a schema, a config. A record
-                that names no rejected option is a note rather than a decision, because nothing in
-                it explains why the alternatives are not still open.
-                """),
-        )),
-        SectionSpec("consequences", "Consequences", (
-            _blocks("body", description="""
-                What this decision makes easy and what it makes hard, including the costs now to be
-                lived with, what it forecloses, and the follow-on work it creates. Consequences
-                that are all benefits mean the trade-off has not been thought through yet - the
-                reader inheriting the cost is the one this section is written for.
-                """),
-        )),
+        SectionSpec("decision", "Decision", (_DECISION,)),
+        SectionSpec("consequences", "Consequences", (_CONSEQUENCES,)),
         SectionSpec("relations", "Relations", (
             _scalar("supersededBy", description="""
                 The page id of the decision record that replaces this one, recorded whenever a
@@ -90,16 +88,13 @@ _DECISION_RECORD = PageType(
         *list_cmds("meta", field="deciders", add_args=(_text("name"),)),
         set_prose_cmd("context"),
         # Two blocks fields on one type, so each passes its own remove/reorder names.
-        *block_cmds(
-            "decision",
-            *add_block_cmd("decision", "paragraph", add_name="addDecisionBlock", args=(_text(),)),
-            *add_block_cmd("decision", "code", add_name="addDecisionCode"),
+        *blocks_cmds(
+            "decision", _DECISION,
             remove_name="removeDecisionBlock", remove_desc="remove a decision block",
             reorder_name="reorderDecisionBlock",
             reorder_desc="move a decision block to an anchored position (precedingId guards a stale read)"),
-        *block_cmds(
-            "consequences",
-            *add_block_cmd("consequences", "paragraph", add_name="addConsequence", args=(_text(),)),
+        *blocks_cmds(
+            "consequences", _CONSEQUENCES,
             remove_name="removeConsequence", remove_desc="remove a consequence",
             reorder_name="reorderConsequence",
             reorder_desc="move a consequence to an anchored position (precedingId guards a stale read)"),
