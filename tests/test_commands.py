@@ -1082,12 +1082,12 @@ def test_remove_and_reorder_blocks_on_an_element():
                            {"itemId": item_id, "blocks": [{"kind": "code", "language": "python", "source": "a"}]}, factory)
     third = apply_command(second.page, ELEMENT_BLOCKS, "addItemDetail",
                           {"itemId": item_id, "blocks": [{"kind": "code", "language": "python", "source": "b"}]}, factory)
-    moved = apply_command(third.page, ELEMENT_BLOCKS, "reorderDetailBlock",
+    moved = apply_command(third.page, ELEMENT_BLOCKS, "reorderItemDetail",
                           {"itemId": item_id, "blockId": third.created_id, "toIndex": 0}, factory)
     assert [block["id"] for block in items_of(moved.page)[0]["detail"]] == [
         third.created_id, first.created_id, second.created_id
     ]
-    removed = apply_command(moved.page, ELEMENT_BLOCKS, "removeDetailBlock",
+    removed = apply_command(moved.page, ELEMENT_BLOCKS, "removeItemDetail",
                             {"itemId": item_id, "blockId": first.created_id}, factory)
     assert [block["id"] for block in items_of(removed.page)[0]["detail"]] == [
         third.created_id, second.created_id
@@ -1119,7 +1119,7 @@ def test_unknown_element_and_block_ids_name_different_lists():
                           {"itemId": "nope", "blocks": [{"kind": "code", "language": "python", "source": "x"}]}, factory)
     # The BLOCK lookup failed - the list named is that element's block field.
     with pytest.raises(NotFoundError, match=r"No entry with id 'nope' in items\.items\[.*\]\.detail\."):
-        _ = apply_command(added.page, ELEMENT_BLOCKS, "removeDetailBlock",
+        _ = apply_command(added.page, ELEMENT_BLOCKS, "removeItemDetail",
                           {"itemId": item_id, "blockId": "nope"}, factory)
 
 
@@ -1245,7 +1245,7 @@ def test_a_block_is_built_in_exactly_one_place():
 def test_add_item_detail_appends_without_losing_the_element():
     """The whole reason an element-scoped add survived the collapse.
 
-    Without it, correcting a step's detail would mean removing and re-adding the element - losing
+    Without it, correcting a item detail would mean removing and re-adding the element - losing
     its id, its element-FSM status, and the ids of every block already in it.
     """
     factory = make_counter()

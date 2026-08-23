@@ -817,8 +817,8 @@ def test_block_command_names_match_the_declared_surface():
             "addDecisions", "setDecisionsBlock", "removeDecision",
             "reorderDecision"} <= names["feature-spec"]
     assert {"addDataModels", "setDataModelsBlock", "removeDataModel", "reorderDataModel",
-            "addStepDetail", "setStepDetailBlock", "removeDetailBlock",
-            "reorderDetailBlock"} <= names["implementation-plan"]
+            "addStepDetail", "setStepDetailBlock", "removeStepDetail",
+            "reorderStepDetail"} <= names["implementation-plan"]
     # Names stay unique within a type.
     for tag, page_type in REGISTRY.items():
         declared = [command.name for command in page_type.commands]
