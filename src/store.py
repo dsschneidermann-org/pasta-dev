@@ -113,7 +113,11 @@ class Store:
         with open(tmp, "w", encoding="utf-8") as handle:
             _ = handle.write(text)
         with self._rw_lock_for(workspace.id).write():  # atomic replace but guarded with the lock
-            os.replace(tmp, path)
+            try:
+                os.replace(tmp, path)
+            except Exception:
+                time.sleep(0.1) # Permission error moving the tmp file can be retried.
+                os.replace(tmp, path)
 
     def _touch_and_save(self, workspace: Workspace) -> None:
         workspace.updated_at = _now()
