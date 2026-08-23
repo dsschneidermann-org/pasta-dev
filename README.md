@@ -10,7 +10,7 @@
 
 ```bash
 uv sync                 # install deps (Python 3.14)
-uv run pytest           # run the test suite
+uv run pytest --testmon # run the test suite
 ```
 
 The data directory defaults to `./.pasta-data`; override with `PASTA_DATA_DIR`.
