@@ -68,8 +68,9 @@ BLOCK = "block"                        # value: {"kind": <kind>, ...that kind's 
 
 _ALIGN_VALUES = ("left", "center", "right", None)
 # Markdown emphasis/code/link tokens rejected inside a plain-text run. Kept deliberately narrow
-# (bold/code/link markers) so ordinary prose containing a lone `*` or `_` is not falsely rejected.
-_MARKDOWN_TOKENS = ("**", "__", "`", "](")
+# (bold/code/link markers) so ordinary prose containing a lone `*` or `_` or even a file with
+# double '__' is not falsely rejected.
+_MARKDOWN_TOKENS = ("**", "`", "](")
 
 
 # --- Spec dataclasses --------------------------------------------------------
@@ -669,15 +670,15 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
               add: bool = True, remove: bool = True, reorder: bool = True,
               add_name: str | None = None, remove_name: str | None = None,
               reorder_name: str | None = None) -> tuple[CommandSpec, ...]:
-    """The add/remove/reorder commands for a LIST field; select a subset with add=/remove=/reorder=
-    (a flow-populated list that is filled elsewhere asks for its reorder only). The noun (command names
-    + `<noun>Id` arg) is the singular of the field when it is not the generic 'items', else of the
-    section; `singular=` overrides an irregular plural. The add's element_map is derived from `add_args`
-    (each mapped onto a same-named element field, so `add_args` names ARE the field names), and
-    _INDEX/_PRECEDING are appended to it; the reorder carries the anchored (toIndex + precedingId)
-    stale-read guard - so the 'every list field has a reorder' and 'every add supports positioned
-    insert' invariants hold by construction. An add that references another page carries a
-    `ref_check`; the remove and reorder name an element already on this
+    """The add/remove/reorder commands for a list field; select a subset with add=/remove=/reorder=
+    (a flow-populated list that is filled elsewhere asks for its reorder only). The noun (command
+    names + `<noun>Id` arg) is the singular of the field when it is not the generic 'items', else
+    of the section; `singular=` overrides an irregular plural. The add's element_map is derived
+    from `add_args` (each mapped onto a same-named element field, so `add_args` names are the
+    field names), and _INDEX/_PRECEDING are appended to it; the reorder carries the anchored
+    (toIndex + precedingId) stale-read guard - so the 'every list field has a reorder' and 'every
+    add supports positioned insert' invariants hold by construction. An add that references
+    another page carries a `ref_check`; the remove and reorder name an element already on this
     page, so they do not.
 
     `field_spec` is the list field's own declaration. Every block-bearing element field it
