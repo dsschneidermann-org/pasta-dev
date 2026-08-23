@@ -251,7 +251,7 @@ def _contents_html(page_type: PageType, page: Page) -> str:
     links: list[str] = []
     for section in page_type.sections:
         count = _section_count(section, page)
-        badge = f' <span class="count">{count}</span>' if count else ""
+        badge = f'<span class="count">{count}</span>' if count else ""
         links.append(f'<a href="#section-{_escape(section.key)}">' +
                      f"{_escape(section.name)}{badge}</a>")
     links.append('<a href="#section-references">References</a>')

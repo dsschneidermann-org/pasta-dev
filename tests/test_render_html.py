@@ -272,7 +272,7 @@ def test_render_page_html_contents_strip_counts_list_elements():
     page = apply_command(page, FIELDS, "addItem", {"text": "two"}, factory).page
     out = render_page_html(page, FIELDS)
     assert '<nav class="page-contents"' in out
-    assert '<a href="#section-items">Items <span class="count">2</span></a>' in out
+    assert '<a href="#section-items">Items<span class="count">2</span></a>' in out
     assert '<a href="#section-basics">Basics</a>' in out          # no badge, no list elements
 
 
