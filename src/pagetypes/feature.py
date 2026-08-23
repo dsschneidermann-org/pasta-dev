@@ -270,6 +270,8 @@ _FEATURE_BRIEF = PageType(
                 spec - the grounded base is recorded, and the design is settled once, in the
                 feature-spec child, before a single step or case exists. The work of it:
 
+                - Update the summary and update the page title to the correct understanding of the
+                  work and escalate any design questions early to the user now.
                 - Author the spec from the grounded base: the behaviour, the interfaces with their
                   exact signatures, the data shapes, the states, the error paths. Decide everything
                   a plan would otherwise have to decide for itself.
@@ -303,7 +305,8 @@ _FEATURE_BRIEF = PageType(
                 - Plan the failure paths the spec implies alongside the happy one - empty inputs,
                   missing values, malformed data, boundaries - and say what the volume this will
                   really see does to the approach.
-                - Ask rather than guess. A question is cheap here and expensive once code exists.
+                - Ask rather than guess. A question is cheap here and expensive once a plan exists.
+                  Record and escalate questions to the user now.
 
                 Keep both plans to what the spec asks for and nothing besides. Mark each ready when
                 it is complete; submitting the plan needs both plans ready and the spec still
