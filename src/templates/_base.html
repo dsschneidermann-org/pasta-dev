@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        {% block head %}
+        <!-- Startup styles of water.css, so styles don't have to wait until JS is loaded -->
+        <link rel="preload" as="style" href="/static/water.css/dark.min.css" />
+        <link rel="preload" id="js-startup-stylesheet" as="style" href="/static/water.css/light.min.css" />
+        <!-- Dynamic version of water.css, overwrites startup styles. JavaScript sets & updates href -->
+        <link rel="stylesheet" id="js-stylesheet" />
+        <!-- Water.css overrides -->
+        <link rel="stylesheet" as="style" href="/static/styles.css" />
+        <title>{% block title %}{% endblock %} - Pasta</title>
+        {% endblock %}
+        <script>
+{% include '_reloader.js' %}
+        </script>
+    </head>
+    <body class="{% block bodyclass %}{% endblock %} light" style="display:none; visibility:hidden">
+        <div id="theme" style="float:right">
+            <form id="theme-form">
+                <input id="theme-light" style="display:none; visibility:hidden" type="radio" value="light" name="theme" checked>
+                <input id="theme-dark" style="display:none; visibility:hidden" type="radio" value="dark" name="theme">
+                <label for="theme-light">Light ☀ /</label><label style="padding-left: 0.3rem" for="theme-dark">Dark 🌙</label>
+            </form>
+        </div>
+        <div id="content">
+            <h1>{{ self.title() }}</h1>
+            <hr />
+            {% block content %}{% endblock %}
+        </div>
+        <div id="footer">
+            {% block footer %}
+            <hr />
+            &copy; Copyright 2026 by <a href="http://dennis-s.dk">Dennis S</a>.
+            {% endblock %}
+        </div>
+        <script>
+{% include '_theme.js' %}
+        </script>
+    </body>
+</html>
