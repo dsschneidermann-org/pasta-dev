@@ -146,7 +146,8 @@ _FEATURE_BRIEF = PageType(
                 covers, contradictory steps, placeholder content, or steps too vague to act on. A
                 plan that builds more than the spec asked for, or abstracts something used once, is a
                 serious gap too and not a matter of taste. Minor wording and style preferences are
-                never a reason to withhold build-ready.
+                never a reason to withhold build-ready. Steps that say to update documentation need
+                to be removed as that is a later activity once the implementation has landed.
                 """),
             _list("findings", element_fields=("issue", "severity", "action"), description="""
                 Each one plan-review finding: what is wrong, why it matters for implementation, its
@@ -325,6 +326,8 @@ _FEATURE_BRIEF = PageType(
                   of through a mock.
                 - Check that the plan is not larger than the problem, and that the pure and
                   effectful sides stayed separate in it.
+                - Check that the steps do not update documentation as that is a later activity once
+                  the implementation has landed.
                 - Record each finding AND make the edit its action names, so the plan and this
                   record agree. A finding recorded but never applied is worse than one never
                   raised.
@@ -375,7 +378,9 @@ _FEATURE_BRIEF = PageType(
                   of rules.
                 - Review the comments added for the change. Avoid verbosity of comments and avoid
                   naming the specifics of other parts of code and instead keep comments to general
-                  principles and intents. Remove uppercase words and other emphasis.
+                  principles and intents. Comments should only refer to the current code, not the
+                  previous implementation. Uppercase words and emphasis markers are inappropriate in
+                  tone and single line comments that are self-evident by code should be removed.
 
                 Three things are deliberately not part of this state, so do not start them here:
                 rebasing onto main happens at ship, not before; recording commits happens after ship,
