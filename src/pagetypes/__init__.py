@@ -431,7 +431,7 @@ class PageType:
         for command in self.commands:
             if command.section is None or command.field is None:
                 continue
-            if not is_field_setter_kind(command):
+            if not is_field_setter(command):
                 continue
             target = (command.section, command.field)
             if target in seen:
@@ -760,15 +760,20 @@ STANDARD_BLOCK_KINDS: tuple[BlockKindSpec, ...] = tuple(
     BlockKindSpec(kind) for kind in _ALL_BLOCK_KINDS)
 
 
-def is_field_setter_kind(command: CommandSpec) -> bool:
+def is_field_setter(command: CommandSpec) -> bool:
     """Whether `command` writes typed field content into a (section, field).
 
-    A SET_SCALAR, a SET_PROSE, an ADD_ELEMENT, or a page-level ADD_BLOCK. An element-scoped add
-    is excluded: the element it fills must exist first, so it is not a stage's own work.
+    A SET_SCALAR, a SET_PROSE, an ADD_ELEMENT (including the element-FSM adds addStep / addCase /
+    askQuestion), or a page-level ADD_BLOCK. Not setters: SET_BLOCK (an edit of one existing
+    block), an element-scoped ADD_BLOCK (the element it fills must exist first, so it is not a
+    stage's own work), REMOVE_* / REORDER_* (structure, not content), SET_ELEMENT_FIELD (a flag on
+    an existing element), ELEMENT_TRANSITION (fires an element's own FSM), TRANSITION / COMPOUND
+    (page-status edges), and the universal ADD_LINK / SET_TITLE.
 
-    The rule lives here rather than in commands.py because PageType's post-init validation needs
-    it and commands.py already imports this module - `commands.is_field_setter` delegates, so the
-    `do` rollup and the declaration-time check can never disagree about what a setter is.
+    The page-type-agnostic classifier behind the self-direction `do` list, where each field gets
+    one entry naming the one command that authors it. It lives here rather than beside that
+    rollup because PageType's post-init validation needs it too and this module cannot import
+    commands.py, so the rollup and the declaration-time check read one rule.
     """
     if command.kind == ADD_BLOCK:
         return command.element_field is None

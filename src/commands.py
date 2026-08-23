@@ -20,28 +20,28 @@ from .pagetypes import (
     ADD_BLOCK,
     ADD_ELEMENT,
     ADD_LINK,
-    COMPOUND,
     BLOCK,
-    ArgSpec,
-    BlockKindSpec,
-    is_field_setter_kind,
     BLOCK_ARRAY,
+    COMPOUND,
     ELEMENT_TRANSITION,
-    REORDER_BLOCK,
-    REORDER_ELEMENT,
     REMOVE_BLOCK,
     REMOVE_ELEMENT,
+    REORDER_BLOCK,
+    REORDER_ELEMENT,
     SET_BLOCK,
     SET_ELEMENT_FIELD,
     SET_PROSE,
     SET_SCALAR,
     SET_TITLE,
     TRANSITION,
+    ArgSpec,
+    BlockKindSpec,
     CommandSpec,
     FieldSpec,
     PageType,
     guard_production_type,
     initial_sections,
+    is_field_setter,
     validate_block,
     validate_blocks,
     validate_inline_content,
@@ -122,26 +122,6 @@ def _is_status_transition(command: CommandSpec) -> bool:
     own FSM, not the page's) - is an AUTHORING command from the page's point of view.
     """
     return command.kind in (TRANSITION, COMPOUND) and command.event is not None
-
-
-def is_field_setter(command: CommandSpec) -> bool:
-    """Whether `command` writes typed field content into a (section, field): a SET_SCALAR, SET_PROSE,
-    ADD_ELEMENT (the add of a LIST field - including the element-FSM adds addStep/addCase/askQuestion),
-    or a page-level ADD_BLOCK.
-
-    The shared, page-type-agnostic classifier behind the self-direction `do` list: each field gets
-    exactly one entry, naming the one command that authors it. Deliberately kind-based, no per-type
-    knowledge. A blocks field used to need a special case here because it had one add per kind; with
-    one add per field it is an ordinary setter.
-    Not field setters: SET_BLOCK (an edit of one existing block), an element-scoped ADD_BLOCK (the
-    element it fills must exist first), REMOVE_* / REORDER_* (structure, not content),
-    SET_ELEMENT_FIELD (a flag on an existing element), ELEMENT_TRANSITION (fires an element's own
-    FSM), TRANSITION / COMPOUND (page-status edges), and the universal ADD_LINK / SET_TITLE.
-
-    Delegates to pagetypes.is_field_setter_kind so PageType's declaration-time check and this
-    rollup share one rule.
-    """
-    return is_field_setter_kind(command)
 
 
 def _topology_ok(command: CommandSpec, allowed_events: set[str]) -> bool:
