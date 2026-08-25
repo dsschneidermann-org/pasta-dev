@@ -5,10 +5,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import cast
 
 from .args import (
-    STANDARD_BLOCK_KINDS,
     BlockKindSpec,
     ElementBlocksSpec,
     _as_block_kinds,
@@ -56,14 +54,6 @@ class FieldSpec:
             if spec.field in seen:
                 raise ValueError(f"{self.key}: element_blocks names '{spec.field}' twice.")
             seen.add(spec.field)
-
-    def block_vocabulary(self) -> tuple[BlockKindSpec, ...]:
-        """The kinds this blocks field accepts - its declaration, else every standard kind.
-
-        The one accessor every consumer reads. Nothing downstream may fall back to the global
-        BLOCK_ARGS, or a per-field body-arg override would silently stop being honoured.
-        """
-        return cast(tuple[BlockKindSpec, ...], self.block_kinds) or STANDARD_BLOCK_KINDS
 
     def element_blocks_spec(self, element_field: str) -> ElementBlocksSpec | None:
         """The block declaration for `element_field`, or None when it holds a scalar value."""

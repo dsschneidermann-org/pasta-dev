@@ -398,7 +398,7 @@ def test_blocks_body_is_an_inline_run_blocks_field():
     assert field.kind == BLOCKS
     add = BLK.command("addBody")
     assert add.kind == ADD_BLOCK and add.args[0].content == BLOCK_ARRAY
-    paragraph = next(kind for kind in field.block_vocabulary() if kind.kind == "paragraph")
+    paragraph = next(kind for kind in field.block_kinds if kind.kind == "paragraph")
     assert paragraph.body_args()[0].content == INLINE_RUNS
 
 
@@ -570,16 +570,16 @@ def test_block_kind_helpers():
         _list_block().body_args(), _quote().body_args(), _table().body_args(), _divider().body_args()]
 
 
-def test_field_spec_block_vocabulary():
+def test_field_spec_block_kinds():
     # An undeclared blocks field accepts every standard kind, materialized as data; a declared one
     # accepts exactly what it names, in the order it names them.
     default = _blocks("body")
-    assert [kind.kind for kind in default.block_vocabulary()] == [
+    assert [kind.kind for kind in default.block_kinds] == [
         "paragraph", "heading", "code", "list", "quote", "table", "divider"]
-    assert [kind.body_args() for kind in default.block_vocabulary()] == [
+    assert [kind.body_args() for kind in default.block_kinds] == [
         kind.body_args() for kind in standard_block_kinds()]
     restricted = _blocks("body", block_kinds=(_code(), _paragraph()))
-    assert [kind.kind for kind in restricted.block_vocabulary()] == ["code", "paragraph"]
+    assert [kind.kind for kind in restricted.block_kinds] == ["code", "paragraph"]
 
 
 def test_field_spec_rejects_a_bad_block_vocabulary():
@@ -767,7 +767,7 @@ def test_blocks_cmds_is_three_commands_named_from_the_label():
     # The add's array carries the field's vocabulary, so the schema and the validator read the
     # same declaration.
     assert add.args[0].content == BLOCK_ARRAY
-    assert add.args[0].block_kinds == body.block_vocabulary()
+    assert add.args[0].block_kinds == body.block_kinds
     assert add.args[0].required
     # It writes no raw argument onto anything - it converts the array into id'd blocks.
     assert dict(add.element_map) == {}
@@ -904,7 +904,7 @@ def test_a_block_argument_is_resolved_from_its_field():
         ),
         fsm=FSMSpec(name="XTestResolved", initial="active", states=("active",)))
     add, remove = page_type.commands
-    assert add.args[0].block_kinds == body.block_vocabulary()
+    assert add.args[0].block_kinds == body.block_kinds
     assert [kind.kind for kind in add.args[0].block_kinds or ()] == ["code", "paragraph"]
     # An argument that carries no blocks is returned untouched, on either command.
     assert add.args[1].block_kinds is None and remove.args[0].block_kinds is None
@@ -918,7 +918,7 @@ def _targeted_vocabulary(page_type, command, arg):
     element_field = command.element_field or (
         arg.name if command.kind == ADD_ELEMENT else None)
     if element_field is None:
-        return field_spec.block_vocabulary()
+        return field_spec.block_kinds
     spec = field_spec.element_blocks_spec(element_field)
     assert spec is not None
     return spec.vocabulary()

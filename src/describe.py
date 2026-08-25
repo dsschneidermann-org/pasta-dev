@@ -115,7 +115,7 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                                            for spec in field_spec.element_blocks] or None),
                         # for a blocks field: the kinds it accepts. The only place a caller can
                         # read a page-level field's vocabulary, now that no command name carries it.
-                        "blockKinds": ([kind.kind for kind in field_spec.block_vocabulary()]
+                        "blockKinds": ([kind.kind for kind in field_spec.block_kinds]
                                        if field_spec.kind == BLOCKS else None),
                         "description": field_spec.description,
                     }
