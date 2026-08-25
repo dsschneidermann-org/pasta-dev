@@ -571,12 +571,14 @@ def test_block_kind_helpers():
 
 
 def test_field_spec_block_vocabulary():
-    # An undeclared blocks field accepts every standard kind; a declared one accepts exactly
-    # what it names, in the order it names them.
-    assert _blocks("body").block_vocabulary() == STANDARD_BLOCK_KINDS
-    assert [kind.kind for kind in _blocks("body").block_vocabulary()] == [
+    # An undeclared blocks field accepts every standard kind, materialized as data; a declared one
+    # accepts exactly what it names, in the order it names them.
+    default = _blocks("body")
+    assert [kind.kind for kind in default.block_vocabulary()] == [
         "paragraph", "heading", "code", "list", "quote", "table", "divider"]
-    restricted = _blocks("body", block_kinds=("code", "paragraph"))
+    assert [kind.body_args() for kind in default.block_vocabulary()] == [
+        kind.body_args() for kind in standard_block_kinds()]
+    restricted = _blocks("body", block_kinds=(_code(), _paragraph()))
     assert [kind.kind for kind in restricted.block_vocabulary()] == ["code", "paragraph"]
 
 

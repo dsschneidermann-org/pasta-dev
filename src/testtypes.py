@@ -87,6 +87,7 @@ from .pagetypes import (
     transition_on_add_cmd,
     add_link_cmd,
     set_title_cmd,
+    standard_block_kinds,
 )
 
 
@@ -130,7 +131,7 @@ def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec
 
 
 def _blocks(key: str, description: str = "",
-            block_kinds: tuple[BlockKindSpec | str, ...] = ()) -> FieldSpec:
+            block_kinds: tuple[BlockKindSpec | str, ...] = standard_block_kinds()) -> FieldSpec:
     return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)
 
 

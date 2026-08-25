@@ -13,6 +13,7 @@ from .args import (
     ElementBlocksSpec,
     _as_block_kinds,
     _reject_duplicate_kinds,
+    standard_block_kinds,
 )
 from .specs import BLOCKS, LIST, PROSE, SCALAR, TITLE_ELEMENT_FIELDS, ElementFSMSpec
 
@@ -112,6 +113,6 @@ def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec
                      description=description)
 
 
-def _blocks(key: str, *, block_kinds: tuple[BlockKindSpec | str, ...] = (),
+def _blocks(key: str, *, block_kinds: tuple[BlockKindSpec | str, ...] = standard_block_kinds(),
             description: str = "") -> FieldSpec:
     return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)
