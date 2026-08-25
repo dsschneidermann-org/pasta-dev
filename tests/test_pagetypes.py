@@ -48,9 +48,21 @@ from src.pagetypes import (
     FieldSpec,
     _array,
     _blocks,
+    _boolean,
+    _code,
+    _divider,
+    _heading,
+    _integer,
     _list,
+    _list_block,
+    _paragraph,
     _prose,
+    _quote,
+    _table,
     _text,
+    _text_heading,
+    _text_paragraph,
+    standard_block_kinds,
     blocks_cmds,
     collect_ref_ids,
     element_blocks_cmds,
@@ -530,6 +542,32 @@ def test_block_kind_spec_rejects_a_bad_declaration():
     assert custom.body_args() == (_text("questionId"), _text())
     with pytest.raises(ValueError, match="non-empty name"):
         BlockKindSpec("")
+
+
+def test_block_kind_helpers():
+    # Each helper builds a BlockKindSpec with the exact standard body args, so it is a drop-in for
+    # the old per-kind table. Asserted against explicit expected args (not a lookup) so the test
+    # stands on its own once that table is gone.
+    assert _paragraph().kind == "paragraph"
+    assert _paragraph().body_args() == (_array("inlines", content=INLINE_RUNS),)
+    assert _heading().body_args() == (_integer("level"), _array("inlines", content=INLINE_RUNS))
+    assert _code().body_args() == (_text("language"), _text("source"))
+    assert _list_block().kind == "list"
+    assert _list_block().body_args() == (_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS))
+    assert _quote().body_args() == (_array("paragraphs", content=INLINE_RUN_LISTS),)
+    assert _table().body_args() == (_array("header", content=INLINE_RUN_LISTS),
+                                    _array("rows", content=INLINE_RUN_GRID),
+                                    _array("align", required=False, content=TABLE_ALIGN))
+    assert _divider().kind == "divider" and _divider().body_args() == ()
+    # The text-only variants: one plain `text` arg (no inline-run shape) in place of `inlines`.
+    assert _text_paragraph().body_args() == (_text(),)
+    assert _text_heading().body_args() == (_integer("level"), _text())
+    # standard_block_kinds() is the whole vocabulary, in the canonical order.
+    assert [kind.kind for kind in standard_block_kinds()] == [
+        "paragraph", "heading", "code", "list", "quote", "table", "divider"]
+    assert [kind.body_args() for kind in standard_block_kinds()] == [
+        _paragraph().body_args(), _heading().body_args(), _code().body_args(),
+        _list_block().body_args(), _quote().body_args(), _table().body_args(), _divider().body_args()]
 
 
 def test_field_spec_block_vocabulary():

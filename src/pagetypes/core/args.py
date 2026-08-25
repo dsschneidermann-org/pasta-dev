@@ -243,3 +243,54 @@ _ALL_BLOCK_KINDS = ("paragraph", "heading", "code", "list", "quote", "table", "d
 # Every standard kind, unrestricted - what a blocks field accepts when it declares no vocabulary.
 STANDARD_BLOCK_KINDS: tuple[BlockKindSpec, ...] = tuple(
     BlockKindSpec(kind) for kind in _ALL_BLOCK_KINDS)
+
+
+# --- Block-kind helpers ------------------------------------------------------
+# Factories that build a BlockKindSpec the way _text builds an ArgSpec, so a field's vocabulary
+# reads as `(_paragraph(), _code())` instead of spelling out each spec's body args. One per standard
+# kind (the standard body), two text-only variants whose body is a single plain `text` arg, and
+# `standard_block_kinds()` for the whole vocabulary.
+def _paragraph() -> BlockKindSpec:
+    return BlockKindSpec("paragraph", args=(_array("inlines", content=INLINE_RUNS),))
+
+
+def _heading() -> BlockKindSpec:
+    return BlockKindSpec("heading", args=(_integer("level"), _array("inlines", content=INLINE_RUNS)))
+
+
+def _code() -> BlockKindSpec:
+    return BlockKindSpec("code", args=(_text("language"), _text("source")))
+
+
+def _list_block() -> BlockKindSpec:
+    return BlockKindSpec("list", args=(_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS)))
+
+
+def _quote() -> BlockKindSpec:
+    return BlockKindSpec("quote", args=(_array("paragraphs", content=INLINE_RUN_LISTS),))
+
+
+def _table() -> BlockKindSpec:
+    return BlockKindSpec("table", args=(_array("header", content=INLINE_RUN_LISTS),
+                                        _array("rows", content=INLINE_RUN_GRID),
+                                        _array("align", required=False, content=TABLE_ALIGN)))
+
+
+def _divider() -> BlockKindSpec:
+    return BlockKindSpec("divider", args=())
+
+
+def _text_paragraph() -> BlockKindSpec:
+    """A paragraph whose body is one plain text arg rather than rich inline runs."""
+    return BlockKindSpec("paragraph", args=(_text(),))
+
+
+def _text_heading() -> BlockKindSpec:
+    """A heading whose body is a level and one plain text arg rather than rich inline runs."""
+    return BlockKindSpec("heading", args=(_integer("level"), _text()))
+
+
+def standard_block_kinds() -> tuple[BlockKindSpec, ...]:
+    """Every standard kind, in the canonical order - the vocabulary a blocks field accepts when it
+    declares none of its own."""
+    return (_paragraph(), _heading(), _code(), _list_block(), _quote(), _table(), _divider())
