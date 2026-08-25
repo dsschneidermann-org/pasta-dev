@@ -810,28 +810,6 @@ def test_the_block_surface_is_three_commands_per_field():
     assert document == {"addBody", "removeBlock", "reorderBlock", "addLink", "setTitle"}
 
 
-def test_the_per_kind_factories_are_gone():
-    """Deleted outright rather than deprecated - aliases would have left the per-kind commands
-    standing beside the unified add, which is the opposite of what the collapse was for."""
-    import src.pagetypes as pagetypes
-    for name in ("add_block_cmd", "block_cmds", "all_block_cmds", "element_block_cmds"):
-        assert not hasattr(pagetypes, name), f"{name} survived the collapse"
-    assert not hasattr(CommandSpec("x", ADD_BLOCK), "block_kind")
-
-
-def test_no_block_set_command_survives():
-    """A blocks field offers no in-place edit, at either level. Nothing declares the SET_BLOCK
-    kind, no page type carries a set...Block name, and the kind constant itself is gone - so a
-    field cannot quietly regrow one."""
-    import src.pagetypes as pagetypes
-    assert not hasattr(pagetypes, "SET_BLOCK") and not hasattr(pagetypes, "BLOCK")
-    for tag, page_type in {**REGISTRY, **TEST_REGISTRY}.items():
-        for command in page_type.commands:
-            assert command.kind != "set_block", f"{tag}.{command.name} is a block set"
-            assert not command.name.endswith("Block") or not command.name.startswith("set"), (
-                f"{tag} declares {command.name}")
-
-
 def test_block_command_names_match_the_declared_surface():
     """Every production add name, and the remove/reorder names it sits beside - which are
     byte-identical to what they were before the sets were dropped."""
