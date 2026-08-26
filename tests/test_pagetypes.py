@@ -648,8 +648,8 @@ def test_validate_block_reads_a_per_field_arg_override():
     """The case the whole vocabulary design exists for: one kind name, two body shapes.
 
     A field declaring `paragraph` as a plain text arg accepts `text` and rejects the standard
-    `inlines`, and a field declaring the standard kind does the reverse. If any consumer fell
-    back to the global BLOCK_ARGS this would pass in one direction only.
+    `inlines`, and a field declaring the standard kind does the reverse. If any consumer read a
+    shared table instead of the kind's own args this would pass in one direction only.
     """
     plain = (BlockKindSpec("paragraph", args=(_text(),)),)
     validate_block({"kind": "paragraph", "text": "just prose"}, plain)
@@ -709,7 +709,7 @@ def test_collect_ref_ids_finds_a_ref_inside_a_block():
 
 
 def test_collect_ref_ids_reads_runs_off_an_overridden_kind():
-    """An override moves a kind's runs to a different arg, so reading BLOCK_ARGS would miss them."""
+    """An override moves a kind's runs to a different arg, so reading a shared table would miss them."""
     kinds = (BlockKindSpec("note", args=(_array("body", content=INLINE_RUNS),)),)
     assert collect_ref_ids(
         BLOCK_ARRAY, [{"kind": "note", "body": ["see ", {"ref": "a:1"}]}], kinds) == ["a:1"]

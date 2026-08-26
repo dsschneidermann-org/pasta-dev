@@ -1162,8 +1162,8 @@ def test_a_field_override_is_enforced_at_the_command():
     """One kind name, two body shapes, decided by the field - the case the vocabulary exists for.
 
     test-child's decisions field declares `paragraph` with a plain `text` arg; test-blocks' body
-    takes the standard inline runs. Each rejects the other's shape. If any consumer fell back to
-    the global BLOCK_ARGS this would pass in one direction only.
+    takes the standard inline runs. Each rejects the other's shape. If any consumer read a shared
+    table instead of the kind's own args this would pass in one direction only.
     """
     factory = make_counter()
     child = create_page(CHILD_BLOCKS, "Child", None, factory)

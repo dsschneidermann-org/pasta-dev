@@ -1,8 +1,8 @@
 """The argument helpers a command declaration is written with, and the block-kind
 vocabulary built out of them.
 
-The two belong together: BLOCK_ARGS is built from the arg helpers, BlockKindSpec reads
-BLOCK_ARGS, and STANDARD_BLOCK_KINDS creates BlockKindSpec values at import time.
+The two belong together: the block-kind helpers build a BlockKindSpec out of the same arg
+helpers a command's arg list uses, and standard_block_kinds() collects the standard kinds.
 """
 
 from __future__ import annotations

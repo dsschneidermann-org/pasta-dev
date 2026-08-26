@@ -369,10 +369,10 @@ _PARENT_IN_PLANNING_OR_LATER = ParentStateGuard(
 # beside a `paragraph` whose body args are overridden to plain text - which is the fixture for
 # per-field kind definitions and per-field arg overrides.
 # ============================================================================
-# A vocabulary that only a per-field declaration can express: a custom kind BLOCK_ARGS does not
-# know, carrying its own cross-page ref check, beside a standard kind whose body args are
+# A vocabulary that only a per-field declaration can express: a custom kind the standard helpers
+# do not provide, carrying its own cross-page ref check, beside a standard kind whose body args are
 # overridden to a plain text arg. No other fixture exercises either, and both are the reason a
-# blocks field declares its own vocabulary rather than sharing the global one.
+# blocks field declares its own vocabulary rather than reusing a shared default.
 # A block-bearing element field whose kind carries a cross-page ref check. This is the only
 # fixture for integrity the command-level check could never give: a block created together with
 # its element hides its questionId inside an array entry, where store._check_ref - which reads one
