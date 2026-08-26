@@ -9,9 +9,7 @@ from textwrap import dedent
 from .args import (
     BlockKindSpec,
     ElementBlocksSpec,
-    _as_block_kinds,
     _reject_duplicate_kinds,
-    standard_block_kinds,
 )
 from .specs import BLOCKS, LIST, PROSE, SCALAR, TITLE_ELEMENT_FIELDS, ElementFSMSpec
 
@@ -25,8 +23,9 @@ class FieldSpec:
     element_fsm: ElementFSMSpec | None = None   # for LIST: a per-element lifecycle (todo/done, ...)
     # for LIST: element fields that hold blocks rather than a scalar value
     element_blocks: tuple[ElementBlocksSpec, ...] = ()
-    # for a blocks field: the kinds it accepts. () means every standard kind.
-    block_kinds: tuple[BlockKindSpec | str, ...] = ()
+    # for a blocks field: the kinds it accepts, always populated (the _blocks helper defaults to
+    # every standard kind, and an empty vocabulary on a blocks field is rejected below).
+    block_kinds: tuple[BlockKindSpec, ...] = ()
     description: str = ""
 
     def __post_init__(self):
@@ -35,11 +34,11 @@ class FieldSpec:
         # breaks are kept - markdown reflows a paragraph's newlines away.
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
         # Checked where it is declared, so a typo fails at import rather than at authoring time.
-        normalized_kinds = _as_block_kinds(self.block_kinds)
-        if normalized_kinds and self.kind != BLOCKS:
+        if self.block_kinds and self.kind != BLOCKS:
             raise ValueError(f"{self.key}: block_kinds is only valid on a blocks field.")
-        _reject_duplicate_kinds(self.key, normalized_kinds)
-        object.__setattr__(self, "block_kinds", normalized_kinds)
+        if self.kind == BLOCKS and not self.block_kinds:
+            raise ValueError(f"{self.key}: a blocks field declares no block kinds.")
+        _reject_duplicate_kinds(self.key, self.block_kinds)
         # A block-bearing element field is checked where it is declared, so a typo fails at import
         # rather than producing a field nothing can ever author.
         seen: set[str] = set()
@@ -103,6 +102,8 @@ def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec
                      description=description)
 
 
-def _blocks(key: str, *, block_kinds: tuple[BlockKindSpec | str, ...] = standard_block_kinds(),
+def _blocks(key: str, *, block_kinds: tuple[BlockKindSpec, ...],
             description: str = "") -> FieldSpec:
+    # block_kinds is required: a blocks field names its vocabulary at the call site (pass
+    # standard_block_kinds() for every standard kind), so nothing downstream needs a fallback.
     return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)

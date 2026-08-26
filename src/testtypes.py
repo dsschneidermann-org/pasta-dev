@@ -71,11 +71,11 @@ from .pagetypes import (
     RefCheck,
     SectionSpec,
     _boolean,
-    _code,
+    _code_block,
     _list_block,
-    _paragraph,
+    _paragraph_runs,
     _text,
-    _text_paragraph,
+    _paragraph_text,
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
@@ -130,8 +130,8 @@ def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec
                      description=description)
 
 
-def _blocks(key: str, description: str = "",
-            block_kinds: tuple[BlockKindSpec | str, ...] = standard_block_kinds()) -> FieldSpec:
+def _blocks(key: str, description: str = "", *,
+            block_kinds: tuple[BlockKindSpec, ...]) -> FieldSpec:
     return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)
 
 
@@ -182,7 +182,8 @@ TEST_BLOCKS = PageType(
     name="Blocks fixture",
     description="Test fixture: the blocks field - every block kind and the inline-run grammar.",
     sections=(
-        SectionSpec("body", "Body", (_blocks("body", "a rich-text blocks body"),)),
+        SectionSpec("body", "Body", (
+            _blocks("body", "a rich-text blocks body", block_kinds=standard_block_kinds()),)),
     ),
     # The field is passed to both its section and its factory, so its vocabulary - here the
     # default, every standard kind - is declared once.
@@ -207,8 +208,8 @@ TEST_ELEMENT_BLOCKS = PageType(
         SectionSpec("items", "Items", (
             _list("items", element_fields=("text", "snippet", "detail", "status"),
                   element_fsm=_STEP_FSM,
-                  element_blocks=(ElementBlocksSpec("snippet", (_code(),)),
-                                  ElementBlocksSpec("detail", (_paragraph(), _code(), _list_block()))),
+                  element_blocks=(ElementBlocksSpec("snippet", (_code_block(),)),
+                                  ElementBlocksSpec("detail", (_paragraph_runs(), _code_block(), _list_block()))),
                   description="a list whose elements carry a code-only field and a rich one"),
         )),
     ),
@@ -388,7 +389,7 @@ TEST_CHILD = PageType(
                       BlockKindSpec("decision", args=(_text("questionId"), _text()),
                                     ref_check=RefCheck(arg="questionId", scope="parent",
                                                        section="questions", field="items")),
-                      _paragraph(),
+                      _paragraph_runs(),
                   )),),
                   description="build steps (element-FSM todo <-> done)"),
         )),
@@ -406,7 +407,7 @@ TEST_CHILD = PageType(
                         BlockKindSpec("decision", args=(_text("questionId"), _text()),
                                       ref_check=RefCheck(arg="questionId", scope="parent",
                                                          section="questions", field="items")),
-                        _text_paragraph(),
+                        _paragraph_text(),
                     )),
         )),
     ),
