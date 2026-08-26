@@ -574,6 +574,20 @@ def test_block_kind_helpers():
         _list_block().body_args(), _quote_block().body_args(), _table_block().body_args(), _divider_block().body_args()]
 
 
+def test_removed_block_names_are_gone_and_helpers_exported():
+    # The old table machinery is removed from the package, and the helpers that replace it are
+    # exported in its place - both the binding and the __all__ entry.
+    import src.pagetypes as pkg
+    for gone in ("BLOCK_ARGS", "STANDARD_BLOCK_KINDS", "_ALL_BLOCK_KINDS", "_as_block_kinds"):
+        assert not hasattr(pkg, gone)
+        assert gone not in pkg.__all__
+    for helper in ("_paragraph_runs", "_heading_runs", "_paragraph_text", "_heading_text",
+                   "_code_block", "_list_block", "_quote_block", "_table_block", "_divider_block",
+                   "standard_block_kinds"):
+        assert hasattr(pkg, helper)
+        assert helper in pkg.__all__
+
+
 def test_field_spec_block_kinds():
     # A blocks field carries exactly the kinds it is declared with, in order. block_kinds is
     # required - the caller passes standard_block_kinds() for the whole standard vocabulary.
