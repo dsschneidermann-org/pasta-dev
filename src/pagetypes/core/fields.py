@@ -23,8 +23,8 @@ class FieldSpec:
     element_fsm: ElementFSMSpec | None = None   # for LIST: a per-element lifecycle (todo/done, ...)
     # for LIST: element fields that hold blocks rather than a scalar value
     element_blocks: tuple[ElementBlocksSpec, ...] = ()
-    # for a blocks field: the kinds it accepts, always populated (the _blocks helper defaults to
-    # every standard kind, and an empty vocabulary on a blocks field is rejected below).
+    # for a blocks field: the kinds it accepts, declared at the call site and never empty (an
+    # empty vocabulary on a blocks field is rejected below).
     block_kinds: tuple[BlockKindSpec, ...] = ()
     description: str = ""
 

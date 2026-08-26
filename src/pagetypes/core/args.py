@@ -215,8 +215,8 @@ _PRECEDING = _text("precedingId", required=False,
 
 # --- Block-kind helpers ------------------------------------------------------
 # Factories that build a BlockKindSpec the way _text builds an ArgSpec, so a field's vocabulary
-# reads as `(_paragraph_runs(), _code_block())` instead of spelling out each spec's body args. One per standard
-# kind (the standard body), two text-only variants whose body is a single plain `text` arg, and
+# reads as `(_paragraph_runs(), _code_block())` rather than spelling out each spec's body args.
+# One per standard kind, two text-only variants whose body is a single plain `text` arg, and
 # `standard_block_kinds()` for the whole vocabulary.
 def _paragraph_runs() -> BlockKindSpec:
     return BlockKindSpec("paragraph", args=(_array("inlines", content=INLINE_RUNS),))
@@ -259,6 +259,5 @@ def _heading_text() -> BlockKindSpec:
 
 
 def standard_block_kinds() -> tuple[BlockKindSpec, ...]:
-    """Every standard kind, in the canonical order - the vocabulary a blocks field accepts when it
-    declares none of its own."""
+    """Every standard kind, in the canonical order - what a field passes to accept them all."""
     return (_paragraph_runs(), _heading_runs(), _code_block(), _list_block(), _quote_block(), _table_block(), _divider_block())
