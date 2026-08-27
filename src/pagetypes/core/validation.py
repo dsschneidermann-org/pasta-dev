@@ -117,21 +117,21 @@ def validate_block(entry: Any, kinds: tuple[BlockKindSpec, ...]) -> None:
             f"A block must be an object with a 'kind', got {type(entry).__name__}."
         )
     kind = entry.get("kind")
-    spec = next((k for k in kinds if k.kind == kind), None)
-    if spec is None:
+    block = next((k for k in kinds if k.kind == kind), None)
+    if block is None:
         raise ValidationError(
             f"Block kind {kind!r} is not accepted here - one of {[k.kind for k in kinds]}."
         )
-    specs = spec.body_args()
-    extra = set(entry) - {spec.name for spec in specs} - {"kind"}
+    args = block.body_args()
+    extra = set(entry) - {arg.name for arg in args} - {"kind"}
     if extra:
         raise ValidationError(f"A '{kind}' block has unknown keys: {sorted(extra)}.")
-    for spec in specs:
-        present = spec.name in entry and entry[spec.name] is not None
-        if spec.required and not present:
-            raise ValidationError(f"A '{kind}' block requires '{spec.name}'.")
-        if present and spec.content is not None:
-            validate_inline_content(spec.content, entry[spec.name])
+    for arg in args:
+        present = arg.name in entry and entry[arg.name] is not None
+        if arg.required and not present:
+            raise ValidationError(f"A '{kind}' block requires '{arg.name}'.")
+        if present and arg.content is not None:
+            validate_inline_content(arg.content, entry[arg.name])
     if kind == "table":
         validate_table(entry.get("header", []), entry.get("rows", []), entry.get("align"))
 
@@ -190,11 +190,11 @@ def _block_ref_ids(entry: Any, kinds: tuple[BlockKindSpec, ...] | None) -> list[
     """
     if not isinstance(entry, dict) or kinds is None:
         return []
-    spec = next((kind for kind in kinds if kind.kind == entry.get("kind")), None)
-    if spec is None:
+    block = next((kind for kind in kinds if kind.kind == entry.get("kind")), None)
+    if block is None:
         return []
     ids: list[str] = []
-    for arg in spec.body_args():
+    for arg in block.body_args():
         if arg.content is not None:
             ids.extend(collect_ref_ids(arg.content, entry.get(arg.name)))
     return ids

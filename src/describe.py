@@ -21,10 +21,10 @@ def _block_schema(kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
     agree. A caller learns a field's whole vocabulary from this alone, which is what replaces
     reading the kind off a per-kind command name."""
     branches: list[dict[str, Any]] = []
-    for spec in kinds:
-        properties: dict[str, Any] = {"kind": {"const": spec.kind}}
+    for block in kinds:
+        properties: dict[str, Any] = {"kind": {"const": block.kind}}
         required = ["kind"]
-        for body in spec.body_args():
+        for body in block.body_args():
             properties[body.name] = {"type": body.type}
             if body.required:
                 required.append(body.name)
@@ -110,12 +110,12 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         # for a list with a per-element lifecycle: its states (e.g. todo/done)
                         "elementStates": list(field_spec.element_fsm.states) if field_spec.element_fsm else None,
                         # for a list whose element fields hold blocks: each field and the kinds it accepts
-                        "elementBlocks": ([{"field": spec.field,
-                                            "kinds": [kind.kind for kind in spec.kinds]}
-                                           for spec in field_spec.element_blocks] or None),
+                        "elementBlocks": ([{"field": element_blocks.field,
+                                            "kinds": [kind.kind for kind in element_blocks.blocks]}
+                                           for element_blocks in field_spec.element_blocks] or None),
                         # for a blocks field: the kinds it accepts. The only place a caller can
                         # read a page-level field's vocabulary, now that no command name carries it.
-                        "blockKinds": ([kind.kind for kind in field_spec.block_kinds]
+                        "blockKinds": ([kind.kind for kind in field_spec.blocks]
                                        if field_spec.kind == BLOCKS else None),
                         "description": field_spec.description,
                     }
