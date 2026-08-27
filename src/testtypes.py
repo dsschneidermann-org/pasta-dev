@@ -48,34 +48,34 @@ Command DECLARATION flows through the SAME shared command-helper factories the p
 imported from
 src.pagetypes) - so a fixture reads like a production type and doubles as coverage of those
 helpers, while its command surface (names, args, legality, FSM edges, guards, ref-checks) stays
-exactly what it was when hand-written. Only the element FSMs and the field-spec helpers remain local,
-so a fixture's SHAPE never moves when a production type does.
+exactly what it was when hand-written. The field-spec and command helpers are shared with
+src.pagetypes; only the element FSMs are declared locally, named distinctly so their diagram labels
+and cache identity never collide with production.
 """
 
 from __future__ import annotations
 
 from .pagetypes import (
-    BLOCKS,
-    LIST,
-    PROSE,
-    SCALAR,
     AutoChildSpec,
     BlockKindSpec,
     ChildStateGuard,
     ElementBlocksSpec,
     ElementFSMSpec,
-    FieldSpec,
     FSMSpec,
     PageType,
     ParentStateGuard,
     RefCheck,
     SectionSpec,
+    _blocks,
     _boolean,
     _code_block,
+    _list,
     _list_block,
     _paragraph_runs,
-    _text,
     _paragraph_text,
+    _prose,
+    _scalar,
+    _text,
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
@@ -112,29 +112,6 @@ _QUESTION_FSM = ElementFSMSpec(
 )                                                # no checkmark_done -> open/answered render without a box
 
 
-# --- Field-spec helpers (readability only, mirroring src.pagetypes) -------
-# The FIELD helpers stay local so a fixture's SHAPE never moves when a production type does; only the
-# COMMAND declaration below is routed through the shared src.pagetypes factories.
-def _scalar(key: str, choices: tuple[str, ...] | None = None, description: str = "") -> FieldSpec:
-    return FieldSpec(key=key, kind=SCALAR, choices=choices, description=description)
-
-
-def _prose(key: str, description: str = "") -> FieldSpec:
-    return FieldSpec(key=key, kind=PROSE, description=description)
-
-
-def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec | None = None,
-          description: str = "", element_blocks: tuple[ElementBlocksSpec, ...] = ()) -> FieldSpec:
-    return FieldSpec(key=key, kind=LIST, element_fields=element_fields,
-                     element_fsm=element_fsm, element_blocks=element_blocks,
-                     description=description)
-
-
-def _blocks(key: str, description: str = "", *,
-            block_kinds: tuple[BlockKindSpec, ...]) -> FieldSpec:
-    return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)
-
-
 # ============================================================================
 # test-fields - every non-block field kind + the content-mutation patterns.
 # scalar (plain), scalar (enum), prose, and a plain list (multi element fields, one optional,
@@ -150,7 +127,7 @@ TEST_FIELDS = PageType(
         SectionSpec("basics", "Basics", (
             _scalar("label", description="a plain scalar"),
             _scalar("kind", choices=("alpha", "beta", "gamma"), description="an enum scalar"),
-            _prose("body", "a prose body"),
+            _prose("body", description="a prose body"),
         )),
         SectionSpec("items", "Items", (
             _list("items", element_fields=("text", "note", "flagged"),
@@ -183,7 +160,7 @@ TEST_BLOCKS = PageType(
     description="Test fixture: the blocks field - every block kind and the inline-run grammar.",
     sections=(
         SectionSpec("body", "Body", (
-            _blocks("body", "a rich-text blocks body", block_kinds=standard_block_kinds()),)),
+            _blocks("body", standard_block_kinds(), "a rich-text blocks body"),)),
     ),
     # The field is passed to both its section and its factory, so its vocabulary - here the
     # default, every standard kind - is declared once.
@@ -245,7 +222,7 @@ TEST_FLOW = PageType(
     name="Flow fixture",
     description="Test fixture: a simple 3-state status FSM with a state/event name collision and a compound transition.",
     sections=(
-        SectionSpec("summary", "Summary", (_prose("body", "what changed"),)),
+        SectionSpec("summary", "Summary", (_prose("body", description="what changed"),)),
         SectionSpec("resolution", "Resolution", (
             _list("commits", element_fields=("sha", "message", "url"), description="commits recorded via close"),
         )),
@@ -290,7 +267,7 @@ TEST_LIFECYCLE = PageType(
     name="Lifecycle fixture",
     description="Test fixture: a rich status FSM with required-content gates, agency, guards, questions, and a pinned auto-child.",
     sections=(
-        SectionSpec("summary", "Summary", (_prose("body", "the intent (gates beginPlanning)"),)),
+        SectionSpec("summary", "Summary", (_prose("body", description="the intent (gates beginPlanning)"),)),
         SectionSpec("parts", "Parts", (
             _list("items", element_fields=("name",), description="parts touched (gates beginImplementation)"),
         )),
@@ -402,13 +379,12 @@ TEST_CHILD = PageType(
                   description="notes, each linked to a parent question (a ref-checked list add)"),
         )),
         SectionSpec("decisions", "Decisions", (
-            _blocks("body", "decisions, each linked to a parent question",
-                    block_kinds=(
+            _blocks("body", (
                         BlockKindSpec("decision", args=(_text("questionId"), _text()),
                                       ref_check=RefCheck(arg="questionId", scope="parent",
                                                          section="questions", field="items")),
                         _paragraph_text(),
-                    )),
+                    ), "decisions, each linked to a parent question"),
         )),
     ),
     commands=(

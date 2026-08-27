@@ -93,7 +93,7 @@ class PageType:
                 f"{self.tag}: command '{command.name}' carries blocks for "
                 f"{command.section}.{command.field}.{element_field}, which is not declared "
                 f"as a block-bearing element field.")
-        return replace(arg, block_kinds=spec.vocabulary())
+        return replace(arg, block_kinds=spec.kinds)
 
 
 

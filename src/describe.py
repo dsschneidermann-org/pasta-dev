@@ -111,7 +111,7 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         "elementStates": list(field_spec.element_fsm.states) if field_spec.element_fsm else None,
                         # for a list whose element fields hold blocks: each field and the kinds it accepts
                         "elementBlocks": ([{"field": spec.field,
-                                            "kinds": [kind.kind for kind in spec.vocabulary()]}
+                                            "kinds": [kind.kind for kind in spec.kinds]}
                                            for spec in field_spec.element_blocks] or None),
                         # for a blocks field: the kinds it accepts. The only place a caller can
                         # read a page-level field's vocabulary, now that no command name carries it.

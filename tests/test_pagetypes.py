@@ -216,7 +216,7 @@ def test_block_commands_target_blocks_fields(tag: str):
         )
         # The kind is data in the argument now, so what a command may write is the vocabulary
         # its block argument carries - which must be exactly the element field's declaration.
-        accepted = [kind.kind for kind in blocks_spec.vocabulary()]
+        accepted = [kind.kind for kind in blocks_spec.kinds]
         for arg in command.args:
             if arg.block_kinds is None:
                 continue
@@ -643,7 +643,7 @@ def test_block_element_fields_names_the_declared_fields():
                                   ElementBlocksSpec("detail", (_paragraph_runs(),))))
     assert field.block_element_fields() == ("snippet", "detail")     # declared order
     snippet = field.element_blocks_spec("snippet")
-    assert snippet is not None and [kind.kind for kind in snippet.vocabulary()] == ["code"]
+    assert snippet is not None and [kind.kind for kind in snippet.kinds] == ["code"]
     assert field.element_blocks_spec("text") is None                 # a scalar element field
     # A list declaring none reports an empty tuple - what keeps every consumer's scalar path intact.
     assert _list("items", element_fields=("text",)).block_element_fields() == ()
@@ -937,7 +937,7 @@ def _targeted_vocabulary(page_type, command, arg):
         return field_spec.block_kinds
     spec = field_spec.element_blocks_spec(element_field)
     assert spec is not None
-    return spec.vocabulary()
+    return spec.kinds
 
 
 def test_resolution_reproduces_the_declared_vocabularies():

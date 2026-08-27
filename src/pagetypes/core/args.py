@@ -133,10 +133,6 @@ class ElementBlocksSpec:
                 f"{self.field}: a block-bearing element field declares no block kinds.")
         _reject_duplicate_kinds(self.field, self.kinds)
 
-    def vocabulary(self) -> tuple[BlockKindSpec, ...]:
-        """This element field's kinds - the accessor every consumer reads."""
-        return self.kinds
-
 
 # --- Arg helpers -------------------------------------------------------------
 # Tiny ArgSpec factories so a command's arg list reads as `(_text("file"), _integer("level"), ...)`

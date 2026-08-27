@@ -23,8 +23,6 @@ class FieldSpec:
     element_fsm: ElementFSMSpec | None = None   # for LIST: a per-element lifecycle (todo/done, ...)
     # for LIST: element fields that hold blocks rather than a scalar value
     element_blocks: tuple[ElementBlocksSpec, ...] = ()
-    # for a blocks field: the kinds it accepts, declared at the call site and never empty (an
-    # empty vocabulary on a blocks field is rejected below).
     block_kinds: tuple[BlockKindSpec, ...] = ()
     description: str = ""
 
@@ -102,8 +100,6 @@ def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec
                      description=description)
 
 
-def _blocks(key: str, *, block_kinds: tuple[BlockKindSpec, ...],
+def _blocks(key: str, block_kinds: tuple[BlockKindSpec, ...],
             description: str = "") -> FieldSpec:
-    # block_kinds is required: a blocks field names its vocabulary at the call site (pass
-    # standard_block_kinds() for every standard kind), so nothing downstream needs a fallback.
     return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)
