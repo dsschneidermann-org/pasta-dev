@@ -117,10 +117,10 @@ def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
             f"A block must be an object with a 'kind', got {type(entry).__name__}."
         )
     kind = entry.get("kind")
-    block = next((k for k in block_kinds if k.kind == kind), None)
+    block = next((block for block in block_kinds if block.kind == kind), None)
     if block is None:
         raise ValidationError(
-            f"Block kind {kind!r} is not accepted here - one of {[k.kind for k in block_kinds]}."
+            f"Block kind {kind!r} is not accepted here - one of {[block.kind for block in block_kinds]}."
         )
     args = block.body_args()
     extra = set(entry) - {arg.name for arg in args} - {"kind"}
@@ -190,13 +190,13 @@ def _block_ref_ids(entry: Any, block_kinds: tuple[BlockKindSpec, ...] | None) ->
     """
     if not isinstance(entry, dict) or block_kinds is None:
         return []
-    block = next((kind for kind in block_kinds if kind.kind == entry.get("kind")), None)
+    block = next((block for block in block_kinds if block.kind == entry.get("kind")), None)
     if block is None:
         return []
     ids: list[str] = []
-    for arg in block.body_args():
-        if arg.content is not None:
-            ids.extend(collect_ref_ids(arg.content, entry.get(arg.name)))
+    for body in block.body_args():
+        if body.content is not None:
+            ids.extend(collect_ref_ids(body.content, entry.get(body.name)))
     return ids
 
 

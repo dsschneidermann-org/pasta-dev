@@ -419,7 +419,7 @@ def _create_blocks(entries: list[dict[str, Any]], block_kinds: tuple[BlockKindSp
     """
     made: list[dict[str, Any]] = []
     for entry in entries:
-        block_kind = next(kind for kind in block_kinds if kind.kind == entry["kind"])
+        block_kind = next(block for block in block_kinds if block.kind == entry["kind"])
         block: dict[str, Any] = {"id": id_factory(""), "kind": block_kind.kind}
         for body in block_kind.body_args():
             block[body.name] = entry.get(body.name)

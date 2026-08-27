@@ -878,8 +878,8 @@ class Store:
             for entry in args.get(arg.name) or []:
                 if not isinstance(entry, dict):
                     continue                  # left for the grammar validation to reject
-                block = next((kind for kind in arg.block_kinds
-                              if kind.kind == entry.get("kind")), None)
+                block = next((block for block in arg.block_kinds
+                              if block.kind == entry.get("kind")), None)
                 if block is not None and block.ref_check is not None:
                     Store._resolve_ref(workspace, page, block.ref_check,
                                        entry.get(block.ref_check.arg), command.name)
