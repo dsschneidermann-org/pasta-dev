@@ -216,7 +216,7 @@ def test_block_commands_target_blocks_fields(tag: str):
         )
         # The kind is data in the argument now, so what a command may write is the vocabulary
         # its block argument carries - which must be exactly the element field's declaration.
-        accepted = [kind.kind for kind in element_blocks.blocks]
+        accepted = [kind.kind for kind in element_blocks.block_kinds]
         for arg in command.args:
             if arg.block_kinds is None:
                 continue
@@ -402,7 +402,7 @@ def test_blocks_body_is_an_inline_run_blocks_field():
     assert field.kind == BLOCKS
     add = BLK.command("addBody")
     assert add.kind == ADD_BLOCK and add.args[0].content == BLOCK_ARRAY
-    paragraph = next(kind for kind in field.blocks if kind.kind == "paragraph")
+    paragraph = next(kind for kind in field.block_kinds if kind.kind == "paragraph")
     assert paragraph.body_args()[0].content == INLINE_RUNS
 
 
@@ -592,32 +592,21 @@ def test_field_spec_block_kinds():
     # A blocks field carries exactly the kinds it is declared with, in order. block_kinds is
     # required - the caller passes standard_blocks() for the whole standard vocabulary.
     every = _blocks("body", block_kinds=standard_blocks())
-    assert [kind.kind for kind in every.blocks] == [
+    assert [kind.kind for kind in every.block_kinds] == [
         "paragraph", "heading", "code", "list", "quote", "table", "divider"]
     restricted = _blocks("body", block_kinds=(_code_block(), _paragraph_runs()))
-    assert [kind.kind for kind in restricted.blocks] == ["code", "paragraph"]
+    assert [kind.kind for kind in restricted.block_kinds] == ["code", "paragraph"]
     with pytest.raises(TypeError):
         _blocks("body")                                  # block_kinds is required
 
 
-def test_block_vocabulary_reads_as_blocks():
-    # A blocks field and a block-bearing element field both expose their vocabulary as `blocks` -
-    # each entry is a fully-typed BlockKindSpec, so the plainer name carries no less meaning.
-    field = _blocks("body", block_kinds=(_code_block(),))
-    assert [block.kind for block in field.blocks] == ["code"]
-    assert not hasattr(field, "block_kinds")
-    element = ElementBlocksSpec("detail", (_code_block(),))
-    assert [block.kind for block in element.blocks] == ["code"]
-    assert not hasattr(element, "kinds")
-
-
 def test_field_spec_rejects_a_bad_block_vocabulary():
     with pytest.raises(ValueError, match="only valid on a blocks field"):
-        FieldSpec(key="body", kind=PROSE, blocks=(_code_block(),))
+        FieldSpec(key="body", kind=PROSE, block_kinds=(_code_block(),))
     with pytest.raises(ValueError, match="twice"):
         _blocks("body", block_kinds=(_code_block(), _code_block()))
     with pytest.raises(ValueError, match="declares no block kinds"):
-        FieldSpec(key="body", kind=BLOCKS, blocks=())
+        FieldSpec(key="body", kind=BLOCKS, block_kinds=())
 
 
 # --- Block-bearing element fields --------------------------------------------
@@ -654,7 +643,7 @@ def test_block_element_fields_names_the_declared_fields():
                                   ElementBlocksSpec("detail", (_paragraph_runs(),))))
     assert field.block_element_fields() == ("snippet", "detail")     # declared order
     snippet = field.element_blocks_spec("snippet")
-    assert snippet is not None and [kind.kind for kind in snippet.blocks] == ["code"]
+    assert snippet is not None and [kind.kind for kind in snippet.block_kinds] == ["code"]
     assert field.element_blocks_spec("text") is None                 # a scalar element field
     # A list declaring none reports an empty tuple - what keeps every consumer's scalar path intact.
     assert _list("items", element_fields=("text",)).block_element_fields() == ()
@@ -794,7 +783,7 @@ def test_blocks_cmds_is_three_commands_named_from_the_label():
     # The add's array carries the field's vocabulary, so the schema and the validator read the
     # same declaration.
     assert add.args[0].content == BLOCK_ARRAY
-    assert add.args[0].block_kinds == body.blocks
+    assert add.args[0].block_kinds == body.block_kinds
     assert add.args[0].required
     # It writes no raw argument onto anything - it converts the array into id'd blocks.
     assert dict(add.element_map) == {}
@@ -931,7 +920,7 @@ def test_a_block_argument_is_resolved_from_its_field():
         ),
         fsm=FSMSpec(name="XTestResolved", initial="active", states=("active",)))
     add, remove = page_type.commands
-    assert add.args[0].block_kinds == body.blocks
+    assert add.args[0].block_kinds == body.block_kinds
     assert [kind.kind for kind in add.args[0].block_kinds or ()] == ["code", "paragraph"]
     # An argument that carries no blocks is returned untouched, on either command.
     assert add.args[1].block_kinds is None and remove.args[0].block_kinds is None
@@ -945,10 +934,10 @@ def _targeted_vocabulary(page_type, command, arg):
     element_field = command.element_field or (
         arg.name if command.kind == ADD_ELEMENT else None)
     if element_field is None:
-        return field_spec.blocks
+        return field_spec.block_kinds
     element_blocks = field_spec.element_blocks_spec(element_field)
     assert element_blocks is not None
-    return element_blocks.blocks
+    return element_blocks.block_kinds
 
 
 def test_resolution_reproduces_the_declared_vocabularies():

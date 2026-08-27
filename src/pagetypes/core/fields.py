@@ -23,7 +23,7 @@ class FieldSpec:
     element_fsm: ElementFSMSpec | None = None   # for LIST: a per-element lifecycle (todo/done, ...)
     # for LIST: element fields that hold blocks rather than a scalar value
     element_blocks: tuple[ElementBlocksSpec, ...] = ()
-    blocks: tuple[BlockKindSpec, ...] = ()
+    block_kinds: tuple[BlockKindSpec, ...] = ()
     description: str = ""
 
     def __post_init__(self):
@@ -32,11 +32,11 @@ class FieldSpec:
         # breaks are kept - markdown reflows a paragraph's newlines away.
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
         # Checked where it is declared, so a typo fails at import rather than at authoring time.
-        if self.blocks and self.kind != BLOCKS:
-            raise ValueError(f"{self.key}: blocks is only valid on a blocks field.")
-        if self.kind == BLOCKS and not self.blocks:
+        if self.block_kinds and self.kind != BLOCKS:
+            raise ValueError(f"{self.key}: block_kinds is only valid on a blocks field.")
+        if self.kind == BLOCKS and not self.block_kinds:
             raise ValueError(f"{self.key}: a blocks field declares no block kinds.")
-        _reject_duplicate_blocks(self.key, self.blocks)
+        _reject_duplicate_blocks(self.key, self.block_kinds)
         # A block-bearing element field is checked where it is declared, so a typo fails at import
         # rather than producing a field nothing can ever author.
         seen: set[str] = set()
@@ -102,4 +102,4 @@ def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec
 
 def _blocks(key: str, block_kinds: tuple[BlockKindSpec, ...],
             description: str = "") -> FieldSpec:
-    return FieldSpec(key=key, kind=BLOCKS, blocks=block_kinds, description=description)
+    return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)

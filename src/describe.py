@@ -15,13 +15,13 @@ from .pagetypes import (BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION, BlockKindSpec
                         PageType)
 
 
-def _block_schema(kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
+def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
     """The schema for one block: a oneOf branch per accepted kind, each built from that kind's
     declared body args - the same source validate_block reads, so the schema and the grammar
     agree. A caller learns a field's whole vocabulary from this alone, which is what replaces
     reading the kind off a per-kind command name."""
     branches: list[dict[str, Any]] = []
-    for block in kinds:
+    for block in block_kinds:
         properties: dict[str, Any] = {"kind": {"const": block.kind}}
         required = ["kind"]
         for body in block.body_args():
@@ -111,11 +111,11 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         "elementStates": list(field_spec.element_fsm.states) if field_spec.element_fsm else None,
                         # for a list whose element fields hold blocks: each field and the kinds it accepts
                         "elementBlocks": ([{"field": element_blocks.field,
-                                            "kinds": [kind.kind for kind in element_blocks.blocks]}
+                                            "kinds": [kind.kind for kind in element_blocks.block_kinds]}
                                            for element_blocks in field_spec.element_blocks] or None),
                         # for a blocks field: the kinds it accepts. The only place a caller can
                         # read a page-level field's vocabulary, now that no command name carries it.
-                        "blockKinds": ([kind.kind for kind in field_spec.blocks]
+                        "blockKinds": ([kind.kind for kind in field_spec.block_kinds]
                                        if field_spec.kind == BLOCKS else None),
                         "description": field_spec.description,
                     }

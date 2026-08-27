@@ -103,7 +103,7 @@ def validate_inline_content(content: str, value: Any) -> None:
                 )
 
 
-def validate_block(entry: Any, kinds: tuple[BlockKindSpec, ...]) -> None:
+def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """Validate one block against the vocabulary its field declares.
 
     A block is an object carrying a `kind` the field declares plus exactly that kind's body args,
@@ -117,10 +117,10 @@ def validate_block(entry: Any, kinds: tuple[BlockKindSpec, ...]) -> None:
             f"A block must be an object with a 'kind', got {type(entry).__name__}."
         )
     kind = entry.get("kind")
-    block = next((k for k in kinds if k.kind == kind), None)
+    block = next((k for k in block_kinds if k.kind == kind), None)
     if block is None:
         raise ValidationError(
-            f"Block kind {kind!r} is not accepted here - one of {[k.kind for k in kinds]}."
+            f"Block kind {kind!r} is not accepted here - one of {[k.kind for k in block_kinds]}."
         )
     args = block.body_args()
     extra = set(entry) - {arg.name for arg in args} - {"kind"}
@@ -136,16 +136,16 @@ def validate_block(entry: Any, kinds: tuple[BlockKindSpec, ...]) -> None:
         validate_table(entry.get("header", []), entry.get("rows", []), entry.get("align"))
 
 
-def validate_blocks(value: Any, kinds: tuple[BlockKindSpec, ...]) -> None:
+def validate_blocks(value: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """Validate an array of blocks against the vocabulary its field declares."""
     if not isinstance(value, list):
         raise ValidationError("A blocks value must be an array of blocks.")
     for entry in value:
-        validate_block(entry, kinds)
+        validate_block(entry, block_kinds)
 
 
 def collect_ref_ids(content: str, value: Any,
-                    kinds: tuple[BlockKindSpec, ...] | None = None) -> list[str]:
+                    block_kinds: tuple[BlockKindSpec, ...] | None = None) -> list[str]:
     """Every `{ref: pageId}` page id carried by an arg `value` of the given `content` shape.
 
     Used by the store to integrity-check inline page references before a write (the pure core cannot
@@ -154,7 +154,7 @@ def collect_ref_ids(content: str, value: Any,
     as the existing cross-page ref check does; a malformed run is left for that validation to reject.
     `TABLE_ALIGN` carries no runs, so it yields nothing.
 
-    `kinds` is the vocabulary of a BLOCK_ARRAY arg. Without it there is no way to know which of a
+    `block_kinds` is the vocabulary of a BLOCK_ARRAY arg. Without it there is no way to know which of a
     block's keys hold runs, so that shape yields nothing rather than guessing - and reading the
     body args off the vocabulary is what keeps an overridden kind's runs reachable.
     """
@@ -178,19 +178,19 @@ def collect_ref_ids(content: str, value: Any,
         # A block carries its runs one level deeper; without this the store's precheck could not
         # see them and a dangling ref would be written.
         for entry in value if isinstance(value, list) else []:
-            ids.extend(_block_ref_ids(entry, kinds))
+            ids.extend(_block_ref_ids(entry, block_kinds))
     return ids
 
 
-def _block_ref_ids(entry: Any, kinds: tuple[BlockKindSpec, ...] | None) -> list[str]:
+def _block_ref_ids(entry: Any, block_kinds: tuple[BlockKindSpec, ...] | None) -> list[str]:
     """Every inline page ref one block carries, read through the body args its kind declares.
 
     Stays defensive like its caller: this runs before the grammar validation, so a malformed
     entry or a kind the field does not declare yields nothing and is left for validate_block.
     """
-    if not isinstance(entry, dict) or kinds is None:
+    if not isinstance(entry, dict) or block_kinds is None:
         return []
-    block = next((kind for kind in kinds if kind.kind == entry.get("kind")), None)
+    block = next((kind for kind in block_kinds if kind.kind == entry.get("kind")), None)
     if block is None:
         return []
     ids: list[str] = []

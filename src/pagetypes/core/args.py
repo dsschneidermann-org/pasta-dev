@@ -108,10 +108,10 @@ class BlockKindSpec:
         return self.args
 
 
-def _reject_duplicate_blocks(where: str, kinds: tuple[BlockKindSpec, ...]) -> None:
+def _reject_duplicate_blocks(where: str, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """A field naming one kind twice is a declaration bug - the second is unreachable."""
     seen: set[str] = set()
-    for block in kinds:
+    for block in block_kinds:
         if block.kind in seen:
             raise ValueError(f"{where}: block kinds name '{block.kind}' twice.")
         seen.add(block.kind)
@@ -121,17 +121,17 @@ def _reject_duplicate_blocks(where: str, kinds: tuple[BlockKindSpec, ...]) -> No
 class ElementBlocksSpec:
     """A LIST element field that holds an ordered array of blocks instead of a scalar value.
 
-    `blocks` is the closed vocabulary the field accepts - the same BlockKindSpec tuple a
+    `block_kinds` is the closed vocabulary the field accepts - the same BlockKindSpec tuple a
     page-level blocks field declares, which is what makes the two levels one mechanism.
     """
     field: str
-    blocks: tuple[BlockKindSpec, ...]
+    block_kinds: tuple[BlockKindSpec, ...]
 
     def __post_init__(self):
-        if not self.blocks:
+        if not self.block_kinds:
             raise ValueError(
                 f"{self.field}: a block-bearing element field declares no block kinds.")
-        _reject_duplicate_blocks(self.field, self.blocks)
+        _reject_duplicate_blocks(self.field, self.block_kinds)
 
 
 # --- Arg helpers -------------------------------------------------------------

@@ -409,7 +409,7 @@ def _apply(
     raise ValidationError(f"Unsupported command kind '{command.kind}'.")
 
 
-def _create_blocks(entries: list[dict[str, Any]], kinds: tuple[BlockKindSpec, ...],
+def _create_blocks(entries: list[dict[str, Any]], block_kinds: tuple[BlockKindSpec, ...],
                  id_factory: IdFactory) -> list[dict[str, Any]]:
     """Id'd blocks from validated argument entries - the one place a block is built.
 
@@ -419,7 +419,7 @@ def _create_blocks(entries: list[dict[str, Any]], kinds: tuple[BlockKindSpec, ..
     """
     made: list[dict[str, Any]] = []
     for entry in entries:
-        block_kind = next(kind for kind in kinds if kind.kind == entry["kind"])
+        block_kind = next(kind for kind in block_kinds if kind.kind == entry["kind"])
         block: dict[str, Any] = {"id": id_factory(""), "kind": block_kind.kind}
         for body in block_kind.body_args():
             block[body.name] = entry.get(body.name)
@@ -433,7 +433,7 @@ def _element_blocks_from_args(field_spec: FieldSpec, args: dict[str, Any],
     the same-named optional argument. A field with no argument starts empty."""
     return {
         element_blocks.field: _create_blocks(
-            args.get(element_blocks.field) or [], element_blocks.blocks, id_factory)
+            args.get(element_blocks.field) or [], element_blocks.block_kinds, id_factory)
         for element_blocks in field_spec.element_blocks
     }
 
