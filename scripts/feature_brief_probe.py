@@ -133,9 +133,18 @@ class Probe:
             return text
 
     def mutate(self, page_id: str, *commands: dict[str, Any]) -> list[str]:
-        """Run a batch on one page and return the ids it created, in order, nulls dropped."""
+        """Run a batch on one page and return the ids it created, in order, nulls dropped.
+
+        Every command must present the page's current status_revision_token, so the batch reads it
+        off the page first and stamps each command. A status transition regenerates the token, so a
+        batch holds at most one transition and only as its final command - which every batch here
+        already does. `.get` keeps the probe runnable against a server predating the token: the key
+        is then absent, stamping None, which such a server ignores."""
+        token = self.call("getPage", workspaceId=self.workspace_id,
+                          pageId=page_id).get("status_revision_token")
+        stamped = [{**command, "statusRevisionToken": token} for command in commands]
         result = self.call("mutatePageBatch", workspaceId=self.workspace_id,
-                           pageId=page_id, commands=list(commands))
+                           pageId=page_id, commands=stamped)
         return [created for created in result.get("createdIds", []) if created]
 
 
@@ -360,6 +369,9 @@ def main() -> None:
     parser.add_argument("--url", default=DEFAULT_URL, help=f"MCP endpoint (default {DEFAULT_URL})")
     parser.add_argument("--workspace", default=DEFAULT_WORKSPACE,
                         help=f"workspace id (default {DEFAULT_WORKSPACE})")
+    parser.add_argument("--new-workspace", nargs="?", const="[probe] lifecycle", default=None,
+                        metavar="NAME", help="create a fresh workspace (optionally named) and run in "
+                                             "it instead of --workspace - the clean-slate run")
     parser.add_argument("--keep", action="store_true",
                         help="leave the brief in place instead of archiving it")
     parser.add_argument("--instructions", type=int, nargs="?", const=200, default=INSTRUCTION_WIDTH,
@@ -372,6 +384,10 @@ def main() -> None:
         with httpx.Client(timeout=30.0) as client:
             probe = Probe(client, args.url, args.workspace)
             probe.handshake()
+            if args.new_workspace is not None:
+                created = probe.call("createWorkspace", name=args.new_workspace)
+                probe.workspace_id = created["id"]
+                print(f"created clean workspace: {probe.workspace_id} ({created['name']!r})")
             walk(probe, args.instructions, args.keep)
     except httpx.ConnectError:
         print(f"\nCould not connect to {args.url} - is the server running on that host/port?")
