@@ -135,13 +135,10 @@ class Probe:
     def mutate(self, page_id: str, *commands: dict[str, Any]) -> list[str]:
         """Run a batch on one page and return the ids it created, in order, nulls dropped.
 
-        Every command must present the page's current status_revision_token, so the batch reads it
-        off the page first and stamps each command. A status transition regenerates the token, so a
-        batch holds at most one transition and only as its final command - which every batch here
-        already does. `.get` keeps the probe runnable against a server predating the token: the key
-        is then absent, stamping None, which such a server ignores."""
+        Reads the page's current status_revision_token and stamps it onto every command, which the
+        server requires on each."""
         token = self.call("getPage", workspaceId=self.workspace_id,
-                          pageId=page_id).get("status_revision_token")
+                          pageId=page_id)["status_revision_token"]
         stamped = [{**command, "statusRevisionToken": token} for command in commands]
         result = self.call("mutatePageBatch", workspaceId=self.workspace_id,
                            pageId=page_id, commands=stamped)

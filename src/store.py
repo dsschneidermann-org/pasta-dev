@@ -537,7 +537,9 @@ class Store:
                     if presented_revision != working.status_revision_token:
                         raise ConflictError(
                             f"statusRevisionToken {presented_revision!r} does not match the page's "
-                            f"current revision {working.status_revision_token!r}; re-read and retry."
+                            f"current revision {working.status_revision_token!r}. Each command must "
+                            f"carry the current token; a status transition regenerates it, so a batch "
+                            f"may hold at most one transition and only as its final command."
                         )
                     if command_spec is not None:
                         self._check_ref(workspace, working, command_spec, args)
