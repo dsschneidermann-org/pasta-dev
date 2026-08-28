@@ -534,10 +534,6 @@ class Store:
                 try:
                     if command is None:
                         raise ValidationError("Unknown command None.")
-                    # Optimistic-concurrency check against the state left by the previous command: a
-                    # transition earlier in the batch has already regenerated the token, so a command
-                    # sequenced after one carries a now-stale token and aborts the whole batch - which
-                    # is what limits a batch to a single transition, at its end.
                     if presented_revision != working.status_revision_token:
                         raise ConflictError(
                             f"statusRevisionToken {presented_revision!r} does not match the page's "
@@ -559,8 +555,7 @@ class Store:
                         f"Batch aborted at command {index} ('{command}'): {exc}"
                     ) from exc
                 working = result.page
-                # A status change is exactly a page-status transition (only those fire fsm.fire), so
-                # the stamp is regenerated whenever the status moved.
+                # A status change is only ever a transition, so regenerate the stamp when it moves.
                 if working.status != status_before:
                     working.status_revision_token = self._next_revision(working.status_revision_token)
                 created_ids.append(result.created_id)
@@ -659,8 +654,7 @@ class Store:
                     f"Valid states: {', '.join(page_type.fsm.states)}."
                 )
             page.status = status
-            # A direct status edit is still a status change, so it regenerates the stamp too - an
-            # out-of-band move must not leave a caller holding a token that still matches.
+            # A direct status edit regenerates the stamp too, so an out-of-band move invalidates held tokens.
             page.status_revision_token = self._next_revision(page.status_revision_token)
             self._touch_and_save(workspace)
             return page
