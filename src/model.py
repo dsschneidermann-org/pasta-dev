@@ -30,7 +30,7 @@ class Page:
     # A short optimistic-concurrency stamp on the lifecycle status: created with the page and
     # regenerated on every status transition. Written only by the store, never by a page-type
     # command; None on a page created before the feature, until its first transition.
-    status_revision_id: str | None = None
+    status_revision_token: str | None = None
 
     def copy(self) -> "Page":
         """A deep copy - the pure command path edits a copy, never the input."""
@@ -45,7 +45,7 @@ class Page:
             archived=self.archived,
             links=[dict(link) for link in self.links],
             expires_at=self.expires_at,
-            status_revision_id=self.status_revision_id,
+            status_revision_token=self.status_revision_token,
         )
 
 

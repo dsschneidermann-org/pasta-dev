@@ -34,12 +34,12 @@ def call(mcp, name, args=None):
 
 
 def mutate(mcp, args):
-    """Call mutatePageBatch presenting the page's current status_revision_id on each command - the
+    """Call mutatePageBatch presenting the page's current status_revision_token on each command - the
     ordinary caller pattern (read the token, then write against it). getPage returns the raw
     serialized page, so the token is under its snake_case key."""
     page = call(mcp, "getPage", {"workspaceId": args["workspaceId"], "pageId": args["pageId"]})
-    token = page["status_revision_id"]
-    stamped = {**args, "commands": [{**command, "statusRevisionId": token}
+    token = page["status_revision_token"]
+    stamped = {**args, "commands": [{**command, "statusRevisionToken": token}
                                     for command in args["commands"]]}
     return call(mcp, "mutatePageBatch", stamped)
 
@@ -340,18 +340,18 @@ def test_create_page_echoes_initial_state_guidance_and_children_do_not(mcp):
 def test_status_revision_surfaced_and_echoed_via_server(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-flow", "title": "A"})
-    token = created["statusRevisionId"]                         # createPage echoes the new token
+    token = created["statusRevisionToken"]                         # createPage echoes the new token
     assert isinstance(token, str) and len(token) == 6 and token.isdigit()
     # getPage surfaces it under the raw serialized (snake_case) key.
-    assert call(mcp, "getPage", {"workspaceId": wid, "pageId": created["id"]})["status_revision_id"] == token
+    assert call(mcp, "getPage", {"workspaceId": wid, "pageId": created["id"]})["status_revision_token"] == token
     # A content write echoes the (unchanged) token; a transition echoes a fresh one.
     result = mutate(mcp, {"workspaceId": wid, "pageId": created["id"],
                           "commands": [{"command": "setSummary", "args": {"text": "s"}}]})
-    assert result["statusRevisionId"] == token
+    assert result["statusRevisionToken"] == token
     opened = mutate(mcp, {"workspaceId": wid, "pageId": created["id"], "commands": [{"command": "open"}]})
-    assert opened["status"] == "open" and opened["statusRevisionId"] != token
+    assert opened["status"] == "open" and opened["statusRevisionToken"] != token
     # A wrong token surfaces as a ToolError rather than mutating.
     with pytest.raises(ToolError, match="does not match"):
         call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": created["id"],
                                       "commands": [{"command": "close", "args": {"sha": "a", "message": "m"},
-                                                    "statusRevisionId": "nope"}]})
+                                                    "statusRevisionToken": "nope"}]})

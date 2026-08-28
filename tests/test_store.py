@@ -39,12 +39,12 @@ def store(tmp_path):
 
 
 def _mutate(store, workspace_id, page_id, commands):
-    """Run a batch presenting the page's current status_revision_id on each command - the ordinary
+    """Run a batch presenting the page's current status_revision_token on each command - the ordinary
     single-batch caller pattern (read the token, then write against it). A batch that transitions
     mid-sequence is deliberately not expressible this way: the transition regenerates the token, so
     a later command's stamp is stale - such tests present tokens explicitly instead."""
-    token = store.get_page(workspace_id, page_id).status_revision_id
-    stamped = [{**command, "statusRevisionId": token} for command in commands]
+    token = store.get_page(workspace_id, page_id).status_revision_token
+    stamped = [{**command, "statusRevisionToken": token} for command in commands]
     return store.mutate_page_batch(workspace_id, page_id, stamped)
 
 
@@ -1628,7 +1628,7 @@ def test_a_ref_checked_block_created_with_its_element_is_checked(store):
         ])
 
 
-# --- status_revision_id: the per-command optimistic-concurrency stamp ---------
+# --- status_revision_token: the per-command optimistic-concurrency stamp ---------
 @pytest.fixture
 def revstore(tmp_path):
     """A store whose revision factory is a deterministic 6-digit counter, so tokens are
@@ -1640,17 +1640,17 @@ def revstore(tmp_path):
 def test_create_assigns_a_six_digit_revision(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "P").page
-    token = page.status_revision_id
+    token = page.status_revision_token
     assert isinstance(token, str) and len(token) == 6 and token.isdigit()
-    assert store.get_page(workspace.id, page.id).status_revision_id == token   # persisted + surfaced
+    assert store.get_page(workspace.id, page.id).status_revision_token == token   # persisted + surfaced
 
 
 def test_create_and_auto_children_each_get_a_fresh_revision(revstore):
     workspace = revstore.create_workspace("demo")
     result = revstore.create_page(workspace.id, "test-lifecycle", "F")
     # parent first, then its pinned child - each drawn from the factory in creation order.
-    assert result.page.status_revision_id == "000001"
-    assert _child(result, "test-child").status_revision_id == "000002"
+    assert result.page.status_revision_token == "000001"
+    assert _child(result, "test-child").status_revision_token == "000002"
 
 
 def test_wrong_revision_token_aborts_and_writes_nothing(revstore):
@@ -1658,7 +1658,7 @@ def test_wrong_revision_token_aborts_and_writes_nothing(revstore):
     page = revstore.create_page(workspace.id, "test-fields", "P").page      # token "000001"
     with pytest.raises(ConflictError, match="does not match"):
         revstore.mutate_page_batch(workspace.id, page.id, [
-            {"command": "addItem", "args": {"text": "x"}, "statusRevisionId": "wrong"}])
+            {"command": "addItem", "args": {"text": "x"}, "statusRevisionToken": "wrong"}])
     assert revstore.get_page(workspace.id, page.id).sections["items"]["items"] == []
 
 
@@ -1672,16 +1672,16 @@ def test_missing_token_is_rejected_when_the_page_has_one(revstore):
 def test_content_keeps_the_token_and_a_transition_regenerates_it(revstore):
     workspace = revstore.create_workspace("demo")
     page = revstore.create_page(workspace.id, "test-flow", "C").page        # token "000001"
-    token = page.status_revision_id
+    token = page.status_revision_token
     # a content command does not move the status, so it leaves the token unchanged
     after, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "setSummary", "args": {"text": "s"}, "statusRevisionId": token}])
-    assert after.status_revision_id == token
+        {"command": "setSummary", "args": {"text": "s"}, "statusRevisionToken": token}])
+    assert after.status_revision_token == token
     # a status transition regenerates the token to a fresh value
     opened, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "open", "statusRevisionId": token}])
+        {"command": "open", "statusRevisionToken": token}])
     assert opened.status == "open"
-    assert opened.status_revision_id != token and opened.status_revision_id.isdigit()
+    assert opened.status_revision_token != token and opened.status_revision_token.isdigit()
 
 
 def test_a_command_after_a_transition_in_one_batch_is_rejected(revstore):
@@ -1689,11 +1689,11 @@ def test_a_command_after_a_transition_in_one_batch_is_rejected(revstore):
     so any command sequenced after it carries a now-stale token and the batch aborts."""
     workspace = revstore.create_workspace("demo")
     page = revstore.create_page(workspace.id, "test-flow", "C").page
-    token = page.status_revision_id
+    token = page.status_revision_token
     with pytest.raises(ConflictError, match="command 1"):
         revstore.mutate_page_batch(workspace.id, page.id, [
-            {"command": "open", "statusRevisionId": token},                              # transitions
-            {"command": "setSummary", "args": {"text": "s"}, "statusRevisionId": token},  # stale now
+            {"command": "open", "statusRevisionToken": token},                              # transitions
+            {"command": "setSummary", "args": {"text": "s"}, "statusRevisionToken": token},  # stale now
         ])
     assert revstore.get_page(workspace.id, page.id).status == "draft"       # all-or-nothing
 
@@ -1701,10 +1701,10 @@ def test_a_command_after_a_transition_in_one_batch_is_rejected(revstore):
 def test_set_page_status_regenerates_the_revision(revstore):
     workspace = revstore.create_workspace("demo")
     page = revstore.create_page(workspace.id, "test-flow", "C").page
-    token = page.status_revision_id
+    token = page.status_revision_token
     updated = revstore.set_page_status(workspace.id, page.id, "open")       # admin FSM bypass
     assert updated.status == "open"
-    assert updated.status_revision_id != token and updated.status_revision_id.isdigit()
+    assert updated.status_revision_token != token and updated.status_revision_token.isdigit()
 
 
 def test_legacy_page_without_a_token_bootstraps_on_first_transition(store):
@@ -1712,16 +1712,16 @@ def test_legacy_page_without_a_token_bootstraps_on_first_transition(store):
     page = store.create_page(workspace.id, "test-flow", "C").page
     # Simulate a page stored before this feature: clear its token on disk.
     loaded = store.load_workspace(workspace.id)
-    loaded.pages[page.id].status_revision_id = None
+    loaded.pages[page.id].status_revision_token = None
     store._touch_and_save(loaded)
 
     # A command presenting no token matches the null current token, and content keeps it null.
     store.mutate_page_batch(workspace.id, page.id, [{"command": "setSummary", "args": {"text": "s"}}])
-    assert store.get_page(workspace.id, page.id).status_revision_id is None
+    assert store.get_page(workspace.id, page.id).status_revision_token is None
     # The first status transition assigns the first real token.
     opened, _ = store.mutate_page_batch(workspace.id, page.id, [{"command": "open"}])
     assert opened.status == "open"
-    assert opened.status_revision_id is not None and opened.status_revision_id.isdigit()
+    assert opened.status_revision_token is not None and opened.status_revision_token.isdigit()
 
 
 def test_render_markdown_shows_the_revision(revstore):
@@ -1733,8 +1733,8 @@ def test_render_markdown_shows_the_revision(revstore):
 def test_next_actions_edges_carry_the_revision(revstore):
     workspace = revstore.create_workspace("demo")
     page = revstore.create_page(workspace.id, "test-lifecycle", "F").page
-    token = page.status_revision_id
+    token = page.status_revision_token
     actions = revstore.next_actions(workspace.id, page.id)
     edges = [e for e in actions["do"] + actions["blocked"] + actions["humanGates"]
              if e["pageId"] == page.id]
-    assert edges and all(edge["statusRevisionId"] == token for edge in edges)
+    assert edges and all(edge["statusRevisionToken"] == token for edge in edges)

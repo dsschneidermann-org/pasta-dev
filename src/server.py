@@ -461,7 +461,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
             "title": page.title,
             "status": page.status,
             "parentId": page.parent_id,
-            "statusRevisionId": page.status_revision_id,
+            "statusRevisionToken": page.status_revision_token,
             # Guidance is not shown for auto-pinned child pages.
             "children": [
                 {"id": child.id, "type": child.type, "title": child.title, "status": child.status}
@@ -481,12 +481,12 @@ async def mutatePageBatch(
     workspaceId: str, pageId: str, commands: list[dict[str, Any]]
 ) -> dict[str, Any]:
     """Run an ordered batch of commands on a page as a single atomic commit (each `{command, args?,
-    statusRevisionId}` decided against the state left by the previous). Every command must carry the
-    page's current `statusRevisionId` - a short token read from getPage, the render* meta line, or a
+    statusRevisionToken}` decided against the state left by the previous). Every command must carry the
+    page's current `statusRevisionToken` - a short token read from getPage, the render* meta line, or a
     prior write/nextActions echo. A status transition regenerates it, so at most one transition is
     legal per batch and only as the final command: a command after a transition carries a now-stale
     token. All-or-nothing: any rejection aborts the whole batch and nothing commits - the error names
-    the failing index and command. Echoes the new status, the current `statusRevisionId`, and next
+    the failing index and command. Echoes the new status, the current `statusRevisionToken`, and next
     actions."""
     with _guard_tool():
         page, created = STORE.mutate_page_batch(workspaceId, pageId, commands)
@@ -496,7 +496,7 @@ async def mutatePageBatch(
         response: dict[str, Any] = {
             "pageId": page.id,
             "status": page.status,
-            "statusRevisionId": page.status_revision_id,
+            "statusRevisionToken": page.status_revision_token,
             "count": len(created),
             "createdIds": created,
             "next": next_actions,

@@ -435,14 +435,14 @@ class Store:
                 guard_reason = self._child_guard_failure(workspace, page, command) or parent_reason
                 if command.agency == "human":
                     edge = {"pageId": page.id, "pageType": page.type, "command": command.name,
-                            "statusRevisionId": page.status_revision_id}
+                            "statusRevisionToken": page.status_revision_token}
                     if guard_reason:
                         edge["blockedReason"] = guard_reason
                     human_gates.append(edge)
                 elif legal.get(command.name) and guard_reason is None:
                     do.append({"pageId": page.id, "pageType": page.type,
                                "kind": "transition", "command": command.name,
-                               "statusRevisionId": page.status_revision_id})
+                               "statusRevisionToken": page.status_revision_token})
                 else:
                     unmet = commands.unmet_requirements(page, command)
                     if parent_reason is not None:
@@ -456,7 +456,7 @@ class Store:
                         reason = guard_reason or "blocked"
                     blocked.append({"pageId": page.id, "pageType": page.type,
                                     "command": command.name, "reason": reason,
-                                    "statusRevisionId": page.status_revision_id})
+                                    "statusRevisionToken": page.status_revision_token})
             # Field setters whose field must be authored to advance this stage also enter `do`.
             do.extend(commands.field_setter_edges(page, page_type, parent_blocked))
             attention.extend(self._page_attention(page, page_type))
@@ -489,7 +489,7 @@ class Store:
             if parent_id is not None and parent_id not in workspace.pages:
                 raise NotFoundError(f"Parent page '{parent_id}' not found in workspace '{workspace_id}'.")
             page = commands.create_page(page_type, title, parent_id, self._id_factory)
-            page.status_revision_id = self._revision_factory()
+            page.status_revision_token = self._revision_factory()
             workspace.pages[page.id] = page
             if parent_id is None:
                 workspace.root_page_ids.append(page.id)
@@ -507,7 +507,7 @@ class Store:
 
         Each command is decided against the state left by the previous one; if any is rejected the
         whole batch aborts and nothing is written (the error names the failing index + command).
-        Every command must present the page's current `statusRevisionId`; a status transition
+        Every command must present the page's current `statusRevisionToken`; a status transition
         regenerates it, so a command after a transition carries a stale token and the batch aborts.
         """
         if not batch:
@@ -529,7 +529,7 @@ class Store:
             for index, entry in enumerate(batch):
                 command = entry.get("command")
                 args = entry.get("args") or {}
-                presented_revision = entry.get("statusRevisionId")
+                presented_revision = entry.get("statusRevisionToken")
                 command_spec = page_type.command(command) if command else None
                 try:
                     if command is None:
@@ -538,10 +538,10 @@ class Store:
                     # transition earlier in the batch has already regenerated the token, so a command
                     # sequenced after one carries a now-stale token and aborts the whole batch - which
                     # is what limits a batch to a single transition, at its end.
-                    if presented_revision != working.status_revision_id:
+                    if presented_revision != working.status_revision_token:
                         raise ConflictError(
-                            f"statusRevisionId {presented_revision!r} does not match the page's "
-                            f"current revision {working.status_revision_id!r}; re-read and retry."
+                            f"statusRevisionToken {presented_revision!r} does not match the page's "
+                            f"current revision {working.status_revision_token!r}; re-read and retry."
                         )
                     if command_spec is not None:
                         self._check_ref(workspace, working, command_spec, args)
@@ -562,7 +562,7 @@ class Store:
                 # A status change is exactly a page-status transition (only those fire fsm.fire), so
                 # the stamp is regenerated whenever the status moved.
                 if working.status != status_before:
-                    working.status_revision_id = self._next_revision(working.status_revision_id)
+                    working.status_revision_token = self._next_revision(working.status_revision_token)
                 created_ids.append(result.created_id)
                 if result.created_id is not None:
                     created_so_far.update(result.created_ids)
@@ -661,7 +661,7 @@ class Store:
             page.status = status
             # A direct status edit is still a status change, so it regenerates the stamp too - an
             # out-of-band move must not leave a caller holding a token that still matches.
-            page.status_revision_id = self._next_revision(page.status_revision_id)
+            page.status_revision_token = self._next_revision(page.status_revision_token)
             self._touch_and_save(workspace)
             return page
 
@@ -864,7 +864,7 @@ class Store:
                     f"Page type '{parent_type.tag}' declares unknown auto-child '{spec.type}'."
                 )
             child = commands.create_page(child_type, child_type.name, parent.id, self._id_factory)
-            child.status_revision_id = self._revision_factory()
+            child.status_revision_token = self._revision_factory()
             workspace.pages[child.id] = child
             parent.child_ids.append(child.id)
             children.append(child)

@@ -46,7 +46,7 @@ def test_meta_line_shows_the_revision_only_when_present():
     # A page carrying no token (created before the feature) renders the bare type/status meta line.
     assert " · rev `" not in render_page(page, FIELDS)
     # Once it carries one, the meta line surfaces it beside the status.
-    page.status_revision_id = "042917"
+    page.status_revision_token = "042917"
     assert "· rev `042917`" in render_page(page, FIELDS)
 
 

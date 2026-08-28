@@ -71,14 +71,14 @@ def test_page_expires_at_defaults_to_none_for_legacy_files():
     assert page_from_dict(data).expires_at is None
 
 
-def test_page_status_revision_id_round_trips():
+def test_page_status_revision_token_round_trips():
     page = _sample_page()
-    page.status_revision_id = "042917"
-    assert page_from_dict(page_to_dict(page)).status_revision_id == "042917"
+    page.status_revision_token = "042917"
+    assert page_from_dict(page_to_dict(page)).status_revision_token == "042917"
 
 
-def test_page_status_revision_id_defaults_to_none_for_legacy_files():
+def test_page_status_revision_token_defaults_to_none_for_legacy_files():
     # a legacy page dict (written before the status-revision stamp existed) loads with None
     data = page_to_dict(_sample_page())
-    del data["status_revision_id"]
-    assert page_from_dict(data).status_revision_id is None
+    del data["status_revision_token"]
+    assert page_from_dict(data).status_revision_token is None

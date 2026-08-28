@@ -320,8 +320,8 @@ def render_page(page: Page, page_type: PageType, level: int = 1,
     render with no workspace) and refs / children fall back to their bare ids.
     """
     meta = f"*{page.type}* · `{page.status}`"
-    if page.status_revision_id is not None:
-        meta += f" · rev `{page.status_revision_id}`"
+    if page.status_revision_token is not None:
+        meta += f" · rev `{page.status_revision_token}`"
     lines = [f"{'#' * level} {_plain(page.title, ref_context)}", "", meta, ""]
     section_heading = "#" * (level + 1)
     for section in page_type.sections:
