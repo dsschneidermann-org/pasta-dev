@@ -528,8 +528,10 @@ class Store:
             created_so_far: set[str] = set()
             for index, entry in enumerate(batch):
                 command = entry.get("command")
-                args = entry.get("args") or {}
-                presented_revision = entry.get("statusRevisionToken")
+                # The token rides as the first entry in args; strip it here so the pure core only
+                # ever sees a command's declared arguments.
+                args = dict(entry.get("args") or {})
+                presented_revision = args.pop("statusRevisionToken", None)
                 command_spec = page_type.command(command) if command else None
                 try:
                     if command is None:
