@@ -81,8 +81,6 @@ _SIMPLE_CHANGE = PageType(
                 """),
         )),
     ),
-    # Mutable per-workspace guidance: merge guidance while the change is reviewed or done, before it
-    # is closed; testing-tool guidance while open, where the change is written.
     workspace_guidance=(
         WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
         WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),

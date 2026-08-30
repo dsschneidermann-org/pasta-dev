@@ -193,8 +193,6 @@ _FEATURE_BRIEF = PageType(
                 """),
         )),
     ),
-    # Mutable per-workspace guidance: merge guidance while reviewing, before the work is shipped;
-    # testing-tool guidance while building, where tests are written.
     workspace_guidance=(
         WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
         WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),

@@ -335,13 +335,7 @@ def validate_page_type(page_type: PageType) -> list[str]:
 
 
 def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
-    """Every workspace-guidance declaration across the registry is well-formed and consistent.
-
-    A registry-wide check, since agreement is between types: each declaration's field name,
-    guidance_for set and description must be non-empty, every status must be a real state of the
-    declaring type, and types sharing a field must give it the same description. Returns a list of
-    messages rather than raising.
-    """
+    """Validate the workspace-guidance declarations across the registry, collecting the errors."""
     errors: list[str] = []
     descriptions: dict[str, tuple[str, str]] = {}   # field -> (description, first tag to declare it)
     for tag, page_type in registry.items():
