@@ -66,6 +66,7 @@ from .pagetypes import (
     ParentStateGuard,
     RefCheck,
     SectionSpec,
+    WorkspaceGuidanceSpec,
     _blocks,
     _boolean,
     _code_block,
@@ -273,7 +274,19 @@ TEST_LIFECYCLE = PageType(
     name="Lifecycle fixture",
     description="Test fixture: a rich status FSM with required-content gates, agency, guards, questions, and a pinned auto-child.",
     sections=(
-        SectionSpec("summary", "Summary", (_prose("body", description="the intent (gates beginPlanning)"),)),
+        SectionSpec("summary", "Summary", (_prose("body", description="the intent (gates beginPlanning)"),),
+                    # Workspace-guidance fields declared under a section: buildTool surfaces across
+                    # two states (set membership), reviewHint at one, and draftHint at the initial
+                    # state (so createPage's echo is observable) - the fixture for the emission
+                    # helper, the setWorkspaceGuidance tool, and the describe surface.
+                    workspace_guidance=(
+                        WorkspaceGuidanceSpec("buildTool", ("building", "review"),
+                                              "the build tool this workspace uses"),
+                        WorkspaceGuidanceSpec("reviewHint", ("review",),
+                                              "a hint shown while reviewing"),
+                        WorkspaceGuidanceSpec("draftHint", ("draft",),
+                                              "a hint shown while drafting"),
+                    )),
         SectionSpec("parts", "Parts", (
             _list("items", element_fields=("name",), description="parts touched (gates beginImplementation)"),
         )),

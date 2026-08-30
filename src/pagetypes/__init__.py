@@ -51,6 +51,7 @@ from .core.specs import (
     FSMSpec,
     ParentStateGuard,
     RefCheck,
+    WorkspaceGuidanceSpec,
 )
 from .core.args import (
     ArgSpec,
@@ -126,6 +127,7 @@ from .core.validation import (
     validate_pagetype_field_setters,
     validate_pagetype_setter_descriptions,
     validate_table,
+    validate_workspace_guidance,
 )
 
 # The package's exports, private helpers included: the page-type modules reach their
@@ -169,6 +171,7 @@ __all__ = [
     "TABLE_ALIGN",
     "TITLE_ELEMENT_FIELDS",
     "TRANSITION",
+    "WorkspaceGuidanceSpec",
     "_ALIGN_VALUES",
     "_INDEX",
     "_MARKDOWN_TOKENS",
@@ -230,6 +233,9 @@ __all__ = [
     "validate_pagetype_setter_descriptions",
     "validate_registry",
     "validate_table",
+    "validate_workspace_guidance",
+    "all_page_types",
+    "workspace_guidance_fields",
 ]
 
 # --- The page types ----------------------------------------------------------
@@ -376,3 +382,22 @@ def discoverable_registry() -> dict[str, PageType]:
 def is_auto_child_type(parent_type: PageType | None, child_type: str) -> bool:
     """Whether `child_type` is an auto-created (pinned, protected) child of `parent_type`."""
     return parent_type is not None and any(spec.type == child_type for spec in parent_type.auto_children)
+
+
+def all_page_types() -> list[PageType]:
+    """Every code-defined page type `get_page_type` can resolve: the production registry and the
+    hand-authored test fixtures. This is `get_page_type`'s resolution set - deliberately independent
+    of test mode, which gates page CREATION and discovery, not resolution - so the workspace-guidance
+    field set a workspace may configure is stable however the suite has left the mode flag."""
+    return list(REGISTRY.values()) + list(_test_registry().values())
+
+
+def workspace_guidance_fields() -> dict[str, WorkspaceGuidanceSpec]:
+    """Every declared workspace-guidance field -> a representative spec (the first to declare it).
+    The set of valid `field` values `setWorkspaceGuidance` accepts, aggregated across
+    `all_page_types()`."""
+    fields: dict[str, WorkspaceGuidanceSpec] = {}
+    for page_type in all_page_types():
+        for spec in page_type.workspace_guidance_specs():
+            fields.setdefault(spec.field, spec)
+    return fields

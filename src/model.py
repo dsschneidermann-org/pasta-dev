@@ -58,6 +58,10 @@ class Workspace:
     pages: dict[str, Page] = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
+    # Mutable per-workspace guidance texts, keyed by a code-defined WorkspaceGuidanceSpec field.
+    # Written only by set_workspace_guidance; surfaced as guidance_<field> on a page whose type
+    # declares the field while its status is in that field's guidance_for set.
+    guidance_config: dict[str, str] = field(default_factory=dict)
 
     def get_page(self, page_id: str) -> Page | None:
         return self.pages.get(page_id)

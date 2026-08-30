@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from ._stage_guidance import BUG_REPORT_DRAFT, BUG_REPORT_OPEN, REVIEW
+from ._workspace_guidance import (
+    MERGE_PROCESS_DESC,
+    MERGE_PROCESS_FIELD,
+    TESTING_TOOL_DESC,
+    TESTING_TOOL_FIELD,
+)
 from . import (
     FSMSpec,
     PageType,
     SectionSpec,
+    WorkspaceGuidanceSpec,
     _list,
     _prose,
     _scalar,
@@ -48,6 +55,11 @@ _BUG_REPORT = PageType(
                 from similar ones. State the symptom you can observe, not the cause you suspect or the
                 fix you have in mind.
                 """),
+        ), workspace_guidance=(
+            # mergeProcess while the fix is reviewed or done (before it is closed/merged);
+            # testingTool while `open`, where the fix is written test-first.
+            WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
+            WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
         )),
         SectionSpec("repro", "Reproduction", (
             _list("steps", element_fields=("text",), description="""

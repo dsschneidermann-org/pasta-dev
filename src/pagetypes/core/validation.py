@@ -334,6 +334,40 @@ def validate_page_type(page_type: PageType) -> list[str]:
     return [f"{page_type.tag}: {error}" for error in errors]
 
 
+def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
+    """Every workspace-guidance declaration across the registry is well-formed and consistent.
+
+    A registry-wide check, because agreement is between types: for each declaration the field name,
+    the guidance_for set and the description must be non-empty, every guidance_for status must be a
+    real state of the declaring type's FSM, and a field declared by several types must carry the
+    SAME description everywhere - so the description is single-sourced in practice. Returns a flat
+    list of messages (never raises); `validate_page_types` folds it into the one aggregated raise.
+    """
+    errors: list[str] = []
+    descriptions: dict[str, tuple[str, str]] = {}   # field -> (description, first tag to declare it)
+    for tag, page_type in registry.items():
+        states = set(page_type.fsm.states)
+        for spec in page_type.workspace_guidance_specs():
+            if not spec.field:
+                errors.append(f"{tag}: a workspace guidance declares an empty field name.")
+            if not spec.guidance_for:
+                errors.append(
+                    f"{tag}: workspace guidance '{spec.field}' declares no guidance_for statuses.")
+            for status in spec.guidance_for:
+                if status not in states:
+                    errors.append(
+                        f"{tag}: workspace guidance '{spec.field}' names unknown status '{status}'.")
+            if not spec.description:
+                errors.append(f"{tag}: workspace guidance '{spec.field}' has an empty description.")
+            prior = descriptions.get(spec.field)
+            if prior is None:
+                descriptions[spec.field] = (spec.description, tag)
+            elif prior[0] != spec.description:
+                errors.append(
+                    f"{tag}: workspace guidance '{spec.field}' description disagrees with '{prior[1]}'.")
+    return errors
+
+
 def validate_page_types(registry: Mapping[str, PageType]) -> None:
     """Validate every page type in `registry` in one pass, collecting all errors.
 
@@ -344,6 +378,8 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
     errors: list[str] = []
     for page_type in registry.values():
         errors.extend(validate_page_type(page_type))
+    # Cross-type check: needs the whole registry at once, so it sits here rather than per-type.
+    errors.extend(validate_workspace_guidance(registry))
     if errors:
         raise ValueError(
             "Invalid page-type declarations:\n" + "\n".join(f"- {error}" for error in errors))

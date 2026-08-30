@@ -473,6 +473,9 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         guidance = page_type.fsm.guidance_for(page.status) if page_type is not None else None
         if guidance is not None:
             response["guidance"] = guidance
+        # Workspace-configured guidance_<field> keys for the created page's initial status, beside
+        # `next` (which also carries them now that next_actions does).
+        response.update(STORE.page_workspace_guidance(workspaceId, page))
         return response
 
 
@@ -501,12 +504,31 @@ async def mutatePageBatch(
             "createdIds": created,
             "next": next_actions,
         }
-        # Sits beside `next`, never inside it: nextActions carries no guidance.
+        # The per-state stage guidance for a state just entered sits beside `next`.
         guidance = (transition_guidance(page_type, commands, page.status)
                     if page_type is not None else None)
         if guidance is not None:
             response["guidance"] = guidance
+        # Workspace-configured guidance_<field> keys for the page's resulting status.
+        response.update(STORE.page_workspace_guidance(workspaceId, page))
         return response
+
+
+# --- Workspace guidance configuration ----------------------------------------
+@mcp.tool
+async def setWorkspaceGuidance(workspaceId: str, field: str, text: str) -> dict[str, Any]:
+    """Set the workspace's stored guidance text for a code-defined guidance field.
+
+    `field` must be one declared by some page type's WorkspaceGuidanceSpec (an unknown field is
+    rejected, listing the declared ones); `text` is a single scalar string, and an empty string
+    clears it. The text then surfaces as `guidance_<field>` on createPage / mutatePageBatch /
+    nextActions results for a page of a declaring type while its status is in that field's
+    `guidance_for` set. Returns the workspace id, the field, and the full guidance config."""
+    with _guard_tool():
+        workspace = STORE.set_workspace_guidance(workspaceId, field, text)
+        await ws_reloader.refresh()
+        return {"workspaceId": workspace.id, "field": field,
+                "guidanceConfig": dict(workspace.guidance_config)}
 
 
 # --- Archiving ---------------------------------------------------------------

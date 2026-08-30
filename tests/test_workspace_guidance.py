@@ -1,0 +1,318 @@
+"""Tests for mutable per-workspace guidance texts.
+
+Covers the whole feature in one place: the pure spec/aggregation/validation/emission layer, the
+serialization round-trip, the describe surface, the store's set + inject, and the server tool and
+response keys. Behaviour is asserted against the hand-authored fixtures (src.testtypes), which
+declare buildTool/reviewHint/draftHint on test-lifecycle; production types stay off-limits under the
+suite's test mode, so the production-registry check reads REGISTRY directly and builds throwaway
+PageTypes for the cross-type validation cases.
+"""
+
+import asyncio
+
+import pytest
+from fastmcp import Client
+from fastmcp.exceptions import ToolError
+
+import src.server as server
+from src.commands import workspace_guidance_for
+from src.errors import ValidationError
+from src.model import Workspace
+from src.pagetypes import (
+    REGISTRY,
+    FSMSpec,
+    PageType,
+    SectionSpec,
+    WorkspaceGuidanceSpec,
+    all_page_types,
+    get_page_type,
+    validate_page_types,
+    validate_workspace_guidance,
+    workspace_guidance_fields,
+)
+from src.serialize import workspace_from_dict, workspace_to_dict
+from src.store import Store
+from src.describe import describe_page_type
+
+LIFECYCLE = get_page_type("test-lifecycle")
+
+
+# --- helpers -----------------------------------------------------------------
+def _wg_type(tag, states, *specs):
+    """A throwaway PageType carrying only workspace-guidance declarations - enough to exercise the
+    cross-type validator without touching a production type."""
+    return PageType(
+        tag=tag, name=tag, description="x",
+        sections=(SectionSpec("s", "S", (), workspace_guidance=specs),),
+        commands=(),
+        fsm=FSMSpec(name=tag, initial=states[0], states=tuple(states)),
+    )
+
+
+@pytest.fixture
+def store(tmp_path):
+    return Store(tmp_path)
+
+
+@pytest.fixture
+def mcp(tmp_path):
+    server.STORE = Store(tmp_path)   # tools resolve STORE from the module at call time
+    return server.mcp
+
+
+def call(mcp, name, args=None):
+    async def _run():
+        async with Client(mcp) as client:
+            result = await client.call_tool(name, args or {})
+            return result.data
+
+    return asyncio.run(_run())
+
+
+def _mutate_store(store, workspace_id, page_id, commands):
+    token = store.get_page(workspace_id, page_id).status_revision_token
+    stamped = [{**command, "args": {"statusRevisionToken": token, **(command.get("args") or {})}}
+               for command in commands]
+    return store.mutate_page_batch(workspace_id, page_id, stamped)
+
+
+def _mutate_server(mcp, args):
+    page = call(mcp, "getPage", {"workspaceId": args["workspaceId"], "pageId": args["pageId"]})
+    token = page["status_revision_token"]
+    stamped = {**args, "commands": [
+        {**command, "args": {"statusRevisionToken": token, **(command.get("args") or {})}}
+        for command in args["commands"]]}
+    return call(mcp, "mutatePageBatch", stamped)
+
+
+def _building_lifecycle(mcp):
+    """Drive a fresh test-lifecycle page to `building` and return (workspaceId, pageId)."""
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    page = call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
+    pid, child_id = page["id"], page["children"][0]["id"]
+    _mutate_server(mcp, {"workspaceId": wid, "pageId": pid, "commands": [
+        {"command": "setSummary", "args": {"text": "S"}},
+        {"command": "addPart", "args": {"name": "P"}},
+        {"command": "beginPlanning"}]})
+    _mutate_server(mcp, {"workspaceId": wid, "pageId": child_id, "commands": [
+        {"command": "addStep", "args": {"text": "build"}}, {"command": "markReady"}]})
+    result = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
+                                  "commands": [{"command": "beginImplementation"}]})
+    assert result["status"] == "building"
+    return wid, pid
+
+
+# --- case 1: WorkspaceGuidanceSpec construction ------------------------------
+def test_workspace_guidance_spec_holds_its_fields():
+    spec = WorkspaceGuidanceSpec("mergeProcess", ("review",), "a desc")
+    assert (spec.field, spec.guidance_for, spec.description) == ("mergeProcess", ("review",), "a desc")
+
+
+def test_workspace_guidance_spec_does_not_validate_at_construction():
+    # A malformed one (empty field, no statuses) constructs without raising - validation is deferred.
+    spec = WorkspaceGuidanceSpec("", (), "")
+    assert spec.field == "" and spec.guidance_for == ()
+
+
+# --- case 2: PageType.workspace_guidance_specs aggregation --------------------
+def test_workspace_guidance_specs_flattened_across_sections():
+    fields = [spec.field for spec in LIFECYCLE.workspace_guidance_specs()]
+    assert fields == ["buildTool", "reviewHint", "draftHint"]
+
+
+def test_workspace_guidance_specs_empty_when_none_declared():
+    assert get_page_type("test-fields").workspace_guidance_specs() == ()
+
+
+# --- case 3: validate_workspace_guidance --------------------------------------
+def test_validate_workspace_guidance_flags_each_problem():
+    unknown_status = _wg_type("wg-a", ("draft",),
+                              WorkspaceGuidanceSpec("f", ("nope",), "d"))
+    empty_for = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("g", (), "d"))
+    empty_field = _wg_type("wg-c", ("draft",), WorkspaceGuidanceSpec("", ("draft",), "d"))
+    empty_desc = _wg_type("wg-d", ("draft",), WorkspaceGuidanceSpec("h", ("draft",), ""))
+    errors = validate_workspace_guidance({t.tag: t for t in
+                                          (unknown_status, empty_for, empty_field, empty_desc)})
+    joined = "\n".join(errors)
+    assert "wg-a" in joined and "unknown status 'nope'" in joined
+    assert "wg-b" in joined and "no guidance_for" in joined
+    assert "wg-c" in joined and "empty field name" in joined
+    assert "wg-d" in joined and "empty description" in joined
+
+
+def test_validate_workspace_guidance_flags_disagreeing_descriptions():
+    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "one"))
+    b = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "two"))
+    errors = validate_workspace_guidance({a.tag: a, b.tag: b})
+    assert any("description disagrees" in e for e in errors)
+
+
+def test_validate_workspace_guidance_clean_when_descriptions_agree():
+    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same"))
+    b = _wg_type("wg-b", ("open", "draft"), WorkspaceGuidanceSpec("shared", ("open",), "same"))
+    assert validate_workspace_guidance({a.tag: a, b.tag: b}) == []
+
+
+# --- case 4: aggregated load raise --------------------------------------------
+def test_validate_page_types_raises_on_bad_workspace_guidance():
+    bad = _wg_type("wg-bad", ("draft",), WorkspaceGuidanceSpec("f", ("missing",), "d"))
+    with pytest.raises(ValueError, match="unknown status 'missing'"):
+        validate_page_types({bad.tag: bad})
+
+
+def test_validate_page_types_clean_for_good_workspace_guidance():
+    good = _wg_type("wg-ok", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d"))
+    assert validate_page_types({good.tag: good}) is None
+
+
+# --- case 5: workspace_guidance_for (pure emission) ---------------------------
+def test_workspace_guidance_for_emits_only_in_set_with_text():
+    config = {"buildTool": "use pytest", "reviewHint": "look hard"}
+    assert workspace_guidance_for(LIFECYCLE, "building", config) == {"guidance_buildTool": "use pytest"}
+    # review is in both buildTool and reviewHint sets.
+    assert workspace_guidance_for(LIFECYCLE, "review", config) == {
+        "guidance_buildTool": "use pytest", "guidance_reviewHint": "look hard"}
+
+
+def test_workspace_guidance_for_skips_out_of_set_absent_and_empty():
+    assert workspace_guidance_for(LIFECYCLE, "planning", {"buildTool": "x"}) == {}   # out of set
+    assert workspace_guidance_for(LIFECYCLE, "building", {}) == {}                    # absent
+    assert workspace_guidance_for(LIFECYCLE, "building", {"buildTool": ""}) == {}     # empty clears
+
+
+# --- case 6: serialization round-trip ----------------------------------------
+def test_guidance_config_round_trips():
+    workspace = Workspace(id="ws:1", name="n", guidance_config={"mergeProcess": "rebase"})
+    restored = workspace_from_dict(workspace_to_dict(workspace))
+    assert restored.guidance_config == {"mergeProcess": "rebase"}
+
+
+def test_missing_guidance_config_loads_empty():
+    restored = workspace_from_dict({"id": "ws:1", "name": "n"})   # a pre-feature file
+    assert restored.guidance_config == {}
+
+
+# --- case 7: describe surface -------------------------------------------------
+def test_describe_page_type_surfaces_workspace_guidance():
+    described = describe_page_type(LIFECYCLE)
+    summary = next(s for s in described["sections"] if s["key"] == "summary")
+    entries = {wg["field"]: wg for wg in summary["workspaceGuidance"]}
+    assert entries["buildTool"]["guidanceFor"] == ["building", "review"]
+    assert entries["reviewHint"]["description"] == "a hint shown while reviewing"
+    # A section with none carries an empty list, not a missing key.
+    parts = next(s for s in described["sections"] if s["key"] == "parts")
+    assert parts["workspaceGuidance"] == []
+
+
+# --- case 8: registry accessors ----------------------------------------------
+def test_all_page_types_spans_production_and_test_fixtures():
+    tags = {pt.tag for pt in all_page_types()}
+    # get_page_type's full resolution set: production types AND the test fixtures, independent of
+    # test mode (so the field set stays stable however the suite left the mode flag).
+    assert "test-lifecycle" in tags and "feature-brief" in tags
+    fields = workspace_guidance_fields()
+    # Fixture-owned fields alongside the production ones; the fixture names are distinct.
+    assert {"buildTool", "reviewHint", "draftHint"} <= set(fields)
+    assert {"mergeProcess", "testingTool"} <= set(fields)
+    assert fields["buildTool"].guidance_for == ("building", "review")
+
+
+# --- case 9: store.set_workspace_guidance ------------------------------------
+def test_set_workspace_guidance_persists_and_validates(store):
+    workspace = store.create_workspace("demo")
+    wid = workspace.id
+    store.set_workspace_guidance(wid, "buildTool", "use pytest")
+    assert store.load_workspace(wid).guidance_config == {"buildTool": "use pytest"}
+    # Empty string is accepted (a clear).
+    store.set_workspace_guidance(wid, "buildTool", "")
+    assert store.load_workspace(wid).guidance_config == {"buildTool": ""}
+    # An undeclared field is rejected, naming the declared ones.
+    with pytest.raises(ValidationError, match="not a workspace guidance field"):
+        store.set_workspace_guidance(wid, "nope", "x")
+
+
+# --- case 10: store.next_actions guidance injection ---------------------------
+def test_next_actions_injects_guidance_for_focused_page(store):
+    workspace = store.create_workspace("demo")
+    wid = workspace.id
+    page = store.create_page(wid, "test-lifecycle", "F").page
+    pid = page.id
+    store.set_workspace_guidance(wid, "buildTool", "use pytest")
+    store.set_workspace_guidance(wid, "reviewHint", "look hard")
+
+    store.set_page_status(wid, pid, "review")
+    actions = store.next_actions(wid, pid)
+    assert actions["guidance_buildTool"] == "use pytest"          # review in buildTool's set
+    assert actions["guidance_reviewHint"] == "look hard"          # review in reviewHint's set
+    # The focused page's per-state stage guidance is always included now.
+    assert actions["guidance"] == LIFECYCLE.fsm.guidance_for("review")
+
+    store.set_page_status(wid, pid, "building")
+    actions = store.next_actions(wid, pid)
+    assert actions["guidance_buildTool"] == "use pytest"          # building in buildTool's set
+    assert "guidance_reviewHint" not in actions                   # building NOT in reviewHint's set
+
+
+def test_next_actions_whole_workspace_has_no_guidance(store):
+    workspace = store.create_workspace("demo")
+    wid = workspace.id
+    pid = store.create_page(wid, "test-lifecycle", "F").page.id
+    store.set_workspace_guidance(wid, "draftHint", "drafting")
+    actions = store.next_actions(wid, None)                       # no focused page
+    assert not any(key.startswith("guidance") for key in actions)
+
+
+# --- case 11: server tool + response keys ------------------------------------
+def test_set_workspace_guidance_tool_and_response_keys(mcp):
+    wid, pid = _building_lifecycle(mcp)
+    result = call(mcp, "setWorkspaceGuidance",
+                  {"workspaceId": wid, "field": "buildTool", "text": "use pytest"})
+    assert result == {"workspaceId": wid, "field": "buildTool",
+                      "guidanceConfig": {"buildTool": "use pytest"}}
+    # A subsequent write response carries guidance_buildTool (page is at `building`), top level.
+    written = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
+                                   "commands": [{"command": "setSummary", "args": {"text": "S2"}}]})
+    assert written["guidance_buildTool"] == "use pytest"
+    # nextActions carries it too.
+    actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
+    assert actions["guidance_buildTool"] == "use pytest"
+
+
+def test_create_page_response_carries_workspace_guidance(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "draftHint", "text": "drafting"})
+    created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
+    assert created["status"] == "draft"
+    assert created["guidance_draftHint"] == "drafting"           # draft is in draftHint's set
+
+
+def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    with pytest.raises(ToolError, match="not a workspace guidance field"):
+        call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "nope", "text": "x"})
+
+
+# --- case 12: production declarations -----------------------------------------
+def test_production_workspace_guidance_is_valid_and_declares_the_fields():
+    assert validate_workspace_guidance(REGISTRY) == []
+    fields = {}
+    for page_type in REGISTRY.values():
+        for spec in page_type.workspace_guidance_specs():
+            fields[spec.field] = spec.description
+    assert set(fields) == {"mergeProcess", "testingTool"}
+    # Declared by more than one work type, with a single-sourced description.
+    declarers = [tag for tag, pt in REGISTRY.items()
+                 if any(s.field == "mergeProcess" for s in pt.workspace_guidance_specs())]
+    assert set(declarers) == {"feature-brief", "simple-change", "bug-report"}
+
+
+# --- case 13: no regression for guidance-free types --------------------------
+def test_guidance_free_type_has_no_guidance_keys(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-fields", "title": "A"})
+    assert not any(key.startswith("guidance") for key in created)
+    written = _mutate_server(mcp, {"workspaceId": wid, "pageId": created["id"],
+                                   "commands": [{"command": "setBody", "args": {"text": "x"}}]})
+    assert not any(key.startswith("guidance") for key in written)
+    actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": created["id"]})
+    assert not any(key.startswith("guidance") for key in actions)

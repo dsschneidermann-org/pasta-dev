@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from ._stage_guidance import REVIEW, SIMPLE_CHANGE_DRAFT, SIMPLE_CHANGE_OPEN
+from ._workspace_guidance import (
+    MERGE_PROCESS_DESC,
+    MERGE_PROCESS_FIELD,
+    TESTING_TOOL_DESC,
+    TESTING_TOOL_FIELD,
+)
 from . import (
     FSMSpec,
     PageType,
     SectionSpec,
+    WorkspaceGuidanceSpec,
     _list,
     _prose,
     _scalar,
@@ -46,6 +53,11 @@ _SIMPLE_CHANGE = PageType(
                 What to change, in a sentence or two: the behaviour today and the behaviour you want
                 in its place. Concrete enough that someone could start work from this line alone.
                 """),
+        ), workspace_guidance=(
+            # mergeProcess while the change is reviewed or done (before it is closed/merged);
+            # testingTool while `open`, where the change is written test-first.
+            WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
+            WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
         )),
         SectionSpec("motivation", "Motivation", (
             _prose("body", description="""

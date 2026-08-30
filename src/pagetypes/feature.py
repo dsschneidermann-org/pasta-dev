@@ -14,6 +14,12 @@ from ._stage_guidance import (
     PLAN_REVIEW,
     SPEC,
 )
+from ._workspace_guidance import (
+    MERGE_PROCESS_DESC,
+    MERGE_PROCESS_FIELD,
+    TESTING_TOOL_DESC,
+    TESTING_TOOL_FIELD,
+)
 from . import (
     AutoChildSpec,
     ChildStateGuard,
@@ -24,6 +30,7 @@ from . import (
     ParentStateGuard,
     RefCheck,
     SectionSpec,
+    WorkspaceGuidanceSpec,
     _blocks,
     _boolean,
     _code_block,
@@ -100,6 +107,12 @@ _FEATURE_BRIEF = PageType(
                 outcome you want, not the implementation you imagine, and say so here if the ask
                 itself looks wrong or underspecified rather than quietly building past it.
                 """),
+        ), workspace_guidance=(
+            # mergeProcess is shown in `review`, the stop before the human ship gate where the
+            # rebase-onto-main discipline matters; testingTool while `building`, where tests are
+            # written. The stored text is workspace-configured through setWorkspaceGuidance.
+            WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
+            WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),
         )),
         SectionSpec("components", "Components", (
             _list("items", element_fields=("name", "text"), description="""

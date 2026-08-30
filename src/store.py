@@ -44,6 +44,7 @@ from .pagetypes import (
     get_page_type,
     is_auto_child_type,
     registered_tags,
+    workspace_guidance_fields,
 )
 from .rwlock import ReadWriteLock
 from .serialize import workspace_from_dict, workspace_to_dict
@@ -461,7 +462,23 @@ class Store:
             do.extend(commands.field_setter_edges(page, page_type, parent_blocked))
             attention.extend(self._page_attention(page, page_type))
 
-        return {"do": do, "blocked": blocked, "humanGates": human_gates, "attention": attention}
+        result: dict[str, Any] = {"do": do, "blocked": blocked,
+                                  "humanGates": human_gates, "attention": attention}
+        # Guidance for the focused page (the subtree root): its per-state stage guidance - always,
+        # not only on the transition that entered the state - and any workspace-configured
+        # guidance_<field> for its current status. A whole-workspace roll-up (page_id None) has no
+        # single focused page, so it carries none.
+        if page_id is not None:
+            focus = workspace.get_page(page_id)
+            if focus is not None and not focus.archived:
+                focus_type = get_page_type(focus.type)
+                if focus_type is not None:
+                    state_guidance = focus_type.fsm.guidance_for(focus.status)
+                    if state_guidance is not None:
+                        result["guidance"] = state_guidance
+                    result.update(commands.workspace_guidance_for(
+                        focus_type, focus.status, workspace.guidance_config))
+        return result
 
     def attention(self, workspace_id: str) -> dict[str, Any]:
         """Workspace-wide scan for element instances awaiting a human (escalated open questions)."""
@@ -846,6 +863,37 @@ class Store:
 
     def unarchive_workspace(self, workspace_id: str) -> Workspace:
         return self._set_workspace_status(workspace_id, "active")
+
+    # --- workspace guidance configuration -----------------------------------
+    def set_workspace_guidance(self, workspace_id: str, field: str, text: str) -> Workspace:
+        """Store `text` under `field` on the workspace's mutable guidance config.
+
+        Rejects a `field` no page type declares (via the registry-aggregated set); an empty string
+        is accepted and stored, which surfaces as nothing (a natural clear). The text then rides as
+        `guidance_<field>` on a page of a declaring type while its status is in that field's
+        `guidance_for` set. Returns the updated workspace.
+        """
+        valid = workspace_guidance_fields()
+        if field not in valid:
+            raise ValidationError(
+                f"'{field}' is not a workspace guidance field. "
+                f"Declared: {', '.join(sorted(valid)) or '(none)'}."
+            )
+        with self._transaction_lock_for(workspace_id):
+            workspace = self.load_workspace(workspace_id)
+            workspace.guidance_config[field] = text
+            self._touch_and_save(workspace)
+            return workspace
+
+    def page_workspace_guidance(self, workspace_id: str, page: Page) -> dict[str, str]:
+        """The `guidance_<field>` keys a write response attaches for `page` at its current status,
+        read from the workspace's stored config. Empty when the type is unregistered or declares no
+        matching guidance."""
+        page_type = get_page_type(page.type)
+        if page_type is None:
+            return {}
+        workspace = self.load_workspace(workspace_id)
+        return commands.workspace_guidance_for(page_type, page.status, workspace.guidance_config)
 
     # --- helpers -------------------------------------------------------------
     def _create_auto_children(

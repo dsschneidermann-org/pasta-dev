@@ -24,6 +24,7 @@ from .specs import (
     TRANSITION,
     AutoChildSpec,
     FSMSpec,
+    WorkspaceGuidanceSpec,
 )
 
 
@@ -97,6 +98,12 @@ class PageType:
                     if field_spec.key == field_key:
                         return field_spec
         return None
+
+    def workspace_guidance_specs(self) -> tuple[WorkspaceGuidanceSpec, ...]:
+        """This type's workspace-guidance declarations, flattened across its sections in
+        section-then-declaration order."""
+        return tuple(spec for section in self.sections
+                     for spec in section.workspace_guidance)
 
 
 def status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], ...]:
