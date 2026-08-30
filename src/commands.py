@@ -8,7 +8,7 @@ the in-memory "copy-edit" half of the storage pattern in `store.py`.
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -259,23 +259,6 @@ def transition_guidance(
         if command is not None and _is_status_transition(command):
             return page_type.fsm.guidance_for(status)
     return None
-
-
-def workspace_guidance_for(page_type: PageType, status: str,
-                           config: Mapping[str, str]) -> dict[str, str]:
-    """The `guidance_<field>` keys a page of `page_type` at `status` carries, given the workspace's
-    stored `config` (pure).
-
-    For each declared field whose statuses include `status`, emit its stored text; skip a field
-    with no text (an empty string clears it).
-    """
-    out: dict[str, str] = {}
-    for spec in page_type.workspace_guidance:
-        if status in spec.guidance_for:
-            text = config.get(spec.field)
-            if text:
-                out[f"guidance_{spec.field}"] = text
-    return out
 
 
 def apply_command(

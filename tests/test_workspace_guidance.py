@@ -1,8 +1,8 @@
 """Tests for mutable per-workspace guidance texts.
 
 The behavioural tests use the hand-authored fixtures, which declare a few guidance fields on
-test-lifecycle; the cross-type validation tests build throwaway page types. Test mode is asserted
-on for each test so the configurable-field set is the fixtures', not production's.
+test-lifecycle; the cross-type validation tests build throwaway page types. The suite runs in test
+mode, so the configurable-field set is the fixtures', not production's.
 """
 
 import asyncio
@@ -11,9 +11,7 @@ import pytest
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
-from src import pagetypes
 import src.server as server
-from src.commands import workspace_guidance_for
 from src.errors import ValidationError
 from src.model import Workspace
 from src.pagetypes import (
@@ -27,17 +25,10 @@ from src.pagetypes import (
     workspace_guidance_fields,
 )
 from src.serialize import workspace_from_dict, workspace_to_dict
-from src.store import Store
+from src.store import Store, workspace_guidance_for
 from src.describe import describe_page_type
 
 LIFECYCLE = get_page_type("test-lifecycle")
-
-
-@pytest.fixture(autouse=True)
-def _test_mode_on():
-    # An earlier test module turns test mode off without restoring it; these tests need it on so the
-    # configurable-field set is the fixtures', not production's.
-    pagetypes.set_test_mode(True)
 
 
 # --- helpers -----------------------------------------------------------------

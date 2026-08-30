@@ -58,8 +58,6 @@ class Workspace:
     pages: dict[str, Page] = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
-    # Mutable per-workspace guidance texts, keyed by field. Surfaced on a page whose type declares
-    # the field while it sits at one of the field's configured statuses.
     guidance_config: dict[str, str] = field(default_factory=dict)
 
     def get_page(self, page_id: str) -> Page | None:

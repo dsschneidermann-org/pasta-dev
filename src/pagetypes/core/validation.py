@@ -377,7 +377,6 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
     errors: list[str] = []
     for page_type in registry.values():
         errors.extend(validate_page_type(page_type))
-    # A cross-type check: it needs the whole registry, not one type at a time.
     errors.extend(validate_workspace_guidance(registry))
     if errors:
         raise ValueError(

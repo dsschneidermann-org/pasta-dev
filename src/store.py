@@ -61,6 +61,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def workspace_guidance_for(page_type: PageType, status: str,
+                           config: dict[str, str]) -> dict[str, str]:
+    """Given a page type at a status, the stored text for each of its workspace guidance fields
+    shown at that status (an empty value clears the field)."""
+    out: dict[str, str] = {}
+    for spec in page_type.workspace_guidance:
+        if status in spec.guidance_for:
+            text = config.get(spec.field)
+            if text:
+                out[f"guidance_{spec.field}"] = text
+    return out
+
+
 @dataclass
 class CreatePageResult:
     page: Page
@@ -474,7 +487,7 @@ class Store:
                     state_guidance = focus_type.fsm.guidance_for(focus.status)
                     if state_guidance is not None:
                         result["guidance"] = state_guidance
-                    result.update(commands.workspace_guidance_for(
+                    result.update(workspace_guidance_for(
                         focus_type, focus.status, workspace.guidance_config))
         return result
 
@@ -864,11 +877,8 @@ class Store:
 
     # --- workspace guidance configuration -----------------------------------
     def set_workspace_guidance(self, workspace_id: str, field: str, text: str) -> Workspace:
-        """Store `text` under `field` on the workspace's guidance config.
-
-        Rejects a field no page type declares. An empty string is allowed and clears the field.
-        Returns the updated workspace.
-        """
+        """Store `text` under `field` on the workspace's guidance config. Rejects a field no page
+        type declares; an empty string clears the field. Returns the updated workspace."""
         valid = workspace_guidance_fields()
         if field not in valid:
             raise ValidationError(
@@ -888,7 +898,7 @@ class Store:
         if page_type is None:
             return {}
         workspace = self.load_workspace(workspace_id)
-        return commands.workspace_guidance_for(page_type, page.status, workspace.guidance_config)
+        return workspace_guidance_for(page_type, page.status, workspace.guidance_config)
 
     # --- helpers -------------------------------------------------------------
     def _create_auto_children(

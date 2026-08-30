@@ -10,6 +10,7 @@ production). This file owns only the seam and the membership of the set.
 
 import pytest
 
+from src import pagetypes
 from src.docsgen import all_state_docs, render_states_index
 from src.pagetypes import (
     discoverable_registry,
@@ -19,6 +20,15 @@ from src.pagetypes import (
 )
 from src.store import Store
 from src.testtypes import TEST_REGISTRY
+
+
+@pytest.fixture
+def _production_mode():
+    # Doc generation runs against the production registry, so a test that reads generated docs needs
+    # test mode off; restore it afterwards so the setting does not leak.
+    pagetypes.set_test_mode(False)
+    yield
+    pagetypes.set_test_mode(True)
 
 # The five capability fixtures - each demonstrates one part of the page-type system. This set is
 # deliberately NOT derived from production: the fixtures are purpose-built, not clones.
@@ -54,7 +64,7 @@ def test_listing_hides_fixtures_by_default():
     assert not any(tag.startswith("test-") for tag in discoverable_registry())
 
 
-def test_docgen_excludes_fixtures_by_default():
+def test_docgen_excludes_fixtures_by_default(_production_mode):
     stems = set(all_state_docs())
     assert stems, "expected some generated state docs"
     assert not any(stem.startswith("test-") for stem in stems)
