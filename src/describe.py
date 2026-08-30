@@ -130,8 +130,7 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                     }
                     for field_spec in section.fields
                 ],
-                # Mutable per-workspace guidance texts this section declares (set via
-                # setWorkspaceGuidance, surfaced as guidance_<field>); empty for most sections.
+                # The mutable per-workspace guidance texts this section declares; usually empty.
                 "workspaceGuidance": [
                     {"field": spec.field, "guidanceFor": list(spec.guidance_for),
                      "description": spec.description}

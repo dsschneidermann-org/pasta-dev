@@ -266,10 +266,8 @@ def workspace_guidance_for(page_type: PageType, status: str,
     """The `guidance_<field>` keys a page of `page_type` at `status` carries, given the workspace's
     stored `config` (pure).
 
-    The workspace-configuration sibling of `transition_guidance`: for every workspace-guidance spec
-    this type declares whose `guidance_for` set contains `status`, emit `guidance_<field>` with the
-    stored text - skipping any field whose text is absent or empty (an empty string is a natural
-    clear). Empty when the type declares none, or none match the status.
+    For each declared field whose statuses include `status`, emit its stored text; skip a field
+    with no text (an empty string clears it).
     """
     out: dict[str, str] = {}
     for spec in page_type.workspace_guidance_specs():

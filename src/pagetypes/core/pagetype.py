@@ -100,8 +100,7 @@ class PageType:
         return None
 
     def workspace_guidance_specs(self) -> tuple[WorkspaceGuidanceSpec, ...]:
-        """This type's workspace-guidance declarations, flattened across its sections in
-        section-then-declaration order."""
+        """This type's workspace-guidance declarations, gathered from its sections in order."""
         return tuple(spec for section in self.sections
                      for spec in section.workspace_guidance)
 

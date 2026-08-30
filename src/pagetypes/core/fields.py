@@ -66,9 +66,7 @@ class SectionSpec:
     key: str
     name: str
     fields: tuple[FieldSpec, ...]
-    # Mutable per-workspace guidance texts this section declares (see WorkspaceGuidanceSpec). A
-    # sibling of `fields`, never mixed into it, so every consumer that iterates content fields is
-    # untouched; the page type aggregates them across its sections.
+    # Mutable per-workspace guidance texts this section declares, kept beside its content fields.
     workspace_guidance: tuple[WorkspaceGuidanceSpec, ...] = ()
 
 

@@ -1,11 +1,8 @@
 """Tests for mutable per-workspace guidance texts.
 
-Covers the whole feature in one place: the pure spec/aggregation/validation/emission layer, the
-serialization round-trip, the describe surface, the store's set + inject, and the server tool and
-response keys. Behaviour is asserted against the hand-authored fixtures (src.testtypes), which
-declare buildTool/reviewHint/draftHint on test-lifecycle; production types stay off-limits under the
-suite's test mode, so the production-registry check reads REGISTRY directly and builds throwaway
-PageTypes for the cross-type validation cases.
+The behavioural tests use the hand-authored fixtures, which declare a few guidance fields on
+test-lifecycle. The production check reads the registry directly, and the cross-type validation
+tests build throwaway page types, since production types are off-limits to the suite.
 """
 
 import asyncio
@@ -39,8 +36,7 @@ LIFECYCLE = get_page_type("test-lifecycle")
 
 # --- helpers -----------------------------------------------------------------
 def _wg_type(tag, states, *specs):
-    """A throwaway PageType carrying only workspace-guidance declarations - enough to exercise the
-    cross-type validator without touching a production type."""
+    """A throwaway page type with only workspace-guidance declarations, for the validation tests."""
     return PageType(
         tag=tag, name=tag, description="x",
         sections=(SectionSpec("s", "S", (), workspace_guidance=specs),),
@@ -207,8 +203,7 @@ def test_describe_page_type_surfaces_workspace_guidance():
 # --- registry accessors ------------------------------------------------------
 def test_all_page_types_spans_production_and_test_fixtures():
     tags = {pt.tag for pt in all_page_types()}
-    # get_page_type's full resolution set: production types AND the test fixtures, independent of
-    # test mode (so the field set stays stable however the suite left the mode flag).
+    # Both production types and the test fixtures, independent of test mode.
     assert "test-lifecycle" in tags and "feature-brief" in tags
     fields = workspace_guidance_fields()
     # Fixture-owned fields alongside the production ones; the fixture names are distinct.
@@ -244,13 +239,13 @@ def test_next_actions_injects_guidance_for_focused_page(store):
     actions = store.next_actions(wid, pid)
     assert actions["guidance_buildTool"] == "use pytest"          # review in buildTool's set
     assert actions["guidance_reviewHint"] == "look hard"          # review in reviewHint's set
-    # The focused page's per-state stage guidance is always included now.
+    # Stage guidance for the focused page is included too.
     assert actions["guidance"] == LIFECYCLE.fsm.guidance_for("review")
 
     store.set_page_status(wid, pid, "building")
     actions = store.next_actions(wid, pid)
     assert actions["guidance_buildTool"] == "use pytest"          # building in buildTool's set
-    assert "guidance_reviewHint" not in actions                   # building NOT in reviewHint's set
+    assert "guidance_reviewHint" not in actions                   # building not in reviewHint's set
 
 
 def test_next_actions_whole_workspace_has_no_guidance(store):

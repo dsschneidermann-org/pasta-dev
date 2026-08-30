@@ -337,11 +337,10 @@ def validate_page_type(page_type: PageType) -> list[str]:
 def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
     """Every workspace-guidance declaration across the registry is well-formed and consistent.
 
-    A registry-wide check, because agreement is between types: for each declaration the field name,
-    the guidance_for set and the description must be non-empty, every guidance_for status must be a
-    real state of the declaring type's FSM, and a field declared by several types must carry the
-    SAME description everywhere - so the description is single-sourced in practice. Returns a flat
-    list of messages (never raises); `validate_page_types` folds it into the one aggregated raise.
+    A registry-wide check, since agreement is between types: each declaration's field name,
+    guidance_for set and description must be non-empty, every status must be a real state of the
+    declaring type, and types sharing a field must give it the same description. Returns a list of
+    messages rather than raising.
     """
     errors: list[str] = []
     descriptions: dict[str, tuple[str, str]] = {}   # field -> (description, first tag to declare it)
@@ -378,7 +377,7 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
     errors: list[str] = []
     for page_type in registry.values():
         errors.extend(validate_page_type(page_type))
-    # Cross-type check: needs the whole registry at once, so it sits here rather than per-type.
+    # A cross-type check: it needs the whole registry, not one type at a time.
     errors.extend(validate_workspace_guidance(registry))
     if errors:
         raise ValueError(

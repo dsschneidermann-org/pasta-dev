@@ -464,10 +464,8 @@ class Store:
 
         result: dict[str, Any] = {"do": do, "blocked": blocked,
                                   "humanGates": human_gates, "attention": attention}
-        # Guidance for the focused page (the subtree root): its per-state stage guidance - always,
-        # not only on the transition that entered the state - and any workspace-configured
-        # guidance_<field> for its current status. A whole-workspace roll-up (page_id None) has no
-        # single focused page, so it carries none.
+        # Guidance for the focused page: its stage guidance for the current status, and any
+        # configured guidance texts for that status. A whole-workspace roll-up has no focused page.
         if page_id is not None:
             focus = workspace.get_page(page_id)
             if focus is not None and not focus.archived:
@@ -866,12 +864,10 @@ class Store:
 
     # --- workspace guidance configuration -----------------------------------
     def set_workspace_guidance(self, workspace_id: str, field: str, text: str) -> Workspace:
-        """Store `text` under `field` on the workspace's mutable guidance config.
+        """Store `text` under `field` on the workspace's guidance config.
 
-        Rejects a `field` no page type declares (via the registry-aggregated set); an empty string
-        is accepted and stored, which surfaces as nothing (a natural clear). The text then rides as
-        `guidance_<field>` on a page of a declaring type while its status is in that field's
-        `guidance_for` set. Returns the updated workspace.
+        Rejects a field no page type declares. An empty string is allowed and clears the field.
+        Returns the updated workspace.
         """
         valid = workspace_guidance_fields()
         if field not in valid:
@@ -886,9 +882,8 @@ class Store:
             return workspace
 
     def page_workspace_guidance(self, workspace_id: str, page: Page) -> dict[str, str]:
-        """The `guidance_<field>` keys a write response attaches for `page` at its current status,
-        read from the workspace's stored config. Empty when the type is unregistered or declares no
-        matching guidance."""
+        """The configured guidance keys for `page` at its current status. Empty when the page's type
+        is unknown or declares nothing for this status."""
         page_type = get_page_type(page.type)
         if page_type is None:
             return {}

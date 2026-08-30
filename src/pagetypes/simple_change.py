@@ -54,8 +54,8 @@ _SIMPLE_CHANGE = PageType(
                 in its place. Concrete enough that someone could start work from this line alone.
                 """),
         ), workspace_guidance=(
-            # mergeProcess while the change is reviewed or done (before it is closed/merged);
-            # testingTool while `open`, where the change is written test-first.
+            # Merge guidance while the change is reviewed or done, before it is closed; testing-tool
+            # guidance while open, where the change is written.
             WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
             WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
         )),

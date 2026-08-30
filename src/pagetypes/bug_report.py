@@ -56,8 +56,8 @@ _BUG_REPORT = PageType(
                 fix you have in mind.
                 """),
         ), workspace_guidance=(
-            # mergeProcess while the fix is reviewed or done (before it is closed/merged);
-            # testingTool while `open`, where the fix is written test-first.
+            # Merge guidance while the fix is reviewed or done, before it is closed; testing-tool
+            # guidance while open, where the fix is written.
             WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
             WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
         )),

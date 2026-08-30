@@ -275,10 +275,8 @@ TEST_LIFECYCLE = PageType(
     description="Test fixture: a rich status FSM with required-content gates, agency, guards, questions, and a pinned auto-child.",
     sections=(
         SectionSpec("summary", "Summary", (_prose("body", description="the intent (gates beginPlanning)"),),
-                    # Workspace-guidance fields declared under a section: buildTool surfaces across
-                    # two states (set membership), reviewHint at one, and draftHint at the initial
-                    # state (so createPage's echo is observable) - the fixture for the emission
-                    # helper, the setWorkspaceGuidance tool, and the describe surface.
+                    # Workspace-guidance fields for the tests: one shown across two states, one at a
+                    # single state, and one at the initial state.
                     workspace_guidance=(
                         WorkspaceGuidanceSpec("buildTool", ("building", "review"),
                                               "the build tool this workspace uses"),

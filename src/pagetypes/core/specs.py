@@ -193,18 +193,12 @@ class AutoChildSpec:
 
 @dataclass(frozen=True)
 class WorkspaceGuidanceSpec:
-    """A per-workspace, mutable guidance text a page type asks to surface at some of its statuses.
+    """A per-workspace, mutable guidance text a page type surfaces at some of its statuses.
 
-    Declared under a section (SectionSpec.workspace_guidance), never as a command. `field` is the
-    config key: it is the argument to setWorkspaceGuidance, the workspace-config key the text is
-    stored under, and the `guidance_<field>` key the text is surfaced under. `guidance_for` is the
-    SET of this type's statuses at which the stored text is emitted (membership, so one field can
-    surface across several states). `description` is the human-facing 'what this field means'; it is
-    single-sourced and must agree across every type that declares the same field (checked at load).
-
-    There is no setter name - one generic setWorkspaceGuidance tool takes the field as its argument.
-    Like AutoChildSpec it has no __post_init__: a malformed declaration is reported by the load-time
-    validator (validate_workspace_guidance), not raised at construction.
+    `field` names the text and keys its stored value. `guidance_for` is the set of statuses the
+    text shows at, tested by membership. `description` says what the field means and must match
+    across any types that share the field. Construction does not validate; a malformed declaration
+    is caught when the registry is validated at load.
     """
     field: str
     guidance_for: tuple[str, ...]

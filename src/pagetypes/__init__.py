@@ -385,17 +385,14 @@ def is_auto_child_type(parent_type: PageType | None, child_type: str) -> bool:
 
 
 def all_page_types() -> list[PageType]:
-    """Every code-defined page type `get_page_type` can resolve: the production registry and the
-    hand-authored test fixtures. This is `get_page_type`'s resolution set - deliberately independent
-    of test mode, which gates page CREATION and discovery, not resolution - so the workspace-guidance
-    field set a workspace may configure is stable however the suite has left the mode flag."""
+    """Every code-defined page type: the production registry plus the hand-authored test fixtures.
+    Deliberately independent of test mode, so the set of configurable guidance fields is stable."""
     return list(REGISTRY.values()) + list(_test_registry().values())
 
 
 def workspace_guidance_fields() -> dict[str, WorkspaceGuidanceSpec]:
-    """Every declared workspace-guidance field -> a representative spec (the first to declare it).
-    The set of valid `field` values `setWorkspaceGuidance` accepts, aggregated across
-    `all_page_types()`."""
+    """Every declared workspace-guidance field mapped to a representative spec (the first to declare
+    it) - the fields a workspace may configure."""
     fields: dict[str, WorkspaceGuidanceSpec] = {}
     for page_type in all_page_types():
         for spec in page_type.workspace_guidance_specs():

@@ -1,18 +1,11 @@
-"""The descriptions of the workspace-configurable guidance fields.
+"""Descriptions of the workspace-configurable guidance fields.
 
-A page type declares a `WorkspaceGuidanceSpec` under one of its sections naming a field, the
-statuses that field surfaces at, and a description of what the field means. The DESCRIPTIONS live
-here, beside `_stage_guidance.py`, so a field several page types declare says the same thing
-everywhere - the load-time validator rejects a field whose description disagrees across types, and
-sourcing it from one constant is how they agree. The stored TEXT itself is not here: it is mutable
-per workspace, set at runtime through `setWorkspaceGuidance`.
+Each field's description is a single constant here, so page types that share a field give it the
+same description and validation stays satisfied. The stored text is not here; it is set per
+workspace at runtime, and only the field names and descriptions are fixed in code.
 
-Like `_stage_guidance.py` this module imports NOTHING - not the package, not core, not the standard
-library - so it stays clear of the partially-initialized-package hazard, and its leading underscore
-sorts it above every page-type module that draws on it.
-
-A field name is a constant too, so the same string names the field in every declaration and cannot
-drift into a second, silently-separate field.
+The module imports nothing, so it can be read early during package setup, and its leading
+underscore keeps it above the page-type modules that use it.
 """
 
 

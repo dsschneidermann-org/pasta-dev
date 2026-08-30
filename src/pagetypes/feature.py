@@ -108,9 +108,8 @@ _FEATURE_BRIEF = PageType(
                 itself looks wrong or underspecified rather than quietly building past it.
                 """),
         ), workspace_guidance=(
-            # mergeProcess is shown in `review`, the stop before the human ship gate where the
-            # rebase-onto-main discipline matters; testingTool while `building`, where tests are
-            # written. The stored text is workspace-configured through setWorkspaceGuidance.
+            # Merge guidance while reviewing, before the work is shipped; testing-tool guidance
+            # while building, where tests are written.
             WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
             WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),
         )),
