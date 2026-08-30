@@ -1,8 +1,8 @@
 """Tests for mutable per-workspace guidance texts.
 
 The behavioural tests use the hand-authored fixtures, which declare a few guidance fields on
-test-lifecycle. The production check reads the registry directly, and the cross-type validation
-tests build throwaway page types, since production types are off-limits to the suite.
+test-lifecycle; the cross-type validation tests build throwaway page types. Test mode is asserted
+on for each test so the configurable-field set is the fixtures', not production's.
 """
 
 import asyncio
@@ -11,17 +11,16 @@ import pytest
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
+from src import pagetypes
 import src.server as server
 from src.commands import workspace_guidance_for
 from src.errors import ValidationError
 from src.model import Workspace
 from src.pagetypes import (
-    REGISTRY,
     FSMSpec,
     PageType,
     SectionSpec,
     WorkspaceGuidanceSpec,
-    all_page_types,
     get_page_type,
     validate_page_types,
     validate_workspace_guidance,
@@ -34,14 +33,22 @@ from src.describe import describe_page_type
 LIFECYCLE = get_page_type("test-lifecycle")
 
 
+@pytest.fixture(autouse=True)
+def _test_mode_on():
+    # An earlier test module turns test mode off without restoring it; these tests need it on so the
+    # configurable-field set is the fixtures', not production's.
+    pagetypes.set_test_mode(True)
+
+
 # --- helpers -----------------------------------------------------------------
 def _wg_type(tag, states, *specs):
     """A throwaway page type with only workspace-guidance declarations, for the validation tests."""
     return PageType(
         tag=tag, name=tag, description="x",
-        sections=(SectionSpec("s", "S", (), workspace_guidance=specs),),
+        sections=(SectionSpec("s", "S", ()),),
         commands=(),
         fsm=FSMSpec(name=tag, initial=states[0], states=tuple(states)),
+        workspace_guidance=specs,
     )
 
 
@@ -110,14 +117,14 @@ def test_workspace_guidance_spec_does_not_validate_at_construction():
     assert spec.field == "" and spec.guidance_for == ()
 
 
-# --- PageType.workspace_guidance_specs aggregation ---------------------------
-def test_workspace_guidance_specs_flattened_across_sections():
-    fields = [spec.field for spec in LIFECYCLE.workspace_guidance_specs()]
+# --- PageType.workspace_guidance ---------------------------------------------
+def test_workspace_guidance_declared_on_the_page_type():
+    fields = [spec.field for spec in LIFECYCLE.workspace_guidance]
     assert fields == ["buildTool", "reviewHint", "draftHint"]
 
 
-def test_workspace_guidance_specs_empty_when_none_declared():
-    assert get_page_type("test-fields").workspace_guidance_specs() == ()
+def test_workspace_guidance_empty_when_none_declared():
+    assert get_page_type("test-fields").workspace_guidance == ()
 
 
 # --- validate_workspace_guidance ---------------------------------------------
@@ -191,24 +198,19 @@ def test_missing_guidance_config_loads_empty():
 # --- describe surface --------------------------------------------------------
 def test_describe_page_type_surfaces_workspace_guidance():
     described = describe_page_type(LIFECYCLE)
-    summary = next(s for s in described["sections"] if s["key"] == "summary")
-    entries = {wg["field"]: wg for wg in summary["workspaceGuidance"]}
+    entries = {wg["field"]: wg for wg in described["workspaceGuidance"]}
     assert entries["buildTool"]["guidanceFor"] == ["building", "review"]
     assert entries["reviewHint"]["description"] == "a hint shown while reviewing"
-    # A section with none carries an empty list, not a missing key.
-    parts = next(s for s in described["sections"] if s["key"] == "parts")
-    assert parts["workspaceGuidance"] == []
+    # A type with none carries an empty list, not a missing key.
+    assert describe_page_type(get_page_type("test-fields"))["workspaceGuidance"] == []
 
 
-# --- registry accessors ------------------------------------------------------
-def test_all_page_types_spans_production_and_test_fixtures():
-    tags = {pt.tag for pt in all_page_types()}
-    # Both production types and the test fixtures, independent of test mode.
-    assert "test-lifecycle" in tags and "feature-brief" in tags
+# --- configurable-field set --------------------------------------------------
+def test_configurable_fields_are_the_fixtures_in_test_mode():
     fields = workspace_guidance_fields()
-    # Fixture-owned fields alongside the production ones; the fixture names are distinct.
-    assert {"buildTool", "reviewHint", "draftHint"} <= set(fields)
-    assert {"mergeProcess", "testingTool"} <= set(fields)
+    assert set(fields) == {"buildTool", "reviewHint", "draftHint"}
+    # The production fields are not offered while in test mode.
+    assert "mergeProcess" not in fields and "testingTool" not in fields
     assert fields["buildTool"].guidance_for == ("building", "review")
 
 
@@ -285,20 +287,6 @@ def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     with pytest.raises(ToolError, match="not a workspace guidance field"):
         call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "nope", "text": "x"})
-
-
-# --- production declarations --------------------------------------------------
-def test_production_workspace_guidance_is_valid_and_declares_the_fields():
-    assert validate_workspace_guidance(REGISTRY) == []
-    fields = {}
-    for page_type in REGISTRY.values():
-        for spec in page_type.workspace_guidance_specs():
-            fields[spec.field] = spec.description
-    assert set(fields) == {"mergeProcess", "testingTool"}
-    # Declared by more than one work type, with a single-sourced description.
-    declarers = [tag for tag, pt in REGISTRY.items()
-                 if any(s.field == "mergeProcess" for s in pt.workspace_guidance_specs())]
-    assert set(declarers) == {"feature-brief", "simple-change", "bug-report"}
 
 
 # --- no regression for guidance-free types -----------------------------------

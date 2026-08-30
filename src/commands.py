@@ -270,7 +270,7 @@ def workspace_guidance_for(page_type: PageType, status: str,
     with no text (an empty string clears it).
     """
     out: dict[str, str] = {}
-    for spec in page_type.workspace_guidance_specs():
+    for spec in page_type.workspace_guidance:
         if status in spec.guidance_for:
             text = config.get(spec.field)
             if text:

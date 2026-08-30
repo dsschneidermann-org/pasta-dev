@@ -53,11 +53,6 @@ _SIMPLE_CHANGE = PageType(
                 What to change, in a sentence or two: the behaviour today and the behaviour you want
                 in its place. Concrete enough that someone could start work from this line alone.
                 """),
-        ), workspace_guidance=(
-            # Merge guidance while the change is reviewed or done, before it is closed; testing-tool
-            # guidance while open, where the change is written.
-            WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
-            WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
         )),
         SectionSpec("motivation", "Motivation", (
             _prose("body", description="""
@@ -85,6 +80,12 @@ _SIMPLE_CHANGE = PageType(
                 once its sha has left history, for example after a rebase.
                 """),
         )),
+    ),
+    # Mutable per-workspace guidance: merge guidance while the change is reviewed or done, before it
+    # is closed; testing-tool guidance while open, where the change is written.
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
     ),
     commands=(
         set_scalar_cmd("change", "component"),

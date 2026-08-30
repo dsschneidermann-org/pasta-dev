@@ -346,7 +346,7 @@ def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
     descriptions: dict[str, tuple[str, str]] = {}   # field -> (description, first tag to declare it)
     for tag, page_type in registry.items():
         states = set(page_type.fsm.states)
-        for spec in page_type.workspace_guidance_specs():
+        for spec in page_type.workspace_guidance:
             if not spec.field:
                 errors.append(f"{tag}: a workspace guidance declares an empty field name.")
             if not spec.guidance_for:

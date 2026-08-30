@@ -107,11 +107,6 @@ _FEATURE_BRIEF = PageType(
                 outcome you want, not the implementation you imagine, and say so here if the ask
                 itself looks wrong or underspecified rather than quietly building past it.
                 """),
-        ), workspace_guidance=(
-            # Merge guidance while reviewing, before the work is shipped; testing-tool guidance
-            # while building, where tests are written.
-            WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
-            WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),
         )),
         SectionSpec("components", "Components", (
             _list("items", element_fields=("name", "text"), description="""
@@ -197,6 +192,12 @@ _FEATURE_BRIEF = PageType(
                 stale once its sha has left history, for example after a rebase.
                 """),
         )),
+    ),
+    # Mutable per-workspace guidance: merge guidance while reviewing, before the work is shipped;
+    # testing-tool guidance while building, where tests are written.
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),
     ),
     commands=(
         set_prose_cmd("summary"),

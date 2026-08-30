@@ -55,11 +55,6 @@ _BUG_REPORT = PageType(
                 from similar ones. State the symptom you can observe, not the cause you suspect or the
                 fix you have in mind.
                 """),
-        ), workspace_guidance=(
-            # Merge guidance while the fix is reviewed or done, before it is closed; testing-tool
-            # guidance while open, where the fix is written.
-            WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
-            WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
         )),
         SectionSpec("repro", "Reproduction", (
             _list("steps", element_fields=("text",), description="""
@@ -95,6 +90,12 @@ _BUG_REPORT = PageType(
                 actually lands the fix, not the intermediate work that led to it.
                 """),
         )),
+    ),
+    # Mutable per-workspace guidance: merge guidance while the fix is reviewed or done, before it is
+    # closed; testing-tool guidance while open, where the fix is written.
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
     ),
     commands=(
         set_scalar_cmd("report", "component"),

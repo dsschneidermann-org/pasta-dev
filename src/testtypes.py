@@ -274,17 +274,7 @@ TEST_LIFECYCLE = PageType(
     name="Lifecycle fixture",
     description="Test fixture: a rich status FSM with required-content gates, agency, guards, questions, and a pinned auto-child.",
     sections=(
-        SectionSpec("summary", "Summary", (_prose("body", description="the intent (gates beginPlanning)"),),
-                    # Workspace-guidance fields for the tests: one shown across two states, one at a
-                    # single state, and one at the initial state.
-                    workspace_guidance=(
-                        WorkspaceGuidanceSpec("buildTool", ("building", "review"),
-                                              "the build tool this workspace uses"),
-                        WorkspaceGuidanceSpec("reviewHint", ("review",),
-                                              "a hint shown while reviewing"),
-                        WorkspaceGuidanceSpec("draftHint", ("draft",),
-                                              "a hint shown while drafting"),
-                    )),
+        SectionSpec("summary", "Summary", (_prose("body", description="the intent (gates beginPlanning)"),)),
         SectionSpec("parts", "Parts", (
             _list("items", element_fields=("name",), description="parts touched (gates beginImplementation)"),
         )),
@@ -343,6 +333,13 @@ TEST_LIFECYCLE = PageType(
     ),
     # On createPage, create the pinned child in the same commit; author into it.
     auto_children=(AutoChildSpec("test-child"),),
+    # Workspace-guidance fields for the tests: one shown across two states, one at a single state,
+    # and one at the initial state.
+    workspace_guidance=(
+        WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses"),
+        WorkspaceGuidanceSpec("reviewHint", ("review",), "a hint shown while reviewing"),
+        WorkspaceGuidanceSpec("draftHint", ("draft",), "a hint shown while drafting"),
+    ),
 )
 
 

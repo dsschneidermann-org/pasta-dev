@@ -10,15 +10,7 @@ from .args import (
     BlockKindSpec,
     ElementBlocksSpec,
 )
-from .specs import (
-    BLOCKS,
-    LIST,
-    PROSE,
-    SCALAR,
-    TITLE_ELEMENT_FIELDS,
-    ElementFSMSpec,
-    WorkspaceGuidanceSpec,
-)
+from .specs import BLOCKS, LIST, PROSE, SCALAR, TITLE_ELEMENT_FIELDS, ElementFSMSpec
 
 
 @dataclass(frozen=True)
@@ -66,8 +58,6 @@ class SectionSpec:
     key: str
     name: str
     fields: tuple[FieldSpec, ...]
-    # Mutable per-workspace guidance texts this section declares, kept beside its content fields.
-    workspace_guidance: tuple[WorkspaceGuidanceSpec, ...] = ()
 
 
 # --- Declaration helpers (readability only) ----------------------------------

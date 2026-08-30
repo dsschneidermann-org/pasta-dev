@@ -234,7 +234,6 @@ __all__ = [
     "validate_registry",
     "validate_table",
     "validate_workspace_guidance",
-    "all_page_types",
     "workspace_guidance_fields",
 ]
 
@@ -384,17 +383,13 @@ def is_auto_child_type(parent_type: PageType | None, child_type: str) -> bool:
     return parent_type is not None and any(spec.type == child_type for spec in parent_type.auto_children)
 
 
-def all_page_types() -> list[PageType]:
-    """Every code-defined page type: the production registry plus the hand-authored test fixtures.
-    Deliberately independent of test mode, so the set of configurable guidance fields is stable."""
-    return list(REGISTRY.values()) + list(_test_registry().values())
-
-
 def workspace_guidance_fields() -> dict[str, WorkspaceGuidanceSpec]:
     """Every declared workspace-guidance field mapped to a representative spec (the first to declare
-    it) - the fields a workspace may configure."""
+    it) - the fields a workspace may configure. Reads the production registry, or the test fixtures
+    under test mode, so a fixture's field is never offered in production."""
+    registry = _test_registry() if _test_mode else REGISTRY
     fields: dict[str, WorkspaceGuidanceSpec] = {}
-    for page_type in all_page_types():
-        for spec in page_type.workspace_guidance_specs():
+    for page_type in registry.values():
+        for spec in page_type.workspace_guidance:
             fields.setdefault(spec.field, spec)
     return fields
