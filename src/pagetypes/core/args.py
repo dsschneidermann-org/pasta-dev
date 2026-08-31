@@ -98,8 +98,9 @@ class BlockKindSpec:
     args: tuple[ArgSpec, ...]
     ref_check: RefCheck | None = None
 
-    def body_args(self) -> tuple[ArgSpec, ...]:
-        return self.args
+
+def body_args(self: BlockKindSpec) -> tuple[ArgSpec, ...]:
+    return self.args
 
 
 @dataclass(frozen=True)

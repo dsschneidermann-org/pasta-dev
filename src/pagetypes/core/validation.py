@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING, Any
 from ...errors import ValidationError
 
 if TYPE_CHECKING:
-    # Annotation only: a page type calls these, so importing it here at runtime
-    # would point the dependency back the way it came.
+    # `PageType` appears only in annotations; the moved `field_spec` / `command` free
+    # functions are reached at runtime through the `pagetype` module imported below.
     from .pagetype import PageType
-from .args import BlockKindSpec, CommandSpec, ElementBlocksSpec
+from . import pagetype
+from .args import BlockKindSpec, CommandSpec, ElementBlocksSpec, body_args
 from .commands import is_field_setter
-from .fields import FieldSpec
+from .fields import FieldSpec, element_blocks_spec
 from .specs import ADD_ELEMENT, BLOCKS, LIST, SET_PROSE, SET_SCALAR, FSMSpec
 from .specs import (
     BLOCK_ARRAY,
@@ -124,7 +125,7 @@ def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
         raise ValidationError(
             f"Block kind {kind!r} is not accepted here - one of {[block.kind for block in block_kinds]}."
         )
-    args = block.body_args()
+    args = body_args(block)
     extra = set(entry) - {arg.name for arg in args} - {"kind"}
     if extra:
         raise ValidationError(f"A '{kind}' block has unknown keys: {sorted(extra)}.")
@@ -196,7 +197,7 @@ def _block_ref_ids(entry: Any, block_kinds: tuple[BlockKindSpec, ...] | None) ->
     if block is None:
         return []
     ids: list[str] = []
-    for body in block.body_args():
+    for body in body_args(block):
         if body.content is not None:
             ids.extend(collect_ref_ids(body.content, entry.get(body.name)))
     return ids
@@ -254,7 +255,7 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
         if command.kind not in (SET_SCALAR, SET_PROSE, ADD_ELEMENT):
             continue
         section, field = command.section, command.field
-        field_spec = (page_type.field_spec(section, field)
+        field_spec = (pagetype.field_spec(page_type, section, field)
                       if section is not None and field is not None else None)
         if field_spec is None:
             errors.append(
@@ -294,7 +295,7 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
             if command.section is None or command.field is None:
                 errors.append(f"command '{command.name}' carries blocks but targets no field.")
                 continue
-            field_spec = page_type.field_spec(command.section, command.field)
+            field_spec = pagetype.field_spec(page_type, command.section, command.field)
             if field_spec is None:
                 errors.append(
                     f"command '{command.name}' carries blocks for "
@@ -308,7 +309,7 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
                         f"command '{command.name}' carries blocks for "
                         f"{command.section}.{command.field}, which is not a blocks field.")
                 continue
-            if field_spec.element_blocks_spec(element_field) is None:
+            if element_blocks_spec(field_spec, element_field) is None:
                 errors.append(
                     f"command '{command.name}' carries blocks for "
                     f"{command.section}.{command.field}.{element_field}, which is not declared "

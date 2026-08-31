@@ -31,8 +31,9 @@ from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import Page, Workspace
-from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck
+from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck, guidance_for
 from .pagetypes.core.args import CommandSpec
+from .pagetypes.core import pagetype
 from .pagetypes.core.pagetype import PageType
 from .pagetypes.core.validation import collect_ref_ids
 from .pagetypes._registry import (
@@ -479,7 +480,7 @@ class Store:
             if focus is not None and not focus.archived:
                 focus_type = get_page_type(focus.type)
                 if focus_type is not None:
-                    state_guidance = focus_type.fsm.guidance_for(focus.status)
+                    state_guidance = guidance_for(focus_type.fsm, focus.status)
                     if state_guidance is not None:
                         result["guidance"] = state_guidance
                     result.update(workspace_guidance_for(
@@ -553,7 +554,7 @@ class Store:
                 command = entry.get("command")
                 args = dict(entry.get("args") or {})
                 presented_revision = args.pop("statusRevisionToken", None)
-                command_spec = page_type.command(command) if command else None
+                command_spec = pagetype.command(page_type, command) if command else None
                 try:
                     if command is None:
                         raise ValidationError("Unknown command None.")

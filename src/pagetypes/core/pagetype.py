@@ -13,7 +13,7 @@ from typing import Any
 
 from ...errors import ValidationError
 from .args import ArgSpec, CommandSpec
-from .fields import FieldSpec, SectionSpec
+from .fields import FieldSpec, SectionSpec, element_blocks_spec
 from .specs import (
     ADD_ELEMENT,
     BLOCKS,
@@ -69,35 +69,37 @@ class PageType:
             return arg
         if command.section is None or command.field is None:
             return arg
-        field_spec = self.field_spec(command.section, command.field)
-        if field_spec is None:
+        spec = field_spec(self, command.section, command.field)
+        if spec is None:
             return arg
         # A list add carries one block argument per block-bearing element field, named after
         # it; an element-scoped block command names that field on the command instead.
         element_field = command.element_field or (
             arg.name if command.kind == ADD_ELEMENT else None)
         if element_field is None:
-            if field_spec.kind != BLOCKS:
+            if spec.kind != BLOCKS:
                 return arg
-            return replace(arg, block_kinds=field_spec.block_kinds)
-        element_blocks = field_spec.element_blocks_spec(element_field)
+            return replace(arg, block_kinds=spec.block_kinds)
+        element_blocks = element_blocks_spec(spec, element_field)
         if element_blocks is None:
             return arg
         return replace(arg, block_kinds=element_blocks.block_kinds)
 
-    def command(self, name: str) -> CommandSpec | None:
-        for command in self.commands:
-            if command.name == name:
-                return command
-        return None
 
-    def field_spec(self, section_key: str, field_key: str) -> FieldSpec | None:
-        for section in self.sections:
-            if section.key == section_key:
-                for field_spec in section.fields:
-                    if field_spec.key == field_key:
-                        return field_spec
-        return None
+def command(self: PageType, name: str) -> CommandSpec | None:
+    for command in self.commands:
+        if command.name == name:
+            return command
+    return None
+
+
+def field_spec(self: PageType, section_key: str, field_key: str) -> FieldSpec | None:
+    for section in self.sections:
+        if section.key == section_key:
+            for field_spec in section.fields:
+                if field_spec.key == field_key:
+                    return field_spec
+    return None
 
 
 def status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], ...]:

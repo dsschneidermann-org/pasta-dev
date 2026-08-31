@@ -104,12 +104,13 @@ class FSMSpec:
                            for state, text in self.state_guidance)
         object.__setattr__(self, "state_guidance", normalized)
 
-    def guidance_for(self, state: str) -> str | None:
-        """The stage instruction for `state`, or None when the type declares none for it."""
-        for name, text in self.state_guidance:
-            if name == state:
-                return text
-        return None
+
+def guidance_for(self: FSMSpec, state: str) -> str | None:
+    """The stage instruction for `state`, or None when the type declares none for it."""
+    for name, text in self.state_guidance:
+        if name == state:
+            return text
+    return None
 
 
 @dataclass(frozen=True)

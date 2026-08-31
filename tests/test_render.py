@@ -8,6 +8,7 @@ from src.commands import apply_command, create_page
 from src.errors import ConflictError, ValidationError
 from src.model import Page
 from src.pagetypes.core.specs import FSMSpec
+from src.pagetypes.core import pagetype
 from src.pagetypes.core.pagetype import PageType
 from src.pagetypes._registry import get_page_type
 from src.render import (RefContext, checkbox_state, escape_markdown, page_text, render_page,
@@ -676,10 +677,10 @@ def test_render_toc_empty_shows_none_without_headings():
 
 def test_checkbox_state_maps_element_fsm_states():
     child = get_page_type("test-child")
-    steps = child.field_spec("steps", "items")
-    checks = child.field_spec("checks", "items")
-    questions = get_page_type("test-lifecycle").field_spec("questions", "items")
-    items = FIELDS.field_spec("items", "items")
+    steps = pagetype.field_spec(child, "steps", "items")
+    checks = pagetype.field_spec(child, "checks", "items")
+    questions = pagetype.field_spec(get_page_type("test-lifecycle"), "questions", "items")
+    items = pagetype.field_spec(FIELDS, "items", "items")
     assert checkbox_state("done", steps.element_fsm) == "done"
     assert checkbox_state("todo", steps.element_fsm) == "todo"
     assert checkbox_state("passed", checks.element_fsm) == "done"
