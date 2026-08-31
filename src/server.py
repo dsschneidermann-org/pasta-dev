@@ -41,6 +41,7 @@ validate_registry()
 DATA_DIR = os.environ.get("PASTA_DATA_DIR", ".pasta-data")
 STORE = Store(DATA_DIR)
 
+
 @asynccontextmanager
 async def app_lifespan(_app: FastAPI):
     # Covers plain ASGI hosting; under the HMR dev server this never fires.
@@ -60,6 +61,7 @@ app.mount("/sphinx", StaticFiles(directory="docsite/_build/html"), name="sphinx"
 
 templates = Jinja2Templates(directory="src/templates")
 
+
 # --- No HTTP caching ---------------------------------------------------------
 # The server is only ever hosted locally, so browser caching buys nothing and has
 # been serving stale images. Stamp a no-cache header on most responses. This wraps
@@ -72,6 +74,7 @@ async def add_no_cache_headers(request: Request, call_next):
     if not request.url.path.endswith(".css"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
 
 # --- Websocket reloader ------------------------------------------------------
 # The browser-facing connection manager (`ws_reloader`) lives in src.hmr_live_refresh so its
@@ -93,6 +96,7 @@ async def fastapi_reloader(websocket: WebSocket):
             _ = await websocket.receive_text() # receive and do nothing
     except WebSocketDisconnect:
         _ = task.cancel()
+
 
 # --- FastAPI routes ----------------------------------------------------------
 @contextmanager
@@ -217,6 +221,7 @@ class InternalError(Exception):
         super().__init__()
         self.tb = tb
 
+
 @app.exception_handler(InternalError)
 async def http_exception_handler(request: Request, exc: InternalError):
     return templates.TemplateResponse(
@@ -232,6 +237,7 @@ async def http_exception_handler(request: Request, exc: InternalError):
 
 # --- MCP -------------------------------------------------------------------
 app.mount("/pasta", mcp_app)  # MCP endpoint at /pasta/mcp
+
 
 @contextmanager
 def _guard_tool() -> Generator[None]:
