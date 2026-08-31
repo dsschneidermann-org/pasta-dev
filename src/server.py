@@ -16,11 +16,6 @@ from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
 
-from wenmode import Wenmode
-from wenmode.presets import github
-
-md2html = Wenmode(github)
-
 from . import cleanup
 # Named import, not `from . import commands`: mutatePageBatch's own parameter would shadow it.
 from .commands import transition_guidance
