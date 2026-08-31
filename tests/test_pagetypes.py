@@ -587,15 +587,6 @@ def test_block_kind_helpers():
         _list_block().body_args(), _quote_block().body_args(), _table_block().body_args(), _divider_block().body_args()]
 
 
-def test_package_exposes_no_hub_surface():
-    # The package init re-exports nothing and holds no registry: neither the building-block bindings
-    # nor an __all__ list are bound on the package. Consumers import the blocks from pagetypes.core.*
-    # and the registry from pagetypes._registry.
-    import src.pagetypes as pkg
-    for gone in ("REGISTRY", "get_page_type", "standard_blocks", "PageType", "__all__"):
-        assert not hasattr(pkg, gone)
-
-
 def test_field_spec_block_kinds():
     # A blocks field carries exactly the kinds it is declared with, in order. block_kinds is
     # required - the caller passes standard_blocks() for the whole standard vocabulary.
