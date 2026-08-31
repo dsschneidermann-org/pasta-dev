@@ -587,10 +587,10 @@ def test_block_kind_helpers():
         _list_block().body_args(), _quote_block().body_args(), _table_block().body_args(), _divider_block().body_args()]
 
 
-def test_package_is_hub_free_after_retirement():
-    # Retiring the import hub empties the package init: it re-exports nothing and holds no registry,
-    # so neither the building-block bindings nor the __all__ list survive on the package. Consumers
-    # reach the blocks through pagetypes.core.* and the registry through pagetypes._registry instead.
+def test_package_exposes_no_hub_surface():
+    # The package init re-exports nothing and holds no registry: neither the building-block bindings
+    # nor an __all__ list are bound on the package. Consumers import the blocks from pagetypes.core.*
+    # and the registry from pagetypes._registry.
     import src.pagetypes as pkg
     for gone in ("REGISTRY", "get_page_type", "standard_blocks", "PageType", "__all__"):
         assert not hasattr(pkg, gone)

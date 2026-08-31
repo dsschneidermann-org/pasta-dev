@@ -1,11 +1,9 @@
 """The page-type registry and its accessors.
 
-Holds `REGISTRY` - the tag -> `PageType` map - the load-time validator that the primary
-flows (server start, HMR reload) call, and the accessors the store, renderer and pure
-core resolve page types through. The test seams (`set_test_mode`, `expose_test_types`,
-`guard_production_type`) live here too. Building blocks are imported from the concrete
+Holds `REGISTRY` - the tag -> `PageType` map - the load-time validator, the resolution and
+listing accessors, and the test seams. Building blocks come from the concrete
 `pagetypes.core.*` submodules and each page type from its own module, so this module sits
-below them in the graph and nothing imports back up into the package init.
+below them in the dependency graph and nothing imports back up into the package init.
 """
 
 from __future__ import annotations
@@ -68,8 +66,9 @@ _expose_test_types = False
 
 
 def _test_registry() -> dict[str, PageType]:
-    # Lazy import: src.testtypes imports the spec classes from the pagetypes package, so importing
-    # it at top level would be a cycle. Resolved here at call time, once both modules are loaded.
+    # Imported at call time, not at module top: testtypes builds on this package's core building
+    # blocks, so a top-level import would have the pagetypes package and testtypes importing each
+    # other. Resolved once, when both modules are loaded.
     from ..testtypes import TEST_REGISTRY
 
     return TEST_REGISTRY
