@@ -88,7 +88,7 @@ async def fastapi_reloader(websocket: WebSocket):
     task = asyncio.create_task(send_updates())
     try:
         while True:
-            _ = await websocket.receive_text() # receive and do nothing
+            _ = await websocket.receive_text()  # receive and do nothing
     except WebSocketDisconnect:
         _ = task.cancel()
 
@@ -120,7 +120,7 @@ async def route_index(request: Request, archived: str | None = None):
 
 
 @app.get("/ws:{workspaceIdPart}", response_class=HTMLResponse)
-async def route_tree(request: Request, workspaceIdPart : str, archived: str | None = None, markdown: str | None = None):
+async def route_tree(request: Request, workspaceIdPart: str, archived: str | None = None, markdown: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
