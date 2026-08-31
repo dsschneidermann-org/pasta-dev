@@ -69,7 +69,7 @@ class PageType:
             return arg
         if command.section is None or command.field is None:
             return arg
-        spec = field_spec(self, command.section, command.field)
+        spec = pagetype_field_spec(self, command.section, command.field)
         if spec is None:
             return arg
         # A list add carries one block argument per block-bearing element field, named after
@@ -86,14 +86,14 @@ class PageType:
         return replace(arg, block_kinds=element_blocks.block_kinds)
 
 
-def command(self: PageType, name: str) -> CommandSpec | None:
+def pagetype_command(self: PageType, name: str) -> CommandSpec | None:
     for command in self.commands:
         if command.name == name:
             return command
     return None
 
 
-def field_spec(self: PageType, section_key: str, field_key: str) -> FieldSpec | None:
+def pagetype_field_spec(self: PageType, section_key: str, field_key: str) -> FieldSpec | None:
     for section in self.sections:
         if section.key == section_key:
             for field_spec in section.fields:

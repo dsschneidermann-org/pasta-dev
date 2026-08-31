@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any
 from ...errors import ValidationError
 
 if TYPE_CHECKING:
-    # `PageType` appears only in annotations; the moved `field_spec` / `command` free
-    # functions are reached at runtime through the `pagetype` module imported below.
+    # `PageType` appears only in annotations; `pagetype_field_spec` is the moved free
+    # function, imported by name below.
     from .pagetype import PageType
-from . import pagetype
+from .pagetype import pagetype_field_spec
 from .args import BlockKindSpec, CommandSpec, ElementBlocksSpec, body_args
 from .commands import is_field_setter
 from .fields import FieldSpec, element_blocks_spec
@@ -255,7 +255,7 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
         if command.kind not in (SET_SCALAR, SET_PROSE, ADD_ELEMENT):
             continue
         section, field = command.section, command.field
-        field_spec = (pagetype.field_spec(page_type, section, field)
+        field_spec = (pagetype_field_spec(page_type, section, field)
                       if section is not None and field is not None else None)
         if field_spec is None:
             errors.append(
@@ -295,7 +295,7 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
             if command.section is None or command.field is None:
                 errors.append(f"command '{command.name}' carries blocks but targets no field.")
                 continue
-            field_spec = pagetype.field_spec(page_type, command.section, command.field)
+            field_spec = pagetype_field_spec(page_type, command.section, command.field)
             if field_spec is None:
                 errors.append(
                     f"command '{command.name}' carries blocks for "

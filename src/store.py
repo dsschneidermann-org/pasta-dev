@@ -33,8 +33,7 @@ from .ids import IdFactory, RevisionFactory, default_id_factory, default_revisio
 from .model import Page, Workspace
 from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck, guidance_for
 from .pagetypes.core.args import CommandSpec
-from .pagetypes.core import pagetype
-from .pagetypes.core.pagetype import PageType
+from .pagetypes.core.pagetype import PageType, pagetype_command
 from .pagetypes.core.validation import collect_ref_ids
 from .pagetypes._registry import (
     get_page_type,
@@ -554,7 +553,7 @@ class Store:
                 command = entry.get("command")
                 args = dict(entry.get("args") or {})
                 presented_revision = args.pop("statusRevisionToken", None)
-                command_spec = pagetype.command(page_type, command) if command else None
+                command_spec = pagetype_command(page_type, command) if command else None
                 try:
                     if command is None:
                         raise ValidationError("Unknown command None.")

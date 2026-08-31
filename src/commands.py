@@ -38,8 +38,7 @@ from .pagetypes.core.args import ArgSpec, BlockKindSpec, CommandSpec, body_args
 from .pagetypes.core.fields import FieldSpec
 from .pagetypes.core.commands import is_field_setter
 from .pagetypes.core.validation import validate_blocks, validate_inline_content
-from .pagetypes.core import pagetype
-from .pagetypes.core.pagetype import PageType, initial_sections
+from .pagetypes.core.pagetype import PageType, initial_sections, pagetype_command, pagetype_field_spec
 from .pagetypes._registry import guard_production_type
 
 _PYTHON_TYPE = {
@@ -180,7 +179,7 @@ def _field_setter_edge(page: Page, page_type: PageType, section: str, field: str
     """One self-instructing `do` field edge: kind='field' with the (section, field), the field's
     instruction (its FieldSpec.description) and the single `command` that writes it, all inline -
     so a `next` consumer needs no describePageType round-trip to know what to author."""
-    field_spec = pagetype.field_spec(page_type, section, field)
+    field_spec = pagetype_field_spec(page_type, section, field)
     return {
         "pageId": page.id, "pageType": page.type, "kind": "field",
         "section": section, "field": field,
@@ -254,7 +253,7 @@ def transition_guidance(
     is the status after the batch, so several transitions yield only the final state's text.
     """
     for entry in batch:
-        command = pagetype.command(page_type, entry.get("command") or "")
+        command = pagetype_command(page_type, entry.get("command") or "")
         if command is not None and _is_status_transition(command):
             return guidance_for(page_type.fsm, status)
     return None
@@ -270,7 +269,7 @@ def apply_command(
 ) -> CommandResult:
     """Validate and apply one command, returning the resulting page (a fresh copy)."""
     args = args or {}
-    command = pagetype.command(page_type, command_name)
+    command = pagetype_command(page_type, command_name)
     if command is None:
         raise ValidationError(
             f"Unknown command '{command_name}' for page type '{page_type.tag}'. " +
@@ -450,7 +449,7 @@ def _add_element(page: Page, page_type: PageType, command: CommandSpec,
     for element_field, arg_name in command.element_map:
         element[element_field] = args.get(arg_name)   # optional args default to None
     # If the list has an element-FSM, the new element starts at that FSM's initial status.
-    field_spec = pagetype.field_spec(page_type, command.section, command.field)
+    field_spec = pagetype_field_spec(page_type, command.section, command.field)
     created: list[str] = [element["id"]]
     if field_spec is not None:
         if field_spec.element_fsm is not None:
@@ -528,7 +527,7 @@ def _set_element_field(page: Page, command: CommandSpec, args: dict[str, Any]) -
 
 def _element_transition(page: Page, page_type: PageType, command: CommandSpec, args: dict[str, Any]) -> None:
     """Fire the element's own FSM event (e.g. a step todo->done), then apply any field writes."""
-    field_spec = pagetype.field_spec(page_type, command.section, command.field)
+    field_spec = pagetype_field_spec(page_type, command.section, command.field)
     if field_spec is None or field_spec.element_fsm is None:
         raise ValidationError(f"{command.section}.{command.field} has no element FSM to drive.")
     element = _find_element(page, command, args)

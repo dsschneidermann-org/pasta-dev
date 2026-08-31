@@ -74,8 +74,13 @@ from src.pagetypes.core.commands import (
     list_cmds,
     set_prose_cmd,
 )
-from src.pagetypes.core import pagetype
-from src.pagetypes.core.pagetype import PageType, initial_sections, status_transitions
+from src.pagetypes.core.pagetype import (
+    PageType,
+    initial_sections,
+    pagetype_command,
+    pagetype_field_spec,
+    status_transitions,
+)
 from src.pagetypes.core.validation import (
     collect_ref_ids,
     validate_block,
@@ -157,7 +162,7 @@ def test_content_commands_target_real_fields(tag: str):
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
         if command.kind in CONTENT_TARGETING:
-            field_spec = pagetype.field_spec(page_type, command.section, command.field)
+            field_spec = pagetype_field_spec(page_type, command.section, command.field)
             assert field_spec is not None, f"{tag}.{command.name} targets missing {command.section}.{command.field}"
             if command.kind in ELEMENT_MAPPING:
                 # every mapped element field must be declared on the list field
@@ -191,7 +196,7 @@ def test_requires_reference_real_fields(tag: str):
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
         for section_key, field_key in command.requires:
-            assert pagetype.field_spec(page_type, section_key, field_key) is not None, (
+            assert pagetype_field_spec(page_type, section_key, field_key) is not None, (
                 f"{tag}.{command.name} requires missing field {section_key}.{field_key}"
             )
 
@@ -202,7 +207,7 @@ def test_element_transitions_reference_real_element_events(tag: str):
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
         if command.kind == ELEMENT_TRANSITION:
-            field_spec = pagetype.field_spec(page_type, command.section, command.field)
+            field_spec = pagetype_field_spec(page_type, command.section, command.field)
             assert field_spec is not None and field_spec.element_fsm is not None, (
                 f"{tag}.{command.name} drives an element FSM on a field that has none"
             )
@@ -218,7 +223,7 @@ def test_block_commands_target_blocks_fields(tag: str):
     for command in page_type.commands:
         if command.kind not in BLOCK_TARGETING:
             continue
-        field_spec = pagetype.field_spec(page_type, command.section, command.field)
+        field_spec = pagetype_field_spec(page_type, command.section, command.field)
         if command.element_field is None:
             assert field_spec is not None and field_spec.kind == BLOCKS, (
                 f"{tag}.{command.name} targets {command.section}.{command.field}, which is not a blocks field"
@@ -311,7 +316,7 @@ def test_field_setter_description_is_short_and_not_the_instruction(tag: str):
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
         if is_field_setter(command):
-            field_spec = pagetype.field_spec(page_type, command.section, command.field)
+            field_spec = pagetype_field_spec(page_type, command.section, command.field)
             assert field_spec is not None, f"{tag}.{command.name} targets a missing field"
             assert command.description, f"{tag}.{command.name} has no description"
             assert "\n" not in command.description, f"{tag}.{command.name} description is multi-line"
@@ -388,7 +393,7 @@ def test_add_link_on_every_authorable_type_but_not_toc():
     # add_link_cmd() is added to every authorable production page type; the command-less toc is the
     # sole exception - it has no authoring surface at all, so it must NOT carry addLink.
     for tag, page_type in REGISTRY.items():
-        command = pagetype.command(page_type, "addLink")
+        command = pagetype_command(page_type, "addLink")
         if tag == "toc":
             assert command is None, "toc cannot be authored - it must not carry addLink"
         else:
@@ -401,7 +406,7 @@ def test_set_title_on_every_authorable_type_but_not_toc():
     # set_title_cmd() - the universal rename alias - is added to every authorable production page type
     # alongside addLink; the command-less toc is the sole exception with no authoring surface.
     for tag, page_type in REGISTRY.items():
-        command = pagetype.command(page_type, "setTitle")
+        command = pagetype_command(page_type, "setTitle")
         if tag == "toc":
             assert command is None, "toc cannot be authored - it must not carry setTitle"
         else:
@@ -412,18 +417,18 @@ def test_reorder_split_into_two_kinds_with_anchored_args():
     # The list-field and blocks-field reorders are two parallel kinds; both carry (id, toIndex, precedingId).
     child_names = {command.name for command in CHILD.commands}
     assert "reorderStep" in child_names and "moveStep" not in child_names and "reorderSteps" not in child_names
-    assert pagetype.command(CHILD, "reorderStep").kind == REORDER_ELEMENT
-    assert [arg.name for arg in pagetype.command(CHILD, "reorderStep").args] == ["stepId", "toIndex", "precedingId"]
-    assert pagetype.command(BLK, "reorderBlock").kind == REORDER_BLOCK
-    assert [arg.name for arg in pagetype.command(BLK, "reorderBlock").args] == ["blockId", "toIndex", "precedingId"]
+    assert pagetype_command(CHILD, "reorderStep").kind == REORDER_ELEMENT
+    assert [arg.name for arg in pagetype_command(CHILD, "reorderStep").args] == ["stepId", "toIndex", "precedingId"]
+    assert pagetype_command(BLK, "reorderBlock").kind == REORDER_BLOCK
+    assert [arg.name for arg in pagetype_command(BLK, "reorderBlock").args] == ["blockId", "toIndex", "precedingId"]
 
 
 def test_blocks_body_is_an_inline_run_blocks_field():
     """The kind is data in the argument now, so the paragraph's inline-run shape is reached
     through the field's vocabulary rather than through a per-kind command."""
-    field = pagetype.field_spec(BLK, "body", "body")
+    field = pagetype_field_spec(BLK, "body", "body")
     assert field.kind == BLOCKS
-    add = pagetype.command(BLK, "addBody")
+    add = pagetype_command(BLK, "addBody")
     assert add.kind == ADD_BLOCK and add.args[0].content == BLOCK_ARRAY
     paragraph = next(block for block in field.block_kinds if block.kind == "paragraph")
     assert body_args(paragraph)[0].content == INLINE_RUNS
@@ -433,9 +438,9 @@ def test_element_fsms_declare_checkmark_done():
     """The checkbox mapping lives on the element FSM (ElementFSMSpec): checkmark_done names the [x]
     state, `initial` is the [ ] state, and an element FSM without checkmark_done renders no box. A
     page-status FSMSpec has no checkmark_done at all - page states are never checkboxes."""
-    step_fsm = pagetype.field_spec(CHILD, "steps", "items").element_fsm
-    check_fsm = pagetype.field_spec(CHILD, "checks", "items").element_fsm
-    question_fsm = pagetype.field_spec(LIFE, "questions", "items").element_fsm
+    step_fsm = pagetype_field_spec(CHILD, "steps", "items").element_fsm
+    check_fsm = pagetype_field_spec(CHILD, "checks", "items").element_fsm
+    question_fsm = pagetype_field_spec(LIFE, "questions", "items").element_fsm
     assert step_fsm.checkmark_done == "done"         # initial "todo" -> [ ], "done" -> [x]
     assert check_fsm.checkmark_done == "passed"      # "pending" -> [ ], "passed" -> [x], "failed" -> no box
     assert question_fsm.checkmark_done is None       # open/answered render without a box
@@ -944,7 +949,7 @@ def test_a_block_argument_is_resolved_from_its_field():
 def _targeted_vocabulary(page_type, command, arg):
     """The vocabulary `arg` should carry, worked out from the sections independently of the
     resolution step - so the two can be compared rather than one trusting the other."""
-    field_spec = pagetype.field_spec(page_type, command.section, command.field)
+    field_spec = pagetype_field_spec(page_type, command.section, command.field)
     assert field_spec is not None
     element_field = command.element_field or (
         arg.name if command.kind == ADD_ELEMENT else None)
@@ -1018,7 +1023,7 @@ def test_an_unresolvable_block_argument_is_left_unfilled_rather_than_raising():
         tag="xtest-unfilled", name="Unfilled", description="ad-hoc",
         sections=(SectionSpec("body", "Body", (_prose("body"),)),), commands=(add,),
         fsm=FSMSpec(name="XTestUnfilled", initial="active", states=("active",)))
-    resolved = pagetype.command(built, "addBody")
+    resolved = pagetype_command(built, "addBody")
     assert resolved is not None and resolved.args[0].block_kinds is None
 
 
