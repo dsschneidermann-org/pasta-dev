@@ -17,7 +17,7 @@ from src.docsgen import (
     state_docs,
 )
 from src.pagetypes.core.pagetype import pagetype_command, pagetype_field_spec
-from src.pagetypes.core.specs import guidance_for
+from src.pagetypes.core.specs import status_guidance
 from src.pagetypes._registry import REGISTRY, get_page_type
 from src.statecharts import page_machine_qualname
 
@@ -153,7 +153,7 @@ def test_generated_docs_do_not_repeat_the_instruction_under_every_setter():
 # --- per-state guidance on the generated page --------------------------------
 def test_state_page_opens_with_its_status_guidance():
     # The text an agent gets on entering a state is the text a human reads on its page.
-    guidance = guidance_for(get_page_type("feature-brief").fsm, "review")
+    guidance = status_guidance(get_page_type("feature-brief").fsm, "review")
     assert guidance                                        # one of the documented states
     docs = state_docs(get_page_type("feature-brief"))
     for line in guidance.splitlines():

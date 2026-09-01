@@ -14,7 +14,7 @@ from fastmcp.exceptions import ToolError
 import src.server as server
 from src.errors import ValidationError
 from src.model import Workspace
-from src.pagetypes.core.specs import FSMSpec, WorkspaceGuidanceSpec, guidance_for
+from src.pagetypes.core.specs import FSMSpec, WorkspaceGuidanceSpec, status_guidance
 from src.pagetypes.core.fields import SectionSpec
 from src.pagetypes.core.pagetype import PageType
 from src.pagetypes.core.validation import validate_page_types, validate_workspace_guidance
@@ -228,7 +228,7 @@ def test_next_actions_injects_guidance_for_focused_page(store):
     assert actions["guidance_buildTool"] == "use pytest"          # review in buildTool's set
     assert actions["guidance_reviewHint"] == "look hard"          # review in reviewHint's set
     # Stage guidance for the focused page is included too.
-    assert actions["guidance"] == guidance_for(LIFECYCLE.fsm, "review")
+    assert actions["guidance"] == status_guidance(LIFECYCLE.fsm, "review")
 
     store.set_page_status(wid, pid, "building")
     actions = store.next_actions(wid, pid)

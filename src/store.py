@@ -31,7 +31,7 @@ from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import Page, Workspace
-from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck, guidance_for
+from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck, status_guidance
 from .pagetypes.core.commands import CommandSpec
 from .pagetypes.core.pagetype import PageType, pagetype_command
 from .pagetypes.core.validation import collect_ref_ids
@@ -479,9 +479,9 @@ class Store:
             if focus is not None and not focus.archived:
                 focus_type = get_page_type(focus.type)
                 if focus_type is not None:
-                    status_guidance = guidance_for(focus_type.fsm, focus.status)
-                    if status_guidance is not None:
-                        result["guidance"] = status_guidance
+                    guidance = status_guidance(focus_type.fsm, focus.status)
+                    if guidance is not None:
+                        result["guidance"] = guidance
                     result.update(workspace_guidance_for(
                         focus_type, focus.status, workspace.guidance_config))
         return result

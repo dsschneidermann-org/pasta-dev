@@ -105,7 +105,7 @@ class FSMSpec:
         object.__setattr__(self, "status_guidance", normalized)
 
 
-def guidance_for(self: FSMSpec, status: str) -> str | None:
+def status_guidance(self: FSMSpec, status: str) -> str | None:
     """The stage instruction for `status`, or None when the type declares none for it."""
     for name, text in self.status_guidance:
         if name == status:

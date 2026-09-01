@@ -37,7 +37,7 @@ from src.pagetypes.core.specs import (
     LIST,
     PROSE,
     FSMSpec,
-    guidance_for,
+    status_guidance,
 )
 from src.pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, body_args, standard_blocks
 from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd
@@ -496,14 +496,14 @@ def test_status_guidance_normalizes_authored_text():
     # Authored as an indented block; it must arrive as written, wrap breaks kept.
     spec = FSMSpec(name="G", initial="a", states=("a", "b"),
                    status_guidance=(("b", "\n    line one\n    line two\n  "),))
-    assert guidance_for(spec, "b") == "line one\nline two"
+    assert status_guidance(spec, "b") == "line one\nline two"
 
 
-def test_guidance_for_returns_none_for_undeclared_state():
+def test_status_guidance_returns_none_for_undeclared_state():
     # None rather than "", so the caller can tell undeclared from empty.
     spec = FSMSpec(name="G", initial="a", states=("a", "b"),
                    status_guidance=(("b", "some guidance"),))
-    assert guidance_for(spec, "a") is None
+    assert status_guidance(spec, "a") is None
 
 
 def test_status_guidance_rejects_unknown_state():

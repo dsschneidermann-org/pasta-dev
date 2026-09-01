@@ -14,7 +14,7 @@ from src.commands import (
 )
 from src.errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from src.model import Page
-from src.pagetypes.core.specs import FSMSpec, guidance_for
+from src.pagetypes.core.specs import FSMSpec, status_guidance
 from src.pagetypes.core.args import ElementBlocksSpec, _table_block, _text, standard_blocks
 from src.pagetypes.core.commands import add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
 from src.pagetypes.core.fields import SectionSpec, _blocks, _list, _prose
@@ -760,7 +760,7 @@ def test_field_setter_edges_drop_blocked_events():
 # --- transition_guidance -----------------------------------------------------
 def test_transition_guidance_returns_the_entered_states_text():
     guidance = transition_guidance(FLOW, [{"command": "open"}], "open")
-    assert guidance == guidance_for(FLOW.fsm, "open")
+    assert guidance == status_guidance(FLOW.fsm, "open")
     assert guidance                                  # non-empty: the fixture declares text here
 
 

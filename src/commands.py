@@ -32,7 +32,7 @@ from .pagetypes.core.specs import (
     SET_SCALAR,
     SET_TITLE,
     TRANSITION,
-    guidance_for,
+    status_guidance,
 )
 from .pagetypes.core.args import ArgSpec, BlockKindSpec, body_args
 from .pagetypes.core.commands import CommandSpec, is_field_setter
@@ -255,7 +255,7 @@ def transition_guidance(
     for entry in batch:
         command = pagetype_command(page_type, entry.get("command") or "")
         if command is not None and _is_status_transition(command):
-            return guidance_for(page_type.fsm, status)
+            return status_guidance(page_type.fsm, status)
     return None
 
 
