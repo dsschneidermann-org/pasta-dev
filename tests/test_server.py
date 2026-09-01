@@ -272,7 +272,7 @@ def test_flow_close_flow(mcp):
     assert fetched["sections"]["resolution"]["commits"][0]["sha"] == "abc"
 
 
-# --- state guidance echoed on a transition -----------------------------------
+# --- stage guidance carried inside `next` ------------------------------------
 # test-flow guides `open` only; test-child guides its initial `draft`.
 FLOW_OPEN_GUIDANCE = ("open - the work is under way.\n"
                       "Record a commit with close when it is finished.")
@@ -285,22 +285,38 @@ def _flow_page(mcp):
     return workspace["id"], page["id"]
 
 
-def test_mutate_page_batch_echoes_guidance_on_transition(mcp):
+def test_mutate_page_batch_carries_guidance_inside_next_on_a_transition(mcp):
     workspace_id, page_id = _flow_page(mcp)
     result = _mutate(mcp,
                   {"workspaceId": workspace_id, "pageId": page_id,
                    "commands": [{"command": "open"}]})
     assert result["status"] == "open"
-    assert result["guidance"] == FLOW_OPEN_GUIDANCE
+    assert result["next"]["guidance"] == FLOW_OPEN_GUIDANCE
+    # One copy only: the response does not repeat it beside `next`.
+    assert "guidance" not in result
 
 
-def test_mutate_page_batch_omits_guidance_on_a_content_only_write(mcp):
+def test_mutate_page_batch_carries_guidance_on_a_content_only_write(mcp):
+    """The stage text instructs the status the page is IN, so it rides every write - a stage is
+    worked through many content-only writes and at most one transition."""
+    workspace_id, page_id = _flow_page(mcp)
+    _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id,
+                  "commands": [{"command": "open"}]})
+    result = _mutate(mcp,
+                  {"workspaceId": workspace_id, "pageId": page_id,
+                   "commands": [{"command": "setSummary", "args": {"text": "x"}}]})
+    assert result["next"]["guidance"] == FLOW_OPEN_GUIDANCE
+    assert "guidance" not in result
+
+
+def test_write_response_omits_guidance_where_the_status_declares_none(mcp):
+    # `draft` guides nothing, so the key is absent - not null - everywhere in the response.
     workspace_id, page_id = _flow_page(mcp)
     result = _mutate(mcp,
                   {"workspaceId": workspace_id, "pageId": page_id,
                    "commands": [{"command": "setSummary", "args": {"text": "x"}}]})
-    # Absent, not null, so an unguided write is byte-identical to before the feature.
-    assert "guidance" not in result
+    assert result["status"] == "draft"
+    assert "guidance" not in result and "guidance" not in result["next"]
 
 
 def test_two_transitions_in_one_batch_are_rejected(mcp):
@@ -316,24 +332,26 @@ def test_two_transitions_in_one_batch_are_rejected(mcp):
     assert call(mcp, "getPage", {"workspaceId": workspace_id, "pageId": page_id})["status"] == "draft"
 
 
-def test_create_page_echoes_initial_status_guidance_and_children_do_not(mcp):
+def test_create_page_carries_initial_status_guidance_and_children_do_not(mcp):
     workspace = call(mcp, "createWorkspace", {"name": "guidance"})
     workspace_id = workspace["id"]
 
-    # A guided initial state echoes on creation.
+    # A guided initial status rides `next`, and is not repeated beside it.
     child = call(mcp, "createPage",
                  {"workspaceId": workspace_id, "type": "test-child", "title": "Child"})
-    assert child["guidance"] == "draft - write the steps and checks here."
+    assert child["next"]["guidance"] == "draft - write the steps and checks here."
+    assert "guidance" not in child
 
-    # One whose initial state declares nothing stays silent.
+    # One whose initial status declares nothing stays silent.
     flow = call(mcp, "createPage",
                 {"workspaceId": workspace_id, "type": "test-flow", "title": "Flow"})
-    assert "guidance" not in flow
+    assert "guidance" not in flow["next"]
 
-    # An auto-pinned child gets no echo, even though it guides its initial state.
+    # An auto-pinned child gets no echo, even though it guides its initial status: `next` guides
+    # only the focused page, and the pinned child is not it.
     parent = call(mcp, "createPage",
                   {"workspaceId": workspace_id, "type": "test-lifecycle", "title": "Parent"})
-    assert "guidance" not in parent
+    assert "guidance" not in parent["next"]
     assert parent["children"]                                   # the pinned child was created
     assert all("guidance" not in entry for entry in parent["children"])
 

@@ -17,12 +17,9 @@ from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
 
 from . import cleanup
-# Named import, not `from . import commands`: mutatePageBatch's own parameter would shadow it.
-from .commands import transition_guidance
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
-from .pagetypes.core.specs import status_guidance
 from .pagetypes._registry import get_page_type, registered_tags, validate_registry
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
@@ -455,7 +452,6 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         result = STORE.create_page(workspaceId, type, title, parentId)
         page = result.page
         next_actions = STORE.next_actions(workspaceId, page.id)
-        page_type = get_page_type(page.type)
         await ws_reloader.refresh()
         response: dict[str, Any] = {
             "id": page.id,
@@ -471,10 +467,6 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
             ],
             "next": next_actions,
         }
-        # Creating a page enters a status, so its initial guidance echoes here too.
-        guidance = status_guidance(page_type.fsm, page.status) if page_type is not None else None
-        if guidance is not None:
-            response["guidance"] = guidance
         response.update(STORE.page_workspace_guidance(workspaceId, page))
         return response
 
@@ -493,7 +485,6 @@ async def mutatePageBatch(
     `statusRevisionToken`, and next actions."""
     with _guard_tool():
         page, created = STORE.mutate_page_batch(workspaceId, pageId, commands)
-        page_type = get_page_type(page.type)
         next_actions = STORE.next_actions(workspaceId, pageId)
         await ws_reloader.refresh()
         response: dict[str, Any] = {
@@ -504,11 +495,6 @@ async def mutatePageBatch(
             "createdIds": created,
             "next": next_actions,
         }
-        # The stage guidance for a status just entered, beside `next`.
-        guidance = (transition_guidance(page_type, commands, page.status)
-                    if page_type is not None else None)
-        if guidance is not None:
-            response["guidance"] = guidance
         response.update(STORE.page_workspace_guidance(workspaceId, page))
         return response
 
