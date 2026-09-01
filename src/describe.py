@@ -26,10 +26,10 @@ def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
     for block in block_kinds:
         properties: dict[str, Any] = {"kind": {"const": block.kind}}
         required = ["kind"]
-        for body in block.body_args:
-            properties[body.name] = {"type": body.type}
-            if body.required:
-                required.append(body.name)
+        for arg in block.body_args:
+            properties[arg.name] = {"type": arg.type}
+            if arg.required:
+                required.append(arg.name)
         branches.append({"type": "object", "properties": properties,
                          "required": required, "additionalProperties": False})
     return {"oneOf": branches}

@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from ...errors import ValidationError
 
-if TYPE_CHECKING:
-    # `PageType` appears only in annotations; `get_pagetype_field` is the moved free
-    # function, imported by name below.
-    from .pagetype import PageType
-from .pagetype import get_pagetype_field
+from .pagetype import PageType, get_pagetype_field
 from .args import BlockKindSpec, ElementBlocksSpec
 from .commands import CommandSpec, is_field_setter
 from .fields import FieldSpec, get_element_blocks
@@ -130,11 +126,10 @@ def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
         raise ValidationError(
             f"Block kind {kind!r} is not accepted here - one of {[block.kind for block in block_kinds]}."
         )
-    args = block.body_args
-    extra = set(entry) - {arg.name for arg in args} - {"kind"}
+    extra = set(entry) - {arg.name for arg in block.body_args} - {"kind"}
     if extra:
         raise ValidationError(f"A '{kind}' block has unknown keys: {sorted(extra)}.")
-    for arg in args:
+    for arg in block.body_args:
         present = arg.name in entry and entry[arg.name] is not None
         if arg.required and not present:
             raise ValidationError(f"A '{kind}' block requires '{arg.name}'.")
@@ -202,9 +197,9 @@ def _block_ref_ids(entry: Any, block_kinds: tuple[BlockKindSpec, ...] | None) ->
     if block is None:
         return []
     ids: list[str] = []
-    for body in block.body_args:
-        if body.content is not None:
-            ids.extend(collect_ref_ids(body.content, entry.get(body.name)))
+    for arg in block.body_args:
+        if arg.content is not None:
+            ids.extend(collect_ref_ids(arg.content, entry.get(arg.name)))
     return ids
 
 

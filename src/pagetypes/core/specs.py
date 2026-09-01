@@ -84,10 +84,10 @@ class FSMSpec:
     transitions: only statuses listed here are authoring-locked. An authoring command can opt out by naming
     the terminal state in `legal_in`.
 
-    `status_guidance` is the stage instruction for a status - what the state you just entered is
-    for - echoed by the write path and used to open that state's generated doc page. It is a
-    tuple of `(state, text)` pairs, not a mapping, because this spec is the `@lru_cache` key in
-    `fsm._machine_class`. Leaving a state undeclared is the normal case.
+    `status_guidance` is the per-status stage instruction: what a page in that status is for and
+    what the work in it consists of. It is a tuple of `(status, text)` pairs, not a mapping,
+    because this spec is the `@lru_cache` key in `fsm._machine_class`. Leaving a status undeclared
+    is the normal case.
     """
     name: str
     initial: str

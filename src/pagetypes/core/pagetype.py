@@ -70,18 +70,18 @@ class PageType:
             return arg
         if command.section is None or command.field is None:
             return arg
-        spec = get_pagetype_field(self, command.section, command.field)
-        if spec is None:
+        field_spec = get_pagetype_field(self, command.section, command.field)
+        if field_spec is None:
             return arg
         # A list add carries one block argument per block-bearing element field, named after
         # it; an element-scoped block command names that field on the command instead.
         element_field = command.element_field or (
             arg.name if command.kind == ADD_ELEMENT else None)
         if element_field is None:
-            if spec.kind != BLOCKS:
+            if field_spec.kind != BLOCKS:
                 return arg
-            return replace(arg, block_kinds=spec.block_kinds)
-        element_blocks = get_element_blocks(spec, element_field)
+            return replace(arg, block_kinds=field_spec.block_kinds)
+        element_blocks = get_element_blocks(field_spec, element_field)
         if element_blocks is None:
             return arg
         return replace(arg, block_kinds=element_blocks.block_kinds)
