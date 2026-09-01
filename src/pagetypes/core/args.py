@@ -39,19 +39,15 @@ class ArgSpec:
 class BlockKindSpec:
     """One block kind a blocks field accepts.
 
-    `args` is the kind's body - the arguments a block of this kind carries, built by a block-kind
+    `body_args` is the kind's body - the arguments a block of this kind carries, built by a block-kind
     helper (or spelled out for a custom kind). The same kind name can carry a different body in a
     different field, which is what a per-field override is. `ref_check` is the kind's cross-page
     integrity rule, enforced in the store per block - it lives here because the referencing
     argument lives inside a block, not flat on a command.
     """
     kind: str
-    args: tuple[ArgSpec, ...]
+    body_args: tuple[ArgSpec, ...]
     ref_check: RefCheck | None = None
-
-
-def body_args(self: BlockKindSpec) -> tuple[ArgSpec, ...]:
-    return self.args
 
 
 @dataclass(frozen=True)
@@ -116,43 +112,43 @@ _PRECEDING = _text("precedingId", required=False,
 # One per standard kind, two text-only variants whose body is a single plain `text` arg, and
 # `standard_blocks()` for the whole vocabulary.
 def _paragraph_runs() -> BlockKindSpec:
-    return BlockKindSpec("paragraph", args=(_array("inlines", content=INLINE_RUNS),))
+    return BlockKindSpec("paragraph", body_args=(_array("inlines", content=INLINE_RUNS),))
 
 
 def _heading_runs() -> BlockKindSpec:
-    return BlockKindSpec("heading", args=(_integer("level"), _array("inlines", content=INLINE_RUNS)))
+    return BlockKindSpec("heading", body_args=(_integer("level"), _array("inlines", content=INLINE_RUNS)))
 
 
 def _code_block() -> BlockKindSpec:
-    return BlockKindSpec("code", args=(_text("language"), _text("source")))
+    return BlockKindSpec("code", body_args=(_text("language"), _text("source")))
 
 
 def _list_block() -> BlockKindSpec:
-    return BlockKindSpec("list", args=(_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS)))
+    return BlockKindSpec("list", body_args=(_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS)))
 
 
 def _quote_block() -> BlockKindSpec:
-    return BlockKindSpec("quote", args=(_array("paragraphs", content=INLINE_RUN_LISTS),))
+    return BlockKindSpec("quote", body_args=(_array("paragraphs", content=INLINE_RUN_LISTS),))
 
 
 def _table_block() -> BlockKindSpec:
-    return BlockKindSpec("table", args=(_array("header", content=INLINE_RUN_LISTS),
+    return BlockKindSpec("table", body_args=(_array("header", content=INLINE_RUN_LISTS),
                                         _array("rows", content=INLINE_RUN_GRID),
                                         _array("align", required=False, content=TABLE_ALIGN)))
 
 
 def _divider_block() -> BlockKindSpec:
-    return BlockKindSpec("divider", args=())
+    return BlockKindSpec("divider", body_args=())
 
 
 def _paragraph_text() -> BlockKindSpec:
     """A paragraph whose body is one plain text arg rather than rich inline runs."""
-    return BlockKindSpec("paragraph", args=(_text(),))
+    return BlockKindSpec("paragraph", body_args=(_text(),))
 
 
 def _heading_text() -> BlockKindSpec:
     """A heading whose body is a level and one plain text arg rather than rich inline runs."""
-    return BlockKindSpec("heading", args=(_integer("level"), _text()))
+    return BlockKindSpec("heading", body_args=(_integer("level"), _text()))
 
 
 def standard_blocks() -> tuple[BlockKindSpec, ...]:

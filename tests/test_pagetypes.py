@@ -39,7 +39,7 @@ from src.pagetypes.core.specs import (
     FSMSpec,
     status_guidance,
 )
-from src.pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, body_args, standard_blocks
+from src.pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
 from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd
 from src.pagetypes.core.fields import (
     FieldSpec,
@@ -407,7 +407,7 @@ def test_blocks_body_is_an_inline_run_blocks_field():
     add = pagetype_command(BLK, "addBody")
     assert add.kind == ADD_BLOCK and add.args[0].content == BLOCK_ARRAY
     paragraph = next(block for block in field.block_kinds if block.kind == "paragraph")
-    assert body_args(paragraph)[0].content == INLINE_RUNS
+    assert paragraph.body_args[0].content == INLINE_RUNS
 
 
 def test_element_fsms_declare_checkmark_done():
@@ -536,21 +536,21 @@ def test_every_production_guidance_text_comes_from_the_stage_guidance_module():
 def test_block_kind_spec_resolves_body_args():
     # A kind carries its own body args; the same kind name can mean a different body in a different
     # field, which is what a per-field override is.
-    assert body_args(_code_block()) == (_text("language"), _text("source"))
-    override = BlockKindSpec("paragraph", args=(_text(),))
-    assert body_args(override) == (_text(),)
-    assert body_args(override) != body_args(_paragraph_runs())
+    assert _code_block().body_args == (_text("language"), _text("source"))
+    override = BlockKindSpec("paragraph", body_args=(_text(),))
+    assert override.body_args == (_text(),)
+    assert override.body_args != _paragraph_runs().body_args
 
 
 def test_block_kind_spec_rejects_a_bad_declaration():
     # Every kind declares its own args - there is no shared table to fall back on - and a custom
     # kind like `decision` is defined exactly by declaring them.
     with pytest.raises(TypeError):
-        BlockKindSpec("decision")                        # args is required
-    custom = BlockKindSpec("decision", args=(_text("questionId"), _text()))
-    assert body_args(custom) == (_text("questionId"), _text())
+        BlockKindSpec("decision")                        # body_args is required
+    custom = BlockKindSpec("decision", body_args=(_text("questionId"), _text()))
+    assert custom.body_args == (_text("questionId"), _text())
     assert any("non-empty name" in error
-               for error in validate_field_spec(_blocks("body", block_kinds=(BlockKindSpec("", args=()),))))
+               for error in validate_field_spec(_blocks("body", block_kinds=(BlockKindSpec("", body_args=()),))))
 
 
 def test_block_kind_helpers():
@@ -558,25 +558,25 @@ def test_block_kind_helpers():
     # the old per-kind table. Asserted against explicit expected args (not a lookup) so the test
     # stands on its own once that table is gone.
     assert _paragraph_runs().kind == "paragraph"
-    assert body_args(_paragraph_runs()) == (_array("inlines", content=INLINE_RUNS),)
-    assert body_args(_heading_runs()) == (_integer("level"), _array("inlines", content=INLINE_RUNS))
-    assert body_args(_code_block()) == (_text("language"), _text("source"))
+    assert _paragraph_runs().body_args == (_array("inlines", content=INLINE_RUNS),)
+    assert _heading_runs().body_args == (_integer("level"), _array("inlines", content=INLINE_RUNS))
+    assert _code_block().body_args == (_text("language"), _text("source"))
     assert _list_block().kind == "list"
-    assert body_args(_list_block()) == (_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS))
-    assert body_args(_quote_block()) == (_array("paragraphs", content=INLINE_RUN_LISTS),)
-    assert body_args(_table_block()) == (_array("header", content=INLINE_RUN_LISTS),
+    assert _list_block().body_args == (_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS))
+    assert _quote_block().body_args == (_array("paragraphs", content=INLINE_RUN_LISTS),)
+    assert _table_block().body_args == (_array("header", content=INLINE_RUN_LISTS),
                                     _array("rows", content=INLINE_RUN_GRID),
                                     _array("align", required=False, content=TABLE_ALIGN))
-    assert _divider_block().kind == "divider" and body_args(_divider_block()) == ()
+    assert _divider_block().kind == "divider" and _divider_block().body_args == ()
     # The text-only variants: one plain `text` arg (no inline-run shape) in place of `inlines`.
-    assert body_args(_paragraph_text()) == (_text(),)
-    assert body_args(_heading_text()) == (_integer("level"), _text())
+    assert _paragraph_text().body_args == (_text(),)
+    assert _heading_text().body_args == (_integer("level"), _text())
     # standard_blocks() is the whole vocabulary, in the canonical order.
     assert [block.kind for block in standard_blocks()] == [
         "paragraph", "heading", "code", "list", "quote", "table", "divider"]
-    assert [body_args(block) for block in standard_blocks()] == [
-        body_args(_paragraph_runs()), body_args(_heading_runs()), body_args(_code_block()),
-        body_args(_list_block()), body_args(_quote_block()), body_args(_table_block()), body_args(_divider_block())]
+    assert [block.body_args for block in standard_blocks()] == [
+        _paragraph_runs().body_args, _heading_runs().body_args, _code_block().body_args,
+        _list_block().body_args, _quote_block().body_args, _table_block().body_args, _divider_block().body_args]
 
 
 def test_field_spec_block_kinds():
@@ -629,7 +629,7 @@ def test_element_blocks_rejects_a_bad_declaration():
     # A block kind carrying an empty name is rejected through the element-blocks path too.
     assert any("non-empty name" in error for error in validate_field_spec(
         FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
-                  element_blocks=(ElementBlocksSpec("detail", (BlockKindSpec("", args=()),)),))))
+                  element_blocks=(ElementBlocksSpec("detail", (BlockKindSpec("", body_args=()),)),))))
 
 
 def test_block_element_fields_names_the_declared_fields():
@@ -660,7 +660,7 @@ def test_validate_block_reads_a_per_field_arg_override():
     `inlines`, and a field declaring the standard kind does the reverse. If any consumer read a
     shared table instead of the kind's own args this would pass in one direction only.
     """
-    plain = (BlockKindSpec("paragraph", args=(_text(),)),)
+    plain = (BlockKindSpec("paragraph", body_args=(_text(),)),)
     validate_block({"kind": "paragraph", "text": "just prose"}, plain)
     with pytest.raises(ValidationError, match="unknown keys"):
         validate_block({"kind": "paragraph", "inlines": ["prose"]}, plain)
@@ -671,7 +671,7 @@ def test_validate_block_reads_a_per_field_arg_override():
 
 def test_validate_block_accepts_a_kind_the_standard_table_does_not_know():
     """A custom kind exists only as a name plus declared args - feature-spec's `decision`."""
-    decision = (BlockKindSpec("decision", args=(_text("questionId"), _text())),)
+    decision = (BlockKindSpec("decision", body_args=(_text("questionId"), _text())),)
     validate_block({"kind": "decision", "questionId": "q:1", "text": "we chose X"}, decision)
     with pytest.raises(ValidationError, match="requires 'questionId'"):
         validate_block({"kind": "decision", "text": "we chose X"}, decision)
@@ -719,7 +719,7 @@ def test_collect_ref_ids_finds_a_ref_inside_a_block():
 
 def test_collect_ref_ids_reads_runs_off_an_overridden_kind():
     """An override moves a kind's runs to a different arg, so reading a shared table would miss them."""
-    kinds = (BlockKindSpec("note", args=(_array("body", content=INLINE_RUNS),)),)
+    kinds = (BlockKindSpec("note", body_args=(_array("body", content=INLINE_RUNS),)),)
     assert collect_ref_ids(
         BLOCK_ARRAY, [{"kind": "note", "body": ["see ", {"ref": "a:1"}]}], kinds) == ["a:1"]
 

@@ -12,7 +12,7 @@ from typing import Any
 from .commands import legal_commands
 from .model import Page
 from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION
-from .pagetypes.core.args import BlockKindSpec, body_args
+from .pagetypes.core.args import BlockKindSpec
 from .pagetypes.core.commands import CommandSpec
 from .pagetypes.core.pagetype import PageType
 
@@ -26,7 +26,7 @@ def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
     for block in block_kinds:
         properties: dict[str, Any] = {"kind": {"const": block.kind}}
         required = ["kind"]
-        for body in body_args(block):
+        for body in block.body_args:
             properties[body.name] = {"type": body.type}
             if body.required:
                 required.append(body.name)

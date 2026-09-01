@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     # function, imported by name below.
     from .pagetype import PageType
 from .pagetype import pagetype_field_spec
-from .args import BlockKindSpec, ElementBlocksSpec, body_args
+from .args import BlockKindSpec, ElementBlocksSpec
 from .commands import CommandSpec, is_field_setter
 from .fields import FieldSpec, element_blocks_spec
 from .specs import (
@@ -130,7 +130,7 @@ def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
         raise ValidationError(
             f"Block kind {kind!r} is not accepted here - one of {[block.kind for block in block_kinds]}."
         )
-    args = body_args(block)
+    args = block.body_args
     extra = set(entry) - {arg.name for arg in args} - {"kind"}
     if extra:
         raise ValidationError(f"A '{kind}' block has unknown keys: {sorted(extra)}.")
@@ -202,7 +202,7 @@ def _block_ref_ids(entry: Any, block_kinds: tuple[BlockKindSpec, ...] | None) ->
     if block is None:
         return []
     ids: list[str] = []
-    for body in body_args(block):
+    for body in block.body_args:
         if body.content is not None:
             ids.extend(collect_ref_ids(body.content, entry.get(body.name)))
     return ids

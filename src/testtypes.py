@@ -380,7 +380,7 @@ TEST_CHILD = PageType(
             _list("items", element_fields=("text", "note", "status"),
                   element_fsm=_STEP_FSM,
                   element_blocks=(ElementBlocksSpec("note", (
-                      BlockKindSpec("decision", args=(_text("questionId"), _text()),
+                      BlockKindSpec("decision", body_args=(_text("questionId"), _text()),
                                     ref_check=RefCheck(arg="questionId", scope="parent",
                                                        section="questions", field="items")),
                       _paragraph_runs(),
@@ -397,7 +397,7 @@ TEST_CHILD = PageType(
         )),
         SectionSpec("decisions", "Decisions", (
             _blocks("body", (
-                        BlockKindSpec("decision", args=(_text("questionId"), _text()),
+                        BlockKindSpec("decision", body_args=(_text("questionId"), _text()),
                                       ref_check=RefCheck(arg="questionId", scope="parent",
                                                          section="questions", field="items")),
                         _paragraph_text(),

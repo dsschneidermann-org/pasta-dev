@@ -34,7 +34,7 @@ from .pagetypes.core.specs import (
     TRANSITION,
     status_guidance,
 )
-from .pagetypes.core.args import ArgSpec, BlockKindSpec, body_args
+from .pagetypes.core.args import ArgSpec, BlockKindSpec
 from .pagetypes.core.commands import CommandSpec, is_field_setter
 from .pagetypes.core.fields import FieldSpec
 from .pagetypes.core.validation import validate_blocks, validate_inline_content
@@ -420,7 +420,7 @@ def _create_blocks(entries: list[dict[str, Any]], block_kinds: tuple[BlockKindSp
     for entry in entries:
         block_kind = next(block for block in block_kinds if block.kind == entry["kind"])
         block: dict[str, Any] = {"id": id_factory(""), "kind": block_kind.kind}
-        for body in body_args(block_kind):
+        for body in block_kind.body_args:
             block[body.name] = entry.get(body.name)
         made.append(block)
     return made

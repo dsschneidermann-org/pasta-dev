@@ -350,7 +350,7 @@ _FEATURE_SPEC = PageType(
         )),
         SectionSpec("decisions", "Decisions", (
             _blocks("body", block_kinds=(
-                BlockKindSpec("decision", args=(_text("questionId"), _text()),
+                BlockKindSpec("decision", body_args=(_text("questionId"), _text()),
                               ref_check=RefCheck(arg="questionId", scope="parent",
                                                  section="questions", field="items")),
             ), description="""
