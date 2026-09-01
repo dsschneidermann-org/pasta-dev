@@ -655,6 +655,30 @@ def test_next_actions_child_guard_does_not_withhold_field_setters(store):
     assert "addPart" in {e["command"] for e in actions["do"] if e["pageId"] == parent.id}
 
 
+def test_next_actions_do_includes_stage_entry_field_setters(store):
+    """A setter scoped by legal_in reaches the rollup where its scope opens, even though no
+    transition requires its field. test-child's addCheck is draft-scoped and markReady requires
+    only steps.items, so addCheck can only be here as a stage-entry edge - and it appears only
+    once the parent has unlocked the child's stage."""
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "F")
+    parent, child = result.page, _child(result, "test-child")
+    _mutate(store, workspace.id, parent.id, [
+        {"command": "setSummary", "args": {"text": "x"}},
+        {"command": "beginPlanning"},
+    ])
+    do = store.next_actions(workspace.id, parent.id)["do"]
+    child_edges = {edge["command"]: edge for edge in do if edge["pageId"] == child.id}
+    assert "addCheck" in child_edges
+    add_check = child_edges["addCheck"]
+    assert add_check["kind"] == "field"
+    assert add_check["section"] == "checks" and add_check["field"] == "items"
+    assert add_check["instruction"]
+    assert add_check["statusRevisionToken"] == store.get_page(workspace.id, child.id).status_revision_token
+    # No key tells a stage-entry edge apart from the stage-required addStep beside it.
+    assert set(add_check) == set(child_edges["addStep"])
+
+
 def test_next_actions_terminal_state_has_no_field_setters(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-flow", "C").page
