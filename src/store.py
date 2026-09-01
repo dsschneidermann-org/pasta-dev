@@ -67,8 +67,6 @@ def workspace_guidance(page_type: PageType, status: str,
             if text:
                 out[f"guidance_{spec.field}"] = text
     return out
-
-
 @dataclass
 class CreatePageResult:
     page: Page
@@ -532,6 +530,8 @@ class Store:
         whole batch aborts and nothing is written (the error names the failing index + command).
         Every command must present the page's current `statusRevisionToken`; a status transition
         regenerates it, so a command after a transition carries a stale token and the batch aborts.
+        A token regenerated mid-batch dies with the abort, so a rejection reports the revision the
+        page is left holding rather than the one the discarded working copy had reached.
         """
         if not batch:
             raise ValidationError("mutatePageBatch requires at least one command.")
@@ -547,6 +547,9 @@ class Store:
                 raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
 
             working = page
+            # The revision on disk. A transition mid-batch moves the working copy's token, but an
+            # abort writes nothing, so this is the one a rejected caller is still holding.
+            stored_revision = page.status_revision_token
             created_ids: list[str | None] = []
             created_so_far: set[str] = set()
             for index, entry in enumerate(batch):
@@ -558,12 +561,8 @@ class Store:
                     if command is None:
                         raise ValidationError("Unknown command None.")
                     if presented_revision != working.status_revision_token:
-                        raise ConflictError(
-                            f"statusRevisionToken {presented_revision!r} does not match the page's "
-                            f"current revision {working.status_revision_token!r}. Each command must "
-                            f"carry the current token; a status transition regenerates it, so a batch "
-                            f"may hold at most one transition and only as its final command."
-                        )
+                        raise ConflictError(self._revision_conflict(
+                            presented_revision, working.status_revision_token, stored_revision))
                     if command_spec is not None:
                         self._check_ref(workspace, working, command_spec, args)
                         self._check_block_refs(workspace, working, command_spec, args)
@@ -590,6 +589,25 @@ class Store:
             workspace.pages[page_id] = working
             self._touch_and_save(workspace)
             return working, created_ids
+
+    @staticmethod
+    def _revision_conflict(presented: object, reached: str | None, stored: str | None) -> str:
+        """Why a batch command's token was rejected, in terms of the revision that outlives the abort.
+
+        `reached` is the token the batch had got to, which a transition earlier in the same batch may
+        have regenerated in memory; the abort writes nothing, so that one is discarded and `stored` -
+        the revision the page keeps - is what a retry must present.
+        """
+        if reached == stored:
+            return (f"statusRevisionToken {presented!r} does not match the page's current revision "
+                    f"{stored!r}, which the page keeps - nothing was written. Each command must carry "
+                    f"the current token; a status transition regenerates it, so a batch may hold at "
+                    f"most one transition and only as its final command.")
+        return (f"statusRevisionToken {presented!r} is stale for this command: the status transition "
+                f"earlier in this batch regenerated the token, and every command after it must carry "
+                f"the new one. Nothing was written, so that regenerated token is discarded with the "
+                f"batch and the page keeps revision {stored!r} - present that one when you retry. A "
+                f"batch may hold at most one status transition, and only as its final command.")
 
     # --- scheduled cleanup ---------------------------------------------------
     def cleanup_workspace(
