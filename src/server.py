@@ -20,7 +20,7 @@ from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
-from .pagetypes._registry import get_page_type, registered_tags, validate_registry
+from .pagetypes._registry import get_page_type, registered_pagetypes, validate_registry
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
 from .serialize import page_to_dict
@@ -365,10 +365,11 @@ async def describePageType(type: str | None = None) -> dict[str, Any]:
     """Describe a page type's sections, fields, commands, and FSM. Omit `type` to list types."""
     with _guard_tool():
         if type is None:
-            return {"types": registered_tags()}
+            return {"types": list(registered_pagetypes())}
         page_type = get_page_type(type)
         if page_type is None:
-            raise ToolError(f"Unknown page type '{type}'. Registered: {', '.join(registered_tags())}.")
+            raise ToolError(
+                f"Unknown page type '{type}'. Registered: {', '.join(registered_pagetypes())}.")
         return describe_page_type(page_type)
 
 
