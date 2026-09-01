@@ -8,6 +8,7 @@ the in-memory "copy-edit" half of the storage pattern in `store.py`.
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any
@@ -23,6 +24,7 @@ from .pagetypes.core.specs import (
     BLOCK_ARRAY,
     COMPOUND,
     ELEMENT_TRANSITION,
+    FSMSpec,
     REMOVE_BLOCK,
     REMOVE_ELEMENT,
     REORDER_BLOCK,
@@ -186,6 +188,53 @@ def _field_setter_edge(page: Page, page_type: PageType, section: str, field: str
         "command": command_name,
         "statusRevisionToken": page.status_revision_token,
     }
+
+
+def _distance_from_initial(fsm_spec: FSMSpec) -> dict[str, int]:
+    """Edge count from the FSM's initial status to each status it can reach (breadth-first).
+
+    A status absent from the result is unreachable, which is how the stage-entry fallback tells
+    'not arrived at yet' from 'never arrives at'.
+    """
+    outgoing: dict[str, set[str]] = {}
+    for _event, source, dest, _agency in fsm_spec.transitions:
+        outgoing.setdefault(source, set()).add(dest)
+    distance = {fsm_spec.initial: 0}
+    queue = deque([fsm_spec.initial])
+    while queue:
+        current = queue.popleft()
+        for following in outgoing.get(current, ()):
+            if following not in distance:
+                distance[following] = distance[current] + 1
+                queue.append(following)
+    return distance
+
+
+def stage_entry_statuses(fsm_spec: FSMSpec, legal_in: Collection[str]) -> set[str]:
+    """The statuses in `legal_in` where the work that scope covers first becomes available.
+
+    A scoped status qualifies when no OTHER scoped status transitions into it - arriving from
+    outside the scope still counts as arriving first, which is what makes a single-status scope
+    (setPullRequestUrl in `review`) always qualify. A scope whose statuses enter each other
+    leaves that empty, because the page FSM is not strictly ordered: `building` and `review` are
+    a cycle, so recordCommit would otherwise open nowhere. There the fallback takes the scoped
+    statuses nearest the initial status - the entry the page reaches soonest - and keeps every
+    one at that distance rather than breaking a tie arbitrarily. Unreachable statuses are not
+    candidates, so a scope no path reaches stays silent.
+    """
+    scoped = set(legal_in)
+    incoming: dict[str, set[str]] = {}
+    for _event, source, dest, _agency in fsm_spec.transitions:
+        incoming.setdefault(dest, set()).add(source)
+    unentered = {status for status in scoped if not (incoming.get(status, set()) & scoped)}
+    if unentered:
+        return unentered
+    distance = _distance_from_initial(fsm_spec)
+    reachable = {status for status in scoped if status in distance}
+    if not reachable:
+        return set()
+    nearest = min(distance[status] for status in reachable)
+    return {status for status in reachable if distance[status] == nearest}
 
 
 def field_setter_edges(page: Page, page_type: PageType,

@@ -10,6 +10,7 @@ from src.commands import (
     is_field_setter,
     legal_commands,
     resolve_anchored_slot,
+    stage_entry_statuses,
 )
 from src.errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from src.model import Page
@@ -754,6 +755,61 @@ def test_field_setter_edges_drop_blocked_events():
     assert field_setter_edges(child, CHILD, {"markReady"}) == []
     # An unrelated blocked event leaves the topology (and so the edges) untouched.
     assert "addStep" in {e["command"] for e in field_setter_edges(child, CHILD, {"reopen"})}
+
+
+# --- stage-entry statuses (stage_entry_statuses) -----------------------------
+# Ad-hoc FSMs built straight from FSMSpec: the helper reads only `initial` and the
+# transition table, so a page type would add nothing but noise here.
+_LINE = FSMSpec(name="XLine", initial="draft", states=("draft", "open", "review", "done"),
+                transitions=(("begin", "draft", "open", "agent"),
+                             ("submit", "open", "review", "agent"),
+                             ("bounce", "review", "open", "agent"),
+                             ("finish", "review", "done", "agent")))
+
+
+def test_stage_entry_statuses_single_status_scope_always_qualifies():
+    """The trivial case: a scope of one status has no other scoped status to be entered from,
+    so it qualifies however many transitions arrive from outside it."""
+    assert stage_entry_statuses(_LINE, ("review",)) == {"review"}
+
+
+def test_stage_entry_statuses_ignore_edges_from_outside_the_scope():
+    """Only edges BETWEEN scoped statuses disqualify. `review` is entered from `open`, but with
+    `open` outside the scope `review` is still where the scope opens; `done` is entered from
+    `review`, which is inside it, so it is not."""
+    assert stage_entry_statuses(_LINE, ("review", "done")) == {"review"}
+
+
+def test_stage_entry_statuses_fall_back_to_nearest_initial_when_the_scope_is_cyclic():
+    """`open` and `review` enter each other, so no scoped status is unentered. The fallback picks
+    the one the page reaches soonest from the FSM's initial status: draft->open is one edge,
+    draft->open->review is two."""
+    assert stage_entry_statuses(_LINE, ("open", "review")) == {"open"}
+
+
+def test_stage_entry_statuses_fallback_keeps_every_status_at_the_shortest_distance():
+    """A tie is not broken arbitrarily - both branches are entry points."""
+    fork = FSMSpec(name="XFork", initial="draft", states=("draft", "a", "b"),
+                   transitions=(("toA", "draft", "a", "agent"), ("toB", "draft", "b", "agent"),
+                                ("aToB", "a", "b", "agent"), ("bToA", "b", "a", "agent")))
+    assert stage_entry_statuses(fork, ("a", "b")) == {"a", "b"}
+
+
+def test_stage_entry_statuses_empty_scope_and_unreachable_scope_yield_nothing():
+    """Total over any input: an empty scope has nothing to offer, and a cyclic scope no path from
+    the initial status reaches has no entry point rather than an arbitrary one."""
+    assert stage_entry_statuses(_LINE, ()) == set()
+    island = FSMSpec(name="XIsland", initial="draft", states=("draft", "x", "y"),
+                     transitions=(("xToY", "x", "y", "agent"), ("yToX", "y", "x", "agent")))
+    assert stage_entry_statuses(island, ("x", "y")) == set()
+
+
+def test_stage_entry_statuses_tolerate_a_status_the_fsm_does_not_declare():
+    """A scope naming an unknown status neither raises nor disturbs the real entry statuses. The
+    result is matched against a page's actual status, which such a name can never equal, so it is
+    carried rather than filtered."""
+    assert "review" in stage_entry_statuses(_LINE, ("nope", "review"))
+    assert stage_entry_statuses(_LINE, ("nope", "review", "done")) == {"nope", "review"}
 
 
 # --- block-bearing element fields --------------------------------------------
