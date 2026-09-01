@@ -16,25 +16,24 @@ from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
 
-from wenmode import Wenmode
-from wenmode.presets import github
-
-md2html = Wenmode(github)
-
 from . import cleanup
-# Named import, not `from . import commands`: mutatePageBatch's own parameter would shadow it.
-from .commands import transition_guidance
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
-from .pagetypes import get_page_type, registered_tags
+from .pagetypes._registry import get_page_type, registered_tags, validate_registry
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
 from .serialize import page_to_dict
 from .store import Store
 
+# Fail fast: validate every page type once at load. This runs on a cold start and re-runs on
+# every HMR reload (this module re-executes then), so a misconfigured type surfaces every error
+# at once instead of piecemeal during a later request.
+validate_registry()
+
 DATA_DIR = os.environ.get("PASTA_DATA_DIR", ".pasta-data")
 STORE = Store(DATA_DIR)
+
 
 @asynccontextmanager
 async def app_lifespan(_app: FastAPI):
@@ -55,6 +54,7 @@ app.mount("/sphinx", StaticFiles(directory="docsite/_build/html"), name="sphinx"
 
 templates = Jinja2Templates(directory="src/templates")
 
+
 # --- No HTTP caching ---------------------------------------------------------
 # The server is only ever hosted locally, so browser caching buys nothing and has
 # been serving stale images. Stamp a no-cache header on most responses. This wraps
@@ -67,6 +67,7 @@ async def add_no_cache_headers(request: Request, call_next):
     if not request.url.path.endswith(".css"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
 
 # --- Websocket reloader ------------------------------------------------------
 # The browser-facing connection manager (`ws_reloader`) lives in src.hmr_live_refresh so its
@@ -85,9 +86,10 @@ async def fastapi_reloader(websocket: WebSocket):
     task = asyncio.create_task(send_updates())
     try:
         while True:
-            _ = await websocket.receive_text() # receive and do nothing
+            _ = await websocket.receive_text()  # receive and do nothing
     except WebSocketDisconnect:
         _ = task.cancel()
+
 
 # --- FastAPI routes ----------------------------------------------------------
 @contextmanager
@@ -116,7 +118,7 @@ async def route_index(request: Request, archived: str | None = None):
 
 
 @app.get("/ws:{workspaceIdPart}", response_class=HTMLResponse)
-async def route_tree(request: Request, workspaceIdPart : str, archived: str | None = None, markdown: str | None = None):
+async def route_tree(request: Request, workspaceIdPart: str, archived: str | None = None, markdown: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
@@ -159,11 +161,11 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 # Drives the Archive/Unarchive button at the bottom of the page (see page.html).
                 "page_id": page.id,
                 "archived": page.archived,
-                # Drives the state dropdown next to the Archive button: every FSM state of this
+                # Drives the status dropdown next to the Archive button: every status of this
                 # page's type, with the current one preselected.
                 "statuses": page_type.fsm.states if page_type is not None else (),
                 "status": page.status,
-                # The Model overlay loads the docsite page for the page's type AND current state.
+                # The Model overlay loads the docsite page for the page's type AND current status.
                 "page_type_doc": f"{page.type}-{page.status}",
             },
         )
@@ -191,9 +193,9 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
         return PlainTextResponse(status_code=202)
 
 
-# Directly set a page's lifecycle state from its web view. Backs the state dropdown + Apply button
+# Directly set a page's lifecycle status from its web view. Backs the status dropdown + Apply button
 # next to the Archive control (see page.html): a deliberate FSM-bypassing admin override, so a human
-# can force any of the type's declared states. `status` arrives as a form field. Like the archive
+# can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
 # routes it fires the live-reload refresh and 202s (no MCP equivalent - a browser can't call MCP).
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
 async def route_set_page_status(workspaceIdPart: str, pageId: str, status: str = Form(...)):
@@ -212,6 +214,7 @@ class InternalError(Exception):
         super().__init__()
         self.tb = tb
 
+
 @app.exception_handler(InternalError)
 async def http_exception_handler(request: Request, exc: InternalError):
     return templates.TemplateResponse(
@@ -227,6 +230,7 @@ async def http_exception_handler(request: Request, exc: InternalError):
 
 # --- MCP -------------------------------------------------------------------
 app.mount("/pasta", mcp_app)  # MCP endpoint at /pasta/mcp
+
 
 @contextmanager
 def _guard_tool() -> Generator[None]:
@@ -448,14 +452,14 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         result = STORE.create_page(workspaceId, type, title, parentId)
         page = result.page
         next_actions = STORE.next_actions(workspaceId, page.id)
-        page_type = get_page_type(page.type)
         await ws_reloader.refresh()
-        response: dict[str, Any] = {
+        return {
             "id": page.id,
             "type": page.type,
             "title": page.title,
             "status": page.status,
             "parentId": page.parent_id,
+            "statusRevisionToken": page.status_revision_token,
             # Guidance is not shown for auto-pinned child pages.
             "children": [
                 {"id": child.id, "type": child.type, "title": child.title, "status": child.status}
@@ -463,39 +467,48 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
             ],
             "next": next_actions,
         }
-        # Creating a page enters a state, so its initial guidance echoes here too.
-        guidance = page_type.fsm.guidance_for(page.status) if page_type is not None else None
-        if guidance is not None:
-            response["guidance"] = guidance
-        return response
 
 
 @mcp.tool
 async def mutatePageBatch(
     workspaceId: str, pageId: str, commands: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Run an ordered batch of commands on a page as a single atomic commit (each `{command, args?}`
-    decided against the state left by the previous). All-or-nothing: any rejection aborts the whole
-    batch and nothing commits - the error names the failing index and command. Echoes the new status
-    and next actions."""
+    """Run an ordered batch of commands on a page as a single atomic commit (each `{command, args}`
+    decided against the state left by the previous). Every command must carry the page's current
+    `statusRevisionToken` as the first entry in its `args` - a short token read from getPage, the
+    render* meta line, or a prior write/nextActions echo. A status transition regenerates it, so at
+    most one transition is legal per batch and only as the final command: a command after a transition
+    carries a now-stale token. All-or-nothing: any rejection aborts the whole batch and nothing commits
+    - the error names the failing index and command. Echoes the new status, the current
+    `statusRevisionToken`, and next actions."""
     with _guard_tool():
         page, created = STORE.mutate_page_batch(workspaceId, pageId, commands)
-        page_type = get_page_type(page.type)
         next_actions = STORE.next_actions(workspaceId, pageId)
         await ws_reloader.refresh()
-        response: dict[str, Any] = {
+        return {
             "pageId": page.id,
             "status": page.status,
+            "statusRevisionToken": page.status_revision_token,
             "count": len(created),
             "createdIds": created,
             "next": next_actions,
         }
-        # Sits beside `next`, never inside it: nextActions carries no guidance.
-        guidance = (transition_guidance(page_type, commands, page.status)
-                    if page_type is not None else None)
-        if guidance is not None:
-            response["guidance"] = guidance
-        return response
+
+
+# --- Workspace guidance configuration ----------------------------------------
+@mcp.tool
+async def setWorkspaceGuidance(workspaceId: str, field: str, text: str) -> dict[str, Any]:
+    """Set the workspace's stored guidance text for a configurable guidance field.
+
+    An unknown field is rejected, listing the ones that are declared. `text` is a single string,
+    and an empty string clears the field. Once set, the text is surfaced to pages that declare the
+    field while they sit at one of its statuses. Returns the workspace id, the field, and the config.
+    """
+    with _guard_tool():
+        workspace = STORE.set_workspace_guidance(workspaceId, field, text)
+        await ws_reloader.refresh()
+        return {"workspaceId": workspace.id, "field": field,
+                "guidanceConfig": dict(workspace.guidance_config)}
 
 
 # --- Archiving ---------------------------------------------------------------
@@ -595,3 +608,7 @@ async def unlink(workspaceId: str, fromId: str, toId: str, role: str) -> dict[st
         page, links = STORE.unlink_page(workspaceId, fromId, toId, role)
         await ws_reloader.refresh()
         return {"id": page.id, "links": links}
+
+
+# --- capture HMR reload errors to hmr_debug.log (see src/_hmr_debug.py) -------
+from . import _hmr_debug  # noqa: E402, F401

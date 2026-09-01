@@ -17,7 +17,9 @@ from wenmode import Wenmode
 from wenmode.presets import github
 
 from .model import Page
-from .pagetypes import BLOCKS, LIST, PROSE, SCALAR, FieldSpec, PageType, SectionSpec
+from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR
+from .pagetypes.core.fields import FieldSpec, SectionSpec, block_element_fields, title_element_field
+from .pagetypes.core.pagetype import PageType
 from .render import RefContext, checkbox_state, render_blocks
 
 # The one Markdown-to-HTML engine, defined here because this is where HTML is produced.
@@ -46,6 +48,14 @@ def _text_html(text: str) -> str:
     return "".join(paragraphs)
 
 
+def _url_link(value: str) -> str:
+    """A field named `url` as a clickable link that opens in a new tab. The value is escaped for
+    both the href and the visible text, so an author-provided leaf stays safe to place directly in
+    the emitted HTML; the new tab carries no opener reference back to this page."""
+    escaped = _escape(value)
+    return f'<a href="{escaped}" target="_blank" rel="noopener noreferrer">{escaped}</a>'
+
+
 @dataclass(frozen=True)
 class ElementView:
     """One list element decomposed for display, before any HTML exists.
@@ -69,10 +79,10 @@ def element_view(element: dict[str, Any], index: int, field_spec: FieldSpec) -> 
     values are - a list whose type declares neither is headed by its ordinal alone."""
     declared = field_spec.element_fields or ()
     # A block-bearing field is neither a heading nor a plain row - it has its own tuple.
-    block_fields = field_spec.block_element_fields()
+    block_fields = block_element_fields(field_spec)
     # The declared heading field, consumed by the heading and never repeated as a row - so a
     # field's row set is fixed by its declaration and does not move with an author's edits.
-    title_key = field_spec.title_element_field()
+    title_key = title_element_field(field_spec)
     # Declared order first, then any stored key the type does not declare, so nothing on the
     # element is hidden. `id` is structural and `status` has its own chip.
     extra = [key for key in element if key not in ("id", "status") and key not in declared]
@@ -135,7 +145,7 @@ def _element_html(view: ElementView, ref_context: RefContext | None) -> str:
         if value is None:
             cell = '<dd class="empty">&mdash;</dd>'
         else:
-            linked = _page_link(value, ref_context)
+            linked = _page_link(value, ref_context) or (_url_link(value) if label == "url" else None)
             cell = f"<dd><p>{linked}</p></dd>" if linked else f"<dd>{_text_html(value)}</dd>"
         cells.append(f"<dt>{_escape(label)}</dt>" + cell)
     for label, blocks in view.block_rows:
@@ -163,8 +173,12 @@ def _field_html(field_spec: FieldSpec, value: Any, ref_context: RefContext | Non
     """One field as HTML, or the empty fallback when it holds no content. A scalar keeps its
     label either way, so the field stays named even when unset."""
     if field_spec.kind == SCALAR:
-        shown = (f"<dd>{_escape(value)}</dd>" if value not in (None, "")
-                 else '<dd class="empty">None.</dd>')
+        if value in (None, ""):
+            shown = '<dd class="empty">None.</dd>'
+        elif field_spec.key == "url":
+            shown = f"<dd>{_url_link(str(value))}</dd>"
+        else:
+            shown = f"<dd>{_escape(value)}</dd>"
         return f'<dl class="field-rows"><dt>{_escape(field_spec.key)}</dt>{shown}</dl>'
     if field_spec.kind == PROSE:
         return _text_html(str(value)) if value else _NONE_HTML
@@ -280,9 +294,13 @@ def render_page_html(page: Page, page_type: PageType,
     A toc carries no subject matter and can hold no outgoing link, so it renders as its header and
     its child list alone: that list IS the table of contents.
     """
+    revision = ""
+    if page.status_revision_token is not None:
+        revision = (f'<span class="page-meta-sep">&nbsp;·&nbsp;rev&nbsp;</span>'
+                    f'<span class="page-revision">{_escape(page.status_revision_token)}</span>')
     head = (f'<header class="page-head"><h1 class="page-title">{_escape(page.title)}</h1>'
             f'<p class="page-meta"><span class="page-type">{_escape(page.type)}&nbsp;·&nbsp;</span>'
-            f'<span class="page-status">{_escape(page.status)}</span></p></header>')
+            f'<span class="page-status">{_escape(page.status)}</span>{revision}</p></header>')
     if page_type.tag == "toc":
         return f'<article class="pasta-page">{head}{_children_html(page, ref_context)}</article>'
     sections = "".join(_section_html(section, page, ref_context)

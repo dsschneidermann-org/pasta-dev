@@ -6,7 +6,8 @@ from src.describe import (
     describe_mutations,
     describe_page_type,
 )
-from src.pagetypes import get_page_type
+from src.pagetypes.core.pagetype import get_pagetype_command
+from src.pagetypes._registry import get_page_type
 
 # Hand-authored capability fixtures (src.testtypes), so enriching a production type never
 # churns these introspection assertions.
@@ -25,18 +26,27 @@ def _counter():
 
 
 def test_command_arg_schema_has_required_and_enum():
-    set_kind = FIELDS.command("setKind")
+    set_kind = get_pagetype_command(FIELDS, "setKind")
     schema = command_arg_schema(set_kind)
-    assert schema["required"] == ["kind"]
-    assert schema["properties"]["kind"]["enum"] == list(FIELDS.command("setKind").args[0].choices)
+    assert schema["required"] == ["statusRevisionToken", "kind"]
+    assert schema["properties"]["kind"]["enum"] == list(get_pagetype_command(FIELDS, "setKind").args[0].choices)
     assert schema["additionalProperties"] is False
 
 
 def test_command_arg_schema_optional_not_required():
-    add_item = FIELDS.command("addItem")
+    add_item = get_pagetype_command(FIELDS, "addItem")
     schema = command_arg_schema(add_item)
     assert "text" in schema["required"]
     assert "note" not in schema["required"]         # optional
+
+
+def test_command_arg_schema_lists_the_revision_token_first():
+    # The optimistic-concurrency stamp is presented inside args, ahead of a command's own arguments,
+    # so it reads as every command's first argument - a content command and a transition alike.
+    for command in (get_pagetype_command(FIELDS, "setKind"), get_pagetype_command(FLOW, "open")):
+        schema = command_arg_schema(command)
+        assert next(iter(schema["properties"])) == "statusRevisionToken"
+        assert schema["required"][0] == "statusRevisionToken"
 
 
 def test_describe_page_type_shape():
@@ -106,16 +116,16 @@ def test_describe_mutations_is_full_catalog():
     assert by_name["setBody"]["available"] is True
 
 
-def test_describe_fsm_projects_state_guidance():
+def test_describe_fsm_projects_status_guidance():
     """The guidance rides on the FSM projection, which is how doc generation reads it."""
     described = describe_page_type(FLOW)["fsm"]
-    assert described["stateGuidance"] == {
+    assert described["statusGuidance"] == {
         "open": "open - the work is under way.\nRecord a commit with close when it is finished."
     }
     # Pre-existing keys untouched, so describePageType stays backward compatible.
     assert described["initial"] == "draft" and described["states"] == ["draft", "open", "closed"]
     # A type declaring none projects an empty mapping rather than omitting the key.
-    assert describe_page_type(get_page_type("test-blocks"))["fsm"]["stateGuidance"] == {}
+    assert describe_page_type(get_page_type("test-blocks"))["fsm"]["statusGuidance"] == {}
 
 
 def test_add_reports_its_block_argument_shape():
@@ -144,7 +154,7 @@ def test_describe_reports_block_bearing_element_fields():
     ]
     # The pre-existing keys are untouched beside it.
     assert field["elementFields"] == ["text", "snippet", "detail", "status"]
-    assert field["elementStates"] == ["todo", "done"]
+    assert field["elementStates"] == ["todo", "done", "skipped"]
     # A list declaring none reports None rather than an empty list.
     plain = describe_page_type(get_page_type("test-fields"))["sections"][1]["fields"][0]
     assert plain["elementBlocks"] is None
@@ -168,11 +178,11 @@ def test_a_blocks_add_describes_its_whole_vocabulary():
     table = next(b for b in branches if b["properties"]["kind"]["const"] == "table")
     assert "align" in table["properties"] and "align" not in table["required"]   # optional
 
-    # The set carries the same oneOf, as a single object rather than an array.
-    block = commands["setBodyBlock"]["args"]["properties"]["block"]
-    assert "oneOf" in block and "items" not in block
-    assert [b["properties"]["kind"]["const"] for b in block["oneOf"]] == [
-        branch["properties"]["kind"]["const"] for branch in branches]
+    # The add is the only place a vocabulary is advertised - nothing else carries blocks.
+    carriers = [c["name"] for c in described["commands"]
+                if any("oneOf" in prop or "oneOf" in prop.get("items", {})
+                       for prop in c["args"]["properties"].values())]
+    assert carriers == ["addBody"]
 
 
 def test_an_overridden_kind_advertises_its_own_args():
@@ -218,3 +228,10 @@ def test_a_blocks_field_reports_its_kinds():
         {"field": "snippet", "kinds": ["code"]},
         {"field": "detail", "kinds": ["paragraph", "code", "list"]},
     ]
+
+
+def test_describe_reports_the_skipped_element_state():
+    """The skip disposition must be advertised to authors, or a caller cannot know a case may be
+    skipped."""
+    checks = _fields_of("test-child")[("checks", "items")]
+    assert checks["elementStates"] == ["pending", "passed", "failed", "skipped"]

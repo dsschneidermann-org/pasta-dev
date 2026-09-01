@@ -29,22 +29,17 @@ from typing import Any, final
 
 from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
-from .ids import IdFactory, default_id_factory, new_id
+from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import Page, Workspace
-from .pagetypes import (
-    ADD_LINK,
-    BLOCK,
-    BLOCK_ARRAY,
-    COMPOUND,
-    LIST,
-    TRANSITION,
-    CommandSpec,
-    PageType,
-    RefCheck,
-    collect_ref_ids,
+from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck, status_guidance
+from .pagetypes.core.commands import CommandSpec
+from .pagetypes.core.pagetype import PageType, get_pagetype_command
+from .pagetypes.core.validation import collect_ref_ids
+from .pagetypes._registry import (
     get_page_type,
     is_auto_child_type,
     registered_tags,
+    workspace_guidance_fields,
 )
 from .rwlock import ReadWriteLock
 from .serialize import workspace_from_dict, workspace_to_dict
@@ -61,6 +56,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def workspace_guidance(page_type: PageType, status: str,
+                           config: dict[str, str]) -> dict[str, str]:
+    """Given a page type at a status, the stored text for each of its workspace guidance fields
+    shown at that status (an empty value clears the field)."""
+    out: dict[str, str] = {}
+    for spec in page_type.workspace_guidance:
+        if status in spec.guidance_for:
+            text = config.get(spec.field)
+            if text:
+                out[f"guidance_{spec.field}"] = text
+    return out
+
+
 @dataclass
 class CreatePageResult:
     page: Page
@@ -69,13 +77,23 @@ class CreatePageResult:
 
 @final
 class Store:
-    def __init__(self, root: str | os.PathLike[str], id_factory: IdFactory = default_id_factory) -> None:
+    def __init__(self, root: str | os.PathLike[str], id_factory: IdFactory = default_id_factory,
+                 revision_factory: RevisionFactory = default_revision_factory) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self._id_factory = id_factory
+        self._revision_factory = revision_factory
         self._transaction_locks: dict[str, threading.Lock] = {}
         self._rw_locks: dict[str, ReadWriteLock] = {}
         self._locks_guard = threading.Lock()
+
+    def _next_revision(self, current: str | None) -> str:
+        """A fresh status-revision token that differs from `current`, so a stale token a caller
+        still holds can never accidentally re-match the page after it moved."""
+        token = self._revision_factory()
+        while token == current:
+            token = self._revision_factory()
+        return token
 
     # --- paths & locks -------------------------------------------------------
     def _path_for(self, workspace_id: str) -> Path:
@@ -119,7 +137,7 @@ class Store:
             try:
                 os.replace(tmp, path)
             except Exception:
-                time.sleep(0.1) # Permission error moving the tmp file can be retried.
+                time.sleep(0.1)  # Permission error moving the tmp file can be retried.
                 os.replace(tmp, path)
 
     def _touch_and_save(self, workspace: Workspace) -> None:
@@ -425,13 +443,15 @@ class Store:
                 # Same precedence as _first_guard_failure: child guards first, then parent.
                 guard_reason = self._child_guard_failure(workspace, page, command) or parent_reason
                 if command.agency == "human":
-                    edge = {"pageId": page.id, "pageType": page.type, "command": command.name}
+                    edge = {"pageId": page.id, "pageType": page.type, "command": command.name,
+                            "statusRevisionToken": page.status_revision_token}
                     if guard_reason:
                         edge["blockedReason"] = guard_reason
                     human_gates.append(edge)
                 elif legal.get(command.name) and guard_reason is None:
                     do.append({"pageId": page.id, "pageType": page.type,
-                               "kind": "transition", "command": command.name})
+                               "kind": "transition", "command": command.name,
+                               "statusRevisionToken": page.status_revision_token})
                 else:
                     unmet = commands.unmet_requirements(page, command)
                     if parent_reason is not None:
@@ -444,12 +464,27 @@ class Store:
                     else:
                         reason = guard_reason or "blocked"
                     blocked.append({"pageId": page.id, "pageType": page.type,
-                                    "command": command.name, "reason": reason})
+                                    "command": command.name, "reason": reason,
+                                    "statusRevisionToken": page.status_revision_token})
             # Field setters whose field must be authored to advance this stage also enter `do`.
             do.extend(commands.field_setter_edges(page, page_type, parent_blocked))
             attention.extend(self._page_attention(page, page_type))
 
-        return {"do": do, "blocked": blocked, "humanGates": human_gates, "attention": attention}
+        result: dict[str, Any] = {"do": do, "blocked": blocked,
+                                  "humanGates": human_gates, "attention": attention}
+        # Guidance for the focused page: its stage guidance for the current status, and any
+        # configured guidance texts for that status. A whole-workspace roll-up has no focused page.
+        if page_id is not None:
+            focus = workspace.get_page(page_id)
+            if focus is not None and not focus.archived:
+                focus_type = get_page_type(focus.type)
+                if focus_type is not None:
+                    guidance = status_guidance(focus_type.fsm, focus.status)
+                    if guidance is not None:
+                        result["guidance"] = guidance
+                    result.update(workspace_guidance(
+                        focus_type, focus.status, workspace.guidance_config))
+        return result
 
     def attention(self, workspace_id: str) -> dict[str, Any]:
         """Workspace-wide scan for element instances awaiting a human (escalated open questions)."""
@@ -477,6 +512,7 @@ class Store:
             if parent_id is not None and parent_id not in workspace.pages:
                 raise NotFoundError(f"Parent page '{parent_id}' not found in workspace '{workspace_id}'.")
             page = commands.create_page(page_type, title, parent_id, self._id_factory)
+            page.status_revision_token = self._revision_factory()
             workspace.pages[page.id] = page
             if parent_id is None:
                 workspace.root_page_ids.append(page.id)
@@ -494,6 +530,8 @@ class Store:
 
         Each command is decided against the state left by the previous one; if any is rejected the
         whole batch aborts and nothing is written (the error names the failing index + command).
+        Every command must present the page's current `statusRevisionToken`; a status transition
+        regenerates it, so a command after a transition carries a stale token and the batch aborts.
         """
         if not batch:
             raise ValidationError("mutatePageBatch requires at least one command.")
@@ -513,17 +551,26 @@ class Store:
             created_so_far: set[str] = set()
             for index, entry in enumerate(batch):
                 command = entry.get("command")
-                args = entry.get("args") or {}
-                command_spec = page_type.command(command) if command else None
+                args = dict(entry.get("args") or {})
+                presented_revision = args.pop("statusRevisionToken", None)
+                command_spec = get_pagetype_command(page_type, command) if command else None
                 try:
                     if command is None:
                         raise ValidationError("Unknown command None.")
+                    if presented_revision != working.status_revision_token:
+                        raise ConflictError(
+                            f"statusRevisionToken {presented_revision!r} does not match the page's "
+                            f"current revision {working.status_revision_token!r}. Each command must "
+                            f"carry the current token; a status transition regenerates it, so a batch "
+                            f"may hold at most one transition and only as its final command."
+                        )
                     if command_spec is not None:
                         self._check_ref(workspace, working, command_spec, args)
                         self._check_block_refs(workspace, working, command_spec, args)
                         self._check_inline_refs(workspace, command_spec, args)
                         self._check_guards(workspace, working, command_spec)
                         self._check_link(workspace, workspace_id, working, command_spec, args)
+                    status_before = working.status
                     result = commands.apply_command(
                         working, page_type, command, args, self._id_factory,
                         batch_context=commands.BatchContext(frozenset(created_so_far)),
@@ -533,6 +580,9 @@ class Store:
                         f"Batch aborted at command {index} ('{command}'): {exc}"
                     ) from exc
                 working = result.page
+                # A status change is only ever a transition, so regenerate the stamp when it moves.
+                if working.status != status_before:
+                    working.status_revision_token = self._next_revision(working.status_revision_token)
                 created_ids.append(result.created_id)
                 if result.created_id is not None:
                     created_so_far.update(result.created_ids)
@@ -609,11 +659,11 @@ class Store:
 
     # --- direct status override ---------------------------------------------
     def set_page_status(self, workspace_id: str, page_id: str, status: str) -> Page:
-        """Set a page's lifecycle status directly to any valid state of its type's FSM, bypassing
-        the modelled transition guards. This is a human admin override (the web page view's state
-        dropdown), not a modelled FSM edge - it exists so a person can correct a page's state from
+        """Set a page's lifecycle status directly to any valid status of its type's FSM, bypassing
+        the modelled transition guards. This is a human admin override (the web page view's status
+        dropdown), not a modelled FSM edge - it exists so a person can correct a page's status from
         the browser. Rejects a missing page, an unregistered type, and a status that isn't one of
-        the type's declared FSM states. Returns the updated page.
+        the type's declared statuses. Returns the updated page.
         """
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
@@ -625,10 +675,12 @@ class Store:
                 raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
             if not fsm.is_valid_status(page_type.fsm, status):
                 raise ValidationError(
-                    f"'{status}' is not a valid state for page type '{page.type}'. " +
-                    f"Valid states: {', '.join(page_type.fsm.states)}."
+                    f"'{status}' is not a valid status for page type '{page.type}'. " +
+                    f"Valid statuses: {', '.join(page_type.fsm.states)}."
                 )
             page.status = status
+            # A direct status edit regenerates the stamp too, so an out-of-band move invalidates held tokens.
+            page.status_revision_token = self._next_revision(page.status_revision_token)
             self._touch_and_save(workspace)
             return page
 
@@ -718,7 +770,7 @@ class Store:
         reserve them either): a title is a display label, never an identifier (pages are addressed
         only by id), so a duplicate cannot dangle a reference or break a lookup. Rejects a missing
         page and a blank title; permitted on archived and pinned pages, since a rename alters no tree
-        structure or lifecycle state. Returns the renamed page.
+        structure or lifecycle status. Returns the renamed page.
         """
         if not title or not title.strip():
             raise ValidationError("Page title must be a non-empty string.")
@@ -818,6 +870,22 @@ class Store:
     def unarchive_workspace(self, workspace_id: str) -> Workspace:
         return self._set_workspace_status(workspace_id, "active")
 
+    # --- workspace guidance configuration -----------------------------------
+    def set_workspace_guidance(self, workspace_id: str, field: str, text: str) -> Workspace:
+        """Store `text` under `field` on the workspace's guidance config. Rejects a field no page
+        type declares; an empty string clears the field. Returns the updated workspace."""
+        valid = workspace_guidance_fields()
+        if field not in valid:
+            raise ValidationError(
+                f"'{field}' is not a workspace guidance field. "
+                f"Declared: {', '.join(sorted(valid)) or '(none)'}."
+            )
+        with self._transaction_lock_for(workspace_id):
+            workspace = self.load_workspace(workspace_id)
+            workspace.guidance_config[field] = text
+            self._touch_and_save(workspace)
+            return workspace
+
     # --- helpers -------------------------------------------------------------
     def _create_auto_children(
         self, workspace: Workspace, parent: Page, parent_type: PageType
@@ -831,6 +899,7 @@ class Store:
                     f"Page type '{parent_type.tag}' declares unknown auto-child '{spec.type}'."
                 )
             child = commands.create_page(child_type, child_type.name, parent.id, self._id_factory)
+            child.status_revision_token = self._revision_factory()
             workspace.pages[child.id] = child
             parent.child_ids.append(child.id)
             children.append(child)
@@ -869,24 +938,21 @@ class Store:
         """Enforce every cross-page ref carried inside a block argument.
 
         A block kind declares its own ref_check, because the referencing argument lives in the
-        block rather than flat on the command. Covers the array add and the single-block set, and
-        - through a list add's block arguments - blocks created together with their element, which
-        the command-level check could never see: it reads one scalar arg and cannot reach into an
-        array entry.
+        block rather than flat on the command. Covers the array add and - through a list add's
+        block arguments - blocks created together with their element, which the command-level
+        check could never see: it reads one scalar arg and cannot reach into an array entry.
         """
         for arg in command.args:
-            if arg.content not in (BLOCK, BLOCK_ARRAY) or arg.block_kinds is None:
+            if arg.content != BLOCK_ARRAY or arg.block_kinds is None:
                 continue
-            value = args.get(arg.name)
-            entries = value if arg.content == BLOCK_ARRAY else [value]
-            for entry in entries or []:
+            for entry in args.get(arg.name) or []:
                 if not isinstance(entry, dict):
                     continue                  # left for the grammar validation to reject
-                spec = next((kind for kind in arg.block_kinds
-                             if kind.kind == entry.get("kind")), None)
-                if spec is not None and spec.ref_check is not None:
-                    Store._resolve_ref(workspace, page, spec.ref_check,
-                                       entry.get(spec.ref_check.arg), command.name)
+                block = next((block for block in arg.block_kinds
+                              if block.kind == entry.get("kind")), None)
+                if block is not None and block.ref_check is not None:
+                    Store._resolve_ref(workspace, page, block.ref_check,
+                                       entry.get(block.ref_check.arg), command.name)
 
     @staticmethod
     def _check_inline_refs(workspace: Workspace, command: CommandSpec, args: dict[str, Any]) -> None:
@@ -931,12 +997,12 @@ class Store:
                 if child is None or child.type != guard.child_type:
                     continue
                 if guard.section is None or guard.field is None:
-                    # page-status form: the child page's own status must match
-                    if child.status != guard.required_status:
+                    # page-status form: the child page's own status must be allowed
+                    if child.status not in guard.allowed:
                         return (f"{guard.message} ('{child.id}' is '{child.status}')")
                     continue
                 for element in child.sections.get(guard.section, {}).get(guard.field, []):
-                    if element.get("status") != guard.required_status:
+                    if element.get("status") not in guard.allowed:
                         return (f"{guard.message} ('{child.id}' has an item in "
                                 f"status '{element.get('status')}')")
         return None

@@ -2,29 +2,37 @@
 
 from __future__ import annotations
 
-from . import (
-    FSMSpec,
-    PageType,
-    SectionSpec,
-    _list,
-    _prose,
-    _scalar,
-    _text,
+from ._stage_guidance import REVIEW, SIMPLE_CHANGE_DRAFT, SIMPLE_CHANGE_OPEN
+from ._workspace_guidance import (
+    MERGE_PROCESS_DESC,
+    MERGE_PROCESS_FIELD,
+    TESTING_TOOL_DESC,
+    TESTING_TOOL_FIELD,
+)
+from .core.specs import FSMSpec, WorkspaceGuidanceSpec
+from .core.args import _text
+from .core.commands import (
     add_link_cmd,
+    set_title_cmd,
     list_cmds,
+    set_element_field_cmd,
     set_prose_cmd,
     set_scalar_cmd,
-    set_title_cmd,
     transition_cmd,
     transition_on_add_cmd,
 )
+from .core.fields import SectionSpec, _list, _prose, _scalar
+from .core.pagetype import PageType
+
+_COMMIT_LOG_STATES = ("open", "review", "done", "closed")
 
 _SIMPLE_CHANGE = PageType(
     tag="simple-change",
     name="Simple change",
     description=(
         "Tracks a small, self-contained change or minor feature through a lightweight flow "
-        "(draft -> open -> done -> closed) - no planning, spec, testing, or review gates. Use this "
+        "(draft -> open -> review -> done -> closed) - no planning, spec or testing gates, but the "
+        "work is still reviewed before it is marked done. Use this "
         "page type ONLY when the user specifically asks to make a small/simple change or a small/simple "
         "feature; for larger work create a feature-brief, and for a defect in existing behavior use "
         "a bug-report."
@@ -56,12 +64,22 @@ _SIMPLE_CHANGE = PageType(
                 that must keep working. A criterion that can only be settled by opinion is not one.
                 """),
         )),
-        SectionSpec("resolution", "Resolution", (
-            _list("changeCommits", element_fields=("sha", "message", "url"), description="""
-                Each a commit that delivers this change, recorded as it is closed: the sha, its
-                subject line, and a url when one exists.
+        SectionSpec("pull_request", "Pull Request", (
+            _scalar("url", description="""
+                The pull request URL created for this change.
                 """),
         )),
+        SectionSpec("resolution", "Resolution", (
+            _list("changeCommits", element_fields=("sha", "message", "stale"), description="""
+                Each a commit that delivers this change: the sha and its subject line. Record each
+                as you make it rather than reconstructing the list at the end, and flag one stale
+                once its sha has left history, for example after a rebase.
+                """),
+        )),
+    ),
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
     ),
     commands=(
         set_scalar_cmd("change", "component"),
@@ -69,18 +87,27 @@ _SIMPLE_CHANGE = PageType(
         set_prose_cmd("motivation"),
         *list_cmds("acceptance", field="criteria", singular="criterion", label="acceptance criterion",
                    add_args=(_text(),)),
+        set_scalar_cmd("pull_request", "url", name="setPullRequestUrl", label="pull request url",
+                       legal_in=("review", "done")),
         transition_cmd("open", "draft -> open"),
-        # open -> done marks the change built but not yet verified as shippable or merged to main.
-        transition_cmd("markDone", "open -> done"),
+        transition_cmd("submitForReview", "open -> review"),
+        # review -> done marks the change built and reviewed, but not yet shippable or merged to main.
+        transition_cmd("markDone", "review -> done"),
+        transition_cmd("requestChanges", "review -> open", agency="either"),
         # close is a human gate: a person confirms the change is shippable/merged before it lands.
         transition_on_add_cmd("close", "done -> closed", section="resolution", field="changeCommits",
                      description="record a change commit AND close the change", agency="human",
-                     add_args=(_text("sha"), _text("message"), _text("url", required=False))),
+                     add_args=(_text("sha"), _text("message"))),
         transition_on_add_cmd("closeWithoutCommit", "done -> closed", section="resolution", field="changeCommits",
                      description="record a closing note (message only, no commit) AND close the change", agency="human",
                      add_args=(_text("message"),)),
-        # changeCommits is populated only by `close`; reorder is offered for a uniform surface.
-        *list_cmds("resolution", field="changeCommits", label="change commit", add=False, remove=False),
+        *list_cmds("resolution", field="changeCommits", add_name="recordCommit", label="change commit",
+                   remove=False, add_args=(_text("sha"), _text("message")),
+                   legal_in=_COMMIT_LOG_STATES),
+        set_element_field_cmd("resolution", field="changeCommits", singular="changeCommit",
+                              name="markCommitStale", const=("stale", True),
+                              description="flag a recorded commit as stale - its sha is no longer in history (e.g. after a rebase)",
+                              legal_in=_COMMIT_LOG_STATES),
         transition_cmd("reopen", "closed -> open"),
         add_link_cmd(),
         set_title_cmd(),
@@ -88,6 +115,11 @@ _SIMPLE_CHANGE = PageType(
     fsm=FSMSpec(
         name="SimpleChange",
         initial="draft",
-        states=("draft", "open", "done", "closed"),
+        states=("draft", "open", "review", "done", "closed"),
+        status_guidance=(
+            ("draft", SIMPLE_CHANGE_DRAFT),
+            ("open", SIMPLE_CHANGE_OPEN),
+            ("review", REVIEW),
+        ),
     ),
 )

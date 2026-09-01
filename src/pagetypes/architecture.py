@@ -2,35 +2,26 @@
 
 from __future__ import annotations
 
-from . import (
-    FSMSpec,
-    PageType,
-    SectionSpec,
-    _blocks,
-    _list,
-    _prose,
-    _scalar,
-    _text,
+from ._stage_guidance import ARCHITECTURE_AUTHORING
+from .core.specs import FSMSpec
+from .core.args import _code_block, _paragraph_runs, _text
+from .core.commands import (
     add_link_cmd,
+    set_title_cmd,
     blocks_cmds,
     list_cmds,
     set_prose_cmd,
     set_scalar_cmd,
-    set_title_cmd,
     transition_cmd,
 )
+from .core.fields import SectionSpec, _blocks, _list, _prose, _scalar
+from .core.pagetype import PageType
 
 _NODE_KINDS = ("module", "component", "subsystem", "service", "layer", "package")
 _CODE_REF_KINDS = ("file", "function", "class", "type", "interface", "constant")
 _DEP_ROLES = ("depends-on", "exposes", "implements", "owns", "calls")
 
 
-_DETAILS = _blocks("body", block_kinds=("paragraph", "code"), description="""
-                Design notes that do not fit the fixed sections: rationale, trade-offs that were
-                considered and rejected, gotchas, and worked examples. Use a code block for anything a
-                reader would otherwise have to reconstruct from prose. Emphasis and links are
-                structured inline runs, not markdown syntax.
-                """)
 _ARCHITECTURE = PageType(
     tag="architecture",
     name="Architecture node",
@@ -74,7 +65,14 @@ _ARCHITECTURE = PageType(
                 through what path.
                 """)
         ,)),
-        SectionSpec("details", "Details", (_DETAILS,)),
+        SectionSpec("details", "Details", (
+            _blocks("body", block_kinds=(_paragraph_runs(), _code_block()), description="""
+                Design notes that do not fit the fixed sections: rationale, trade-offs that were
+                considered and rejected, gotchas, and worked examples. Use a code block for anything a
+                reader would otherwise have to reconstruct from prose. Emphasis and links are
+                structured inline runs, not markdown syntax.
+                """),
+        )),
         SectionSpec("codeReferences", "Code references", (
             _list("items", element_fields=("file", "symbol", "kind"), description="""
                 Each a pointer into real source: the repo-relative file path, the symbol when the
@@ -115,7 +113,7 @@ _ARCHITECTURE = PageType(
         # `details` is a `blocks` field with a deliberately narrow surface: a prose note (inline
         # runs) or a code note, plus the universal remove/reorder.
         *blocks_cmds(
-            "details", _DETAILS,
+            "details",
             remove_name="removeNote", remove_desc="remove a note block",
             reorder_name="reorderNote",
             reorder_desc="move a note block to an anchored position (precedingId guards a stale read)"),
@@ -137,28 +135,6 @@ _ARCHITECTURE = PageType(
         initial="authoring",
         states=("authoring", "current"),
         terminal_states=("current",),
-        state_guidance=(("authoring", """
-            authoring - documents a part of the system that already exists, written by reading
-            that code rather than recalling it. The work of it:
-
-            - Fix the boundary first: one part, one granularity, a job stated in one line. If
-              that line needs an "and", it is two nodes.
-            - Describe what is there today. Aspirational architecture belongs in a feature
-              brief, and a page mixing the two describes neither.
-            - Write what one file cannot show: why it exists, where its boundary runs, what
-              crosses it, what must stay true. Point at a symbol rather than copy it.
-            - Say which side of the pure/effectful line the node sits on, and where that line
-              runs inside it. A reader deciding where new behaviour belongs needs that first.
-            - Write invariants that can be checked and broken, with what breaks when violated.
-              "Stays consistent" is not one.
-            - Record dependencies in the direction this node experiences them, naming what
-              crosses the boundary.
-            - Confirm each code reference by opening it, then record the commit you read at.
-
-            Why it is shaped this way belongs in a decision record, linked from here. Keep the
-            page at the scale of its siblings, and when the code moves on mark it stale rather
-            than leave it describing an older system - a stale page is locked until markCurrent
-            brings it back here.
-            """),),
+        status_guidance=(("authoring", ARCHITECTURE_AUTHORING),),
     ),
 )
