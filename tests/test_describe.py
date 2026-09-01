@@ -116,7 +116,7 @@ def test_describe_mutations_is_full_catalog():
     assert by_name["setBody"]["available"] is True
 
 
-def test_describe_fsm_projects_state_guidance():
+def test_describe_fsm_projects_status_guidance():
     """The guidance rides on the FSM projection, which is how doc generation reads it."""
     described = describe_page_type(FLOW)["fsm"]
     assert described["stateGuidance"] == {

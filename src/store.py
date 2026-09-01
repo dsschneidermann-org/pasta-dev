@@ -479,9 +479,9 @@ class Store:
             if focus is not None and not focus.archived:
                 focus_type = get_page_type(focus.type)
                 if focus_type is not None:
-                    state_guidance = guidance_for(focus_type.fsm, focus.status)
-                    if state_guidance is not None:
-                        result["guidance"] = state_guidance
+                    status_guidance = guidance_for(focus_type.fsm, focus.status)
+                    if status_guidance is not None:
+                        result["guidance"] = status_guidance
                     result.update(workspace_guidance_for(
                         focus_type, focus.status, workspace.guidance_config))
         return result

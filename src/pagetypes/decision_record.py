@@ -111,6 +111,6 @@ _DECISION_RECORD = PageType(
         initial="authoring",
         states=("authoring", "accepted"),
         terminal_states=("accepted",),
-        state_guidance=(("authoring", DECISION_RECORD_AUTHORING),),
+        status_guidance=(("authoring", DECISION_RECORD_AUTHORING),),
     ),
 )

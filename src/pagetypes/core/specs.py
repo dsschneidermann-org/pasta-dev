@@ -84,7 +84,7 @@ class FSMSpec:
     transitions: only states listed here are authoring-locked. An authoring command can opt out by naming
     the terminal state in `legal_in`.
 
-    `state_guidance` is the stage instruction for a status - what the state you just entered is
+    `status_guidance` is the stage instruction for a status - what the state you just entered is
     for - echoed by the write path and used to open that state's generated doc page. It is a
     tuple of `(state, text)` pairs, not a mapping, because this spec is the `@lru_cache` key in
     `fsm._machine_class`. Leaving a state undeclared is the normal case.
@@ -94,21 +94,21 @@ class FSMSpec:
     states: tuple[str, ...]
     transitions: tuple[tuple[str, str, str, str], ...] = ()
     terminal_states: tuple[str, ...] = ()
-    state_guidance: tuple[tuple[str, str], ...] = ()
+    status_guidance: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self):
         # Setup only: normalize each guidance text as authored (dedent a
         # newline-stripped block, then rstrip). The state names are checked by
         # validate_fsm_spec, not here.
         normalized = tuple((state, dedent(text.strip("\n")).rstrip())
-                           for state, text in self.state_guidance)
-        object.__setattr__(self, "state_guidance", normalized)
+                           for state, text in self.status_guidance)
+        object.__setattr__(self, "status_guidance", normalized)
 
 
-def guidance_for(self: FSMSpec, state: str) -> str | None:
-    """The stage instruction for `state`, or None when the type declares none for it."""
-    for name, text in self.state_guidance:
-        if name == state:
+def guidance_for(self: FSMSpec, status: str) -> str | None:
+    """The stage instruction for `status`, or None when the type declares none for it."""
+    for name, text in self.status_guidance:
+        if name == status:
             return text
     return None
 

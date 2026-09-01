@@ -116,7 +116,7 @@ _SIMPLE_CHANGE = PageType(
         name="SimpleChange",
         initial="draft",
         states=("draft", "open", "review", "done", "closed"),
-        state_guidance=(
+        status_guidance=(
             ("draft", SIMPLE_CHANGE_DRAFT),
             ("open", SIMPLE_CHANGE_OPEN),
             ("review", REVIEW),

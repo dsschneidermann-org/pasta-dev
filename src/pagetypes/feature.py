@@ -282,7 +282,7 @@ _FEATURE_BRIEF = PageType(
         states=("draft", "grounding", "spec", "planning", "planReview", "building", "review",
                 "shipped", "abandoned"),
         terminal_states=("shipped", "abandoned"),
-        state_guidance=(
+        status_guidance=(
             ("grounding", GROUNDING),
             ("spec", SPEC),
             ("planning", PLANNING),

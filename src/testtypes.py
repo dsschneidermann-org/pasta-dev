@@ -249,7 +249,7 @@ TEST_FLOW = PageType(
         states=("draft", "open", "closed"),
         terminal_states=("closed",),
         # Only `open` is guided, leaving draft and closed to fixture the unguided paths.
-        state_guidance=(("open", """
+        status_guidance=(("open", """
             open - the work is under way.
             Record a commit with close when it is finished.
             """),),
@@ -322,7 +322,7 @@ TEST_LIFECYCLE = PageType(
         initial="draft",
         states=("draft", "planning", "building", "review", "done", "abandoned"),
         terminal_states=("done", "abandoned"),
-        state_guidance=(("review", """
+        status_guidance=(("review", """
             review - the build is done.
             Check the child steps and checks before the ship gate.
             """),),
@@ -440,7 +440,7 @@ TEST_CHILD = PageType(
         initial="draft",
         states=("draft", "ready"),
         # A guided initial state, which is what makes createPage's echo testable.
-        state_guidance=(("draft", "draft - write the steps and checks here."),),
+        status_guidance=(("draft", "draft - write the steps and checks here."),),
     ),
 )
 

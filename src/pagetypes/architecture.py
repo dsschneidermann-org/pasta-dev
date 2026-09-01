@@ -135,6 +135,6 @@ _ARCHITECTURE = PageType(
         initial="authoring",
         states=("authoring", "current"),
         terminal_states=("current",),
-        state_guidance=(("authoring", ARCHITECTURE_AUTHORING),),
+        status_guidance=(("authoring", ARCHITECTURE_AUTHORING),),
     ),
 )

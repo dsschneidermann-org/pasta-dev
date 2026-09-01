@@ -384,14 +384,14 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
 
 
 def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
-    """Every state_guidance pair names a declared state, and no state twice."""
+    """Every status_guidance pair names a declared state, and no state twice."""
     errors: list[str] = []
     seen: set[str] = set()
-    for state, _text in fsm.state_guidance:
+    for state, _text in fsm.status_guidance:
         if state not in fsm.states:
-            errors.append(f"{fsm.name}: state_guidance names unknown state '{state}'.")
+            errors.append(f"{fsm.name}: status_guidance names unknown state '{state}'.")
         elif state in seen:
-            errors.append(f"{fsm.name}: state_guidance names '{state}' twice.")
+            errors.append(f"{fsm.name}: status_guidance names '{state}' twice.")
         seen.add(state)
     return errors
 

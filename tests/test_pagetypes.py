@@ -491,30 +491,30 @@ def test_collect_ref_ids_across_shapes():
     assert collect_ref_ids(INLINE_RUNS, [{"ref": 123}]) == []
 
 
-# --- FSMSpec.state_guidance --------------------------------------------------
-def test_state_guidance_normalizes_authored_text():
+# --- FSMSpec.status_guidance --------------------------------------------------
+def test_status_guidance_normalizes_authored_text():
     # Authored as an indented block; it must arrive as written, wrap breaks kept.
     spec = FSMSpec(name="G", initial="a", states=("a", "b"),
-                   state_guidance=(("b", "\n    line one\n    line two\n  "),))
+                   status_guidance=(("b", "\n    line one\n    line two\n  "),))
     assert guidance_for(spec, "b") == "line one\nline two"
 
 
 def test_guidance_for_returns_none_for_undeclared_state():
     # None rather than "", so the caller can tell undeclared from empty.
     spec = FSMSpec(name="G", initial="a", states=("a", "b"),
-                   state_guidance=(("b", "some guidance"),))
+                   status_guidance=(("b", "some guidance"),))
     assert guidance_for(spec, "a") is None
 
 
-def test_state_guidance_rejects_unknown_state():
+def test_status_guidance_rejects_unknown_state():
     # A typo in a state name is reported by the validator, not silently never appearing.
-    fsm = FSMSpec(name="G", initial="a", states=("a",), state_guidance=(("nope", "x"),))
+    fsm = FSMSpec(name="G", initial="a", states=("a",), status_guidance=(("nope", "x"),))
     assert any("unknown state" in error for error in validate_fsm_spec(fsm))
 
 
-def test_state_guidance_rejects_duplicate_state():
+def test_status_guidance_rejects_duplicate_state():
     fsm = FSMSpec(name="G", initial="a", states=("a",),
-                  state_guidance=(("a", "x"), ("a", "y")))
+                  status_guidance=(("a", "x"), ("a", "y")))
     assert any("twice" in error for error in validate_fsm_spec(fsm))
 
 
@@ -526,7 +526,7 @@ def test_every_production_guidance_text_comes_from_the_stage_guidance_module():
                  if name.isupper() and isinstance(value, str)}
     declared = [(tag, state, text)
                 for tag, page_type in REGISTRY.items()
-                for state, text in page_type.fsm.state_guidance]
+                for state, text in page_type.fsm.status_guidance]
     assert declared, "no production page type declares stage guidance"
     for tag, state, text in declared:
         assert text in constants, f"{tag}.{state} guidance is not a _stage_guidance constant"
@@ -1017,7 +1017,7 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
         sections=(SectionSpec("body", "Body", (body,)),),
         commands=(set_prose_cmd("body"), *blocks_cmds("body")),
         fsm=FSMSpec(name="XBroken", initial="active", states=("active",),
-                    state_guidance=(("nope", "x"),)),
+                    status_guidance=(("nope", "x"),)),
     )
     with pytest.raises(ValueError) as exc:
         validate_page_types({broken.tag: broken})

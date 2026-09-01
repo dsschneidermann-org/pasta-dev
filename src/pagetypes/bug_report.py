@@ -129,7 +129,7 @@ _BUG_REPORT = PageType(
         name="BugReport",
         initial="draft",
         states=("draft", "open", "review", "done", "closed"),
-        state_guidance=(
+        status_guidance=(
             ("draft", BUG_REPORT_DRAFT),
             ("open", BUG_REPORT_OPEN),
             ("review", REVIEW),
