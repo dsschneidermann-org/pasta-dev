@@ -22,6 +22,6 @@ _TOC = PageType(
     fsm=FSMSpec(
         name="Toc",
         initial="active",
-        states=("active",),
+        statuses=("active",),
     ),
 )

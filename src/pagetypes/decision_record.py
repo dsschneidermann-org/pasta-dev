@@ -109,8 +109,8 @@ _DECISION_RECORD = PageType(
     fsm=FSMSpec(
         name="DecisionRecord",
         initial="authoring",
-        states=("authoring", "accepted"),
-        terminal_states=("accepted",),
+        statuses=("authoring", "accepted"),
+        terminal_statuses=("accepted",),
         status_guidance=(("authoring", DECISION_RECORD_AUTHORING),),
     ),
 )

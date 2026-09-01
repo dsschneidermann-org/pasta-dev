@@ -345,7 +345,7 @@ def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
     errors: list[str] = []
     descriptions: dict[str, tuple[str, str]] = {}   # field -> (description, first tag to declare it)
     for tag, page_type in registry.items():
-        states = set(page_type.fsm.states)
+        statuses = set(page_type.fsm.statuses)
         for spec in page_type.workspace_guidance:
             if not spec.field:
                 errors.append(f"{tag}: a workspace guidance declares an empty field name.")
@@ -353,7 +353,7 @@ def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
                 errors.append(
                     f"{tag}: workspace guidance '{spec.field}' declares no guidance_for statuses.")
             for status in spec.guidance_for:
-                if status not in states:
+                if status not in statuses:
                     errors.append(
                         f"{tag}: workspace guidance '{spec.field}' names unknown status '{status}'.")
             if not spec.description:
@@ -388,7 +388,7 @@ def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
     errors: list[str] = []
     seen: set[str] = set()
     for state, _text in fsm.status_guidance:
-        if state not in fsm.states:
+        if state not in fsm.statuses:
             errors.append(f"{fsm.name}: status_guidance names unknown state '{state}'.")
         elif state in seen:
             errors.append(f"{fsm.name}: status_guidance names '{state}' twice.")

@@ -47,7 +47,7 @@ from .core.pagetype import PageType
 
 _STEP_FSM = ElementFSMSpec(
     name="Step",
-    initial="todo", states=("todo", "done", "skipped"),
+    initial="todo", statuses=("todo", "done", "skipped"),
     transitions=(("markDone", "todo", "done", "agent"),
                  ("reopen", "done", "todo", "agent"),
                  ("skip", "todo", "skipped", "agent"),
@@ -56,7 +56,7 @@ _STEP_FSM = ElementFSMSpec(
 )
 _CASE_FSM = ElementFSMSpec(
     name="Case",
-    initial="pending", states=("pending", "passed", "failed", "skipped"),
+    initial="pending", statuses=("pending", "passed", "failed", "skipped"),
     transitions=(("pass", "pending", "passed", "agent"),
                  ("fail", "pending", "failed", "agent"),
                  ("skip", "pending", "skipped", "agent")),
@@ -64,7 +64,7 @@ _CASE_FSM = ElementFSMSpec(
 )
 _QUESTION_FSM = ElementFSMSpec(
     name="Question",
-    initial="open", states=("open", "answered"),
+    initial="open", statuses=("open", "answered"),
     transitions=(("answer", "open", "answered", "agent"),),
 )
 
@@ -279,9 +279,9 @@ _FEATURE_BRIEF = PageType(
     fsm=FSMSpec(
         name="FeatureBrief",
         initial="draft",
-        states=("draft", "grounding", "spec", "planning", "planReview", "building", "review",
+        statuses=("draft", "grounding", "spec", "planning", "planReview", "building", "review",
                 "shipped", "abandoned"),
-        terminal_states=("shipped", "abandoned"),
+        terminal_statuses=("shipped", "abandoned"),
         status_guidance=(
             ("grounding", GROUNDING),
             ("spec", SPEC),
@@ -338,7 +338,7 @@ _FEATURE_SPEC = PageType(
             ), description="""
                 The design in enough detail that a plan can be written from it without making further
                 decisions: the behaviour, the interfaces with their exact signatures and types, the
-                data shapes, the states, and the error paths. Separate the pure logic from the code
+                data shapes, the statuses, and the error paths. Separate the pure logic from the code
                 that performs effects and give each its own interfaces: what is a function of its
                 inputs alone, and what needs I/O, storage, the clock or randomness. The rules belong
                 on the pure side, and the effectful side should be thin enough to hold none of them.
@@ -385,8 +385,8 @@ _FEATURE_SPEC = PageType(
     fsm=FSMSpec(
         name="FeatureSpec",
         initial="draft",
-        states=("draft", "sealed"),
-        terminal_states=("sealed",),
+        statuses=("draft", "sealed"),
+        terminal_statuses=("sealed",),
     ),
 )
 
@@ -454,7 +454,7 @@ _IMPLEMENTATION_PLAN = PageType(
     fsm=FSMSpec(
         name="ImplementationPlan",
         initial="draft",
-        states=("draft", "ready"),
+        statuses=("draft", "ready"),
     ),
 )
 
@@ -496,6 +496,6 @@ _TESTING_PLAN = PageType(
     fsm=FSMSpec(
         name="TestingPlan",
         initial="draft",
-        states=("draft", "ready"),
+        statuses=("draft", "ready"),
     ),
 )

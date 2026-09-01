@@ -92,7 +92,7 @@ def _command_summary(command: CommandSpec) -> dict[str, Any]:
 def describe_fsm(page_type: PageType) -> dict[str, Any]:
     return {
         "initial": page_type.fsm.initial,
-        "states": list(page_type.fsm.states),
+        "statuses": list(page_type.fsm.statuses),
         "transitions": [
             {"event": event, "source": source, "dest": dest, "agency": agency}
             for event, source, dest, agency in page_type.fsm.transitions
@@ -118,8 +118,8 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         "kind": field_spec.kind,
                         "choices": list(field_spec.choices) if field_spec.choices else None,
                         "elementFields": list(field_spec.element_fields) if field_spec.element_fields else None,
-                        # for a list with a per-element lifecycle: its states (e.g. todo/done)
-                        "elementStates": list(field_spec.element_fsm.states) if field_spec.element_fsm else None,
+                        # for a list with a per-element lifecycle: its statuses (e.g. todo/done)
+                        "elementStates": list(field_spec.element_fsm.statuses) if field_spec.element_fsm else None,
                         # for a list whose element fields hold blocks: each field and the kinds it accepts
                         "elementBlocks": ([{"field": element_blocks.field,
                                             "kinds": [block.kind for block in element_blocks.block_kinds]}

@@ -663,7 +663,7 @@ class Store:
         the modelled transition guards. This is a human admin override (the web page view's state
         dropdown), not a modelled FSM edge - it exists so a person can correct a page's state from
         the browser. Rejects a missing page, an unregistered type, and a status that isn't one of
-        the type's declared FSM states. Returns the updated page.
+        the type's declared FSM statuses. Returns the updated page.
         """
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
@@ -676,7 +676,7 @@ class Store:
             if not fsm.is_valid_status(page_type.fsm, status):
                 raise ValidationError(
                     f"'{status}' is not a valid state for page type '{page.type}'. " +
-                    f"Valid states: {', '.join(page_type.fsm.states)}."
+                    f"Valid statuses: {', '.join(page_type.fsm.statuses)}."
                 )
             page.status = status
             # A direct status edit regenerates the stamp too, so an out-of-band move invalidates held tokens.

@@ -123,7 +123,7 @@ def test_describe_fsm_projects_status_guidance():
         "open": "open - the work is under way.\nRecord a commit with close when it is finished."
     }
     # Pre-existing keys untouched, so describePageType stays backward compatible.
-    assert described["initial"] == "draft" and described["states"] == ["draft", "open", "closed"]
+    assert described["initial"] == "draft" and described["statuses"] == ["draft", "open", "closed"]
     # A type declaring none projects an empty mapping rather than omitting the key.
     assert describe_page_type(get_page_type("test-blocks"))["fsm"]["stateGuidance"] == {}
 

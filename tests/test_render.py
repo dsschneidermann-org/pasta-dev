@@ -643,7 +643,7 @@ def test_render_child_pages_web_escapes_child_label():
 # The production `toc` type is off-limits under the test-mode guard (get_page_type("toc") raises), so
 # we build a tag="toc" PageType directly to drive the render branch that keys on page_type.tag.
 TOC = PageType(tag="toc", name="Table of contents", description="", sections=(), commands=(),
-               fsm=FSMSpec(name="Toc", initial="active", states=("active",)))
+               fsm=FSMSpec(name="Toc", initial="active", statuses=("active",)))
 
 
 def _toc_with_children(child_ids):

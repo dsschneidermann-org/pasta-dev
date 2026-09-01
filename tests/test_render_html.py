@@ -370,7 +370,7 @@ def test_render_page_html_toc_is_its_child_list_alone():
     # which blocks resolving the production toc type but does not stop a test building its own.
     toc = PageType(tag="toc", name="Toc fixture", description="local toc for the render test",
                    sections=(), commands=(),
-                   fsm=FSMSpec(name="LocalToc", initial="active", states=("active",)))
+                   fsm=FSMSpec(name="LocalToc", initial="active", statuses=("active",)))
     page = Page(id="toc:1", type="toc", title="Contents", status="active", child_ids=["a:1"])
     out = render_page_html(page, toc, _context())
     assert '<h1 class="page-title">Contents</h1>' in out

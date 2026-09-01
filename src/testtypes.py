@@ -22,7 +22,7 @@ role:
                          ``abandon`` to a terminal state, a questions element-FSM + escalate, a
                          pinned auto-child, a ``beginImplementation`` guarded on that child's page
                          status (page-status guard), and a ``ship`` guarded on that child's element
-                         states (element-status guards).
+                         statuses (element-status guards).
   - ``test-child``     - the pinned auto-child of ``test-lifecycle``: two element FSMs (todo/done
                          steps and pending/passed/failed checks, covering every checkbox render
                          case), a ``legal_in`` content lock where structural edits are draft-only
@@ -92,7 +92,7 @@ from .pagetypes.core.pagetype import PageType
 # Named distinctly from production so their diagram labels and cache identity never collide.
 _STEP_FSM = ElementFSMSpec(
     name="TestStep",
-    initial="todo", states=("todo", "done", "skipped"),
+    initial="todo", statuses=("todo", "done", "skipped"),
     transitions=(("markDone", "todo", "done", "agent"),
                  ("reopen", "done", "todo", "agent"),
                  ("skip", "todo", "skipped", "agent"),
@@ -101,7 +101,7 @@ _STEP_FSM = ElementFSMSpec(
 )
 _CHECK_FSM = ElementFSMSpec(
     name="TestCheck",
-    initial="pending", states=("pending", "passed", "failed", "skipped"),
+    initial="pending", statuses=("pending", "passed", "failed", "skipped"),
     transitions=(("pass", "pending", "passed", "agent"),
                  ("fail", "pending", "failed", "agent"),
                  ("skip", "pending", "skipped", "agent")),
@@ -109,7 +109,7 @@ _CHECK_FSM = ElementFSMSpec(
 )
 _QUESTION_FSM = ElementFSMSpec(
     name="TestQuestion",
-    initial="open", states=("open", "answered"),
+    initial="open", statuses=("open", "answered"),
     transitions=(("answer", "open", "answered", "agent"),),
 )                                                # no checkmark_done -> open/answered render without a box
 
@@ -145,7 +145,7 @@ TEST_FIELDS = PageType(
         add_link_cmd(),
         set_title_cmd(),
     ),
-    fsm=FSMSpec(name="TestFields", initial="active", states=("active",)),
+    fsm=FSMSpec(name="TestFields", initial="active", statuses=("active",)),
 )
 
 
@@ -167,7 +167,7 @@ TEST_BLOCKS = PageType(
     # The field is passed to both its section and its factory, so its vocabulary - here the
     # default, every standard kind - is declared once.
     commands=(*blocks_cmds("body"), add_link_cmd(), set_title_cmd()),
-    fsm=FSMSpec(name="TestBlocks", initial="active", states=("active",)),
+    fsm=FSMSpec(name="TestBlocks", initial="active", statuses=("active",)),
 )
 
 
@@ -207,7 +207,7 @@ TEST_ELEMENT_BLOCKS = PageType(
         add_link_cmd(),
         set_title_cmd(),
     ),
-    fsm=FSMSpec(name="TestElementBlocks", initial="draft", states=("draft", "ready")),
+    fsm=FSMSpec(name="TestElementBlocks", initial="draft", statuses=("draft", "ready")),
 )
 
 
@@ -246,8 +246,8 @@ TEST_FLOW = PageType(
     fsm=FSMSpec(
         name="TestFlow",
         initial="draft",
-        states=("draft", "open", "closed"),
-        terminal_states=("closed",),
+        statuses=("draft", "open", "closed"),
+        terminal_statuses=("closed",),
         # Only `open` is guided, leaving draft and closed to fixture the unguided paths.
         status_guidance=(("open", """
             open - the work is under way.
@@ -260,9 +260,9 @@ TEST_FLOW = PageType(
 # ============================================================================
 # test-lifecycle - the rich status FSM: required-content preconditions on transitions, agency
 # variety (agent / human / either), a multi-source `abandon` OR-combined to a terminal state,
-# terminal states, a questions element-FSM + escalate (feeds `attention`), a pinned auto-child,
+# terminal statuses, a questions element-FSM + escalate (feeds `attention`), a pinned auto-child,
 # a `beginImplementation` guarded on that child's page status (a page-status ChildStateGuard),
-# and `submitForReview` + `ship` guarded on that child's element states (element-status
+# and `submitForReview` + `ship` guarded on that child's element statuses (element-status
 # ChildStateGuards whose allowed set accepts done/passed or skipped).
 # ============================================================================
 TEST_LIFECYCLE = PageType(
@@ -294,7 +294,7 @@ TEST_LIFECYCLE = PageType(
         # form of ChildStateGuard, evaluated in the store).
         transition_cmd("beginImplementation", "planning -> building", requires=(("parts", "items"),),
                        guards=(ChildStateGuard("test-child", ("ready",), "the test-child must be marked ready"),)),
-        # `submitForReview` and `ship` are both guarded on the child's element states: every step
+        # `submitForReview` and `ship` are both guarded on the child's element statuses: every step
         # done-or-skipped and every check passed-or-skipped (element-status guards checked across the
         # page's child pages by the store). The review gate refuses unaddressed work; a skipped item
         # counts as addressed at both.
@@ -320,8 +320,8 @@ TEST_LIFECYCLE = PageType(
     fsm=FSMSpec(
         name="TestLifecycle",
         initial="draft",
-        states=("draft", "planning", "building", "review", "done", "abandoned"),
-        terminal_states=("done", "abandoned"),
+        statuses=("draft", "planning", "building", "review", "done", "abandoned"),
+        terminal_statuses=("done", "abandoned"),
         status_guidance=(("review", """
             review - the build is done.
             Check the child steps and checks before the ship gate.
@@ -329,7 +329,7 @@ TEST_LIFECYCLE = PageType(
     ),
     # On createPage, create the pinned child in the same commit; author into it.
     auto_children=(AutoChildSpec("test-child"),),
-    # Workspace-guidance fields for the tests: one shown across two states, one at a single state,
+    # Workspace-guidance fields for the tests: one shown across two statuses, one at a single state,
     # and one at the initial state.
     workspace_guidance=(
         WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses"),
@@ -438,7 +438,7 @@ TEST_CHILD = PageType(
     fsm=FSMSpec(
         name="TestChild",
         initial="draft",
-        states=("draft", "ready"),
+        statuses=("draft", "ready"),
         # A guided initial state, which is what makes createPage's echo testable.
         status_guidance=(("draft", "draft - write the steps and checks here."),),
     ),

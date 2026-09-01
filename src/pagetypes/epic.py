@@ -30,7 +30,7 @@ from .core.pagetype import PageType
 
 _QUESTION_FSM = ElementFSMSpec(
     name="Question",
-    initial="open", states=("open", "answered"),
+    initial="open", statuses=("open", "answered"),
     transitions=(("answer", "open", "answered", "agent"),),
 )
 
@@ -215,9 +215,9 @@ _EPIC = PageType(
     fsm=FSMSpec(
         name="Epic",
         initial="draft",
-        states=("draft", "grounding", "decomposition", "planReview",
+        statuses=("draft", "grounding", "decomposition", "planReview",
                 "executing", "review", "shipped", "abandoned"),
-        terminal_states=("shipped", "abandoned"),
+        terminal_statuses=("shipped", "abandoned"),
     ),
     # On createPage, create the pinned agent plan in the same commit; author into it.
     auto_children=(AutoChildSpec("agent-plan"),),
@@ -244,7 +244,7 @@ _MODEL_TIERS = ("cheap", "standard", "capable")
 # records how many attempts a workstream took.
 _DISPATCH_FSM = ElementFSMSpec(
     name="Dispatch",
-    initial="pending", states=("pending", "dispatched", "reported", "accepted", "blocked"),
+    initial="pending", statuses=("pending", "dispatched", "reported", "accepted", "blocked"),
     transitions=(("dispatch", "pending", "dispatched", "agent"),
                  ("report", "dispatched", "reported", "agent"),
                  ("accept", "reported", "accepted", "agent"),
@@ -345,6 +345,6 @@ _AGENT_PLAN = PageType(
     fsm=FSMSpec(
         name="AgentPlan",
         initial="draft",
-        states=("draft", "ready"),
+        statuses=("draft", "ready"),
     ),
 )
