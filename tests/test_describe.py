@@ -119,13 +119,13 @@ def test_describe_mutations_is_full_catalog():
 def test_describe_fsm_projects_status_guidance():
     """The guidance rides on the FSM projection, which is how doc generation reads it."""
     described = describe_page_type(FLOW)["fsm"]
-    assert described["stateGuidance"] == {
+    assert described["statusGuidance"] == {
         "open": "open - the work is under way.\nRecord a commit with close when it is finished."
     }
     # Pre-existing keys untouched, so describePageType stays backward compatible.
     assert described["initial"] == "draft" and described["statuses"] == ["draft", "open", "closed"]
     # A type declaring none projects an empty mapping rather than omitting the key.
-    assert describe_page_type(get_page_type("test-blocks"))["fsm"]["stateGuidance"] == {}
+    assert describe_page_type(get_page_type("test-blocks"))["fsm"]["statusGuidance"] == {}
 
 
 def test_add_reports_its_block_argument_shape():

@@ -98,7 +98,7 @@ def describe_fsm(page_type: PageType) -> dict[str, Any]:
             for event, source, dest, agency in page_type.fsm.transitions
         ],
         # A dict is safe here - a projection, unlike the FSMSpec, which must stay hashable.
-        "stateGuidance": dict(page_type.fsm.status_guidance),
+        "statusGuidance": dict(page_type.fsm.status_guidance),
     }
 
 
