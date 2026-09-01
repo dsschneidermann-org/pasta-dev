@@ -297,8 +297,8 @@ def test_mutate_page_batch_carries_guidance_inside_next_on_a_transition(mcp):
 
 
 def test_mutate_page_batch_carries_guidance_on_a_content_only_write(mcp):
-    """The stage text instructs the status the page is IN, so it rides every write - a stage is
-    worked through many content-only writes and at most one transition."""
+    """The stage text instructs the status the page currently sits at, so it rides every write - a
+    stage is worked through many content-only writes and at most one transition."""
     workspace_id, page_id = _flow_page(mcp)
     _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id,
                   "commands": [{"command": "open"}]})
