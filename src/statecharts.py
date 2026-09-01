@@ -11,18 +11,22 @@ from __future__ import annotations
 
 from .fsm import machine_class
 from .pagetypes.core.pagetype import get_pagetype_field
-from .pagetypes._registry import get_page_type
+from .pagetypes._registry import REGISTRY
+
+# One binding per production page type, so these lookups name REGISTRY rather than
+# `registered_pagetypes()`: the documentation site is generated from the production types, and a
+# module binding classes at import must not depend on which registry is in play at import time.
 
 
 def _page_fsm(tag: str):
-    page = get_page_type(tag)
+    page = REGISTRY.get(tag)
     if page is None:
         raise KeyError(f"Unknown page type {tag!r}.")
     return page.fsm
 
 
 def _element_fsm(tag: str, section: str, field: str):
-    page = get_page_type(tag)
+    page = REGISTRY.get(tag)
     if page is None:
         raise KeyError(f"Unknown page type {tag!r}.")
     field_spec = get_pagetype_field(page, section, field)
@@ -64,7 +68,7 @@ def page_machine_qualname(tag: str) -> str:
     maintained tag→name map, so a newly registered type that forgets its binding raises loudly
     instead of silently going undocumented.
     """
-    page_type = get_page_type(tag)
+    page_type = REGISTRY.get(tag)
     if page_type is None:
         raise KeyError(f"Unknown page type {tag!r}.")
     target = machine_class(page_type.fsm)

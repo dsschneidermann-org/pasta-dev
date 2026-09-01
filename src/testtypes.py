@@ -37,10 +37,11 @@ Tests assert against these fixtures so a production page type can be enriched fr
 churning the suite; production types are trusted to reuse these same patterns and are verified only
 through the generic invariants, the registered set, the description directive, and doc generation.
 
-These types are RESOLVABLE by ``get_page_type`` (so the store, renderer, and pure core operate on a
-test page like any other) but HIDDEN from discovery - the ``describePageType`` listing and doc-gen
-enumeration - unless the test-only ``expose_test_types()`` flag is set (see src.pagetypes). They
-are deliberately NOT bound in src.statecharts, so they are not documentable.
+Under test mode these types stand in for the production registry (see src.pagetypes._registry): they
+are what ``registered_pagetypes()`` hands back, so the store, renderer, and pure core operate on a
+test page like any other and the ``describePageType`` listing advertises them. Outside test mode they
+neither resolve nor list. They are deliberately NOT bound in src.statecharts, so they are not
+documentable.
 
 Command DECLARATION flows through the SAME shared command-helper factories the production types use
 (``set_prose_cmd`` / ``set_scalar_cmd`` / ``list_cmds`` / ``element_cmds`` / ``set_element_field_cmd`` /

@@ -18,12 +18,12 @@ from src.docsgen import (
 )
 from src.pagetypes.core.pagetype import get_pagetype_command, get_pagetype_field
 from src.pagetypes.core.specs import status_guidance
-from src.pagetypes._registry import REGISTRY, get_page_type
+from src.pagetypes._registry import get_page_type, registered_pagetypes
 from src.statecharts import page_machine_qualname
 
 # Migration note: the PURE FSM-analysis tests below (reachable_states, ignore_requirements) pin to
 # the hand-authored test fixtures (src.testtypes), so enriching a production FSM never churns
-# them. The `state_docs`-pipeline tests further down stay on the production REGISTRY on purpose:
+# them. The `state_docs`-pipeline tests further down stay on the production registry on purpose:
 # state_docs resolves each type's diagram class via `page_machine_qualname`, which is bound (in
 # src.statecharts) for production types ONLY. Documenting a fixture is a deliberate non-goal, so
 # those tests - and the registry-wide coverage/qualname tests - must track production.
@@ -38,6 +38,15 @@ def _production_mode():
     set_test_mode(True)
 
 
+@pytest.fixture
+def fixture_types(_production_mode):
+    # The FSM-analysis tests read the hand-authored fixtures, which the registry hands back only
+    # under test mode - so they step back into it, past this module's production default.
+    set_test_mode(True)
+    yield
+    set_test_mode(False)
+
+
 def _counter():
     state = {"n": 0}
 
@@ -49,7 +58,7 @@ def _counter():
 
 
 # --- reachable_states --------------------------------------------------------
-def test_reachable_states_lifecycle_shortest_paths():
+def test_reachable_states_lifecycle_shortest_paths(fixture_types):
     paths = reachable_states(get_page_type("test-lifecycle").fsm)
     assert paths["draft"] == []                       # initial
     assert paths["planning"] == ["beginPlanning"]
@@ -58,26 +67,26 @@ def test_reachable_states_lifecycle_shortest_paths():
     assert paths["abandoned"] == ["abandon"]          # BFS finds the direct draft->abandoned edge
 
 
-def test_reachable_states_single_state_blocks():
+def test_reachable_states_single_state_blocks(fixture_types):
     assert reachable_states(get_page_type("test-blocks").fsm) == {"active": []}
 
 
 def test_every_declared_state_is_reachable():
     # Doc coverage depends on this: an unreachable state gets no page and no :events: path.
-    for tag, page_type in REGISTRY.items():
+    for tag, page_type in registered_pagetypes().items():
         reachable = reachable_states(page_type.fsm)
         assert set(reachable) == set(page_type.fsm.states), f"{tag} has an unreachable state"
 
 
 # --- ignore_requirements (the "skip validation" support) ---------------------
-def test_ignore_requirements_surfaces_content_gated_transition():
+def test_ignore_requirements_surfaces_content_gated_transition(fixture_types):
     lifecycle = get_page_type("test-lifecycle")
     page = create_page(lifecycle, "F", None, _counter())   # empty draft
     assert legal_commands(page, lifecycle)["beginPlanning"] is False          # requires summary.body
     assert legal_commands(page, lifecycle, ignore_requirements=True)["beginPlanning"] is True
 
 
-def test_ignore_requirements_does_not_bypass_legal_in_lock():
+def test_ignore_requirements_does_not_bypass_legal_in_lock(fixture_types):
     child = get_page_type("test-child")
     ready_child = _seed_page(child, "ready")           # ready locks step edits (legal_in=draft)
     assert legal_commands(ready_child, child, ignore_requirements=True)["addStep"] is False
@@ -85,7 +94,7 @@ def test_ignore_requirements_does_not_bypass_legal_in_lock():
 
 # --- page_machine_qualname ---------------------------------------------------
 def test_page_machine_qualname_resolves_for_every_registered_type():
-    for tag, page_type in REGISTRY.items():
+    for tag, page_type in registered_pagetypes().items():
         qualname = page_machine_qualname(tag)
         module_path, _, name = qualname.rpartition(".")
         resolved = getattr(importlib.import_module(module_path), name)
@@ -102,7 +111,7 @@ def test_page_machine_qualname_unknown_tag_raises():
 def test_all_state_docs_covers_every_reachable_state():
     expected = {
         f"{tag}-{state}"
-        for tag, page_type in REGISTRY.items()
+        for tag, page_type in registered_pagetypes().items()
         for state in reachable_states(page_type.fsm)
     }
     assert set(all_state_docs()) == expected
