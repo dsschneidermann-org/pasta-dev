@@ -14,7 +14,7 @@ from typing import Any
 from ...errors import ValidationError
 from .args import ArgSpec
 from .commands import CommandSpec
-from .fields import FieldSpec, SectionSpec, element_blocks_spec
+from .fields import FieldSpec, SectionSpec, get_element_blocks
 from .specs import (
     ADD_ELEMENT,
     BLOCKS,
@@ -70,7 +70,7 @@ class PageType:
             return arg
         if command.section is None or command.field is None:
             return arg
-        spec = pagetype_field_spec(self, command.section, command.field)
+        spec = get_pagetype_field(self, command.section, command.field)
         if spec is None:
             return arg
         # A list add carries one block argument per block-bearing element field, named after
@@ -81,20 +81,20 @@ class PageType:
             if spec.kind != BLOCKS:
                 return arg
             return replace(arg, block_kinds=spec.block_kinds)
-        element_blocks = element_blocks_spec(spec, element_field)
+        element_blocks = get_element_blocks(spec, element_field)
         if element_blocks is None:
             return arg
         return replace(arg, block_kinds=element_blocks.block_kinds)
 
 
-def pagetype_command(self: PageType, name: str) -> CommandSpec | None:
+def get_pagetype_command(self: PageType, name: str) -> CommandSpec | None:
     for command in self.commands:
         if command.name == name:
             return command
     return None
 
 
-def pagetype_field_spec(self: PageType, section_key: str, field_key: str) -> FieldSpec | None:
+def get_pagetype_field(self: PageType, section_key: str, field_key: str) -> FieldSpec | None:
     for section in self.sections:
         if section.key == section_key:
             for field_spec in section.fields:

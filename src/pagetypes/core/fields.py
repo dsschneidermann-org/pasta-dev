@@ -29,7 +29,7 @@ class FieldSpec:
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
 
 
-def element_blocks_spec(self: FieldSpec, element_field: str) -> ElementBlocksSpec | None:
+def get_element_blocks(self: FieldSpec, element_field: str) -> ElementBlocksSpec | None:
     """The block declaration for `element_field`, or None when it holds a scalar value."""
     for blocks in self.element_blocks:
         if blocks.field == element_field:

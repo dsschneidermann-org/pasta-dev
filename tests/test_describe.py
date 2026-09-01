@@ -6,7 +6,7 @@ from src.describe import (
     describe_mutations,
     describe_page_type,
 )
-from src.pagetypes.core.pagetype import pagetype_command
+from src.pagetypes.core.pagetype import get_pagetype_command
 from src.pagetypes._registry import get_page_type
 
 # Hand-authored capability fixtures (src.testtypes), so enriching a production type never
@@ -26,15 +26,15 @@ def _counter():
 
 
 def test_command_arg_schema_has_required_and_enum():
-    set_kind = pagetype_command(FIELDS, "setKind")
+    set_kind = get_pagetype_command(FIELDS, "setKind")
     schema = command_arg_schema(set_kind)
     assert schema["required"] == ["statusRevisionToken", "kind"]
-    assert schema["properties"]["kind"]["enum"] == list(pagetype_command(FIELDS, "setKind").args[0].choices)
+    assert schema["properties"]["kind"]["enum"] == list(get_pagetype_command(FIELDS, "setKind").args[0].choices)
     assert schema["additionalProperties"] is False
 
 
 def test_command_arg_schema_optional_not_required():
-    add_item = pagetype_command(FIELDS, "addItem")
+    add_item = get_pagetype_command(FIELDS, "addItem")
     schema = command_arg_schema(add_item)
     assert "text" in schema["required"]
     assert "note" not in schema["required"]         # optional
@@ -43,7 +43,7 @@ def test_command_arg_schema_optional_not_required():
 def test_command_arg_schema_lists_the_revision_token_first():
     # The optimistic-concurrency stamp is presented inside args, ahead of a command's own arguments,
     # so it reads as every command's first argument - a content command and a transition alike.
-    for command in (pagetype_command(FIELDS, "setKind"), pagetype_command(FLOW, "open")):
+    for command in (get_pagetype_command(FIELDS, "setKind"), get_pagetype_command(FLOW, "open")):
         schema = command_arg_schema(command)
         assert next(iter(schema["properties"])) == "statusRevisionToken"
         assert schema["required"][0] == "statusRevisionToken"
