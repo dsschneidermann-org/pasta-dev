@@ -104,12 +104,12 @@ ELEMENT_MAPPING = {ADD_ELEMENT, SET_ELEMENT_FIELD, ELEMENT_TRANSITION}
 def test_fsm_is_well_formed(tag: str):
     page_type = ALL_TYPES[tag]
     fsm = page_type.fsm
-    assert fsm.initial in fsm.statuses
+    assert fsm.initial in fsm.states
     # The status transition table is DERIVED from the type's transition/compound commands,
     # and PageType.__post_init__ writes it onto the fsm.
     for _event, source, dest, agency in page_type.fsm.transitions:
-        assert source in fsm.statuses, f"{tag}: transition source {source} not a state"
-        assert dest in fsm.statuses, f"{tag}: transition dest {dest} not a state"
+        assert source in fsm.states, f"{tag}: transition source {source} not a state"
+        assert dest in fsm.states, f"{tag}: transition dest {dest} not a state"
         assert agency in {"agent", "human", "either"}
 
 
@@ -118,14 +118,14 @@ def test_transition_commands_declare_source_and_dest(tag: str):
     """The single-home rule: every transition/compound command declares its source state(s) via
     legal_in and a real destination via dest, and no command maps one event to two different dests."""
     page_type = ALL_TYPES[tag]
-    statuses = set(page_type.fsm.statuses)
+    states = set(page_type.fsm.states)
     event_dests: dict[str, str] = {}
     for command in page_type.commands:
         if command.kind in (TRANSITION, COMPOUND) and command.event is not None:
             assert command.legal_in, f"{tag}.{command.name} has no legal_in source state(s)"
-            assert command.dest in statuses, f"{tag}.{command.name} dest {command.dest} not a state"
+            assert command.dest in states, f"{tag}.{command.name} dest {command.dest} not a state"
             for source in command.legal_in:
-                assert source in statuses, f"{tag}.{command.name} source {source} not a state"
+                assert source in states, f"{tag}.{command.name} source {source} not a state"
             prior = event_dests.setdefault(command.event, command.dest)
             assert prior == command.dest, \
                 f"{tag}: event {command.event} maps to two dests ({prior}, {command.dest})"
@@ -313,7 +313,7 @@ def _drift_type(setter_description: str, field_description: str):
                               (_prose("body", description=field_description),)),),
         commands=(CommandSpec("setSummary", SET_PROSE, setter_description,
                               section="summary", field="body", args=(_text(),)),),
-        fsm=FSMSpec(name="XDrift", initial="active", statuses=("active",)),
+        fsm=FSMSpec(name="XDrift", initial="active", states=("active",)),
     )
 
 
@@ -344,7 +344,7 @@ def test_field_setter_targeting_an_unknown_field_is_still_rejected():
         sections=(SectionSpec("summary", "Summary", (_prose("body", description="x"),)),),
         commands=(CommandSpec("setGhost", SET_PROSE, "set the ghost",
                               section="summary", field="missing", args=(_text(),)),),
-        fsm=FSMSpec(name="XGhost", initial="active", statuses=("active",)),
+        fsm=FSMSpec(name="XGhost", initial="active", states=("active",)),
     )
     assert any("unknown field" in error for error in validate_pagetype_setter_descriptions(ghost))
 
@@ -413,7 +413,7 @@ def test_blocks_body_is_an_inline_run_blocks_field():
 def test_element_fsms_declare_checkmark_done():
     """The checkbox mapping lives on the element FSM (ElementFSMSpec): checkmark_done names the [x]
     state, `initial` is the [ ] state, and an element FSM without checkmark_done renders no box. A
-    page-status FSMSpec has no checkmark_done at all - page statuses are never checkboxes."""
+    page-status FSMSpec has no checkmark_done at all - page states are never checkboxes."""
     step_fsm = get_pagetype_field(CHILD, "steps", "items").element_fsm
     check_fsm = get_pagetype_field(CHILD, "checks", "items").element_fsm
     question_fsm = get_pagetype_field(LIFE, "questions", "items").element_fsm
@@ -494,26 +494,26 @@ def test_collect_ref_ids_across_shapes():
 # --- FSMSpec.status_guidance --------------------------------------------------
 def test_status_guidance_normalizes_authored_text():
     # Authored as an indented block; it must arrive as written, wrap breaks kept.
-    spec = FSMSpec(name="G", initial="a", statuses=("a", "b"),
+    spec = FSMSpec(name="G", initial="a", states=("a", "b"),
                    status_guidance=(("b", "\n    line one\n    line two\n  "),))
     assert status_guidance(spec, "b") == "line one\nline two"
 
 
 def test_status_guidance_returns_none_for_undeclared_state():
     # None rather than "", so the caller can tell undeclared from empty.
-    spec = FSMSpec(name="G", initial="a", statuses=("a", "b"),
+    spec = FSMSpec(name="G", initial="a", states=("a", "b"),
                    status_guidance=(("b", "some guidance"),))
     assert status_guidance(spec, "a") is None
 
 
 def test_status_guidance_rejects_unknown_state():
     # A typo in a state name is reported by the validator, not silently never appearing.
-    fsm = FSMSpec(name="G", initial="a", statuses=("a",), status_guidance=(("nope", "x"),))
+    fsm = FSMSpec(name="G", initial="a", states=("a",), status_guidance=(("nope", "x"),))
     assert any("unknown state" in error for error in validate_fsm_spec(fsm))
 
 
 def test_status_guidance_rejects_duplicate_state():
-    fsm = FSMSpec(name="G", initial="a", statuses=("a",),
+    fsm = FSMSpec(name="G", initial="a", states=("a",),
                   status_guidance=(("a", "x"), ("a", "y")))
     assert any("twice" in error for error in validate_fsm_spec(fsm))
 
@@ -762,7 +762,7 @@ def _resolved(section_key, title, field_spec, commands):
         tag="xtest-resolved-factory", name="Resolved factory", description="ad-hoc",
         sections=(SectionSpec(section_key, title, (field_spec,)),),
         commands=commands,
-        fsm=FSMSpec(name="XTestResolvedFactory", initial="active", statuses=("active",)),
+        fsm=FSMSpec(name="XTestResolvedFactory", initial="active", states=("active",)),
     ).commands
 
 
@@ -890,7 +890,7 @@ def test_two_do_eligible_setters_for_one_field_are_rejected():
         tag="xtest-two-setters", name="Two setters", description="ad-hoc",
         sections=(SectionSpec("body", "Body", (body,)),),
         commands=(set_prose_cmd("body"), *blocks_cmds("body")),
-        fsm=FSMSpec(name="XTestTwoSetters", initial="active", statuses=("active",)),
+        fsm=FSMSpec(name="XTestTwoSetters", initial="active", states=("active",)),
     )
     assert any("two field setters" in error
                for error in validate_pagetype_field_setters(two_setters))
@@ -914,7 +914,7 @@ def test_a_block_argument_is_resolved_from_its_field():
             CommandSpec("removeBlock", REMOVE_BLOCK, "remove a block",
                         section="body", field="body", args=(_text("blockId"),)),
         ),
-        fsm=FSMSpec(name="XTestResolved", initial="active", statuses=("active",)))
+        fsm=FSMSpec(name="XTestResolved", initial="active", states=("active",)))
     add, remove = page_type.commands
     assert add.args[0].block_kinds == body.block_kinds
     assert [block.kind for block in add.args[0].block_kinds or ()] == ["code", "paragraph"]
@@ -964,7 +964,7 @@ def test_a_block_argument_that_cannot_be_resolved_is_reported_by_the_validator()
         return PageType(
             tag="xtest-unresolvable", name="Unresolvable", description="ad-hoc",
             sections=(section_spec,), commands=(command,),
-            fsm=FSMSpec(name="XTestUnresolvable", initial="active", statuses=("active",)))
+            fsm=FSMSpec(name="XTestUnresolvable", initial="active", states=("active",)))
 
     add = CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
                       section="body", field="body",
@@ -998,7 +998,7 @@ def test_an_unresolvable_block_argument_is_left_unfilled_rather_than_raising():
     built = PageType(
         tag="xtest-unfilled", name="Unfilled", description="ad-hoc",
         sections=(SectionSpec("body", "Body", (_prose("body"),)),), commands=(add,),
-        fsm=FSMSpec(name="XTestUnfilled", initial="active", statuses=("active",)))
+        fsm=FSMSpec(name="XTestUnfilled", initial="active", states=("active",)))
     resolved = get_pagetype_command(built, "addBody")
     assert resolved is not None and resolved.args[0].block_kinds is None
 
@@ -1016,7 +1016,7 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
         tag="xtest-broken", name="Broken", description="ad-hoc",
         sections=(SectionSpec("body", "Body", (body,)),),
         commands=(set_prose_cmd("body"), *blocks_cmds("body")),
-        fsm=FSMSpec(name="XBroken", initial="active", statuses=("active",),
+        fsm=FSMSpec(name="XBroken", initial="active", states=("active",),
                     status_guidance=(("nope", "x"),)),
     )
     with pytest.raises(ValueError) as exc:

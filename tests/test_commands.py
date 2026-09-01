@@ -404,7 +404,7 @@ def test_legal_in_override_is_per_state_not_merely_declared():
         commands=(set_prose_cmd("note", legal_in=("open",)),        # never names the terminal state
                   set_prose_cmd("log", legal_in=("open", "done")),  # names it - opts in
                   transition_cmd("finish", "open -> done")),
-        fsm=FSMSpec(name="XOptIn", initial="open", statuses=("open", "done"), terminal_statuses=("done",)),
+        fsm=FSMSpec(name="XOptIn", initial="open", states=("open", "done"), terminal_states=("done",)),
     )
     page = create_page(page_type, "A page", None, make_counter())
     legal_open = legal_commands(page, page_type)
@@ -496,7 +496,7 @@ def test_abandon_reaches_abandoned_from_multiple_states():
     factory = make_counter()
     # From draft.
     assert apply_command(new_life(factory), LIFE, "abandon", {}, factory).page.status == "abandoned"
-    # From building (an event with several source statuses, OR-combined in the FSM).
+    # From building (an event with several source states, OR-combined in the FSM).
     page = apply_command(new_life(factory), LIFE, "setSummary", {"text": "x"}, factory).page
     page = apply_command(page, LIFE, "beginPlanning", {}, factory).page
     page = apply_command(page, LIFE, "addPart", {"name": "R"}, factory).page
@@ -681,7 +681,7 @@ def _field_setter_page_type() -> PageType:
                            requires=(("overview", "body"), ("design", "body"))),
             add_link_cmd(), set_title_cmd(),
         ),
-        fsm=FSMSpec(name="XTestSeal", initial="draft", statuses=("draft", "sealed")),
+        fsm=FSMSpec(name="XTestSeal", initial="draft", states=("draft", "sealed")),
     )
 
 
@@ -798,7 +798,7 @@ def _unified_blocks_page_type() -> PageType:
         description="ad-hoc fixture: one blocks field, one add and one set",
         sections=(SectionSpec("body", "Body", (body,)),),
         commands=(*blocks_cmds("body"), add_link_cmd(), set_title_cmd()),
-        fsm=FSMSpec(name="XTestUnifiedBlocks", initial="active", statuses=("active",)),
+        fsm=FSMSpec(name="XTestUnifiedBlocks", initial="active", states=("active",)),
     )
 
 
@@ -934,7 +934,7 @@ def _table_blocks_page_type() -> PageType:
         sections=(SectionSpec("items", "Items", (items,)),),
         commands=(*list_cmds("items", add_args=(_text(),), element_blocks=("detail",)),
                   add_link_cmd(), set_title_cmd()),
-        fsm=FSMSpec(name="XTestTableBlocks", initial="active", statuses=("active",)),
+        fsm=FSMSpec(name="XTestTableBlocks", initial="active", states=("active",)),
     )
 
 

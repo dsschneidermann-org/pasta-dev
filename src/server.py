@@ -166,7 +166,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 "archived": page.archived,
                 # Drives the state dropdown next to the Archive button: every FSM state of this
                 # page's type, with the current one preselected.
-                "statuses": page_type.fsm.statuses if page_type is not None else (),
+                "statuses": page_type.fsm.states if page_type is not None else (),
                 "status": page.status,
                 # The Model overlay loads the docsite page for the page's type AND current state.
                 "page_type_doc": f"{page.type}-{page.status}",
@@ -198,7 +198,7 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
 
 # Directly set a page's lifecycle state from its web view. Backs the state dropdown + Apply button
 # next to the Archive control (see page.html): a deliberate FSM-bypassing admin override, so a human
-# can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
+# can force any of the type's declared states. `status` arrives as a form field. Like the archive
 # routes it fires the live-reload refresh and 202s (no MCP equivalent - a browser can't call MCP).
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
 async def route_set_page_status(workspaceIdPart: str, pageId: str, status: str = Form(...)):

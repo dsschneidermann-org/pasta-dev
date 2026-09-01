@@ -77,11 +77,11 @@ class FSMSpec:
     command), and `legal_in` is the uniform "where is this command legal" declaration across every
     command kind. (Element lifecycles are a separate concept - see `ElementFSMSpec`.)
 
-    `terminal_statuses` names statuses in which the work is finished. While a page sits in one, `legal_commands`
+    `terminal_states` names states in which the work is finished. While a page sits in one, `legal_commands`
     locks every authoring command (describeMutations reports them unavailable; mutatePageBatch rejects
     them) - but any remaining status transitions stay legal, so a terminal state can still offer, e.g., a
     `reopen` edge. This is an explicit declaration, NOT inferred from a state merely lacking outgoing
-    transitions: only statuses listed here are authoring-locked. An authoring command can opt out by naming
+    transitions: only states listed here are authoring-locked. An authoring command can opt out by naming
     the terminal state in `legal_in`.
 
     `status_guidance` is the per-status stage instruction: what a page in that status is for and
@@ -91,9 +91,9 @@ class FSMSpec:
     """
     name: str
     initial: str
-    statuses: tuple[str, ...]
+    states: tuple[str, ...]
     transitions: tuple[tuple[str, str, str, str], ...] = ()
-    terminal_statuses: tuple[str, ...] = ()
+    terminal_states: tuple[str, ...] = ()
     status_guidance: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self):
@@ -128,7 +128,7 @@ class ElementFSMSpec:
     """
     name: str
     initial: str
-    statuses: tuple[str, ...]
+    states: tuple[str, ...]
     # (event, source, dest, agency)
     transitions: tuple[tuple[str, str, str, str], ...]
     checkmark_done: str | None = None

@@ -115,7 +115,7 @@ _SIMPLE_CHANGE = PageType(
     fsm=FSMSpec(
         name="SimpleChange",
         initial="draft",
-        statuses=("draft", "open", "review", "done", "closed"),
+        states=("draft", "open", "review", "done", "closed"),
         status_guidance=(
             ("draft", SIMPLE_CHANGE_DRAFT),
             ("open", SIMPLE_CHANGE_OPEN),

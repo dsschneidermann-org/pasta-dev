@@ -1,4 +1,4 @@
-"""Pure generation of Sphinx docs for every page type AND every one of its FSM statuses.
+"""Pure generation of Sphinx docs for every page type AND every one of its FSM states.
 
 For each registered page type this captures ``describe_page_type`` (the type-level schema)
 and, for each reachable status, ``describe_mutations`` on a content-less page pinned at that
@@ -145,7 +145,7 @@ def _field_line(field: dict[str, Any]) -> str:
     if field["elementFields"]:
         notes.append("element fields: " + ", ".join(f"`{name}`" for name in field["elementFields"]))
     if field["elementStates"]:
-        notes.append("element statuses: " + ", ".join(f"`{name}`" for name in field["elementStates"]))
+        notes.append("element states: " + ", ".join(f"`{name}`" for name in field["elementStates"]))
     if field["elementBlocks"]:
         notes.append("block element fields: " + ", ".join(
             f"`{spec['field']}` ({', '.join(spec['kinds'])})" for spec in field["elementBlocks"]))
@@ -184,15 +184,15 @@ def _page_type_section(described: dict[str, Any]) -> str:
     ])
 
 
-def _all_states_line(tag: str, current: str, statuses: list[str]) -> str:
+def _all_states_line(tag: str, current: str, states: list[str]) -> str:
     parts = [f"**{state}**" if state == current else f"[{state}]({_stem(tag, state)}.md)"
-             for state in statuses]
-    return "**All statuses:** " + " · ".join(parts)
+             for state in states]
+    return "**All states:** " + " · ".join(parts)
 
 
 def _render_state_doc(page_type: PageType, state: str, events: list[str],
                       described: dict[str, Any], mutations: list[dict[str, Any]],
-                      statuses: list[str], qualname: str) -> str:
+                      states: list[str], qualname: str) -> str:
     tag = page_type.tag
     available = [command for command in mutations if command["available"]]
     transitions = [command for command in available if command["kind"] in _PAGE_TRANSITION_KINDS]
@@ -200,7 +200,7 @@ def _render_state_doc(page_type: PageType, state: str, events: list[str],
     event_dest = {edge["event"]: edge["dest"]
                   for edge in described["fsm"]["transitions"] if edge["source"] == state}
 
-    # A state's own guidance opens its page; statuses declaring none keep the placeholder.
+    # A state's own guidance opens its page; states declaring none keep the placeholder.
     guidance = described["fsm"]["statusGuidance"].get(state)
     intro = (guidance or f"The `{state}` state of the `{tag}` page type.") + "\n\n"
 
@@ -208,7 +208,7 @@ def _render_state_doc(page_type: PageType, state: str, events: list[str],
         f"# {tag} - {state}",
         intro,
         _diagram_block(qualname, tag, state, events),
-        _all_states_line(tag, state, statuses),
+        _all_states_line(tag, state, states),
         "## Transitions\n\n" + _transitions_section(tag, state, transitions, event_dest),
         "## Authoring commands\n\n" + _authoring_section(state, authoring),
         _page_type_section(described),
@@ -227,8 +227,8 @@ def state_docs(page_type: PageType) -> dict[str, str]:
     described = describe_page_type(page_type)
     qualname = page_machine_qualname(page_type.tag)
     paths = reachable_states(page_type.fsm)
-    # Footer/order follows declaration order for readability; all declared statuses are reachable.
-    ordered_states = [state for state in page_type.fsm.statuses if state in paths]
+    # Footer/order follows declaration order for readability; all declared states are reachable.
+    ordered_states = [state for state in page_type.fsm.states if state in paths]
 
     docs: dict[str, str] = {}
     for state in ordered_states:
@@ -252,7 +252,7 @@ def render_states_index(registry: dict[str, PageType] | None = None) -> str:
     """The generated ``states.md`` - a toctree over every state doc, so they are reachable."""
     registry = discoverable_registry() if registry is None else registry
     lines = [
-        "# Page-type statuses",
+        "# Page-type states",
         "",
         ("A generated reference for every state of every page type: the status FSM navigated to "
          "that state, the transitions out of it, and the authoring commands legal there. "
@@ -266,7 +266,7 @@ def render_states_index(registry: dict[str, PageType] | None = None) -> str:
     ]
     for page_type in registry.values():
         paths = reachable_states(page_type.fsm)
-        for state in page_type.fsm.statuses:
+        for state in page_type.fsm.states:
             if state in paths:
                 lines.append(_stem(page_type.tag, state) + ".md")
     lines.append("```")

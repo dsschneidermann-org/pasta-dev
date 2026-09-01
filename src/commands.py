@@ -147,7 +147,7 @@ def legal_commands(page: Page, page_type: PageType, ignore_requirements: bool = 
     A command is legal when: the FSM permits it from the current status (content commands
     always pass this) AND, for a content command, its status is allowed by `legal_in`
     (the plan "ready" lock) AND every required-content precondition it declares is satisfied
-    AND, in a terminal status (`fsm.terminal_statuses`), the command is either a status transition or
+    AND, in a terminal status (`fsm.terminal_states`), the command is either a status transition or
     one that names that status in its `legal_in` (see `_opts_into_terminal_status`) - authoring is
     locked once the work is finished, while any remaining transitions (e.g. `reopen`) stay legal.
     Cross-page checks (ref integrity, the `ship` guard) are enforced in the store, not here.
@@ -159,7 +159,7 @@ def legal_commands(page: Page, page_type: PageType, ignore_requirements: bool = 
     the live describeMutations tool.
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status)
-    in_terminal = page.status in page_type.fsm.terminal_statuses
+    in_terminal = page.status in page_type.fsm.terminal_states
     return {
         command.name: (
             _topology_ok(command, allowed)
@@ -197,7 +197,7 @@ def field_setter_edges(page: Page, page_type: PageType,
     stage: its (section, field) is a required precondition (`requires`) of a transition TOPOLOGICALLY
     legal from the current status, AND the setter is legal right now. Derived generically from the
     FSM - no per-page-type knowledge - so a status-scoped setter surfaces only where its field is a
-    stage requirement, and the `legal_in=None` 'always legal' setters no longer add noise in statuses
+    stage requirement, and the `legal_in=None` 'always legal' setters no longer add noise in states
     where their field is not the goal (e.g. setSummary while building).
 
     `blocked_events` names events the CALLER has determined cannot fire for a reason that no

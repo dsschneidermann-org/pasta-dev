@@ -30,15 +30,15 @@ from .pagetypes.core.specs import ElementFSMSpec, FSMSpec
 def _machine_class(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
     """Build (once) a StateMachine subclass from an FSM spec. Cached per spec."""
     namespace: dict[str, object] = {}
-    state_attr = {value: f"state_{value}" for value in fsm.statuses}
+    state_attr = {value: f"state_{value}" for value in fsm.states}
 
     # A state with no outgoing transition is terminal. python-statemachine's "trap state"
-    # validation requires such statuses to be declared final=True, so we infer it here rather
+    # validation requires such states to be declared final=True, so we infer it here rather
     # than making every FSMSpec author remember to. (Cyclic FSMs like architecture/bug-report
-    # have no such statuses, so this leaves them unchanged.)
+    # have no such states, so this leaves them unchanged.)
     sources = {source for _event, source, _dest, _agency in fsm.transitions}
 
-    for value in fsm.statuses:
+    for value in fsm.states:
         namespace[state_attr[value]] = State(
             value, value=value, initial=(value == fsm.initial), final=(value not in sources)
         )
@@ -91,4 +91,4 @@ def fire(fsm: FSMSpec | ElementFSMSpec, current_status: str, event: str) -> str:
 
 
 def is_valid_status(fsm: FSMSpec | ElementFSMSpec, status: str) -> bool:
-    return status in fsm.statuses
+    return status in fsm.states

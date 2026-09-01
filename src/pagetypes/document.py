@@ -29,6 +29,6 @@ _DOCUMENT = PageType(
     fsm=FSMSpec(
         name="Document",
         initial="active",
-        statuses=("active",),
+        states=("active",),
     ),
 )

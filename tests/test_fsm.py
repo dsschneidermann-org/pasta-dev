@@ -48,7 +48,7 @@ def test_is_valid_status():
 
 def test_status_guidance_keeps_fsmspec_hashable_for_the_machine_cache():
     # A dict field here would raise "unhashable type" at the _machine_class cache.
-    made = [FSMSpec(name="Guided", initial="draft", statuses=("draft", "open"),
+    made = [FSMSpec(name="Guided", initial="draft", states=("draft", "open"),
                     transitions=(("open", "draft", "open", "agent"),),
                     status_guidance=(("open", "do the open work"),))
             for _ in range(2)]

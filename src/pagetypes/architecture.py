@@ -133,8 +133,8 @@ _ARCHITECTURE = PageType(
     fsm=FSMSpec(
         name="Architecture",
         initial="authoring",
-        statuses=("authoring", "current"),
-        terminal_statuses=("current",),
+        states=("authoring", "current"),
+        terminal_states=("current",),
         status_guidance=(("authoring", ARCHITECTURE_AUTHORING),),
     ),
 )

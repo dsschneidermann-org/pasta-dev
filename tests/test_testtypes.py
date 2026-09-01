@@ -34,7 +34,7 @@ def test_registry_is_the_five_capability_fixtures():
 def test_each_fixture_is_tagged_and_has_a_valid_initial_state(tag):
     page_type = TEST_REGISTRY[tag]
     assert page_type.tag == tag
-    assert page_type.fsm.initial in page_type.fsm.statuses
+    assert page_type.fsm.initial in page_type.fsm.states
 
 
 # --- resolution is always on -------------------------------------------------

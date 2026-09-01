@@ -42,7 +42,7 @@ feature-spec child, before a single step or case exists. The work of it:
 - Update the summary and update the page title to the correct understanding of the
   work and escalate any design questions early to the user now.
 - Author the spec from the grounded base: the behaviour, the interfaces with their
-  exact signatures, the data shapes, the statuses, the error paths. Decide everything
+  exact signatures, the data shapes, the states, the error paths. Decide everything
   a plan would otherwise have to decide for itself.
 - Draw the line between pure logic and effects while designing rather than after.
   Decide what is a function of its inputs alone and what needs I/O, storage, the
@@ -139,7 +139,7 @@ FEATURE_BRIEF_REVIEW = """
 review - the build is done, and this is the last stop before the human ship gate.
 This state is for verifying, not for finishing off. The work of it:
 
-- Re-read the spec's design section and confirm every requirement it statuses is
+- Re-read the spec's design section and confirm every requirement it states is
   actually implemented, not merely planned.
 - Confirm every implementation-plan step is done and every testing-plan case passed
   against a test that genuinely ran. A case marked passed without a run you saw is

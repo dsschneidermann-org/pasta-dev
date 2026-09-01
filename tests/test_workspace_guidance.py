@@ -27,13 +27,13 @@ LIFECYCLE = get_page_type("test-lifecycle")
 
 
 # --- helpers -----------------------------------------------------------------
-def _wg_type(tag, statuses, *specs):
+def _wg_type(tag, states, *specs):
     """A throwaway page type with only workspace-guidance declarations, for the validation tests."""
     return PageType(
         tag=tag, name=tag, description="x",
         sections=(SectionSpec("s", "S", ()),),
         commands=(),
-        fsm=FSMSpec(name=tag, initial=statuses[0], statuses=tuple(statuses)),
+        fsm=FSMSpec(name=tag, initial=states[0], states=tuple(states)),
         workspace_guidance=specs,
     )
 

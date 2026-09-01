@@ -128,7 +128,7 @@ _BUG_REPORT = PageType(
     fsm=FSMSpec(
         name="BugReport",
         initial="draft",
-        statuses=("draft", "open", "review", "done", "closed"),
+        states=("draft", "open", "review", "done", "closed"),
         status_guidance=(
             ("draft", BUG_REPORT_DRAFT),
             ("open", BUG_REPORT_OPEN),

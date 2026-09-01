@@ -66,7 +66,7 @@ def test_every_declared_state_is_reachable():
     # Doc coverage depends on this: an unreachable state gets no page and no :events: path.
     for tag, page_type in REGISTRY.items():
         reachable = reachable_states(page_type.fsm)
-        assert set(reachable) == set(page_type.fsm.statuses), f"{tag} has an unreachable state"
+        assert set(reachable) == set(page_type.fsm.states), f"{tag} has an unreachable state"
 
 
 # --- ignore_requirements (the "skip validation" support) ---------------------
@@ -110,7 +110,7 @@ def test_all_state_docs_covers_every_reachable_state():
 
 def test_states_index_lists_every_generated_page():
     index = render_states_index()
-    assert index.startswith("# Page-type statuses")
+    assert index.startswith("# Page-type states")
     assert "```{toctree}" in index
     for stem in all_state_docs():
         assert f"{stem}.md" in index
@@ -154,7 +154,7 @@ def test_generated_docs_do_not_repeat_the_instruction_under_every_setter():
 def test_state_page_opens_with_its_status_guidance():
     # The text an agent gets on entering a state is the text a human reads on its page.
     guidance = status_guidance(get_page_type("feature-brief").fsm, "review")
-    assert guidance                                        # one of the documented statuses
+    assert guidance                                        # one of the documented states
     docs = state_docs(get_page_type("feature-brief"))
     for line in guidance.splitlines():
         assert line in docs["feature-brief-review"]
