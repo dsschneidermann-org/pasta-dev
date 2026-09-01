@@ -453,7 +453,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         page = result.page
         next_actions = STORE.next_actions(workspaceId, page.id)
         await ws_reloader.refresh()
-        response: dict[str, Any] = {
+        return {
             "id": page.id,
             "type": page.type,
             "title": page.title,
@@ -467,8 +467,6 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
             ],
             "next": next_actions,
         }
-        response.update(STORE.page_workspace_guidance(workspaceId, page))
-        return response
 
 
 @mcp.tool
@@ -487,7 +485,7 @@ async def mutatePageBatch(
         page, created = STORE.mutate_page_batch(workspaceId, pageId, commands)
         next_actions = STORE.next_actions(workspaceId, pageId)
         await ws_reloader.refresh()
-        response: dict[str, Any] = {
+        return {
             "pageId": page.id,
             "status": page.status,
             "statusRevisionToken": page.status_revision_token,
@@ -495,8 +493,6 @@ async def mutatePageBatch(
             "createdIds": created,
             "next": next_actions,
         }
-        response.update(STORE.page_workspace_guidance(workspaceId, page))
-        return response
 
 
 # --- Workspace guidance configuration ----------------------------------------
