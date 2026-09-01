@@ -32,7 +32,7 @@ from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundErro
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import Page, Workspace
 from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck, guidance_for
-from .pagetypes.core.args import CommandSpec
+from .pagetypes.core.commands import CommandSpec
 from .pagetypes.core.pagetype import PageType, pagetype_command
 from .pagetypes.core.validation import collect_ref_ids
 from .pagetypes._registry import (

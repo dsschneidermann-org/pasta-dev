@@ -72,7 +72,7 @@ class FSMSpec:
     """A page's status FSM: its state set and initial state ONLY.
 
     The transition table is NOT stored here - it is DERIVED from the page type's transition/compound
-    commands by `status_transitions(page_type)`, where each such command declares its source state(s)
+    commands by `_status_transitions(page_type)`, where each such command declares its source state(s)
     via `legal_in=` and its destination via `dest=`. So a status edge lives in exactly one place (the
     command), and `legal_in` is the uniform "where is this command legal" declaration across every
     command kind. (Element lifecycles are a separate concept - see `ElementFSMSpec`.)

@@ -64,27 +64,10 @@ from .pagetypes.core.specs import (
     RefCheck,
     WorkspaceGuidanceSpec,
 )
-from .pagetypes.core.args import (
-    BlockKindSpec,
-    ElementBlocksSpec,
-    _boolean,
-    _code_block,
-    _list_block,
-    _paragraph_runs,
-    _paragraph_text,
-    _text,
+from .pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _boolean, _code_block, _list_block, _paragraph_runs, _paragraph_text, _text, standard_blocks
+from .pagetypes.core.commands import (
     add_link_cmd,
     set_title_cmd,
-    standard_blocks,
-)
-from .pagetypes.core.fields import (
-    SectionSpec,
-    _blocks,
-    _list,
-    _prose,
-    _scalar,
-)
-from .pagetypes.core.commands import (
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
@@ -94,6 +77,13 @@ from .pagetypes.core.commands import (
     set_scalar_cmd,
     transition_cmd,
     transition_on_add_cmd,
+)
+from .pagetypes.core.fields import (
+    SectionSpec,
+    _blocks,
+    _list,
+    _prose,
+    _scalar,
 )
 from .pagetypes.core.pagetype import PageType
 

@@ -34,9 +34,9 @@ from .pagetypes.core.specs import (
     TRANSITION,
     guidance_for,
 )
-from .pagetypes.core.args import ArgSpec, BlockKindSpec, CommandSpec, body_args
+from .pagetypes.core.args import ArgSpec, BlockKindSpec, body_args
+from .pagetypes.core.commands import CommandSpec, is_field_setter
 from .pagetypes.core.fields import FieldSpec
-from .pagetypes.core.commands import is_field_setter
 from .pagetypes.core.validation import validate_blocks, validate_inline_content
 from .pagetypes.core.pagetype import PageType, initial_sections, pagetype_command, pagetype_field_spec
 from .pagetypes._registry import guard_production_type

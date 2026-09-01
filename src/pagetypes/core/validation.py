@@ -12,11 +12,16 @@ if TYPE_CHECKING:
     # function, imported by name below.
     from .pagetype import PageType
 from .pagetype import pagetype_field_spec
-from .args import BlockKindSpec, CommandSpec, ElementBlocksSpec, body_args
-from .commands import is_field_setter
+from .args import BlockKindSpec, ElementBlocksSpec, body_args
+from .commands import CommandSpec, is_field_setter
 from .fields import FieldSpec, element_blocks_spec
-from .specs import ADD_ELEMENT, BLOCKS, LIST, SET_PROSE, SET_SCALAR, FSMSpec
 from .specs import (
+    ADD_ELEMENT,
+    BLOCKS,
+    LIST,
+    SET_PROSE,
+    SET_SCALAR,
+    FSMSpec,
     BLOCK_ARRAY,
     INLINE_RUNS,
     INLINE_RUN_GRID,

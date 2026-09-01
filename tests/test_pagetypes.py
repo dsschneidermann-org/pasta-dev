@@ -39,26 +39,8 @@ from src.pagetypes.core.specs import (
     FSMSpec,
     guidance_for,
 )
-from src.pagetypes.core.args import (
-    BlockKindSpec,
-    CommandSpec,
-    ElementBlocksSpec,
-    _array,
-    _boolean,
-    _code_block,
-    _divider_block,
-    _heading_runs,
-    _heading_text,
-    _integer,
-    _list_block,
-    _paragraph_runs,
-    _paragraph_text,
-    _quote_block,
-    _table_block,
-    _text,
-    body_args,
-    standard_blocks,
-)
+from src.pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, body_args, standard_blocks
+from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd
 from src.pagetypes.core.fields import (
     FieldSpec,
     SectionSpec,
@@ -68,18 +50,11 @@ from src.pagetypes.core.fields import (
     block_element_fields,
     element_blocks_spec,
 )
-from src.pagetypes.core.commands import (
-    blocks_cmds,
-    element_blocks_cmds,
-    list_cmds,
-    set_prose_cmd,
-)
 from src.pagetypes.core.pagetype import (
     PageType,
     initial_sections,
     pagetype_command,
     pagetype_field_spec,
-    status_transitions,
 )
 from src.pagetypes.core.validation import (
     collect_ref_ids,
@@ -88,10 +63,6 @@ from src.pagetypes.core.validation import (
     validate_inline_content,
     validate_pagetype_field_setters,
     validate_table,
-)
-from src.pagetypes._registry import REGISTRY, get_page_type
-from src.pagetypes import _stage_guidance
-from src.pagetypes.core.validation import (
     validate_field_spec,
     validate_fsm_spec,
     validate_page_type,
@@ -99,6 +70,8 @@ from src.pagetypes.core.validation import (
     validate_pagetype_block_args,
     validate_pagetype_setter_descriptions,
 )
+from src.pagetypes._registry import REGISTRY, get_page_type
+from src.pagetypes import _stage_guidance
 from src.testtypes import TEST_REGISTRY
 
 _STANDARD_BLOCK_HELPERS = {
@@ -132,8 +105,9 @@ def test_fsm_is_well_formed(tag: str):
     page_type = ALL_TYPES[tag]
     fsm = page_type.fsm
     assert fsm.initial in fsm.states
-    # The status transition table is DERIVED from the type's transition/compound commands.
-    for _event, source, dest, agency in status_transitions(page_type):
+    # The status transition table is DERIVED from the type's transition/compound commands,
+    # and PageType.__post_init__ writes it onto the fsm.
+    for _event, source, dest, agency in page_type.fsm.transitions:
         assert source in fsm.states, f"{tag}: transition source {source} not a state"
         assert dest in fsm.states, f"{tag}: transition dest {dest} not a state"
         assert agency in {"agent", "human", "either"}
@@ -328,7 +302,8 @@ def test_field_setter_description_is_short_and_not_the_instruction(tag: str):
 def _drift_type(setter_description: str, field_description: str):
     """A one-setter page type whose setter and field descriptions are both caller-controlled, so a
     test can pick which branch of the field-setter validation fires."""
-    from src.pagetypes.core.args import CommandSpec, _text
+    from src.pagetypes.core.args import _text
+    from src.pagetypes.core.commands import CommandSpec
     from src.pagetypes.core.specs import FSMSpec
     from src.pagetypes.core.fields import SectionSpec, _prose
     from src.pagetypes.core.pagetype import PageType
@@ -359,7 +334,8 @@ def test_field_setter_repeating_a_single_line_field_instruction_is_rejected():
 
 def test_field_setter_targeting_an_unknown_field_is_still_rejected():
     # The pre-existing check must survive the guard rewrite it sat beside.
-    from src.pagetypes.core.args import CommandSpec, _text
+    from src.pagetypes.core.args import _text
+    from src.pagetypes.core.commands import CommandSpec
     from src.pagetypes.core.specs import FSMSpec
     from src.pagetypes.core.fields import SectionSpec, _prose
     from src.pagetypes.core.pagetype import PageType

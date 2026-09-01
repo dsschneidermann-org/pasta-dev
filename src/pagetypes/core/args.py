@@ -8,18 +8,13 @@ helpers a command's arg list uses, and standard_blocks() collects the standard k
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from ...errors import ValidationError
 from .specs import (
-    ADD_LINK,
     INLINE_RUNS,
     INLINE_RUN_GRID,
     INLINE_RUN_LISTS,
-    SET_TITLE,
     TABLE_ALIGN,
-    ChildStateGuard,
-    ParentStateGuard,
     RefCheck,
 )
 
@@ -38,50 +33,6 @@ class ArgSpec:
     # for a BLOCK_ARRAY arg: the vocabulary it accepts, copied from the field's declaration
     # - what makes the value checkable, and what describe reads to build the arg's schema
     block_kinds: tuple[BlockKindSpec, ...] | None = None
-
-
-@dataclass(frozen=True)
-class CommandSpec:
-    name: str
-    kind: str
-    description: str = ""
-    section: str | None = None
-    field: str | None = None
-    args: tuple[ArgSpec, ...] = ()
-    event: str | None = None                    # FSM event for TRANSITION / COMPOUND
-    # for TRANSITION / COMPOUND: the destination state. Paired with `legal_in` (the source state(s)),
-    # this is the single home for a status edge - `status_transitions(page_type)` derives the whole
-    # page FSM table from these.
-    dest: str | None = None
-    # for ADD_ELEMENT / SET_ELEMENT_FIELD / ELEMENT_TRANSITION: (elementField, argName) pairs
-    # mapping args onto the element. The id-taking kinds treat args[0] as the target element id.
-    element_map: tuple[tuple[str, str], ...] = ()
-    # for SET_ELEMENT_FIELD / ELEMENT_TRANSITION: literal (elementField, value) pairs to stamp
-    # onto the target element (the flag-setting shape).
-    element_const: tuple[tuple[str, Any], ...] = ()
-    # for ADD_BLOCK / REMOVE_BLOCK / REORDER_BLOCK: the LIST element field holding the blocks.
-    # None = the section's own blocks field. When set, args[0] is the element id and - for
-    # remove/reorder - args[1] is the block id.
-    element_field: str | None = None
-    # for COMPOUND: ordered sub-commands applied atomically. (ELEMENT_TRANSITION fires the
-    # element-FSM event named in `event` on the target element.)
-    steps: tuple["CommandSpec", ...] = ()
-    # for TRANSITION / COMPOUND: (section, field) pairs that must be populated before the
-    # transition is legal - a required-content precondition on top of the FSM topology.
-    requires: tuple[tuple[str, str], ...] = ()
-    # Where this command is legal (None = any status). The uniform "where-legal" declaration:
-    #   - content command: the statuses it may run in (a status-scoped lock);
-    #   - TRANSITION / COMPOUND: the SOURCE state(s) of the edge (paired with `dest`), from which the
-    #     page FSM table is derived. Not surfaced in the command summary for transitions (the source
-    #     is already reported via the derived FSM transition list), so describe output is unchanged.
-    legal_in: tuple[str, ...] | None = None
-    # cross-page integrity check / transition guard (evaluated in the store)
-    ref_check: RefCheck | None = None
-    guards: tuple[ChildStateGuard, ...] = ()
-    # cross-page guard over the PARENT's state (evaluated in the store) - see ParentStateGuard
-    parent_guards: tuple[ParentStateGuard, ...] = ()
-    agency: str = "agent"                       # "agent" | "human" | "either" (informational this pass)
-    generated: bool = False
 
 
 @dataclass(frozen=True)
@@ -122,36 +73,6 @@ class ElementBlocksSpec:
 def _text(name: str = "text", *, required: bool = True,
           choices: tuple[str, ...] | None = None, description: str = "") -> ArgSpec:
     return ArgSpec(name, required=required, choices=choices, description=description)
-
-
-def add_link_cmd() -> CommandSpec:
-    """The universal reference-link authoring command: add an outgoing typed edge (this --role--> toId)
-    to Page.links. Added to every authorable page type's command surface, so linking is discoverable as
-    a page command and not only through the separate top-level `link` tool. Always legal - no legal_in /
-    requires - so it runs in any status. The store's _check_link precheck enforces the cross-page rules
-    shared with link_page, before the pure core appends."""
-    return CommandSpec(
-        name="addLink",
-        kind=ADD_LINK,
-        description="add a typed reference link from this page to another (this --role--> toId)",
-        args=(_text("toId", description="the target page id to link to"),
-              _text("role", description="the edge role, e.g. depends-on / relates-to")),
-    )
-
-
-def set_title_cmd() -> CommandSpec:
-    """The universal page-rename authoring command: set this page's title - an alias for the top-level
-    renamePage tool, exposed as a page command (like add_link_cmd's addLink) so a title can be fixed in
-    the same authoring surface (describeMutations / mutatePageBatch) as the content it describes. Added to
-    every authorable page type EXCEPT the command-less toc. Always legal - no legal_in / requires - so it
-    runs in any status (locked only in a terminal state, as all authoring is). The pure core sets
-    Page.title after rejecting a blank title, exactly as renamePage does."""
-    return CommandSpec(
-        name="setTitle",
-        kind=SET_TITLE,
-        description="set this page's title (an alias for the renamePage operation)",
-        args=(_text("title", description="the new page title (must be non-empty)"),),
-    )
 
 
 def _integer(name: str, *, required: bool = True, description: str = "") -> ArgSpec:

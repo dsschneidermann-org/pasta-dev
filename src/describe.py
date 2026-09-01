@@ -12,7 +12,8 @@ from typing import Any
 from .commands import legal_commands
 from .model import Page
 from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION
-from .pagetypes.core.args import BlockKindSpec, CommandSpec, body_args
+from .pagetypes.core.args import BlockKindSpec, body_args
+from .pagetypes.core.commands import CommandSpec
 from .pagetypes.core.pagetype import PageType
 
 

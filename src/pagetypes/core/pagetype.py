@@ -12,7 +12,8 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from ...errors import ValidationError
-from .args import ArgSpec, CommandSpec
+from .args import ArgSpec
+from .commands import CommandSpec
 from .fields import FieldSpec, SectionSpec, element_blocks_spec
 from .specs import (
     ADD_ELEMENT,
@@ -43,7 +44,7 @@ class PageType:
 
     def __post_init__(self):
         self._resolve_block_vocabularies()
-        object.__setattr__(self.fsm, "transitions", status_transitions(self))
+        object.__setattr__(self.fsm, "transitions", _status_transitions(self))
 
     def _resolve_block_vocabularies(self) -> None:
         """Fill each block-carrying argument's accepted kinds in from the field it targets.
@@ -102,7 +103,7 @@ def pagetype_field_spec(self: PageType, section_key: str, field_key: str) -> Fie
     return None
 
 
-def status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], ...]:
+def _status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], ...]:
     """The page's status-FSM transition table, DERIVED from its transition/compound commands.
 
     Each top-level command with a page-status event (kind TRANSITION or COMPOUND, `event` set) owns one
