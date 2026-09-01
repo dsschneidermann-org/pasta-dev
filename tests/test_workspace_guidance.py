@@ -20,7 +20,7 @@ from src.pagetypes.core.pagetype import PageType
 from src.pagetypes.core.validation import validate_page_types, validate_workspace_guidance
 from src.pagetypes._registry import get_page_type, workspace_guidance_fields
 from src.serialize import workspace_from_dict, workspace_to_dict
-from src.store import Store, workspace_guidance_for
+from src.store import Store, workspace_guidance
 from src.describe import describe_page_type
 
 LIFECYCLE = get_page_type("test-lifecycle")
@@ -154,19 +154,19 @@ def test_validate_page_types_clean_for_good_workspace_guidance():
     assert validate_page_types({good.tag: good}) is None
 
 
-# --- workspace_guidance_for (pure emission) ----------------------------------
-def test_workspace_guidance_for_emits_only_in_set_with_text():
+# --- workspace_guidance (pure emission) ----------------------------------
+def test_workspace_guidance_emits_only_in_set_with_text():
     config = {"buildTool": "use pytest", "reviewHint": "look hard"}
-    assert workspace_guidance_for(LIFECYCLE, "building", config) == {"guidance_buildTool": "use pytest"}
+    assert workspace_guidance(LIFECYCLE, "building", config) == {"guidance_buildTool": "use pytest"}
     # review is in both buildTool and reviewHint sets.
-    assert workspace_guidance_for(LIFECYCLE, "review", config) == {
+    assert workspace_guidance(LIFECYCLE, "review", config) == {
         "guidance_buildTool": "use pytest", "guidance_reviewHint": "look hard"}
 
 
-def test_workspace_guidance_for_skips_out_of_set_absent_and_empty():
-    assert workspace_guidance_for(LIFECYCLE, "planning", {"buildTool": "x"}) == {}   # out of set
-    assert workspace_guidance_for(LIFECYCLE, "building", {}) == {}                    # absent
-    assert workspace_guidance_for(LIFECYCLE, "building", {"buildTool": ""}) == {}     # empty clears
+def test_workspace_guidance_skips_out_of_set_absent_and_empty():
+    assert workspace_guidance(LIFECYCLE, "planning", {"buildTool": "x"}) == {}   # out of set
+    assert workspace_guidance(LIFECYCLE, "building", {}) == {}                    # absent
+    assert workspace_guidance(LIFECYCLE, "building", {"buildTool": ""}) == {}     # empty clears
 
 
 # --- serialization round-trip ------------------------------------------------

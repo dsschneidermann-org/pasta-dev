@@ -56,7 +56,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def workspace_guidance_for(page_type: PageType, status: str,
+def workspace_guidance(page_type: PageType, status: str,
                            config: dict[str, str]) -> dict[str, str]:
     """Given a page type at a status, the stored text for each of its workspace guidance fields
     shown at that status (an empty value clears the field)."""
@@ -482,7 +482,7 @@ class Store:
                     guidance = status_guidance(focus_type.fsm, focus.status)
                     if guidance is not None:
                         result["guidance"] = guidance
-                    result.update(workspace_guidance_for(
+                    result.update(workspace_guidance(
                         focus_type, focus.status, workspace.guidance_config))
         return result
 
@@ -893,7 +893,7 @@ class Store:
         if page_type is None:
             return {}
         workspace = self.load_workspace(workspace_id)
-        return workspace_guidance_for(page_type, page.status, workspace.guidance_config)
+        return workspace_guidance(page_type, page.status, workspace.guidance_config)
 
     # --- helpers -------------------------------------------------------------
     def _create_auto_children(
