@@ -1714,6 +1714,34 @@ def test_a_command_after_a_transition_in_one_batch_is_rejected(revstore):
     assert revstore.get_page(workspace.id, page.id).status == "draft"       # all-or-nothing
 
 
+def test_rejection_after_a_transition_names_the_revision_the_rollback_leaves(revstore):
+    """The token a mid-batch transition generates is discarded with the abort and the caller never
+    sees it, so the error reports the revision the page is left holding - the one to retry with."""
+    workspace = revstore.create_workspace("demo")
+    page = revstore.create_page(workspace.id, "test-flow", "C").page        # token "000001"
+    token = page.status_revision_token
+    with pytest.raises(ConflictError) as exc:
+        revstore.mutate_page_batch(workspace.id, page.id, [
+            {"command": "open", "args": {"statusRevisionToken": token}},                       # -> "000002"
+            {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}},     # stale now
+        ])
+    message = str(exc.value)
+    kept = revstore.get_page(workspace.id, page.id).status_revision_token
+    assert kept == token                                        # the rollback restores nothing else
+    assert repr(kept) in message                                # what survives is named
+    assert "000002" not in message                              # the discarded token is not
+
+
+def test_rejection_before_any_transition_names_the_current_revision(revstore):
+    workspace = revstore.create_workspace("demo")
+    page = revstore.create_page(workspace.id, "test-flow", "C").page        # token "000001"
+    with pytest.raises(ConflictError) as exc:
+        revstore.mutate_page_batch(workspace.id, page.id, [
+            {"command": "setSummary", "args": {"statusRevisionToken": "wrong", "text": "s"}}])
+    # No transition ran, so the working copy never moved: the page's own token is the one to name.
+    assert repr(page.status_revision_token) in str(exc.value)
+
+
 def test_set_page_status_regenerates_the_revision(revstore):
     workspace = revstore.create_workspace("demo")
     page = revstore.create_page(workspace.id, "test-flow", "C").page
