@@ -213,14 +213,13 @@ def _distance_from_initial(fsm_spec: FSMSpec) -> dict[str, int]:
 def stage_entry_statuses(fsm_spec: FSMSpec, legal_in: Collection[str]) -> set[str]:
     """The statuses in `legal_in` where the work that scope covers first becomes available.
 
-    A scoped status qualifies when no OTHER scoped status transitions into it - arriving from
+    A scoped status qualifies when no other scoped status transitions into it - arriving from
     outside the scope still counts as arriving first, which is what makes a single-status scope
-    (setPullRequestUrl in `review`) always qualify. A scope whose statuses enter each other
-    leaves that empty, because the page FSM is not strictly ordered: `building` and `review` are
-    a cycle, so recordCommit would otherwise open nowhere. There the fallback takes the scoped
-    statuses nearest the initial status - the entry the page reaches soonest - and keeps every
-    one at that distance rather than breaking a tie arbitrarily. Unreachable statuses are not
-    candidates, so a scope no path reaches stays silent.
+    always qualify. A page FSM is not strictly ordered, so a scope whose statuses enter each
+    other leaves that empty and would open nowhere; there the fallback takes the scoped statuses
+    nearest the initial status - the entry the page reaches soonest - and keeps every one at that
+    distance rather than breaking a tie arbitrarily. Unreachable statuses are not candidates, so
+    a scope no path reaches stays silent.
     """
     scoped = set(legal_in)
     incoming: dict[str, set[str]] = {}
@@ -242,15 +241,15 @@ def field_setter_edges(page: Page, page_type: PageType,
     """The field-setter `do` edges for `page` in its current status (pure).
 
     A legal setter is surfaced for either of two reasons, and the two sets are unioned and
-    deduplicated by (section, field). It is STAGE-REQUIRED when its (section, field) is a required
+    deduplicated by (section, field). It is stage-required when its (section, field) is a required
     precondition (`requires`) of a transition TOPOLOGICALLY legal from the current status - authoring
-    it is what advances the stage. It is STAGE-ENTRY when the page sits in one of the statuses where
-    its own `legal_in` scope opens (see `stage_entry_statuses`) - work that becomes available here
-    though no transition demands it, like setPullRequestUrl on reaching review. A stage-entry edge
-    is unconditional while the page is in that status, so it does not blink out once its field holds
-    content. Both are derived generically from the FSM and `legal_in` - no per-page-type knowledge -
-    and a `legal_in=None` setter has no scope to enter, so it is surfaced only when stage-required
-    and adds no noise where its field is not the goal (e.g. setSummary while building).
+    it is what advances the stage. It is stage-entry when the page sits in one of the statuses where
+    its own `legal_in` scope opens (see `stage_entry_statuses`) - work that becomes available on
+    arriving here though no transition demands it. A stage-entry edge is unconditional while the page
+    is in that status, so it does not blink out once its field holds content. Both are derived
+    generically from the FSM and `legal_in` - no per-page-type knowledge - and a `legal_in=None`
+    setter has no scope to enter, so it is surfaced only when stage-required and adds no noise where
+    its field is not the goal (e.g. setSummary while building).
 
     `blocked_events` names events the CALLER has determined cannot fire for a reason that no
     authoring on this page can clear - it is dropped from the topology before requirements are
