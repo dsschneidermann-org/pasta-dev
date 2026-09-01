@@ -7,7 +7,9 @@ from wenmode.presets import github
 from src.commands import apply_command, create_page
 from src.errors import ConflictError, ValidationError
 from src.model import Page
-from src.pagetypes import FSMSpec, PageType, get_page_type
+from src.pagetypes.core.specs import FSMSpec
+from src.pagetypes.core.pagetype import PageType, get_pagetype_field
+from src.pagetypes._registry import get_page_type
 from src.render import (RefContext, checkbox_state, escape_markdown, page_text, render_page,
                             render_workspace_links)
 
@@ -39,6 +41,15 @@ def test_render_fields_markdown():
     assert "- **kind:** alpha" in md
     assert "The body." in md
     assert "Item text." in md
+
+
+def test_meta_line_shows_the_revision_only_when_present():
+    page = create_page(FIELDS, "Page title", None, make_counter())
+    # A page carrying no token (created before the feature) renders the bare type/status meta line.
+    assert " · rev `" not in render_page(page, FIELDS)
+    # Once it carries one, the meta line surfaces it beside the status.
+    page.status_revision_token = "042917"
+    assert "· rev `042917`" in render_page(page, FIELDS)
 
 
 def test_render_blocks_heading_and_code():
@@ -85,6 +96,27 @@ def test_render_workspace_links_show_meta_false():
     md = render_workspace_links(TREE, show_archived=False, show_meta=False)
     assert "[Root](/ws:demo/page/test-fields:a1)" in md         # links still present
     assert "`" not in md and "·" not in md                      # but no type/status meta
+
+
+def test_render_workspace_links_status_suffix_for_change_types_only():
+    # feature-brief/simple-change/bug-report carry their status in parens inside the link text;
+    # other page types (e.g. architecture) render a plain title with no status suffix.
+    tree = {"workspaceId": "ws:demo", "nodes": [
+        {"id": "feature-brief:a1", "title": "Feature", "type": "feature-brief", "status": "shipped",
+         "children": []},
+        {"id": "simple-change:b1", "title": "Change", "type": "simple-change", "status": "done",
+         "children": []},
+        {"id": "bug-report:c1", "title": "Bug", "type": "bug-report", "status": "open",
+         "children": []},
+        {"id": "architecture:d1", "title": "Arch", "type": "architecture", "status": "current",
+         "children": []},
+    ]}
+    md = render_workspace_links(tree, show_archived=False, show_meta=False)
+    assert "[Feature (shipped)](/ws:demo/page/feature-brief:a1)" in md
+    assert "[Change (done)](/ws:demo/page/simple-change:b1)" in md
+    assert "[Bug (open)](/ws:demo/page/bug-report:c1)" in md
+    assert "[Arch](/ws:demo/page/architecture:d1)" in md
+    assert "[Arch (current)]" not in md
 
 
 def test_render_workspace_links_archived_marker_is_prefix():
@@ -176,20 +208,14 @@ def test_render_blocks_block_kinds():
     assert any(line == "---" for line in md.splitlines())  # divider on its own line
 
 
-def test_blocks_block_editing_in_place_and_move():
+def test_blocks_block_move_and_remove():
     factory = make_counter()
     p = apply_command(new_blocks(factory), BLOCKS, "addBody", {"blocks": [{"kind": "paragraph", "inlines": ["first"]}]}, factory)
     first_id = p.created_id
     h = apply_command(p.page, BLOCKS, "addBody", {"blocks": [{"kind": "heading", "level": 1, "inlines": ["Title"]}]}, factory)
     heading_id = h.created_id
-    # setParagraph edits in place: same block id, runs replaced, no new id created
-    edited = apply_command(h.page, BLOCKS, "setBodyBlock",
-                           {"blockId": first_id, "block": {"kind": "paragraph", "inlines": ["updated"]}}, factory)
-    body = edited.page.sections["body"]["body"]
-    assert body[0]["id"] == first_id and body[0]["inlines"] == ["updated"]
-    assert edited.created_id is None
     # reorderBlock moves by id - front insert names no predecessor
-    moved = apply_command(edited.page, BLOCKS, "reorderBlock",
+    moved = apply_command(h.page, BLOCKS, "reorderBlock",
                           {"blockId": heading_id, "toIndex": 0, "precedingId": None}, factory)
     assert [b["id"] for b in moved.page.sections["body"]["body"]] == [heading_id, first_id]
     # a stale predecessor for the destination slot is rejected
@@ -210,25 +236,22 @@ def test_blocks_add_block_index_insertion():
     assert [blk["inlines"] for blk in c.page.sections["body"]["body"]] == [["A"], ["C"], ["B"]]
 
 
-def test_blocks_set_may_change_a_block_kind():
-    """A generalized set overwrites the block whatever its kind, keeping its id and its slot.
-
-    The per-kind guard this replaces ('setParagraph edits a paragraph block, but block X is a
-    heading') existed only because the command carried its kind; a set that could not change the
-    kind would leave an in-place retype expressible only as remove + positioned add, creating a
-    new id.
-    """
+def test_a_block_is_retyped_by_removing_it_and_adding_at_its_slot():
+    """There is no in-place edit, so changing a paragraph into a heading is remove plus a
+    positioned add. The block keeps its slot and renders as the new kind; the id is new."""
     factory = make_counter()
     p = apply_command(new_blocks(factory), BLOCKS, "addBody",
                       {"blocks": [{"kind": "paragraph", "inlines": ["x"]}]}, factory)
-    edited = apply_command(p.page, BLOCKS, "setBodyBlock",
-                           {"blockId": p.created_id,
-                            "block": {"kind": "heading", "level": 1, "inlines": ["y"]}}, factory)
-    assert edited.page.sections["body"]["body"] == [
-        {"id": p.created_id, "kind": "heading", "level": 1, "inlines": ["y"]}
+    removed = apply_command(p.page, BLOCKS, "removeBlock", {"blockId": p.created_id}, factory)
+    retyped = apply_command(removed.page, BLOCKS, "addBody",
+                            {"blocks": [{"kind": "heading", "level": 1, "inlines": ["y"]}]},
+                            factory)
+    assert retyped.page.sections["body"]["body"] == [
+        {"id": retyped.created_id, "kind": "heading", "level": 1, "inlines": ["y"]}
     ]
-    assert "## y" not in render_page(edited.page, BLOCKS)   # level 1, so a single hash
-    assert "# y" in render_page(edited.page, BLOCKS)
+    assert retyped.created_id != p.created_id
+    assert "## y" not in render_page(retyped.page, BLOCKS)   # level 1, so a single hash
+    assert "# y" in render_page(retyped.page, BLOCKS)
 
 
 def test_blocks_reject_markdown_and_bad_table_at_apply_time():
@@ -430,6 +453,25 @@ def test_render_check_checkbox_pending_passed_failed():
     assert "- [x] c pass" in md         # passed (checkmark_done) -> checked
     assert "- c fail" in md             # failed -> NO box (neither initial nor checkmark_done)
     assert "- [ ] c fail" not in md and "- [x] c fail" not in md
+
+
+def test_render_skipped_element_has_no_checkbox_but_keeps_its_suffix():
+    factory = make_counter()
+    child = get_page_type("test-child")
+    page = create_page(child, "Child", "test-lifecycle:x", factory)
+    page = apply_command(page, child, "addStep", {"text": "s skip"}, factory).page
+    page = apply_command(page, child, "addCheck", {"text": "c skip"}, factory).page
+    step_id = page.sections["steps"]["items"][0]["id"]
+    check_id = page.sections["checks"]["items"][0]["id"]
+    page = apply_command(page, child, "markStepSkipped", {"stepId": step_id}, factory).page
+    page = apply_command(page, child, "markCheckSkipped", {"checkId": check_id}, factory).page
+    md = render_page(page, child)
+    # skipped is neither the initial nor the checkmark_done state, so it renders with no box - but
+    # the trailing status label still surfaces the disposition.
+    assert "- s skip" in md and "- c skip" in md
+    assert "- [ ] s skip" not in md and "- [x] s skip" not in md
+    assert "- [ ] c skip" not in md and "- [x] c skip" not in md
+    assert "_[skipped]_" in md
 
 
 def test_render_question_has_no_checkbox():
@@ -634,10 +676,10 @@ def test_render_toc_empty_shows_none_without_headings():
 
 def test_checkbox_state_maps_element_fsm_states():
     child = get_page_type("test-child")
-    steps = child.field_spec("steps", "items")
-    checks = child.field_spec("checks", "items")
-    questions = get_page_type("test-lifecycle").field_spec("questions", "items")
-    items = FIELDS.field_spec("items", "items")
+    steps = get_pagetype_field(child, "steps", "items")
+    checks = get_pagetype_field(child, "checks", "items")
+    questions = get_pagetype_field(get_page_type("test-lifecycle"), "questions", "items")
+    items = get_pagetype_field(FIELDS, "items", "items")
     assert checkbox_state("done", steps.element_fsm) == "done"
     assert checkbox_state("todo", steps.element_fsm) == "todo"
     assert checkbox_state("passed", checks.element_fsm) == "done"

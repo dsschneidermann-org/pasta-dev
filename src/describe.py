@@ -11,38 +11,47 @@ from typing import Any
 
 from .commands import legal_commands
 from .model import Page
-from .pagetypes import (BLOCK, BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION, BlockKindSpec, CommandSpec,
-                        PageType)
+from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION
+from .pagetypes.core.args import BlockKindSpec
+from .pagetypes.core.commands import CommandSpec
+from .pagetypes.core.pagetype import PageType
 
 
-def _block_schema(kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
+def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
     """The schema for one block: a oneOf branch per accepted kind, each built from that kind's
     declared body args - the same source validate_block reads, so the schema and the grammar
     agree. A caller learns a field's whole vocabulary from this alone, which is what replaces
     reading the kind off a per-kind command name."""
     branches: list[dict[str, Any]] = []
-    for spec in kinds:
-        properties: dict[str, Any] = {"kind": {"const": spec.kind}}
+    for block in block_kinds:
+        properties: dict[str, Any] = {"kind": {"const": block.kind}}
         required = ["kind"]
-        for body in spec.body_args():
-            properties[body.name] = {"type": body.type}
-            if body.required:
-                required.append(body.name)
+        for arg in block.body_args:
+            properties[arg.name] = {"type": arg.type}
+            if arg.required:
+                required.append(arg.name)
         branches.append({"type": "object", "properties": properties,
                          "required": required, "additionalProperties": False})
     return {"oneOf": branches}
 
 
+_REVISION_TOKEN_ARG = {
+    "type": "string",
+    "description": "the page's current status_revision_token; a status transition regenerates it, so a "
+                   "batch holds at most one transition and only as its final command",
+}
+
+
 def command_arg_schema(command: CommandSpec) -> dict[str, Any]:
-    """A JSON Schema object for a command's arguments."""
-    properties: dict[str, Any] = {}
-    required: list[str] = []
+    """A JSON Schema object for a command's arguments. Every command carries the page's
+    status_revision_token as its first argument - the optimistic-concurrency stamp the store reads
+    and strips before the pure core sees the remaining arguments."""
+    properties: dict[str, Any] = {"statusRevisionToken": dict(_REVISION_TOKEN_ARG)}
+    required: list[str] = ["statusRevisionToken"]
     for arg in command.args:
         prop: dict[str, Any] = {"type": arg.type}
         if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
             prop = {"type": "array", "items": _block_schema(arg.block_kinds)}
-        elif arg.content == BLOCK and arg.block_kinds is not None:
-            prop = _block_schema(arg.block_kinds)
         if arg.choices is not None:
             prop["enum"] = list(arg.choices)
         if arg.description:
@@ -70,7 +79,7 @@ def _command_summary(command: CommandSpec) -> dict[str, Any]:
         "event": command.event,
         "agency": command.agency,
         # statuses a CONTENT command is allowed in. Suppressed for a transition/compound command:
-        # there `legal_in` is the edge's SOURCE state, already reported in the FSM transition list,
+        # there `legal_in` is the edge's SOURCE status, already reported in the FSM transition list,
         # so hiding it here keeps the describe output unclobbered.
         "legalIn": (list(command.legal_in) if command.legal_in
                     and command.kind not in (TRANSITION, COMPOUND) else None),
@@ -89,7 +98,7 @@ def describe_fsm(page_type: PageType) -> dict[str, Any]:
             for event, source, dest, agency in page_type.fsm.transitions
         ],
         # A dict is safe here - a projection, unlike the FSMSpec, which must stay hashable.
-        "stateGuidance": dict(page_type.fsm.state_guidance),
+        "statusGuidance": dict(page_type.fsm.status_guidance),
     }
 
 
@@ -112,12 +121,12 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         # for a list with a per-element lifecycle: its states (e.g. todo/done)
                         "elementStates": list(field_spec.element_fsm.states) if field_spec.element_fsm else None,
                         # for a list whose element fields hold blocks: each field and the kinds it accepts
-                        "elementBlocks": ([{"field": spec.field,
-                                            "kinds": [kind.kind for kind in spec.vocabulary()]}
-                                           for spec in field_spec.element_blocks] or None),
+                        "elementBlocks": ([{"field": element_blocks.field,
+                                            "kinds": [block.kind for block in element_blocks.block_kinds]}
+                                           for element_blocks in field_spec.element_blocks] or None),
                         # for a blocks field: the kinds it accepts. The only place a caller can
                         # read a page-level field's vocabulary, now that no command name carries it.
-                        "blockKinds": ([kind.kind for kind in field_spec.block_vocabulary()]
+                        "blockKinds": ([block.kind for block in field_spec.block_kinds]
                                        if field_spec.kind == BLOCKS else None),
                         "description": field_spec.description,
                     }
@@ -125,6 +134,11 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                 ],
             }
             for section in page_type.sections
+        ],
+        "workspaceGuidance": [
+            {"field": spec.field, "guidanceFor": list(spec.guidance_for),
+             "description": spec.description}
+            for spec in page_type.workspace_guidance
         ],
         "commands": [_command_summary(command) for command in page_type.commands],
     }

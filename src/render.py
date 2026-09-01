@@ -9,7 +9,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from .model import Page, Workspace
-from .pagetypes import BLOCKS, LIST, PROSE, SCALAR, ElementFSMSpec, FieldSpec, PageType, get_page_type
+from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR, ElementFSMSpec
+from .pagetypes.core.fields import FieldSpec, block_element_fields
+from .pagetypes.core.pagetype import PageType
+from .pagetypes._registry import get_page_type
 
 
 # --- plain-text escaping (web render only) -----------------------------------
@@ -120,7 +123,7 @@ def _indent_list_content(markdown: str) -> str:
 def _render_list(elements: list[dict[str, Any]], field_spec: FieldSpec | None = None,
                  ref_context: RefContext | None = None) -> str | None:
     element_fsm = field_spec.element_fsm if field_spec is not None else None
-    block_fields = field_spec.block_element_fields() if field_spec is not None else ()
+    block_fields = block_element_fields(field_spec) if field_spec is not None else ()
     lines: list[str] = []
     for element in elements:
         # A block-bearing field is rendered below the bullet, never flattened into it.
@@ -319,7 +322,10 @@ def render_page(page: Page, page_type: PageType, level: int = 1,
     `ref_context` resolves inline `{ref}` runs and child-page links to titled links; omit it (a direct
     render with no workspace) and refs / children fall back to their bare ids.
     """
-    lines = [f"{'#' * level} {_plain(page.title, ref_context)}", "", f"*{page.type}* · `{page.status}`", ""]
+    meta = f"*{page.type}* · `{page.status}`"
+    if page.status_revision_token is not None:
+        meta += f" · rev `{page.status_revision_token}`"
+    lines = [f"{'#' * level} {_plain(page.title, ref_context)}", "", meta, ""]
     section_heading = "#" * (level + 1)
     for section in page_type.sections:
         chunks = [_field_content(field_spec, page.sections.get(section.key, {}).get(field_spec.key), ref_context)
@@ -375,6 +381,11 @@ def render_tree(workspace: Workspace, show_archived: bool = False) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
+# Page types whose workspace status is worth a glance in the nav tree - the pages a user
+# tracks through a lifecycle, as opposed to structural/reference pages (toc, architecture, ...).
+_STATUS_SUFFIX_TYPES = frozenset({"feature-brief", "simple-change", "bug-report"})
+
+
 def render_workspace_links(tree: dict[str, Any], show_archived: bool = False, show_meta: bool = False,
                            escape_plain_text: bool = False) -> str:
     """A `store.tree()` result as a nested Markdown list - every page a link to /page/<id>.
@@ -385,6 +396,8 @@ def render_workspace_links(tree: dict[str, Any], show_archived: bool = False, sh
     `show_archived=True` lists links with `?archived=true` query parameter.
     `show_meta=True` lists the page-title links, including each page's `type · status`.
     `escape_plain_text=True` (the web path) markdown-escapes the plain-text page-title labels.
+    When `show_meta=False`, pages of a type in `_STATUS_SUFFIX_TYPES` get their status appended
+    to the link text in parentheses, e.g. "Change (done)".
     """
     query = "?archived=true" if show_archived else ""
 
@@ -394,6 +407,8 @@ def render_workspace_links(tree: dict[str, Any], show_archived: bool = False, sh
             indent = "  " * depth
             title = escape_markdown(page['title']) if escape_plain_text else page['title']
             meta = f" *{page['type']}* · `{page['status']}`" if show_meta else ""
+            if not show_meta and page['type'] in _STATUS_SUFFIX_TYPES:
+                title = f"{title} ({page['status']})"
             prefix = "**(A)** " if page.get("archived") else ""
             lines.append(f"{indent}- {prefix}[{title}](/{str(tree.get("workspaceId"))}/page/{page['id']}{query}){meta}")
             lines.extend(walk(page.get("children", []), depth + 1))
@@ -450,7 +465,7 @@ def page_text(page: Page, page_type: PageType) -> str:
                     if field_spec.kind == BLOCKS:
                         parts.append(_block_inline_text(entry))
                     # an element's block fields carry their text one level deeper again
-                    for block_field in field_spec.block_element_fields():
+                    for block_field in block_element_fields(field_spec):
                         for block in entry.get(block_field) or []:
                             if not isinstance(block, dict):
                                 continue

@@ -16,11 +16,10 @@ from . import fsm
 from .errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory
 from .model import Page
-from .pagetypes import (
+from .pagetypes.core.specs import (
     ADD_BLOCK,
     ADD_ELEMENT,
     ADD_LINK,
-    BLOCK,
     BLOCK_ARRAY,
     COMPOUND,
     ELEMENT_TRANSITION,
@@ -28,24 +27,18 @@ from .pagetypes import (
     REMOVE_ELEMENT,
     REORDER_BLOCK,
     REORDER_ELEMENT,
-    SET_BLOCK,
     SET_ELEMENT_FIELD,
     SET_PROSE,
     SET_SCALAR,
     SET_TITLE,
     TRANSITION,
-    ArgSpec,
-    BlockKindSpec,
-    CommandSpec,
-    FieldSpec,
-    PageType,
-    guard_production_type,
-    initial_sections,
-    is_field_setter,
-    validate_block,
-    validate_blocks,
-    validate_inline_content,
 )
+from .pagetypes.core.args import ArgSpec, BlockKindSpec
+from .pagetypes.core.commands import CommandSpec, is_field_setter
+from .pagetypes.core.fields import FieldSpec
+from .pagetypes.core.validation import validate_blocks, validate_inline_content
+from .pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
+from .pagetypes._registry import guard_production_type
 
 _PYTHON_TYPE = {
     "string": str,
@@ -55,6 +48,7 @@ _PYTHON_TYPE = {
     "array": list,
     "object": dict,
 }
+
 
 @dataclass(frozen=True)
 class BatchContext:
@@ -138,9 +132,9 @@ def _status_ok(page: Page, command: CommandSpec) -> bool:
 
 def _opts_into_terminal_status(page: Page, command: CommandSpec) -> bool:
     """Whether `command` names the page's (terminal) status in an explicit `legal_in`, overriding the
-    terminal-state authoring lock - how bookkeeping that outlives the work stays writable.
+    terminal-status authoring lock - how bookkeeping that outlives the work stays writable.
 
-    Always explicit: `legal_in=None` (the default) says nothing about the terminal state and stays
+    Always explicit: `legal_in=None` (the default) says nothing about the terminal status and stays
     locked, as does a `legal_in` that omits it.
     """
     return command.legal_in is not None and page.status in command.legal_in
@@ -159,8 +153,8 @@ def legal_commands(page: Page, page_type: PageType, ignore_requirements: bool = 
 
     `ignore_requirements=True` skips *only* the required-content preconditions, so a transition
     gated on unfilled required content still reports legal on the FSM topology alone. Used by doc
-    generation to enumerate a state's outgoing transitions on a content-less page; FSM topology, the
-    `legal_in` status-lock, and the terminal-state authoring lock are unaffected. Not exposed through
+    generation to enumerate a status's outgoing transitions on a content-less page; FSM topology, the
+    `legal_in` status-lock, and the terminal-status authoring lock are unaffected. Not exposed through
     the live describeMutations tool.
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status)
@@ -170,8 +164,8 @@ def legal_commands(page: Page, page_type: PageType, ignore_requirements: bool = 
             _topology_ok(command, allowed)
             and _status_ok(page, command)
             and (ignore_requirements or not unmet_requirements(page, command))
-            # Terminal state: lock authoring, leave transitions (e.g. reopen) legal, and let a
-            # command naming this state in `legal_in` opt back in.
+            # Terminal status: lock authoring, leave transitions (e.g. reopen) legal, and let a
+            # command naming this status in `legal_in` opt back in.
             and (not in_terminal or _is_status_transition(command)
                  or _opts_into_terminal_status(page, command))
         )
@@ -184,12 +178,13 @@ def _field_setter_edge(page: Page, page_type: PageType, section: str, field: str
     """One self-instructing `do` field edge: kind='field' with the (section, field), the field's
     instruction (its FieldSpec.description) and the single `command` that writes it, all inline -
     so a `next` consumer needs no describePageType round-trip to know what to author."""
-    field_spec = page_type.field_spec(section, field)
+    field_spec = get_pagetype_field(page_type, section, field)
     return {
         "pageId": page.id, "pageType": page.type, "kind": "field",
         "section": section, "field": field,
         "instruction": field_spec.description.strip() if field_spec is not None else "",
         "command": command_name,
+        "statusRevisionToken": page.status_revision_token,
     }
 
 
@@ -201,7 +196,7 @@ def field_setter_edges(page: Page, page_type: PageType,
     stage: its (section, field) is a required precondition (`requires`) of a transition TOPOLOGICALLY
     legal from the current status, AND the setter is legal right now. Derived generically from the
     FSM - no per-page-type knowledge - so a status-scoped setter surfaces only where its field is a
-    stage requirement, and the `legal_in=None` 'always legal' setters no longer add noise in states
+    stage requirement, and the `legal_in=None` 'always legal' setters no longer add noise in statuses
     where their field is not the goal (e.g. setSummary while building).
 
     `blocked_events` names events the CALLER has determined cannot fire for a reason that no
@@ -217,8 +212,8 @@ def field_setter_edges(page: Page, page_type: PageType,
     single `command` that authors it (see `_field_setter_edge`). A field is one edge naming one
     command, because a field's whole authoring content is reachable in a single command - a blocks
     field takes its blocks as an array, and a list field's add carries the blocks its element is
-    created holding. SET_BLOCK, remove, reorder and the element-scoped block adds are never
-    surfaced here; describeMutations reports them.
+    created holding. remove, reorder and the element-scoped block adds are never surfaced here;
+    describeMutations reports them.
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status) - set(blocked_events)
     required = {
@@ -246,23 +241,6 @@ def field_setter_edges(page: Page, page_type: PageType,
             for (section, field), command_name in setters.items()]
 
 
-def transition_guidance(
-    page_type: PageType, batch: list[dict[str, Any]], status: str
-) -> str | None:
-    """The stage guidance for the state a committed `batch` left the page in (pure).
-
-    The coarser sibling of `field_setter_edges`: that says which field to author next, this says
-    what the stage just entered is for. None unless the batch moved the status - which it did
-    exactly when it held a page-status transition, so the store never has to report it. `status`
-    is the status after the batch, so several transitions yield only the final state's text.
-    """
-    for entry in batch:
-        command = page_type.command(entry.get("command") or "")
-        if command is not None and _is_status_transition(command):
-            return page_type.fsm.guidance_for(status)
-    return None
-
-
 def apply_command(
     page: Page,
     page_type: PageType,
@@ -273,7 +251,7 @@ def apply_command(
 ) -> CommandResult:
     """Validate and apply one command, returning the resulting page (a fresh copy)."""
     args = args or {}
-    command = page_type.command(command_name)
+    command = get_pagetype_command(page_type, command_name)
     if command is None:
         raise ValidationError(
             f"Unknown command '{command_name}' for page type '{page_type.tag}'. " +
@@ -283,6 +261,10 @@ def apply_command(
     _check_legal(page, page_type, command)
 
     working = page.copy()
+    # Backfill any section/field the page type declares now but this page predates - e.g. a
+    # section added to the page type after this page was created - so the command below can
+    # write into it instead of finding it missing.
+    working.sections = initial_sections(page_type, working.sections)
     created_id, created_ids = _apply(working, page_type, command, args, id_factory, batch_context)
     return CommandResult(page=working, created_id=created_id, created_ids=created_ids)
 
@@ -314,8 +296,6 @@ def _validate_args(command: CommandSpec, args: dict[str, Any]) -> None:
             )
         if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
             validate_blocks(value, arg.block_kinds)
-        elif arg.content == BLOCK and arg.block_kinds is not None:
-            validate_block(value, arg.block_kinds)
         elif arg.content is not None:
             validate_inline_content(arg.content, value)
 
@@ -395,9 +375,6 @@ def _apply(
         return None, []
     if command.kind == ADD_BLOCK:
         return _add_block(page, command, args, id_factory, batch_context)
-    if command.kind == SET_BLOCK:
-        _set_block(page, command, args)
-        return None, []
     if command.kind == TRANSITION:
         page.status = fsm.fire(page_type.fsm, page.status, command.event)
         return None, []
@@ -413,7 +390,7 @@ def _apply(
     raise ValidationError(f"Unsupported command kind '{command.kind}'.")
 
 
-def _create_blocks(entries: list[dict[str, Any]], kinds: tuple[BlockKindSpec, ...],
+def _create_blocks(entries: list[dict[str, Any]], block_kinds: tuple[BlockKindSpec, ...],
                  id_factory: IdFactory) -> list[dict[str, Any]]:
     """Id'd blocks from validated argument entries - the one place a block is built.
 
@@ -423,9 +400,9 @@ def _create_blocks(entries: list[dict[str, Any]], kinds: tuple[BlockKindSpec, ..
     """
     made: list[dict[str, Any]] = []
     for entry in entries:
-        spec = next(kind for kind in kinds if kind.kind == entry["kind"])
-        block: dict[str, Any] = {"id": id_factory(""), "kind": spec.kind}
-        for body in spec.body_args():
+        block_kind = next(block for block in block_kinds if block.kind == entry["kind"])
+        block: dict[str, Any] = {"id": id_factory(""), "kind": block_kind.kind}
+        for body in block_kind.body_args:
             block[body.name] = entry.get(body.name)
         made.append(block)
     return made
@@ -435,8 +412,11 @@ def _element_blocks_from_args(field_spec: FieldSpec, args: dict[str, Any],
                               id_factory: IdFactory) -> dict[str, list[dict[str, Any]]]:
     """The id'd block arrays for an element being created: one per declared block field, read from
     the same-named optional argument. A field with no argument starts empty."""
-    return {spec.field: _create_blocks(args.get(spec.field) or [], spec.vocabulary(), id_factory)
-            for spec in field_spec.element_blocks}
+    return {
+        element_blocks.field: _create_blocks(
+            args.get(element_blocks.field) or [], element_blocks.block_kinds, id_factory)
+        for element_blocks in field_spec.element_blocks
+    }
 
 
 def _add_element(page: Page, page_type: PageType, command: CommandSpec,
@@ -451,7 +431,7 @@ def _add_element(page: Page, page_type: PageType, command: CommandSpec,
     for element_field, arg_name in command.element_map:
         element[element_field] = args.get(arg_name)   # optional args default to None
     # If the list has an element-FSM, the new element starts at that FSM's initial status.
-    field_spec = page_type.field_spec(command.section, command.field)
+    field_spec = get_pagetype_field(page_type, command.section, command.field)
     created: list[str] = [element["id"]]
     if field_spec is not None:
         if field_spec.element_fsm is not None:
@@ -512,7 +492,7 @@ def _target_entries(page: Page, command: CommandSpec, args: dict[str, Any]) -> l
 
 def _entry_id(command: CommandSpec, args: dict[str, Any]) -> str:
     """The id of the entry a command targets. args[0] is the id by convention; an element-scoped
-    block command spends args[0] on the element that holds the field, so its entry id is args[1]."""
+    remove/reorder spends args[0] on the element that holds the field, so its entry id is args[1]."""
     return args[command.args[1 if command.element_field is not None else 0].name]
 
 
@@ -529,7 +509,7 @@ def _set_element_field(page: Page, command: CommandSpec, args: dict[str, Any]) -
 
 def _element_transition(page: Page, page_type: PageType, command: CommandSpec, args: dict[str, Any]) -> None:
     """Fire the element's own FSM event (e.g. a step todo->done), then apply any field writes."""
-    field_spec = page_type.field_spec(command.section, command.field)
+    field_spec = get_pagetype_field(page_type, command.section, command.field)
     if field_spec is None or field_spec.element_fsm is None:
         raise ValidationError(f"{command.section}.{command.field} has no element FSM to drive.")
     element = _find_element(page, command, args)
@@ -648,11 +628,6 @@ def _block_array_arg(command: CommandSpec) -> ArgSpec | None:
     return next((arg for arg in command.args if arg.content == BLOCK_ARRAY), None)
 
 
-def _block_object_arg(command: CommandSpec) -> ArgSpec | None:
-    """The object argument a block set carries its replacement in."""
-    return next((arg for arg in command.args if arg.content == BLOCK), None)
-
-
 def _add_block(page: Page, command: CommandSpec, args: dict[str, Any], id_factory: IdFactory,
                batch_context: BatchContext | None = None) -> tuple[str | None, list[str]]:
     """Add a run of blocks to a blocks field - the section's own, or an element's when the command
@@ -671,32 +646,6 @@ def _add_block(page: Page, command: CommandSpec, args: dict[str, Any], id_factor
         _place_entry(entries, block, command, args, batch_context, offset=offset)
     created = [block["id"] for block in blocks]
     return (created[0] if created else None), created
-
-
-def _set_block(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
-    """Replace one block by id, preserving its id and its position and nothing else.
-
-    A generalized set is a true overwrite: the supplied block's kind replaces the stored one, so
-    the entry is rebuilt rather than updated in place and no body key from the previous kind
-    survives the change. The only kind rule is that the supplied kind is one the field declares,
-    which validate_block enforced in _validate_args before this ran.
-    """
-    object_arg = _block_object_arg(command)
-    if object_arg is None:                           # unreachable: every set declares one
-        raise ValidationError(f"Command '{command.name}' declares no block argument.")
-    entries = _target_entries(page, command, args)
-    context = _entry_context(command, args)
-    target_id = _entry_id(command, args)
-    supplied = args[object_arg.name]
-    spec = next(kind for kind in (object_arg.block_kinds or ()) if kind.kind == supplied["kind"])
-    for index, entry in enumerate(entries):
-        if entry.get("id") == target_id:
-            rebuilt: dict[str, Any] = {"id": target_id, "kind": spec.kind}
-            for body in spec.body_args():
-                rebuilt[body.name] = supplied.get(body.name)
-            entries[index] = rebuilt
-            return
-    raise NotFoundError(f"No entry with id '{target_id}' in {context}.")
 
 
 def _remove_by_id(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:

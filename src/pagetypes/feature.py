@@ -6,25 +6,33 @@ on their own, and reading one without the others would hide the coupling.
 
 from __future__ import annotations
 
-from . import (
+from ._stage_guidance import (
+    BUILDING,
+    FEATURE_BRIEF_REVIEW,
+    GROUNDING,
+    PLANNING,
+    PLAN_REVIEW,
+    SPEC,
+)
+from ._workspace_guidance import (
+    MERGE_PROCESS_DESC,
+    MERGE_PROCESS_FIELD,
+    TESTING_TOOL_DESC,
+    TESTING_TOOL_FIELD,
+)
+from .core.specs import (
     AutoChildSpec,
     ChildStateGuard,
-    ElementBlocksSpec,
     ElementFSMSpec,
     FSMSpec,
-    PageType,
     ParentStateGuard,
     RefCheck,
-    SectionSpec,
-    _blocks,
-    _boolean,
-    _integer,
-    _list,
-    _prose,
-    _scalar,
-    _text,
-    BlockKindSpec,
+    WorkspaceGuidanceSpec,
+)
+from .core.args import ElementBlocksSpec, _boolean, _code_block, _paragraph_runs, _text, _heading_text, _paragraph_text, BlockKindSpec
+from .core.commands import (
     add_link_cmd,
+    set_title_cmd,
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
@@ -32,27 +40,33 @@ from . import (
     set_element_field_cmd,
     set_prose_cmd,
     set_scalar_cmd,
-    set_title_cmd,
     transition_cmd,
 )
+from .core.fields import SectionSpec, _blocks, _list, _prose, _scalar
+from .core.pagetype import PageType
 
 _STEP_FSM = ElementFSMSpec(
     name="Step",
-    initial="todo", states=("todo", "done"),
-    transitions=(("markDone", "todo", "done", "agent"), ("reopen", "done", "todo", "agent")),
-    checkmark_done="done",                       # a step is a checkbox: initial "todo" -> [ ], "done" -> [x]
+    initial="todo", states=("todo", "done", "skipped"),
+    transitions=(("markDone", "todo", "done", "agent"),
+                 ("reopen", "done", "todo", "agent"),
+                 ("skip", "todo", "skipped", "agent"),
+                 ("reopen", "skipped", "todo", "agent")),
+    checkmark_done="done",
 )
 _CASE_FSM = ElementFSMSpec(
     name="Case",
-    initial="pending", states=("pending", "passed", "failed"),
-    transitions=(("pass", "pending", "passed", "agent"), ("fail", "pending", "failed", "agent")),
-    checkmark_done="passed",                     # initial "pending" -> [ ], "passed" -> [x], "failed" -> no box
+    initial="pending", states=("pending", "passed", "failed", "skipped"),
+    transitions=(("pass", "pending", "passed", "agent"),
+                 ("fail", "pending", "failed", "agent"),
+                 ("skip", "pending", "skipped", "agent")),
+    checkmark_done="passed",
 )
 _QUESTION_FSM = ElementFSMSpec(
     name="Question",
     initial="open", states=("open", "answered"),
     transitions=(("answer", "open", "answered", "agent"),),
-)                                                # no checkmark_done -> open/answered render without a box
+)
 
 
 _VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
@@ -135,7 +149,7 @@ _FEATURE_BRIEF = PageType(
                 not reopened during the build.
                 """),
         )),
-        # The plan review's outcome (populated in the `planReview` state): a verdict plus a summary
+        # The plan review's outcome (populated in the `planReview` status): a verdict plus a summary
         # of the findings the review raised. The findings themselves must also be applied as edits.
         SectionSpec("review", "Plan review", (
             _scalar("verdict", choices=_VERDICTS, description="""
@@ -157,13 +171,22 @@ _FEATURE_BRIEF = PageType(
                 this record agree. Say where it applies, by step or spec section.
                 """),
         )),
-        SectionSpec("commits", "Commits", (
-            _list("items", element_fields=("sha", "message", "url", "stale"), description="""
-                Each a commit made for this feature while building: its sha, subject line, and a url
-                when one exists. Record each as you make it rather than reconstructing the list at the
-                end, and flag one stale once its sha has left history, for example after a rebase.
+        SectionSpec("pull_request", "Pull Request", (
+            _scalar("url", description="""
+                The pull request URL created for this feature review.
                 """),
         )),
+        SectionSpec("commits", "Commits", (
+            _list("items", element_fields=("sha", "message", "stale"), description="""
+                Each a commit made for this feature while building: its sha and subject line. Record
+                each as you make it rather than reconstructing the list at the end, and flag one
+                stale once its sha has left history, for example after a rebase.
+                """),
+        )),
+    ),
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),
     ),
     commands=(
         set_prose_cmd("summary"),
@@ -179,7 +202,7 @@ _FEATURE_BRIEF = PageType(
             ("answerQuestion", "answer", "answer a question (open -> answered)", (_text("answer"),)),)),
         set_element_field_cmd("questions", name="escalateQuestion",
                               description="flag a question as awaiting a human", const=("needsHuman", True)),
-        # Plan-review recording - legal only in the `planReview` state, where the authored plan is
+        # Plan-review recording - legal only in the `planReview` status, where the authored plan is
         # reviewed before any code is written. `approvePlan` (planReview -> building) requires a
         # verdict to have been recorded first (see its `requires=` below).
         set_scalar_cmd("review", "verdict", name="setReviewVerdict", choices=_VERDICTS,
@@ -189,8 +212,10 @@ _FEATURE_BRIEF = PageType(
                              _text("action", required=False, choices=_FINDING_ACTIONS,
                                    description="how the finding was applied to the plan")),
                    legal_in=("planReview",)),
+        set_scalar_cmd("pull_request", "url", name="setPullRequestUrl", label="pull request url",
+                       legal_in=("review",)),
         *list_cmds("commits", add_name="recordCommit", label="recorded commit", remove=False,
-                   add_args=(_text("sha"), _text("message"), _text("url", required=False)),
+                   add_args=(_text("sha"), _text("message")),
                    legal_in=_COMMIT_LOG_STATES),
         set_element_field_cmd("commits", name="markCommitStale", const=("stale", True),
                               description="flag a recorded commit as stale - its sha is no longer in history (e.g. after a rebase)",
@@ -208,7 +233,7 @@ _FEATURE_BRIEF = PageType(
             ("documentation", "items"),
         )),
         transition_cmd("beginPlanning", "spec -> planning", requires=(("questions", "items"),), guards=(
-            ChildStateGuard("feature-spec", "sealed", "the feature spec must be sealed"),
+            ChildStateGuard("feature-spec", ("sealed",), "the feature spec must be sealed"),
         )),
         # planning -> planReview is gated on the three planning artifacts being finalized: the
         # implementation-plan and testing-plan children each `ready` and the feature-spec `sealed`
@@ -217,23 +242,33 @@ _FEATURE_BRIEF = PageType(
         # and an unsealed spec must not reach review. There must be an authored plan before it can
         # be reviewed.
         transition_cmd("submitPlan", "planning -> planReview", guards=(
-            ChildStateGuard("implementation-plan", "ready", "the implementation plan must be marked ready"),
-            ChildStateGuard("testing-plan", "ready", "the testing plan must be marked ready"),
-            ChildStateGuard("feature-spec", "sealed", "the feature spec must be sealed"),
+            ChildStateGuard("implementation-plan", ("ready",), "the implementation plan must be marked ready"),
+            ChildStateGuard("testing-plan", ("ready",), "the testing plan must be marked ready"),
+            ChildStateGuard("feature-spec", ("sealed",), "the feature spec must be sealed"),
         )),
         # planReview -> building requires a verdict to have been recorded (the review happened).
         # The verdict is a soft guide (requires only checks presence).
         transition_cmd("approvePlan", "planReview -> building", requires=(("review", "verdict"),)),
         transition_cmd("revisePlan", "planReview -> planning (send the plan back)"),
-        transition_cmd("submitForReview", "building -> review"),
+        # `submitForReview` and `ship` are both guarded on every step being done-or-skipped and every
+        # case passed-or-skipped (checked across the brief's child pages by the store): the review gate
+        # refuses unaddressed work, and a deliberately skipped item counts as addressed at both.
+        transition_cmd("submitForReview", "building -> review", guards=(
+            ChildStateGuard("implementation-plan", ("done", "skipped"),
+                            "every implementation-plan step must be done or skipped",
+                            section="steps", field="items"),
+            ChildStateGuard("testing-plan", ("passed", "skipped"),
+                            "every testing-plan case must be passed or skipped",
+                            section="cases", field="items"),
+        )),
         transition_cmd("reopenPlanning", "building -> planning"),
         transition_cmd("requestChanges", "review -> building", agency="either"),
-        # `ship` is a human gate AND is guarded: every implementation-plan step must be `done`
-        # and every testing-plan case `passed` (checked across the brief's child pages by the store).
         transition_cmd("ship", "review -> shipped (human gate)", agency="human", guards=(
-            ChildStateGuard("implementation-plan", "done", "every implementation-plan step must be done",
+            ChildStateGuard("implementation-plan", ("done", "skipped"),
+                            "every implementation-plan step must be done or skipped",
                             section="steps", field="items"),
-            ChildStateGuard("testing-plan", "passed", "every testing-plan case must be passed",
+            ChildStateGuard("testing-plan", ("passed", "skipped"),
+                            "every testing-plan case must be passed or skipped",
                             section="cases", field="items"),
         )),
         transition_cmd("abandon", "drop the work -> abandoned", agency="human",
@@ -247,149 +282,13 @@ _FEATURE_BRIEF = PageType(
         states=("draft", "grounding", "spec", "planning", "planReview", "building", "review",
                 "shipped", "abandoned"),
         terminal_states=("shipped", "abandoned"),
-        state_guidance=(
-            ("grounding", """
-                grounding - the summary is written and nothing else is known yet. This state is for
-                reading the real repository and recording what is actually there. The work of it:
-
-                - Find the code this feature touches and read it: the function, the file, the
-                  callers. Understand why it exists, not just what it does. A component whose
-                  purpose you cannot state is one you are not ready to plan against.
-                - Record only what you confirmed by opening it. Every component, constraint,
-                  conflict and stale doc here is read out of this repository, never inferred from a
-                  name or remembered from somewhere else.
-                - Follow callers and imports outward until the blast radius stops growing, and note
-                  as you go which components hold pure logic and which perform effects.
-                - Turn whatever reading could not settle into a question rather than an assumption.
-                  An unsurfaced assumption is the most expensive thing to carry out of this state.
-
-                No code is edited here and no design is started. If the summary turns out to be
-                wrong or underspecified once you can see the code, say so now, while nothing has
-                been built on it.
-            """),
-            ("spec", """
-                spec - the grounded base is recorded, and the design is settled once, in the
-                feature-spec child, before a single step or case exists. The work of it:
-
-                - Update the summary and update the page title to the correct understanding of the
-                  work and escalate any design questions early to the user now.
-                - Author the spec from the grounded base: the behaviour, the interfaces with their
-                  exact signatures, the data shapes, the states, the error paths. Decide everything
-                  a plan would otherwise have to decide for itself.
-                - Draw the line between pure logic and effects while designing rather than after.
-                  Decide what is a function of its inputs alone and what needs I/O, storage, the
-                  clock or randomness, and give each side its own interfaces. The rules live on the
-                  pure side; the effectful side stays thin enough to hold none of its own.
-                - Spec the smallest thing that delivers the summary. No configurability, extension
-                  points or generality nobody asked for, and no abstraction over a single use.
-                - Answer the brief's questions and record each decision with the alternatives it
-                  rejected and why, so a settled question is not reopened mid-build.
-                - Escalate what only a person can settle instead of settling it on their behalf.
-
-                Seal the spec once it is settled; sealing is what unlocks planning. Steps and cases
-                are not written here, because a design still moving is not one to plan against.
-            """),
-            ("planning", """
-                planning - the spec is sealed and is now turned into an implementation plan and a
-                testing plan detailed enough to build from without deciding anything further. The
-                work of it:
-
-                - Write each step as one action a skilled stranger to this codebase could finish in
-                  a few minutes, naming the exact files and carrying the real content it needs.
-                  Steps are read out of order and alone, so repeat detail rather than refer back.
-                - Give every step its verification: what will be run, and what it should print or
-                  return. A step with no way to tell whether it worked is not yet a step.
-                - Order the work so the pure logic is built and tested before the effectful code
-                  that calls it, and keep a step on one side of that line: a step that adds a rule
-                  changes pure logic, a step that wires it to storage or the network changes the
-                  shell around it.
-                - Plan the failure paths the spec implies alongside the happy one - empty inputs,
-                  missing values, malformed data, boundaries - and say what the volume this will
-                  really see does to the approach.
-                - Ask rather than guess. A question is cheap here and expensive once a plan exists.
-                  Record and escalate questions to the user now.
-
-                Keep both plans to what the spec asks for and nothing besides. Mark each ready when
-                it is complete; submitting the plan needs both plans ready and the spec still
-                sealed.
-            """),
-            ("planReview", """
-                plan-review - the plan is written, and this is the last point at which fixing it is
-                still cheap. This state is for reading the plan against the spec, not for building.
-                The work of it:
-
-                - Check every spec requirement against a step that delivers it, and every step
-                  against a spec requirement that asked for it. A requirement no step covers and a
-                  step nothing asked for are both findings.
-                - Check that the testing plan can actually fail: cases that assert real behaviour,
-                  that cover the spec's error paths, and that reach the pure logic directly instead
-                  of through a mock.
-                - Check that the plan is not larger than the problem, and that the pure and
-                  effectful sides stayed separate in it.
-                - Check that the steps do not update documentation as that is a later activity once
-                  the implementation has landed.
-                - Record each finding AND make the edit its action names, so the plan and this
-                  record agree. A finding recorded but never applied is worse than one never
-                  raised.
-
-                Set the verdict honestly: needs-changes when an implementer would build the wrong
-                thing or get stuck, needs-human-decision when a question has to go to a person.
-                Wording and style preferences are not grounds to withhold build-ready.
-            """),
-            ("building", """
-                building - the plan is approved, and this is where code is written. Work the steps
-                in their order and let the plan, not improvisation, decide what gets built. The work
-                of it:
-
-                - Work test-first: write the failing test, watch it fail, write the least code that
-                  passes it, watch it pass, commit. Mark a step done or a case passed only from a
-                  run you actually saw.
-                - Keep the pure logic pure. Decisions, derivations and transformations are functions
-                  of their arguments, with no I/O, no clock, no randomness and no reaching into
-                  shared mutable state, and the code that performs effects stays a thin shell that
-                  calls them and applies what they return. Where a step tangles the two, split them
-                  rather than reach for a mock.
-                - Name things for what they mean. A longer name that carries intent beats a short
-                  one that loses it, and an argument keeps its caller's name unless renaming
-                  genuinely clarifies. Comments say why, not what.
-                - Stay surgical. Touch only what the step needs; leave adjacent code, comments and
-                  formatting exactly as found, and match the style already there even where you
-                  would have chosen otherwise. Remove only the imports and helpers your own change
-                  orphaned, and raise anything else you notice as a conflict or a question instead
-                  of fixing it in passing.
-                - Handle the realistic failure cases the plan named, and flag a limitation you are
-                  knowingly leaving in rather than let it be discovered later.
-
-                Anything the plan did not anticipate is a question, or a reopened plan, not a quiet
-                improvisation. Record each commit as you make it.
-            """),
-            ("review", """
-                review - the build is done, and this is the last stop before the human ship gate.
-                This state is for verifying, not for finishing off. The work of it:
-
-                - Re-read the spec's design section and confirm every requirement it states is
-                  actually implemented, not merely planned.
-                - Confirm every implementation-plan step is done and every testing-plan case passed
-                  against a test that genuinely ran. A case marked passed without a run you saw is
-                  the one failure this gate exists to catch.
-                - Confirm nothing that worked before is broken now, and that the diff carries only
-                  what the plan called for: an unrelated change here is a change nobody reviewed.
-                - Confirm the pure logic stayed free of effects and the shell around it stayed free
-                  of rules.
-                - Review the comments added for the change. Avoid verbosity of comments and avoid
-                  naming the specifics of other parts of code and instead keep comments to general
-                  principles and intents. Comments should only refer to the current code, not the
-                  previous implementation. Uppercase words and emphasis markers are inappropriate in
-                  tone and single line comments that are self-evident by code should be removed.
-
-                Three things are deliberately not part of this state, so do not start them here:
-                rebasing onto main happens at ship, not before; recording commits happens after ship,
-                once the shas are final; and reconciling the documentation pages the brief named as
-                going stale also happens at ship.
-
-                If any of this turns up outstanding work, use requestChanges to go back to building
-                rather than ship with a known gap.
-            """),
+        status_guidance=(
+            ("grounding", GROUNDING),
+            ("spec", SPEC),
+            ("planning", PLANNING),
+            ("planReview", PLAN_REVIEW),
+            ("building", BUILDING),
+            ("review", FEATURE_BRIEF_REVIEW),
         ),
     ),
     # On createPage, create the three pinned children in the same commit; author into those.
@@ -413,35 +312,6 @@ _FEATURE_IN_PLANNING_OR_LATER = ParentStateGuard(
 )
 
 
-_DESIGN = _blocks("body", block_kinds=(
-    BlockKindSpec("paragraph", args=(_text(),)),
-    BlockKindSpec("heading", args=(_integer("level"), _text())),
-    "code",
-), description="""
-                The design in enough detail that a plan can be written from it without making further
-                decisions: the behaviour, the interfaces with their exact signatures and types, the
-                data shapes, the states, and the error paths. Separate the pure logic from the code
-                that performs effects and give each its own interfaces: what is a function of its
-                inputs alone, and what needs I/O, storage, the clock or randomness. The rules belong
-                on the pure side, and the effectful side should be thin enough to hold none of them.
-                Use a heading per area and a code block for anything with a precise shape. No TBDs
-                and no 'handle edge cases' placeholders, nothing that contradicts another part of the
-                spec, and nothing that was not asked for. Emphasis and links are structured inline
-                runs, not markdown syntax.
-                """)
-
-
-_SPEC_DECISIONS = _blocks("body", block_kinds=(
-    BlockKindSpec("decision", args=(_text("questionId"), _text()),
-                  ref_check=RefCheck(arg="questionId", scope="parent",
-                                     section="questions", field="items")),
-), description="""
-                One decision block per resolved question, linking the brief question it answers: the
-                decision taken, the alternatives rejected, and why. This is what keeps a settled
-                question from being reopened mid-build, so record the reasoning, not just the outcome.
-                """)
-
-
 _FEATURE_SPEC = PageType(
     tag="feature-spec",
     name="Spec",
@@ -460,8 +330,35 @@ _FEATURE_SPEC = PageType(
                 separate features, each able to ship on its own.
                 """),
         )),
-        SectionSpec("design", "Design", (_DESIGN,)),
-        SectionSpec("decisions", "Decisions", (_SPEC_DECISIONS,)),
+        SectionSpec("design", "Design", (
+            _blocks("body", block_kinds=(
+                _paragraph_text(),
+                _heading_text(),
+                _code_block(),
+            ), description="""
+                The design in enough detail that a plan can be written from it without making further
+                decisions: the behaviour, the interfaces with their exact signatures and types, the
+                data shapes, the states, and the error paths. Separate the pure logic from the code
+                that performs effects and give each its own interfaces: what is a function of its
+                inputs alone, and what needs I/O, storage, the clock or randomness. The rules belong
+                on the pure side, and the effectful side should be thin enough to hold none of them.
+                Use a heading per area and a code block for anything with a precise shape. No TBDs
+                and no 'handle edge cases' placeholders, nothing that contradicts another part of the
+                spec, and nothing that was not asked for. Emphasis and links are structured inline
+                runs, not markdown syntax.
+                """),
+        )),
+        SectionSpec("decisions", "Decisions", (
+            _blocks("body", block_kinds=(
+                BlockKindSpec("decision", body_args=(_text("questionId"), _text()),
+                              ref_check=RefCheck(arg="questionId", scope="parent",
+                                                 section="questions", field="items")),
+            ), description="""
+                One decision block per resolved question, linking the brief question it answers: the
+                decision taken, the alternatives rejected, and why. This is what keeps a settled
+                question from being reopened mid-build, so record the reasoning, not just the outcome.
+                """),
+        )),
     ),
     # Every authoring command is allowed in `draft`: sealing the spec locks ALL edits, so a
     # `sealed` spec is frozen and must be `reopen`ed to change.
@@ -469,12 +366,12 @@ _FEATURE_SPEC = PageType(
         set_prose_cmd("overview"),
         # Each field's add and set are generated from the same declaration the validator reads.
         *blocks_cmds(
-            "design", _DESIGN,
+            "design",
             remove_name="removeDesignBlock", remove_desc="remove a design block",
             reorder_name="reorderDesignBlock",
             reorder_desc="move a design block to an anchored position (precedingId guards a stale read)"),
         *blocks_cmds(
-            "decisions", _SPEC_DECISIONS,
+            "decisions",
             remove_name="removeDecision", remove_desc="remove a decision",
             reorder_name="reorderDecision",
             reorder_desc="move a decision to an anchored position (precedingId guards a stale read)"),
@@ -494,8 +391,14 @@ _FEATURE_SPEC = PageType(
 )
 
 
-_STEPS = _list("items", element_fields=("detail", "status"), element_fsm=_STEP_FSM,
-                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),),
+_IMPLEMENTATION_PLAN = PageType(
+    tag="implementation-plan",
+    name="Implementation plan",
+    description="The step-by-step build plan for a feature. Auto-created as a child of a feature-brief.",
+    sections=(
+        SectionSpec("steps", "Steps", (
+            _list("items", element_fields=("detail", "status"), element_fsm=_STEP_FSM,
+                  element_blocks=(ElementBlocksSpec("detail", (_paragraph_runs(), _code_block())),),
                   description="""
                 Each one action an implementer can finish in a few minutes, ordered, written for a
                 skilled developer who knows nothing about this codebase or its domain. Name the exact
@@ -509,41 +412,35 @@ _STEPS = _list("items", element_fields=("detail", "status"), element_fsm=_STEP_F
                 prose. Never write 'TBD', 'add error handling', 'write tests for the above', or 'same
                 as step N' - repeat the detail instead, because steps are read out of order and in
                 isolation. Mark a step done only once its test passes (element-FSM todo <-> done).
-                """)
-
-_MODELS = _blocks("models", block_kinds=("code",), description="""
+                """),
+        )),
+        SectionSpec("dataModels", "Data models", (
+            _blocks("models", block_kinds=(_code_block(),), description="""
                 One code block per data shape this feature introduces or changes, written as real
                 declarations rather than prose: field names, types, and which are optional. Steps
                 refer to these by name, so the names and types here must match the ones the steps use
                 exactly - a shape called one thing here and another in a step is a bug.
-                """)
-
-
-_IMPLEMENTATION_PLAN = PageType(
-    tag="implementation-plan",
-    name="Implementation plan",
-    description="The step-by-step build plan for a feature. Auto-created as a child of a feature-brief.",
-    sections=(
-        SectionSpec("steps", "Steps", (_STEPS,)),
-        SectionSpec("dataModels", "Data models", (_MODELS,)),
+                """),
+        )),
     ),
     commands=(
         # The add carries the step's content, so one command writes a whole step and a batch of
         # them never has to name an id it has not committed.
         *list_cmds("steps", label="step", legal_in=("draft",), add_args=(),
-                   field_spec=_STEPS),
+                   element_blocks=("detail",)),
         # The step's detail, appended to once the step exists - without this an element's blocks
         # would be write-once, and fixing one would cost the step its id and its todo/done status.
-        *element_blocks_cmds("steps", _STEPS, "detail", legal_in=("draft",)),
+        *element_blocks_cmds("steps", "detail", legal_in=("draft",)),
         # Execution-status marks stay legal once the plan is `ready`: progress is recorded while
         # building against a finalized plan. Only the structural edits above are `draft`-only.
         *element_cmds("steps", legal_in=("draft", "ready"),
                       marks=(("markStepDone", "markDone", "mark a step done"),
+                             ("markStepSkipped", "skip", "mark a step skipped"),
                              ("markStepTodo", "reopen", "reopen a step"))),
         # The field key is `models` under section `dataModels`, so the derived label would be
         # `models`; label= keeps the name the surface already reads with.
         *blocks_cmds(
-            "dataModels", _MODELS, label="dataModels",
+            "dataModels", field="models", label="dataModels",
             remove_name="removeDataModel", remove_desc="remove a data-model block",
             reorder_name="reorderDataModel",
             reorder_desc="move a data-model block to an anchored position (precedingId guards a stale read)",
@@ -588,7 +485,8 @@ _TESTING_PLAN = PageType(
         # while building against a finalized plan. Only the structural edits above are `draft`-only.
         *element_cmds("cases", legal_in=("draft", "ready"),
                       marks=(("markCasePassed", "pass", "mark a case passed"),
-                             ("markCaseFailed", "fail", "mark a case failed"))),
+                             ("markCaseFailed", "fail", "mark a case failed"),
+                             ("markCaseSkipped", "skip", "mark a case skipped"))),
         transition_cmd("markReady", "draft -> ready", requires=(("cases", "items"),),
                        parent_guards=(_FEATURE_IN_PLANNING_OR_LATER,)),
         transition_cmd("reopen", "ready -> draft (unlocks structural edits)"),

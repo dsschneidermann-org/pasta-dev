@@ -8,7 +8,7 @@ role:
                          required + optional element field) and the content-mutation patterns over
                          them (set, add + positioned insert, remove, reorder, set-element-field).
   - ``test-blocks``    - the ``blocks`` field: every block kind, the inline-run grammar, in-place
-                         set, reorder, remove; a single terminal ``active`` state.
+                         set, reorder, remove; a single terminal ``active`` status.
   - ``test-element-blocks`` - block-bearing element fields: a list whose elements carry blocks
                          under a per-field kind restriction (``snippet`` code-only, ``detail``
                          paragraph/code/list), an element FSM, and a draft→ready FSM whose
@@ -19,7 +19,7 @@ role:
                          that share the name ``open``, and a COMPOUND ``close`` that records a
                          commit AND transitions.
   - ``test-lifecycle`` - a rich status FSM: required-content preconditions, agency, a multi-source
-                         ``abandon`` to a terminal state, a questions element-FSM + escalate, a
+                         ``abandon`` to a terminal status, a questions element-FSM + escalate, a
                          pinned auto-child, a ``beginImplementation`` guarded on that child's page
                          status (page-status guard), and a ``ship`` guarded on that child's element
                          states (element-status guards).
@@ -48,30 +48,26 @@ Command DECLARATION flows through the SAME shared command-helper factories the p
 imported from
 src.pagetypes) - so a fixture reads like a production type and doubles as coverage of those
 helpers, while its command surface (names, args, legality, FSM edges, guards, ref-checks) stays
-exactly what it was when hand-written. Only the element FSMs and the field-spec helpers remain local,
-so a fixture's SHAPE never moves when a production type does.
+exactly what it was when hand-written. The field-spec and command helpers are shared with
+src.pagetypes; only the element FSMs are declared locally, named distinctly so their diagram labels
+and cache identity never collide with production.
 """
 
 from __future__ import annotations
 
-from .pagetypes import (
-    BLOCKS,
-    LIST,
-    PROSE,
-    SCALAR,
+from .pagetypes.core.specs import (
     AutoChildSpec,
-    BlockKindSpec,
     ChildStateGuard,
-    ElementBlocksSpec,
     ElementFSMSpec,
-    FieldSpec,
     FSMSpec,
-    PageType,
     ParentStateGuard,
     RefCheck,
-    SectionSpec,
-    _boolean,
-    _text,
+    WorkspaceGuidanceSpec,
+)
+from .pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _boolean, _code_block, _list_block, _paragraph_runs, _paragraph_text, _text, standard_blocks
+from .pagetypes.core.commands import (
+    add_link_cmd,
+    set_title_cmd,
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
@@ -81,24 +77,35 @@ from .pagetypes import (
     set_scalar_cmd,
     transition_cmd,
     transition_on_add_cmd,
-    add_link_cmd,
-    set_title_cmd,
 )
+from .pagetypes.core.fields import (
+    SectionSpec,
+    _blocks,
+    _list,
+    _prose,
+    _scalar,
+)
+from .pagetypes.core.pagetype import PageType
 
 
 # --- Element-level FSMs (a list element's own tiny lifecycle) -----------------
 # Named distinctly from production so their diagram labels and cache identity never collide.
 _STEP_FSM = ElementFSMSpec(
     name="TestStep",
-    initial="todo", states=("todo", "done"),
-    transitions=(("markDone", "todo", "done", "agent"), ("reopen", "done", "todo", "agent")),
-    checkmark_done="done",                       # todo -> [ ], done -> [x]
+    initial="todo", states=("todo", "done", "skipped"),
+    transitions=(("markDone", "todo", "done", "agent"),
+                 ("reopen", "done", "todo", "agent"),
+                 ("skip", "todo", "skipped", "agent"),
+                 ("reopen", "skipped", "todo", "agent")),
+    checkmark_done="done",
 )
 _CHECK_FSM = ElementFSMSpec(
     name="TestCheck",
-    initial="pending", states=("pending", "passed", "failed"),
-    transitions=(("pass", "pending", "passed", "agent"), ("fail", "pending", "failed", "agent")),
-    checkmark_done="passed",                     # pending -> [ ], passed -> [x], failed -> no box
+    initial="pending", states=("pending", "passed", "failed", "skipped"),
+    transitions=(("pass", "pending", "passed", "agent"),
+                 ("fail", "pending", "failed", "agent"),
+                 ("skip", "pending", "skipped", "agent")),
+    checkmark_done="passed",
 )
 _QUESTION_FSM = ElementFSMSpec(
     name="TestQuestion",
@@ -107,34 +114,11 @@ _QUESTION_FSM = ElementFSMSpec(
 )                                                # no checkmark_done -> open/answered render without a box
 
 
-# --- Field-spec helpers (readability only, mirroring src.pagetypes) -------
-# The FIELD helpers stay local so a fixture's SHAPE never moves when a production type does; only the
-# COMMAND declaration below is routed through the shared src.pagetypes factories.
-def _scalar(key: str, choices: tuple[str, ...] | None = None, description: str = "") -> FieldSpec:
-    return FieldSpec(key=key, kind=SCALAR, choices=choices, description=description)
-
-
-def _prose(key: str, description: str = "") -> FieldSpec:
-    return FieldSpec(key=key, kind=PROSE, description=description)
-
-
-def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec | None = None,
-          description: str = "", element_blocks: tuple[ElementBlocksSpec, ...] = ()) -> FieldSpec:
-    return FieldSpec(key=key, kind=LIST, element_fields=element_fields,
-                     element_fsm=element_fsm, element_blocks=element_blocks,
-                     description=description)
-
-
-def _blocks(key: str, description: str = "",
-            block_kinds: tuple[BlockKindSpec | str, ...] = ()) -> FieldSpec:
-    return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)
-
-
 # ============================================================================
 # test-fields - every non-block field kind + the content-mutation patterns.
 # scalar (plain), scalar (enum), prose, and a plain list (multi element fields, one optional,
 # no element FSM). Commands cover set_scalar, set_prose, add_element (append + positioned insert),
-# remove_element, reorder_element, and set_element_field (a boolean const). Single `active` state:
+# remove_element, reorder_element, and set_element_field (a boolean const). Single `active` status:
 # this fixture has no lifecycle of its own - it is purely a content surface.
 # ============================================================================
 TEST_FIELDS = PageType(
@@ -145,7 +129,7 @@ TEST_FIELDS = PageType(
         SectionSpec("basics", "Basics", (
             _scalar("label", description="a plain scalar"),
             _scalar("kind", choices=("alpha", "beta", "gamma"), description="an enum scalar"),
-            _prose("body", "a prose body"),
+            _prose("body", description="a prose body"),
         )),
         SectionSpec("items", "Items", (
             _list("items", element_fields=("text", "note", "flagged"),
@@ -170,19 +154,19 @@ TEST_FIELDS = PageType(
 # The richest content surface, in four commands: one add taking an array of kinded blocks, one
 # generalized set replacing any block whatever its kind, plus reorder, remove and positioned
 # insert. The field declares no vocabulary, so it accepts every standard kind. Single terminal
-# `active` state (also the single-state / terminal case for render and reachable_states).
+# `active` status (also the single-state / terminal case for render and reachable_states).
 # ============================================================================
-_BLOCKS_BODY = _blocks("body", "a rich-text blocks body")
 TEST_BLOCKS = PageType(
     tag="test-blocks",
     name="Blocks fixture",
     description="Test fixture: the blocks field - every block kind and the inline-run grammar.",
     sections=(
-        SectionSpec("body", "Body", (_BLOCKS_BODY,)),
+        SectionSpec("body", "Body", (
+            _blocks("body", standard_blocks(), "a rich-text blocks body"),)),
     ),
     # The field is passed to both its section and its factory, so its vocabulary - here the
     # default, every standard kind - is declared once.
-    commands=(*blocks_cmds("body", _BLOCKS_BODY), add_link_cmd(), set_title_cmd()),
+    commands=(*blocks_cmds("body"), add_link_cmd(), set_title_cmd()),
     fsm=FSMSpec(name="TestBlocks", initial="active", states=("active",)),
 )
 
@@ -195,28 +179,29 @@ TEST_BLOCKS = PageType(
 # the only way to observe both the draft-only content lock on the element-scoped commands and their
 # absence from the self-direction `do` list.
 # ============================================================================
-_ELEMENT_ITEMS = _list("items", element_fields=("text", "snippet", "detail", "status"),
-                       element_fsm=_STEP_FSM,
-                       element_blocks=(ElementBlocksSpec("snippet", ("code",)),
-                                       ElementBlocksSpec("detail", ("paragraph", "code", "list"))),
-                       description="a list whose elements carry a code-only field and a rich one")
 TEST_ELEMENT_BLOCKS = PageType(
     tag="test-element-blocks",
     name="Element blocks fixture",
     description="Test fixture: list elements whose fields hold blocks, restricted per field.",
     sections=(
-        SectionSpec("items", "Items", (_ELEMENT_ITEMS,)),
+        SectionSpec("items", "Items", (
+            _list("items", element_fields=("text", "snippet", "detail", "status"),
+                  element_fsm=_STEP_FSM,
+                  element_blocks=(ElementBlocksSpec("snippet", (_code_block(),)),
+                                  ElementBlocksSpec("detail", (_paragraph_runs(), _code_block(), _list_block()))),
+                  description="a list whose elements carry a code-only field and a rich one"),
+        )),
     ),
     commands=(
         # Structural edits are draft-only; the element-status marks stay legal once ready.
         # The add carries the element's content, so one command creates a complete item.
         *list_cmds("items", legal_in=("draft",), add_args=(_text("text"),),
-                   field_spec=_ELEMENT_ITEMS),
+                   element_blocks=("snippet", "detail")),
         *element_cmds("items", legal_in=("draft", "ready"),
                       marks=(("markItemDone", "markDone", "mark an item done"),
                              ("markItemTodo", "reopen", "reopen an item"))),
-        *element_blocks_cmds("items", _ELEMENT_ITEMS, "snippet", legal_in=("draft",)),
-        *element_blocks_cmds("items", _ELEMENT_ITEMS, "detail", legal_in=("draft",)),
+        *element_blocks_cmds("items", "snippet", legal_in=("draft",)),
+        *element_blocks_cmds("items", "detail", legal_in=("draft",)),
         transition_cmd("markReady", "draft -> ready", requires=(("items", "items"),)),
         transition_cmd("reopen", "ready -> draft"),
         add_link_cmd(),
@@ -230,7 +215,7 @@ TEST_ELEMENT_BLOCKS = PageType(
 # test-flow - the simple status FSM: draft -> open -> closed, closed -> open.
 # The `open` STATE and the `open` EVENT deliberately share a name (the FSM engine must handle
 # this). `close` is a COMPOUND that records a commit AND fires the transition, atomically.
-# `closed` is declared TERMINAL yet keeps its `reopen` edge - the fixture for the terminal-state
+# `closed` is declared TERMINAL yet keeps its `reopen` edge - the fixture for the terminal-status
 # authoring lock's "transitions still allowed if any" branch (authoring locked, reopen still legal)
 # and for the `legal_in` override of it - `reorderCommit` names `closed` and stays legal there.
 # ============================================================================
@@ -239,7 +224,7 @@ TEST_FLOW = PageType(
     name="Flow fixture",
     description="Test fixture: a simple 3-state status FSM with a state/event name collision and a compound transition.",
     sections=(
-        SectionSpec("summary", "Summary", (_prose("body", "what changed"),)),
+        SectionSpec("summary", "Summary", (_prose("body", description="what changed"),)),
         SectionSpec("resolution", "Resolution", (
             _list("commits", element_fields=("sha", "message", "url"), description="commits recorded via close"),
         )),
@@ -264,7 +249,7 @@ TEST_FLOW = PageType(
         states=("draft", "open", "closed"),
         terminal_states=("closed",),
         # Only `open` is guided, leaving draft and closed to fixture the unguided paths.
-        state_guidance=(("open", """
+        status_guidance=(("open", """
             open - the work is under way.
             Record a commit with close when it is finished.
             """),),
@@ -274,17 +259,18 @@ TEST_FLOW = PageType(
 
 # ============================================================================
 # test-lifecycle - the rich status FSM: required-content preconditions on transitions, agency
-# variety (agent / human / either), a multi-source `abandon` OR-combined to a terminal state,
-# terminal states, a questions element-FSM + escalate (feeds `attention`), a pinned auto-child,
+# variety (agent / human / either), a multi-source `abandon` OR-combined to a terminal status,
+# terminal statuses, a questions element-FSM + escalate (feeds `attention`), a pinned auto-child,
 # a `beginImplementation` guarded on that child's page status (a page-status ChildStateGuard),
-# and a `ship` guarded on that child's element states (two element-status ChildStateGuards).
+# and `submitForReview` + `ship` guarded on that child's element states (element-status
+# ChildStateGuards whose allowed set accepts done/passed or skipped).
 # ============================================================================
 TEST_LIFECYCLE = PageType(
     tag="test-lifecycle",
     name="Lifecycle fixture",
     description="Test fixture: a rich status FSM with required-content gates, agency, guards, questions, and a pinned auto-child.",
     sections=(
-        SectionSpec("summary", "Summary", (_prose("body", "the intent (gates beginPlanning)"),)),
+        SectionSpec("summary", "Summary", (_prose("body", description="the intent (gates beginPlanning)"),)),
         SectionSpec("parts", "Parts", (
             _list("items", element_fields=("name",), description="parts touched (gates beginImplementation)"),
         )),
@@ -307,16 +293,23 @@ TEST_LIFECYCLE = PageType(
         # guard: the pinned test-child must be `ready` before building (exercises the page-status
         # form of ChildStateGuard, evaluated in the store).
         transition_cmd("beginImplementation", "planning -> building", requires=(("parts", "items"),),
-                       guards=(ChildStateGuard("test-child", "ready", "the test-child must be marked ready"),)),
-        transition_cmd("submitForReview", "building -> review (human gate)", agency="human"),
+                       guards=(ChildStateGuard("test-child", ("ready",), "the test-child must be marked ready"),)),
+        # `submitForReview` and `ship` are both guarded on the child's element states: every step
+        # done-or-skipped and every check passed-or-skipped (element-status guards checked across the
+        # page's child pages by the store). The review gate refuses unaddressed work; a skipped item
+        # counts as addressed at both.
+        transition_cmd("submitForReview", "building -> review (human gate)", agency="human", guards=(
+            ChildStateGuard("test-child", ("done", "skipped"), "every test-child step must be done",
+                            section="steps", field="items"),
+            ChildStateGuard("test-child", ("passed", "skipped"), "every test-child check must be passed",
+                            section="checks", field="items"),
+        )),
         transition_cmd("reopenPlanning", "building -> planning", agency="either"),
         transition_cmd("requestChanges", "review -> building", agency="either"),
-        # `ship` is a human gate AND is guarded: every child step must be `done` and every child
-        # check `passed` (element-status guards checked across the page's child pages by the store).
         transition_cmd("ship", "review -> done (human gate)", agency="human", guards=(
-            ChildStateGuard("test-child", "done", "every test-child step must be done",
+            ChildStateGuard("test-child", ("done", "skipped"), "every test-child step must be done",
                             section="steps", field="items"),
-            ChildStateGuard("test-child", "passed", "every test-child check must be passed",
+            ChildStateGuard("test-child", ("passed", "skipped"), "every test-child check must be passed",
                             section="checks", field="items"),
         )),
         transition_cmd("abandon", "drop the work -> abandoned", agency="either",
@@ -329,13 +322,20 @@ TEST_LIFECYCLE = PageType(
         initial="draft",
         states=("draft", "planning", "building", "review", "done", "abandoned"),
         terminal_states=("done", "abandoned"),
-        state_guidance=(("review", """
+        status_guidance=(("review", """
             review - the build is done.
             Check the child steps and checks before the ship gate.
             """),),
     ),
     # On createPage, create the pinned child in the same commit; author into it.
     auto_children=(AutoChildSpec("test-child"),),
+    # Workspace-guidance fields for the tests: one shown across two statuses, one at a single status,
+    # and one at the initial status.
+    workspace_guidance=(
+        WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses"),
+        WorkspaceGuidanceSpec("reviewHint", ("review",), "a hint shown while reviewing"),
+        WorkspaceGuidanceSpec("draftHint", ("draft",), "a hint shown while drafting"),
+    ),
 )
 
 
@@ -363,38 +363,30 @@ _PARENT_IN_PLANNING_OR_LATER = ParentStateGuard(
 # beside a `paragraph` whose body args are overridden to plain text - which is the fixture for
 # per-field kind definitions and per-field arg overrides.
 # ============================================================================
-# A vocabulary that only a per-field declaration can express: a custom kind BLOCK_ARGS does not
-# know, carrying its own cross-page ref check, beside a standard kind whose body args are
+# A vocabulary that only a per-field declaration can express: a custom kind the standard helpers
+# do not provide, carrying its own cross-page ref check, beside a standard kind whose body args are
 # overridden to a plain text arg. No other fixture exercises either, and both are the reason a
-# blocks field declares its own vocabulary rather than sharing the global one.
+# blocks field declares its own vocabulary rather than reusing a shared default.
 # A block-bearing element field whose kind carries a cross-page ref check. This is the only
 # fixture for integrity the command-level check could never give: a block created together with
 # its element hides its questionId inside an array entry, where store._check_ref - which reads one
 # scalar argument - cannot see it.
-_CHILD_STEPS = _list(
-    "items", element_fields=("text", "note", "status"), element_fsm=_STEP_FSM,
-    element_blocks=(ElementBlocksSpec("note", (
-        BlockKindSpec("decision", args=(_text("questionId"), _text()),
-                      ref_check=RefCheck(arg="questionId", scope="parent",
-                                         section="questions", field="items")),
-        "paragraph",
-    )),),
-    description="build steps (element-FSM todo <-> done)")
-
-_CHILD_DECISIONS = _blocks(
-    "body", "decisions, each linked to a parent question",
-    block_kinds=(
-        BlockKindSpec("decision", args=(_text("questionId"), _text()),
-                      ref_check=RefCheck(arg="questionId", scope="parent",
-                                         section="questions", field="items")),
-        BlockKindSpec("paragraph", args=(_text(),)),
-    ))
 TEST_CHILD = PageType(
     tag="test-child",
     name="Child fixture",
     description="Test fixture: element FSMs + checkbox rendering, a legal_in content lock, and a cross-page ref check.",
     sections=(
-        SectionSpec("steps", "Steps", (_CHILD_STEPS,)),
+        SectionSpec("steps", "Steps", (
+            _list("items", element_fields=("text", "note", "status"),
+                  element_fsm=_STEP_FSM,
+                  element_blocks=(ElementBlocksSpec("note", (
+                      BlockKindSpec("decision", body_args=(_text("questionId"), _text()),
+                                    ref_check=RefCheck(arg="questionId", scope="parent",
+                                                       section="questions", field="items")),
+                      _paragraph_runs(),
+                  )),),
+                  description="build steps (element-FSM todo <-> done)"),
+        )),
         SectionSpec("checks", "Checks", (
             _list("items", element_fields=("text", "status"), element_fsm=_CHECK_FSM,
                   description="verification checks (element-FSM pending -> passed/failed)"),
@@ -403,26 +395,35 @@ TEST_CHILD = PageType(
             _list("items", element_fields=("questionId", "text"),
                   description="notes, each linked to a parent question (a ref-checked list add)"),
         )),
-        SectionSpec("decisions", "Decisions", (_CHILD_DECISIONS,)),
+        SectionSpec("decisions", "Decisions", (
+            _blocks("body", (
+                        BlockKindSpec("decision", body_args=(_text("questionId"), _text()),
+                                      ref_check=RefCheck(arg="questionId", scope="parent",
+                                                         section="questions", field="items")),
+                        _paragraph_text(),
+                    ), "decisions, each linked to a parent question"),
+        )),
     ),
     commands=(
         *list_cmds("steps", label="step", add_args=(_text(),), legal_in=("draft",),
-                   field_spec=_CHILD_STEPS),
-        *element_blocks_cmds("steps", _CHILD_STEPS, "note", legal_in=("draft",)),
+                   element_blocks=("note",)),
+        *element_blocks_cmds("steps", "note", legal_in=("draft",)),
         # Element-status marks stay legal in `ready` (progress recorded on a finalized plan); only
         # the structural add/remove/reorder commands are `draft`-only.
         *element_cmds("steps", legal_in=("draft", "ready"), marks=(
             ("markStepDone", "markDone", "mark a step done"),
+            ("markStepSkipped", "skip", "mark a step skipped"),
             ("markStepTodo", "reopen", "reopen a step"))),
         *list_cmds("checks", label="check", add_args=(_text(),), legal_in=("draft",)),
         *element_cmds("checks", legal_in=("draft", "ready"), marks=(
             ("markCheckPassed", "pass", "mark a check passed"),
-            ("markCheckFailed", "fail", "mark a check failed"))),
+            ("markCheckFailed", "fail", "mark a check failed"),
+            ("markCheckSkipped", "skip", "mark a check skipped"))),
         # The list twin of addDecision below: the same ref check, on an add_element.
         *list_cmds("notes", label="note", add_args=(_text("questionId"), _text()),
                    ref_check=RefCheck(arg="questionId", scope="parent", section="questions", field="items"),
                    legal_in=("draft",)),
-        *blocks_cmds("decisions", _CHILD_DECISIONS,
+        *blocks_cmds("decisions",
                      remove_name="removeDecision", remove_desc="remove a decision",
                      reorder_name="reorderDecision",
                      reorder_desc="move a decision to an anchored position "
@@ -438,8 +439,8 @@ TEST_CHILD = PageType(
         name="TestChild",
         initial="draft",
         states=("draft", "ready"),
-        # A guided initial state, which is what makes createPage's echo testable.
-        state_guidance=(("draft", "draft - write the steps and checks here."),),
+        # A guided initial status, which is what makes createPage's echo testable.
+        status_guidance=(("draft", "draft - write the steps and checks here."),),
     ),
 )
 

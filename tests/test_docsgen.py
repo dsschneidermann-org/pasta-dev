@@ -5,7 +5,7 @@ import importlib
 import pytest
 
 from src import statecharts
-from src import pagetypes
+from src.pagetypes._registry import set_test_mode
 from src.commands import create_page, legal_commands
 from src.docsgen import (
     _bullet,
@@ -16,7 +16,9 @@ from src.docsgen import (
     render_states_index,
     state_docs,
 )
-from src.pagetypes import REGISTRY, get_page_type
+from src.pagetypes.core.pagetype import get_pagetype_command, get_pagetype_field
+from src.pagetypes.core.specs import status_guidance
+from src.pagetypes._registry import REGISTRY, get_page_type
 from src.statecharts import page_machine_qualname
 
 # Migration note: the PURE FSM-analysis tests below (reachable_states, ignore_requirements) pin to
@@ -25,6 +27,15 @@ from src.statecharts import page_machine_qualname
 # state_docs resolves each type's diagram class via `page_machine_qualname`, which is bound (in
 # src.statecharts) for production types ONLY. Documenting a fixture is a deliberate non-goal, so
 # those tests - and the registry-wide coverage/qualname tests - must track production.
+
+
+@pytest.fixture(autouse=True)
+def _production_mode():
+    # Doc generation runs against the production registry, so this whole module runs with test mode
+    # off. Restored afterwards so the setting does not leak into later test modules.
+    set_test_mode(False)
+    yield
+    set_test_mode(True)
 
 
 def _counter():
@@ -74,7 +85,6 @@ def test_ignore_requirements_does_not_bypass_legal_in_lock():
 
 # --- page_machine_qualname ---------------------------------------------------
 def test_page_machine_qualname_resolves_for_every_registered_type():
-    pagetypes.set_test_mode(False)
     for tag, page_type in REGISTRY.items():
         qualname = page_machine_qualname(tag)
         module_path, _, name = qualname.rpartition(".")
@@ -90,7 +100,6 @@ def test_page_machine_qualname_unknown_tag_raises():
 
 # --- registry-wide coverage + index ------------------------------------------
 def test_all_state_docs_covers_every_reachable_state():
-    pagetypes.set_test_mode(False)
     expected = {
         f"{tag}-{state}"
         for tag, page_type in REGISTRY.items()
@@ -115,40 +124,36 @@ def test_no_dead_overview_link_in_state_pages():
 
 def test_all_state_docs_is_idempotent():
     # Doc generation is pure over the registry: regenerating yields byte-identical output.
-    pagetypes.set_test_mode(False)
     assert all_state_docs() == all_state_docs()
 
 
 def test_generated_docs_carry_the_instruction_on_the_field_not_the_setter():
     # The instruction reaches the docs through the field line (rendered as an indented block, so it
     # arrives line by line); the setter's own line is the short description.
-    pagetypes.set_test_mode(False)
     brief = get_page_type("feature-brief")
-    instruction = brief.field_spec("summary", "body").description
+    instruction = get_pagetype_field(brief, "summary", "body").description
     assert instruction and "\n" in instruction                # a wrapped multi-line authoring instruction
     docs = "\n".join(all_state_docs().values())
     for line in instruction.splitlines():
         assert line in docs                                   # still printed, from the Sections listing
-    assert brief.command("setSummary").description == "set the summary"
-    assert "- `setSummary(text)` *(set_prose)* - set the summary" in docs
+    assert get_pagetype_command(brief, "setSummary").description == "set the summary"
+    assert "- `setSummary(statusRevisionToken, text)` *(set_prose)* - set the summary" in docs
 
 
 def test_generated_docs_do_not_repeat_the_instruction_under_every_setter():
     # The instruction's first line appears at most once per document (the Sections listing), where it
     # used to appear again under Commands and under Authoring commands.
-    pagetypes.set_test_mode(False)
     brief = get_page_type("feature-brief")
-    first_line = brief.field_spec("summary", "body").description.splitlines()[0]
+    first_line = get_pagetype_field(brief, "summary", "body").description.splitlines()[0]
     for doc in all_state_docs().values():
         if brief.tag in doc:
             assert doc.count(first_line) <= 1
 
 
 # --- per-state guidance on the generated page --------------------------------
-def test_state_page_opens_with_its_state_guidance():
-    # The text an agent gets on entering a state is the text a human reads on its page.
-    pagetypes.set_test_mode(False)
-    guidance = get_page_type("feature-brief").fsm.guidance_for("review")
+def test_state_page_opens_with_its_status_guidance():
+    # The text an agent gets on entering a status is the text a human reads on its page.
+    guidance = status_guidance(get_page_type("feature-brief").fsm, "review")
     assert guidance                                        # one of the documented states
     docs = state_docs(get_page_type("feature-brief"))
     for line in guidance.splitlines():
@@ -158,7 +163,6 @@ def test_state_page_opens_with_its_state_guidance():
 
 def test_state_page_without_guidance_keeps_the_placeholder():
     # Pins the narrow scope: a sibling state, and a type with no guidance at all.
-    pagetypes.set_test_mode(False)
     brief = state_docs(get_page_type("feature-brief"))
     assert "The `draft` state of the `feature-brief` page type." in brief["feature-brief-draft"]
     document = state_docs(get_page_type("document"))
@@ -223,12 +227,14 @@ def test_field_line_omits_block_kinds_for_a_non_blocks_field():
 
 
 def test_generated_docs_name_no_deleted_block_command():
-    """The per-kind commands are gone; a generated page still naming one would send an authoring
-    agent at a command that does not exist."""
+    """The per-kind commands and every block set are gone; a generated page still naming one
+    would send an authoring agent at a command that does not exist."""
     deleted = ("addParagraph", "addHeading", "addDivider", "addQuote", "addTable",
                "addDetailParagraph", "addDetailCode", "addNoteCode", "addDesignCode",
                "addDecisionCode", "addDecisionBlock", "setParagraph", "setHeading",
-               "setDetailParagraph", "setDetailCode")
+               "setDetailParagraph", "setDetailCode",
+               "setBodyBlock", "setDetailsBlock", "setDecisionBlock", "setConsequencesBlock",
+               "setDesignBlock", "setDecisionsBlock", "setDataModelsBlock", "setStepDetailBlock")
     pages = all_state_docs()
     assert pages
     for name, text in pages.items():

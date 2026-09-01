@@ -10,29 +10,15 @@ from src.commands import (
     is_field_setter,
     legal_commands,
     resolve_anchored_slot,
-    transition_guidance,
 )
 from src.errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from src.model import Page
-from src.pagetypes import (
-    FSMSpec,
-    PageType,
-    ElementBlocksSpec,
-    SectionSpec,
-    _blocks,
-    _list,
-    _prose,
-    _text,
-    add_link_cmd,
-    blocks_cmds,
-    get_page_type,
-    initial_sections,
-    blocks_cmds,
-    list_cmds,
-    set_prose_cmd,
-    set_title_cmd,
-    transition_cmd,
-)
+from src.pagetypes.core.specs import FSMSpec
+from src.pagetypes.core.args import ElementBlocksSpec, _table_block, _text, standard_blocks
+from src.pagetypes.core.commands import add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
+from src.pagetypes.core.fields import SectionSpec, _blocks, _list, _prose
+from src.pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
+from src.pagetypes._registry import get_page_type
 
 # Hand-authored capability fixtures (src.testtypes) - purpose-built so enriching a production
 # type never churns these command-surface assertions.
@@ -68,6 +54,16 @@ def test_create_page_initial_state():
 def test_create_page_rejects_blank_title():
     with pytest.raises(ValidationError):
         _ = create_page(FIELDS, "   ", None, make_counter())
+
+
+def test_apply_command_backfills_a_section_missing_from_the_stored_page():
+    # Simulates a page type gaining a new section/field after some of its pages already exist:
+    # the stored page predates "items" and must not raise when a command targets it.
+    page = create_page(FIELDS, "A fixture", None, make_counter())
+    del page.sections["items"]
+    result = apply_command(page, FIELDS, "addItem", {"text": "hi"}, make_counter())
+    assert [item["text"] for item in result.page.sections["items"]["items"]] == ["hi"]
+    assert result.created_id is not None
 
 
 def test_add_link_appends_edge_and_is_always_legal():
@@ -499,7 +495,7 @@ def test_abandon_reaches_abandoned_from_multiple_states():
     factory = make_counter()
     # From draft.
     assert apply_command(new_life(factory), LIFE, "abandon", {}, factory).page.status == "abandoned"
-    # From building (an event with several source states, OR-combined in the FSM).
+    # From building (an event with several source statuses, OR-combined in the FSM).
     page = apply_command(new_life(factory), LIFE, "setSummary", {"text": "x"}, factory).page
     page = apply_command(page, LIFE, "beginPlanning", {}, factory).page
     page = apply_command(page, LIFE, "addPart", {"name": "R"}, factory).page
@@ -590,8 +586,8 @@ def test_step_lifecycle_and_ready_lock():
     ready = apply_command(done.page, CHILD, "markReady", {}, factory)
     legal = legal_commands(ready.page, CHILD)
     assert {name for name, ok in legal.items() if ok} == {
-        "reopen", "markStepDone", "markStepTodo", "markCheckPassed", "markCheckFailed", "addLink",
-        "setTitle"}
+        "reopen", "markStepDone", "markStepSkipped", "markStepTodo",
+        "markCheckPassed", "markCheckFailed", "markCheckSkipped", "addLink", "setTitle"}
     with pytest.raises(IllegalCommandError):
         _ = apply_command(ready.page, CHILD, "addStep", {"text": "late"}, factory)
 
@@ -607,6 +603,23 @@ def test_check_pass_and_fail_are_terminal():
     # passed is terminal - you cannot then fail it.
     with pytest.raises(IllegalCommandError):
         _ = apply_command(passed.page, CHILD, "markCheckFailed", {"checkId": check_id}, factory)
+
+
+def test_skip_is_legal_only_from_the_initial_state():
+    factory = make_counter()
+    child = new_child(factory)
+    s = apply_command(child, CHILD, "addStep", {"text": "build"}, factory)
+    step_id = s.created_id
+    c = apply_command(s.page, CHILD, "addCheck", {"text": "renders"}, factory)
+    check_id = c.created_id
+    done = apply_command(c.page, CHILD, "markStepDone", {"stepId": step_id}, factory)
+    # A done step has no skip edge - skip fires only from todo.
+    with pytest.raises(IllegalCommandError):
+        _ = apply_command(done.page, CHILD, "markStepSkipped", {"stepId": step_id}, factory)
+    passed = apply_command(done.page, CHILD, "markCheckPassed", {"checkId": check_id}, factory)
+    # skip fires only from pending, so a passed check cannot be skipped either.
+    with pytest.raises(IllegalCommandError):
+        _ = apply_command(passed.page, CHILD, "markCheckSkipped", {"checkId": check_id}, factory)
 
 
 def test_add_decision_carries_ref():
@@ -626,31 +639,31 @@ def test_is_field_setter_classifies_by_kind():
     element-scoped add - is not."""
     life = get_page_type("test-lifecycle")
     blocks = get_page_type("test-blocks")
-    assert is_field_setter(FIELDS.command("setLabel"))       # SET_SCALAR
-    assert is_field_setter(FIELDS.command("setBody"))        # SET_PROSE
-    assert is_field_setter(FIELDS.command("addItem"))        # ADD_ELEMENT
-    assert is_field_setter(life.command("askQuestion"))      # ADD_ELEMENT (element-FSM list add)
-    assert not is_field_setter(FIELDS.command("removeItem"))     # REMOVE_ELEMENT
-    assert not is_field_setter(FIELDS.command("reorderItem"))    # REORDER_ELEMENT
-    assert not is_field_setter(FIELDS.command("flagItem"))       # SET_ELEMENT_FIELD
-    assert not is_field_setter(FIELDS.command("addLink"))        # ADD_LINK
-    assert not is_field_setter(FIELDS.command("setTitle"))       # SET_TITLE
-    assert not is_field_setter(life.command("answerQuestion"))   # ELEMENT_TRANSITION
-    assert not is_field_setter(life.command("beginPlanning"))    # TRANSITION
+    assert is_field_setter(get_pagetype_command(FIELDS, "setLabel"))       # SET_SCALAR
+    assert is_field_setter(get_pagetype_command(FIELDS, "setBody"))        # SET_PROSE
+    assert is_field_setter(get_pagetype_command(FIELDS, "addItem"))        # ADD_ELEMENT
+    assert is_field_setter(get_pagetype_command(life, "askQuestion"))      # ADD_ELEMENT (element-FSM list add)
+    assert not is_field_setter(get_pagetype_command(FIELDS, "removeItem"))     # REMOVE_ELEMENT
+    assert not is_field_setter(get_pagetype_command(FIELDS, "reorderItem"))    # REORDER_ELEMENT
+    assert not is_field_setter(get_pagetype_command(FIELDS, "flagItem"))       # SET_ELEMENT_FIELD
+    assert not is_field_setter(get_pagetype_command(FIELDS, "addLink"))        # ADD_LINK
+    assert not is_field_setter(get_pagetype_command(FIELDS, "setTitle"))       # SET_TITLE
+    assert not is_field_setter(get_pagetype_command(life, "answerQuestion"))   # ELEMENT_TRANSITION
+    assert not is_field_setter(get_pagetype_command(life, "beginPlanning"))    # TRANSITION
     # A page-level blocks add is now an ordinary field setter: one add per field, so it names
     # exactly one command in `do`.
-    assert is_field_setter(blocks.command("addBody"))             # ADD_BLOCK, page-level
-    assert not is_field_setter(blocks.command("setBodyBlock"))    # SET_BLOCK is never a setter
+    assert is_field_setter(get_pagetype_command(blocks, "addBody"))             # ADD_BLOCK, page-level
+    assert not is_field_setter(get_pagetype_command(blocks, "removeBlock"))     # REMOVE_BLOCK
     element_blocks = get_page_type("test-element-blocks")
     # An element-scoped add fills an element that must exist first, so it is not a stage's work.
-    assert not is_field_setter(element_blocks.command("addItemDetail"))
+    assert not is_field_setter(get_pagetype_command(element_blocks, "addItemDetail"))
 
 
 # --- stage-scoped field-setter `do` edges (field_setter_edges) ---------------
 # An ad-hoc, unregistered draft->sealed type: markSealed requires overview (prose) AND design (blocks),
 # both authored in `draft`. Built directly (not via the store/registry) to exercise the pure edge logic -
 # blocks grouping, legal_in gating, and stage-scoping - which no production-mirroring fixture covers.
-_DESIGN_BODY = _blocks("body", description="the design instruction")
+_DESIGN_BODY = _blocks("body", block_kinds=standard_blocks(), description="the design instruction")
 
 
 def _field_setter_page_type() -> PageType:
@@ -662,7 +675,7 @@ def _field_setter_page_type() -> PageType:
         ),
         commands=(
             set_prose_cmd("overview", legal_in=("draft",)),
-            *blocks_cmds("design", _DESIGN_BODY, legal_in=("draft",)),
+            *blocks_cmds("design", legal_in=("draft",)),
             transition_cmd("markSealed", "draft -> sealed",
                            requires=(("overview", "body"), ("design", "body"))),
             add_link_cmd(), set_title_cmd(),
@@ -678,7 +691,7 @@ def _field_setter_page(seal: PageType, status: str) -> Page:
 
 def test_field_setter_edges_group_blocks_and_carry_instructions():
     """Every field surfaces as one `do` entry naming one command - a blocks field's single add
-    (never SET_BLOCK/remove/reorder) or a prose/scalar setter. Each carries the field's FieldSpec
+    (never its remove/reorder) or a prose/scalar setter. Each carries the field's FieldSpec
     instruction inline."""
     seal = _field_setter_page_type()
     edges = field_setter_edges(_field_setter_page(seal, "draft"), seal)
@@ -706,7 +719,7 @@ def test_field_setter_edges_use_the_instruction_key_not_description():
         assert edge["instruction"]
         assert "description" not in edge
     # the setter's own description is the short label, and never leaks onto the edge
-    assert seal.command("setOverview").description == "set the overview"
+    assert get_pagetype_command(seal, "setOverview").description == "set the overview"
 
 
 def test_field_setter_edges_are_stage_and_legal_in_scoped():
@@ -743,23 +756,6 @@ def test_field_setter_edges_drop_blocked_events():
     assert "addStep" in {e["command"] for e in field_setter_edges(child, CHILD, {"reopen"})}
 
 
-# --- transition_guidance -----------------------------------------------------
-def test_transition_guidance_returns_the_entered_states_text():
-    guidance = transition_guidance(FLOW, [{"command": "open"}], "open")
-    assert guidance == FLOW.fsm.guidance_for("open")
-    assert guidance                                  # non-empty: the fixture declares text here
-
-
-def test_transition_guidance_is_none_for_a_content_only_batch():
-    # No transition, so no new stage was entered.
-    assert transition_guidance(FLOW, [{"command": "setSummary", "args": {"text": "x"}}], "draft") is None
-
-
-def test_transition_guidance_is_none_when_the_state_declares_none():
-    # A real transition, but `draft` declares no guidance.
-    assert transition_guidance(FLOW, [{"command": "reopen"}], "draft") is None
-
-
 # --- block-bearing element fields --------------------------------------------
 ELEMENT_BLOCKS = get_page_type("test-element-blocks")
 
@@ -778,12 +774,12 @@ def items_of(page):
 
 def _unified_blocks_page_type() -> PageType:
     """An ad-hoc type whose body field carries the unified four-command block surface."""
-    body = _blocks("body", description="a rich-text blocks body")
+    body = _blocks("body", block_kinds=standard_blocks(), description="a rich-text blocks body")
     return PageType(
         tag="xtest-unified-blocks", name="Unified blocks fixture",
         description="ad-hoc fixture: one blocks field, one add and one set",
         sections=(SectionSpec("body", "Body", (body,)),),
-        commands=(*blocks_cmds("body", body), add_link_cmd(), set_title_cmd()),
+        commands=(*blocks_cmds("body"), add_link_cmd(), set_title_cmd()),
         fsm=FSMSpec(name="XTestUnifiedBlocks", initial="active", states=("active",)),
     )
 
@@ -861,55 +857,36 @@ def test_add_block_run_inserts_at_the_anchored_slot():
                           {"blocks": [], "precedingId": first}, factory)
 
 
-def test_set_block_changes_a_kind_in_place():
-    """A generalized set is a true overwrite: same id, same slot, no key of the old kind left."""
+def test_a_page_level_add_rejects_a_kind_the_field_does_not_declare():
+    factory = make_counter()
+    page = _unified_page(factory)
+    with pytest.raises(ValidationError, match="not accepted here"):
+        _ = apply_command(page, UNIFIED, "addBody",
+                          {"blocks": [{"kind": "nope", "text": "x"}]}, factory)
+
+
+def test_a_block_is_replaced_by_removing_it_and_adding_at_its_slot():
+    """There is no in-place edit. Replacing a block is remove plus a positioned add, which
+    keeps its slot and its neighbours - and gives it a NEW id, the whole cost of dropping the
+    set."""
     factory = make_counter()
     page = _unified_page(factory)
     page = apply_command(page, UNIFIED, "addBody", {"blocks": [
-        {"kind": "paragraph", "inlines": ["prose"]},
-        {"kind": "code", "language": "py", "source": "x = 1"},
+        {"kind": "paragraph", "inlines": ["first"]},
+        {"kind": "paragraph", "inlines": ["second"]},
+        {"kind": "paragraph", "inlines": ["third"]},
     ]}, factory).page
-    paragraph_id = _body(page)[0]["id"]
-    edited = apply_command(page, UNIFIED, "setBodyBlock", {
-        "blockId": paragraph_id,
-        "block": {"kind": "code", "language": "sh", "source": "ls"},
+    first, second, third = (block["id"] for block in _body(page))
+    page = apply_command(page, UNIFIED, "removeBlock", {"blockId": second}, factory).page
+    replaced = apply_command(page, UNIFIED, "addBody", {
+        "blocks": [{"kind": "code", "language": "sh", "source": "ls"}],
+        "index": 1, "precedingId": first,
     }, factory)
-    blocks = _body(edited.page)
-    assert len(blocks) == 2
-    assert blocks[0]["id"] == paragraph_id          # id preserved
-    assert blocks[0]["kind"] == "code"              # kind changed in place
-    assert blocks[0]["source"] == "ls"
-    assert "inlines" not in blocks[0]               # nothing of the paragraph survives
-
-
-def test_set_block_rejects_a_kind_the_field_does_not_declare():
-    factory = make_counter()
-    page = _unified_page(factory)
-    page = apply_command(page, UNIFIED, "addBody", {
-        "blocks": [{"kind": "paragraph", "inlines": ["prose"]}]}, factory).page
-    block_id = _body(page)[0]["id"]
-    with pytest.raises(ValidationError, match="not accepted here"):
-        _ = apply_command(page, UNIFIED, "setBodyBlock", {
-            "blockId": block_id, "block": {"kind": "nope", "text": "x"}}, factory)
-    with pytest.raises(NotFoundError):
-        _ = apply_command(page, UNIFIED, "setBodyBlock", {
-            "blockId": "no-such-block",
-            "block": {"kind": "paragraph", "inlines": ["x"]}}, factory)
-
-
-def test_set_block_gives_a_divider_the_set_it_never_had():
-    """The per-kind surface gave a body-less kind an add and no set, so a divider could not be
-    edited at all. The generalized set covers every kind the field declares."""
-    factory = make_counter()
-    page = _unified_page(factory)
-    page = apply_command(page, UNIFIED, "addBody",
-                         {"blocks": [{"kind": "divider"}]}, factory).page
-    divider_id = _body(page)[0]["id"]
-    edited = apply_command(page, UNIFIED, "setBodyBlock", {
-        "blockId": divider_id,
-        "block": {"kind": "paragraph", "inlines": ["now prose"]}}, factory)
-    assert _body(edited.page)[0] == {
-        "id": divider_id, "kind": "paragraph", "inlines": ["now prose"]}
+    blocks = _body(replaced.page)
+    assert [block["id"] for block in blocks] == [first, replaced.created_id, third]
+    assert replaced.created_id != second        # a replacement is a new block, not an edit
+    assert blocks[1] == {"id": replaced.created_id, "kind": "code",
+                         "language": "sh", "source": "ls"}
 
 
 def test_a_bad_table_inside_a_page_level_add_still_raises():
@@ -932,12 +909,12 @@ def _table_blocks_page_type() -> PageType:
     """An ad-hoc type whose element field accepts a table, so a table can be reached through an
     array argument. The shared fixtures deliberately declare narrower vocabularies."""
     items = _list("items", element_fields=("text", "detail"),
-                  element_blocks=(ElementBlocksSpec("detail", ("table",)),))
+                  element_blocks=(ElementBlocksSpec("detail", (_table_block(),)),))
     return PageType(
         tag="xtest-table-blocks", name="Table blocks fixture",
         description="ad-hoc fixture: an element block field accepting a table",
         sections=(SectionSpec("items", "Items", (items,)),),
-        commands=(*list_cmds("items", add_args=(_text(),), field_spec=items),
+        commands=(*list_cmds("items", add_args=(_text(),), element_blocks=("detail",)),
                   add_link_cmd(), set_title_cmd()),
         fsm=FSMSpec(name="XTestTableBlocks", initial="active", states=("active",)),
     )
@@ -1047,30 +1024,16 @@ def test_add_and_set_a_block_on_an_element():
     assert element["snippet"] == []
 
 
-def test_set_a_block_on_an_element_may_change_its_kind():
+def test_an_element_scoped_add_is_held_to_the_element_fields_vocabulary():
+    """The kind rule one level deeper is the same one: `detail` declares paragraph, code and
+    list, so a table is refused there just as it is at the page level."""
     factory = make_counter()
     page, item_id = new_item(factory)
-    added = apply_command(page, ELEMENT_BLOCKS, "addItemDetail",
-                          {"itemId": item_id, "blocks": [{"kind": "code", "language": "python", "source": "x = 1"}]}, factory)
-    block_id = added.created_id
-    edited = apply_command(added.page, ELEMENT_BLOCKS, "setItemDetailBlock",
-                           {"itemId": item_id, "blockId": block_id, "block": {"kind": "code", "language": "python", "source": "x = 2"}}, factory)
-    assert items_of(edited.page)[0]["detail"] == [
-        {"id": block_id, "kind": "code", "language": "python", "source": "x = 2"}
-    ]
-    # A set is a true overwrite: the same block becomes a paragraph, keeping its id and slot,
-    # with no key of the code block left behind.
-    retyped = apply_command(edited.page, ELEMENT_BLOCKS, "setItemDetailBlock",
-                            {"itemId": item_id, "blockId": block_id,
-                             "block": {"kind": "paragraph", "inlines": ["nope"]}}, factory)
-    assert items_of(retyped.page)[0]["detail"] == [
-        {"id": block_id, "kind": "paragraph", "inlines": ["nope"]}
-    ]
-    # The one kind rule left is the field's vocabulary - `detail` does not accept a table.
     with pytest.raises(ValidationError, match="not accepted here"):
-        _ = apply_command(retyped.page, ELEMENT_BLOCKS, "setItemDetailBlock",
-                          {"itemId": item_id, "blockId": block_id,
-                           "block": {"kind": "table", "header": [["A"]], "rows": [[["1"]]]}}, factory)
+        _ = apply_command(page, ELEMENT_BLOCKS, "addItemDetail",
+                          {"itemId": item_id,
+                           "blocks": [{"kind": "table", "header": [["A"]], "rows": [[["1"]]]}]},
+                          factory)
 
 
 def test_remove_and_reorder_blocks_on_an_element():
@@ -1173,7 +1136,7 @@ def test_element_scoped_block_adds_are_withheld_from_the_fields_edge():
         ("items", "items", "addItem")
     ]
     # One edge, carrying the field's own instruction once.
-    assert edges[0]["instruction"] == ELEMENT_BLOCKS.field_spec("items", "items").description
+    assert edges[0]["instruction"] == get_pagetype_field(ELEMENT_BLOCKS, "items", "items").description
 
 
 CHILD_BLOCKS = get_page_type("test-child")
@@ -1183,8 +1146,8 @@ def test_a_field_override_is_enforced_at_the_command():
     """One kind name, two body shapes, decided by the field - the case the vocabulary exists for.
 
     test-child's decisions field declares `paragraph` with a plain `text` arg; test-blocks' body
-    takes the standard inline runs. Each rejects the other's shape. If any consumer fell back to
-    the global BLOCK_ARGS this would pass in one direction only.
+    takes the standard inline runs. Each rejects the other's shape. If any consumer read a shared
+    table instead of the kind's own args this would pass in one direction only.
     """
     factory = make_counter()
     child = create_page(CHILD_BLOCKS, "Child", None, factory)
@@ -1200,20 +1163,6 @@ def test_a_field_override_is_enforced_at_the_command():
     with pytest.raises(ValidationError, match="unknown keys"):
         _ = apply_command(page, UNIFIED, "addBody",
                           {"blocks": [{"kind": "paragraph", "text": "plain prose"}]}, factory)
-
-
-def test_a_custom_kind_is_settable_like_any_other():
-    """test-child's `decision` had no in-place set at all under the per-kind surface."""
-    factory = make_counter()
-    child = create_page(CHILD_BLOCKS, "Child", None, factory)
-    added = apply_command(child, CHILD_BLOCKS, "addDecisions", {"blocks": [
-        {"kind": "decision", "questionId": "q:1", "text": "first"}]}, factory)
-    block_id = added.created_id
-    edited = apply_command(added.page, CHILD_BLOCKS, "setDecisionsBlock", {
-        "blockId": block_id,
-        "block": {"kind": "decision", "questionId": "q:2", "text": "second"}}, factory)
-    assert edited.page.sections["decisions"]["body"] == [
-        {"id": block_id, "kind": "decision", "questionId": "q:2", "text": "second"}]
 
 
 def test_a_block_is_built_in_exactly_one_place():
@@ -1296,10 +1245,10 @@ def test_every_declared_content_shape_is_checked_through_the_array_path():
     with pytest.raises(ValidationError, match="Markdown syntax"):
         _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
             {"kind": "table", "header": [["A"]], "rows": [[["a `code` cell"]]]}]}, factory)
-    # The same rules on the SET, since both run one validator.
-    added = apply_command(page, UNIFIED, "addBody",
-                          {"blocks": [{"kind": "paragraph", "inlines": ["ok"]}]}, factory)
+    # The same rules on an element-scoped add, since every block path runs one validator.
+    element_page, item_id = new_item(factory)
     with pytest.raises(ValidationError, match="Markdown syntax"):
-        _ = apply_command(added.page, UNIFIED, "setBodyBlock", {
-            "blockId": added.created_id,
-            "block": {"kind": "list", "ordered": False, "items": [["a **bold** item"]]}}, factory)
+        _ = apply_command(element_page, ELEMENT_BLOCKS, "addItemDetail", {
+            "itemId": item_id,
+            "blocks": [{"kind": "list", "ordered": False,
+                        "items": [["a **bold** item"]]}]}, factory)
