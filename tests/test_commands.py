@@ -809,7 +809,7 @@ def test_field_setter_edges_stage_entry_is_the_nearest_status_of_a_cyclic_scope(
     entry = _stage_entry_page_type()
     assert "setUrl" in {e["command"] for e in field_setter_edges(_stage_entry_page(entry, "open"), entry)}
     assert "setUrl" not in {e["command"] for e in field_setter_edges(_stage_entry_page(entry, "review"), entry)}
-    # And nowhere its legal_in does not name at all.
+    # And not in a status its legal_in does not name at all.
     assert "setUrl" not in {e["command"] for e in field_setter_edges(_stage_entry_page(entry, "draft"), entry)}
 
 
@@ -841,7 +841,7 @@ def test_stage_entry_statuses_single_status_scope_always_qualifies():
 
 
 def test_stage_entry_statuses_ignore_edges_from_outside_the_scope():
-    """Only edges BETWEEN scoped statuses disqualify. `review` is entered from `open`, but with
+    """Only edges between scoped statuses disqualify. `review` is entered from `open`, but with
     `open` outside the scope `review` is still where the scope opens; `done` is entered from
     `review`, which is inside it, so it is not."""
     assert stage_entry_statuses(_LINE, ("review", "done")) == {"review"}
