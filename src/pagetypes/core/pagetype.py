@@ -1,9 +1,10 @@
 """The page type itself: what a page of this type is made of, and how it is set up.
 
-Its post-init hook does the two setup steps a declaration needs before anything reads it -
-resolves each block argument's vocabulary from the field it targets, and derives the
-FSM transition table from the commands. Whether the finished declaration is well-formed is
-a separate concern, checked by the validators in `validation.py`.
+Its post-init hook does the setup steps a declaration needs before anything reads it - resolves
+each block argument's vocabulary from the field it targets, derives the FSM transition table from
+the commands, and builds the status machine that table describes. Whether the finished declaration
+is well-formed is a separate concern, checked by the validators in `validation.py` - including
+what the build settles, which is reported there rather than raised from here.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from ...errors import ValidationError
+from ...fsm import try_build_machine
 from .args import ArgSpec
 from .commands import CommandSpec
 from .fields import FieldSpec, SectionSpec, get_element_blocks
@@ -45,6 +47,18 @@ class PageType:
     def __post_init__(self):
         self._resolve_block_vocabularies()
         object.__setattr__(self.fsm, "transitions", _status_transitions(self))
+        self._build_machine()
+
+    def _build_machine(self) -> None:
+        """Build the status machine with the declaration rather than on first use.
+
+        A failure is held rather than raised, so one malformed FSM does not stop the module that
+        declares it from importing; `validate_page_types` reports it with every other declaration
+        error.
+        """
+        machine, error = try_build_machine(self.fsm)
+        object.__setattr__(self.fsm, "machine", machine)
+        object.__setattr__(self.fsm, "machine_error", error)
 
     def _resolve_block_vocabularies(self) -> None:
         """Fill each block-carrying argument's accepted kinds in from the field it targets.

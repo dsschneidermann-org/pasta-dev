@@ -41,7 +41,7 @@ from src.pagetypes.core.specs import (
     status_guidance,
 )
 from src.pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
-from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd
+from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
 from src.pagetypes.core.fields import (
     FieldSpec,
     SectionSpec,
@@ -623,7 +623,7 @@ def test_field_spec_rejects_a_bad_block_vocabulary():
 
 # --- Block-bearing element fields --------------------------------------------
 def test_element_blocks_spec_is_hashable():
-    # FieldSpec is reachable from the FSMSpec that keys fsm._machine_class's lru_cache, so a
+    # FieldSpec is reachable from the FSMSpec that keys fsm._cached_machine's lru_cache, so a
     # declaration that cannot be hashed would break every page type at once.
     assert {ElementBlocksSpec("detail", (_code_block(),))} == {ElementBlocksSpec("detail", (_code_block(),))}
     field = FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
@@ -1046,6 +1046,23 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
     assert "two field setters" in message
     assert "unknown status" in message
     assert "xtest-broken:" in message
+
+
+def test_validate_page_types_reports_a_status_machine_that_cannot_be_built():
+    # `orphan` is unreachable, so the machine cannot be built. The declaration imports cleanly and
+    # the failure arrives through validation, named the way its author wrote it.
+    unreachable = PageType(
+        tag="xtest-unreachable", name="Unreachable", description="ad-hoc",
+        sections=(SectionSpec("body", "Body", (_prose("body"),)),),
+        commands=(transition_cmd("finish", "draft → done"),),
+        fsm=FSMSpec(name="XUnreachable", initial="draft", states=("draft", "done", "orphan")),
+    )
+    with pytest.raises(ValueError) as exc:
+        validate_page_types({unreachable.tag: unreachable})
+    message = str(exc.value)
+    assert "xtest-unreachable:" in message
+    assert "'orphan'" in message
+    assert "state_orphan" not in message
 
 
 def test_validate_registry_passes_over_the_production_registry(production_mode):

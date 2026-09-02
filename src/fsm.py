@@ -1,8 +1,9 @@
 """Pure FSM evaluation via python-statemachine.
 
-For each `FSMSpec` we build one `StateMachine` subclass (cached), then evaluate a
-transition on an *ephemeral* instance seeded at the page's current status. The
-machine is the single source of truth for legality and for the resulting state.
+For each `FSMSpec` we build one `StateMachine` subclass - held by the page type that
+declares it, memoized here otherwise - then evaluate a transition on an *ephemeral*
+instance seeded at the page's current status. The machine is the single source of truth
+for legality and for the resulting state.
 
 Design notes (verified against python-statemachine 3.2.0):
 
@@ -20,15 +21,18 @@ from functools import lru_cache
 from typing import Any
 
 from statemachine import Event, State, StateMachine
-from statemachine.exceptions import TransitionNotAllowed
+from statemachine.exceptions import InvalidDefinition, TransitionNotAllowed
 
 from .errors import IllegalCommandError
 from .pagetypes.core.specs import ElementFSMSpec, FSMSpec
 
 
-@lru_cache(maxsize=None)
-def _machine_class(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
-    """Build (once) a StateMachine subclass from an FSM spec. Cached per spec."""
+def build_machine(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
+    """Build a StateMachine subclass from an FSM spec.
+
+    Uncached - the caller keeps what it builds. Raises `InvalidDefinition` when the graph is
+    not well formed, which is python-statemachine's own check.
+    """
     namespace: dict[str, object] = {}
     state_attr = {value: f"state_{value}" for value in fsm.states}
 
@@ -57,23 +61,46 @@ def _machine_class(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
     return type(fsm.name, (StateMachine,), namespace)
 
 
+def try_build_machine(
+    fsm: FSMSpec | ElementFSMSpec,
+) -> tuple[type[StateMachine] | None, InvalidDefinition | None]:
+    """The machine built from `fsm`, or the definition error that stopped it.
+
+    Building is the well-formedness check, so a spec that cannot build hands its error back
+    rather than raising out of the class creation that triggered it.
+    """
+    try:
+        return build_machine(fsm), None
+    except InvalidDefinition as exc:
+        return None, exc
+
+
+@lru_cache(maxsize=None)
+def _cached_machine(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
+    """Build (once) a StateMachine subclass from an FSM spec, keyed on the spec itself."""
+    return build_machine(fsm)
+
+
 def _current_value(machine: StateMachine) -> str:
     """The single active state's value (these FSMs are flat, so there is exactly one)."""
     return next(iter(machine.configuration_values))
 
 
 def machine_class(fsm: FSMSpec | ElementFSMSpec) -> Any:
-    """The concrete (cached) StateMachine subclass for an FSM spec.
+    """The StateMachine subclass for an FSM spec: the one its owner built, else a cached build.
 
-    A public handle on the built machine - used by ``src.statecharts`` to expose
-    one importable class per page type for docs/introspection.
+    A page type builds its machine as it is declared and keeps it, so that machine is collected
+    with the declaration rather than held in the cache. Anything else - an element spec, or a
+    page spec no page type owns - goes through the cache. Either way the same class comes back
+    every time, which is what ``src.statecharts`` binds for docs/introspection.
     """
-    return _machine_class(fsm)
+    owned = fsm.machine if isinstance(fsm, FSMSpec) else None
+    return owned if owned is not None else _cached_machine(fsm)
 
 
 def allowed_events(fsm: FSMSpec | ElementFSMSpec, current_status: str) -> set[str]:
     """The set of FSM event ids legal from `current_status` (topology only)."""
-    machine = _machine_class(fsm)(start_value=current_status)
+    machine = machine_class(fsm)(start_value=current_status)
     return {event.id for event in machine.allowed_events}
 
 
@@ -82,7 +109,7 @@ def fire(fsm: FSMSpec | ElementFSMSpec, current_status: str, event: str) -> str:
 
     Raises `IllegalCommandError` if the event is not legal from that state.
     """
-    machine = _machine_class(fsm)(start_value=current_status)
+    machine = machine_class(fsm)(start_value=current_status)
     try:
         machine.send(event)
     except TransitionNotAllowed as exc:
