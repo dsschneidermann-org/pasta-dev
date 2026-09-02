@@ -12,11 +12,8 @@ alongside production). This file owns only the seam and the membership of the se
 import pytest
 
 from src.errors import ProductionTypeInTestError, ValidationError
-from src.pagetypes._registry import (
-    get_page_type,
-    registered_pagetypes,
-    set_test_mode,
-)
+from src.pagetypes import _registry
+from src.pagetypes._registry import get_page_type, registered_pagetypes
 from src.store import Store
 from src.testtypes import TEST_REGISTRY
 
@@ -24,15 +21,6 @@ from src.testtypes import TEST_REGISTRY
 # deliberately NOT derived from production: the fixtures are purpose-built, not clones.
 TEST_TAGS = {"test-fields", "test-blocks", "test-element-blocks", "test-flow", "test-lifecycle",
              "test-child"}
-
-
-@pytest.fixture
-def production_mode():
-    """Leave test mode for one test, so it sees what a live server sees. Restored afterwards so the
-    setting does not leak into the rest of the suite."""
-    set_test_mode(False)
-    yield
-    set_test_mode(True)
 
 
 # --- the fixture set ---------------------------------------------------------
@@ -56,6 +44,24 @@ def test_production_hands_back_the_production_types(production_mode):
     registry = registered_pagetypes()
     assert "feature-brief" in registry
     assert not any(tag.startswith("test-") for tag in registry)
+
+
+# --- the mode empties the map, it does not merely gate it --------------------
+def test_test_mode_empties_the_production_registry():
+    """Reaching past the accessor into REGISTRY finds nothing while the mode is on, so a test cannot
+    depend on a production page type by any route."""
+    assert _registry.REGISTRY == {}
+
+
+def test_leaving_test_mode_puts_the_production_registry_back(production_mode):
+    assert set(_registry.REGISTRY) == set(registered_pagetypes())
+    assert "feature-brief" in _registry.REGISTRY
+
+
+def test_the_registry_is_restored_into_the_same_map(production_mode):
+    # Emptied and refilled in place rather than rebound, so a reference taken before the switch is
+    # still the live one - which is what lets a caller compare the two by identity.
+    assert registered_pagetypes() is _registry.REGISTRY
 
 
 # --- resolution reads that same map ------------------------------------------

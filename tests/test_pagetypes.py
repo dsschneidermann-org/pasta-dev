@@ -1,10 +1,11 @@
 """Unit tests for registry integrity - the specs must be internally consistent.
 
-The generic, parametrized structural invariants run over BOTH the production REGISTRY and the
+The generic, parametrized structural invariants run over BOTH the production types and the
 hand-authored test registry (TEST_REGISTRY) - every page type, production or fixture, must be
-well-formed. `test_expected_types_registered` stays pinned to the production SET so a genuinely
-new or removed production type still fails loudly. The content-specific assertions further down
-pin to the test fixtures (src.testtypes), so enriching a production type never breaks them.
+well-formed. The production side is named from the page-type modules rather than read out of
+REGISTRY, which test mode empties, and `test_production_types_are_exactly_the_registered_ones`
+keeps that hand-written list honest. The content-specific assertions further down pin to the test
+fixtures (src.testtypes), so enriching a production type never breaks them.
 """
 
 from textwrap import dedent
@@ -70,8 +71,21 @@ from src.pagetypes.core.validation import (
     validate_pagetype_block_args,
     validate_pagetype_setter_descriptions,
 )
-from src.pagetypes._registry import REGISTRY, get_page_type
+from src.pagetypes._registry import get_page_type
 from src.pagetypes import _stage_guidance
+from src.pagetypes.architecture import _ARCHITECTURE
+from src.pagetypes.bug_report import _BUG_REPORT
+from src.pagetypes.decision_record import _DECISION_RECORD
+from src.pagetypes.document import _DOCUMENT
+from src.pagetypes.epic import _AGENT_PLAN, _EPIC
+from src.pagetypes.feature import (
+    _FEATURE_BRIEF,
+    _FEATURE_SPEC,
+    _IMPLEMENTATION_PLAN,
+    _TESTING_PLAN,
+)
+from src.pagetypes.simple_change import _SIMPLE_CHANGE
+from src.pagetypes.toc import _TOC
 from src.testtypes import TEST_REGISTRY
 
 _STANDARD_BLOCK_HELPERS = {
@@ -85,8 +99,15 @@ def _kinds(*names: str) -> tuple[BlockKindSpec, ...]:
     return tuple(_STANDARD_BLOCK_HELPERS[name]() for name in names)
 
 
+# The production types named from their own modules rather than read out of REGISTRY: entering test
+# mode empties that map, and these invariants must keep covering production all the same.
+PRODUCTION_TYPES = {page_type.tag: page_type for page_type in (
+    _ARCHITECTURE, _DECISION_RECORD, _BUG_REPORT, _SIMPLE_CHANGE, _FEATURE_BRIEF, _FEATURE_SPEC,
+    _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _DOCUMENT, _TOC,
+)}
+
 # Structural invariants must hold for EVERY page type - production and hand-authored fixture alike.
-ALL_TYPES = {**REGISTRY, **TEST_REGISTRY}
+ALL_TYPES = {**PRODUCTION_TYPES, **TEST_REGISTRY}
 
 # Commands that target a real section.field
 CONTENT_TARGETING = {
@@ -368,7 +389,7 @@ def test_blocks_fixture_has_full_block_surface():
 def test_add_link_on_every_authorable_type_but_not_toc():
     # add_link_cmd() is added to every authorable production page type; the command-less toc is the
     # sole exception - it has no authoring surface at all, so it must NOT carry addLink.
-    for tag, page_type in REGISTRY.items():
+    for tag, page_type in PRODUCTION_TYPES.items():
         command = get_pagetype_command(page_type, "addLink")
         if tag == "toc":
             assert command is None, "toc cannot be authored - it must not carry addLink"
@@ -381,7 +402,7 @@ def test_add_link_on_every_authorable_type_but_not_toc():
 def test_set_title_on_every_authorable_type_but_not_toc():
     # set_title_cmd() - the universal rename alias - is added to every authorable production page type
     # alongside addLink; the command-less toc is the sole exception with no authoring surface.
-    for tag, page_type in REGISTRY.items():
+    for tag, page_type in PRODUCTION_TYPES.items():
         command = get_pagetype_command(page_type, "setTitle")
         if tag == "toc":
             assert command is None, "toc cannot be authored - it must not carry setTitle"
@@ -525,7 +546,7 @@ def test_every_production_guidance_text_comes_from_the_stage_guidance_module():
                  for name, value in vars(_stage_guidance).items()
                  if name.isupper() and isinstance(value, str)}
     declared = [(tag, state, text)
-                for tag, page_type in REGISTRY.items()
+                for tag, page_type in PRODUCTION_TYPES.items()
                 for state, text in page_type.fsm.status_guidance]
     assert declared, "no production page type declares stage guidance"
     for tag, state, text in declared:
@@ -853,11 +874,11 @@ def test_the_block_surface_is_three_commands_per_field():
     no in-place edit at all: a block is replaced by removing it and adding at its slot.
     """
     adds = [command.name
-            for page_type in REGISTRY.values()
+            for page_type in PRODUCTION_TYPES.values()
             for command in page_type.commands
             if command.kind == ADD_BLOCK]
     assert len(adds) == 8
-    document = {command.name for command in REGISTRY["document"].commands}
+    document = {command.name for command in PRODUCTION_TYPES["document"].commands}
     assert document == {"addBody", "removeBlock", "reorderBlock", "addLink", "setTitle"}
 
 
@@ -865,7 +886,7 @@ def test_block_command_names_match_the_declared_surface():
     """Every production add name, and the remove/reorder names it sits beside - which are
     byte-identical to what they were before the sets were dropped."""
     names = {tag: {command.name for command in page_type.commands}
-             for tag, page_type in REGISTRY.items()}
+             for tag, page_type in PRODUCTION_TYPES.items()}
     assert {"addBody", "removeBlock", "reorderBlock"} <= names["document"]
     assert {"addDetails", "removeNote", "reorderNote"} <= names["architecture"]
     assert {"addDecision", "removeDecisionBlock", "reorderDecisionBlock",
@@ -877,7 +898,7 @@ def test_block_command_names_match_the_declared_surface():
             "addStepDetail", "removeStepDetail",
             "reorderStepDetail"} <= names["implementation-plan"]
     # Names stay unique within a type.
-    for tag, page_type in REGISTRY.items():
+    for tag, page_type in PRODUCTION_TYPES.items():
         declared = [command.name for command in page_type.commands]
         assert len(declared) == len(set(declared)), f"{tag} declares a duplicate command name"
 
@@ -896,7 +917,7 @@ def test_two_do_eligible_setters_for_one_field_are_rejected():
                for error in validate_pagetype_field_setters(two_setters))
     # Every registered type passes it - the five collapsing blocks fields were the only ones
     # that ever carried more than one.
-    for page_type in {**REGISTRY, **TEST_REGISTRY}.values():
+    for page_type in ALL_TYPES.values():
         assert validate_pagetype_field_setters(page_type) == []
 
 
@@ -1027,7 +1048,15 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
     assert "xtest-broken:" in message
 
 
-def test_validate_registry_passes_over_the_production_registry():
-    # The single entry point the primary flows call returns cleanly for the real registry.
+def test_validate_registry_passes_over_the_production_registry(production_mode):
+    # The single entry point the primary flows call returns cleanly for the real registry, which is
+    # in place only outside test mode.
     from src.pagetypes._registry import validate_registry
     assert validate_registry() is None
+
+
+def test_production_types_are_exactly_the_registered_ones(production_mode):
+    # PRODUCTION_TYPES is written out by hand so the invariants above survive test mode emptying
+    # REGISTRY; this is what fails when a page type is added or removed and the list is not.
+    from src.pagetypes._registry import registered_pagetypes
+    assert registered_pagetypes() == PRODUCTION_TYPES
