@@ -104,10 +104,21 @@ def test_page_machine_qualname_names_the_production_bindings(production_mode):
     assert page_machine_qualname("architecture") == f"{statecharts.__name__}.ArchitectureMachine"
 
 
+def test_page_machine_qualname_resolves_for_every_production_type(production_mode):
+    """The same guarantee as the fixture loop above, over the types the documentation site actually
+    publishes. The bindings are written out one per type rather than derived from the registry, so
+    this is what fails when a page type is added and its binding is not."""
+    for tag, page_type in registered_pagetypes().items():
+        qualname = page_machine_qualname(tag)
+        module_path, _, name = qualname.rpartition(".")
+        resolved = getattr(importlib.import_module(module_path), name)
+        assert resolved is machine_class(page_type.fsm), tag
+
+
 def test_page_machine_qualname_missing_binding_raises(monkeypatch):
     # A registered type whose machine was never bound fails rather than naming a path that will
     # not import. No real registry reaches this, so an empty module stands in for the bindings.
-    monkeypatch.setattr(docsgen, "_bindings_module", lambda: ModuleType("src.emptycharts"))
+    monkeypatch.setattr(docsgen, "_bindings_module", lambda: ModuleType("unbound-fixture"))
     with pytest.raises(KeyError, match="No page-status machine is bound"):
         page_machine_qualname("test-flow")
 
