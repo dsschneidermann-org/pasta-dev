@@ -38,7 +38,7 @@ from .pagetypes.core.validation import collect_ref_ids
 from .pagetypes._registry import (
     get_page_type,
     is_auto_child_type,
-    registered_tags,
+    registered_pagetypes,
     workspace_guidance_fields,
 )
 from .rwlock import ReadWriteLock
@@ -503,7 +503,7 @@ class Store:
         page_type = get_page_type(type_tag)
         if page_type is None:
             raise ValidationError(
-                f"Unknown page type '{type_tag}'. Registered: {', '.join(sorted(registered_tags()))}."
+                f"Unknown page type '{type_tag}'. Registered: {', '.join(sorted(registered_pagetypes()))}."
             )
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)

@@ -30,7 +30,7 @@ from .describe import describe_mutations, describe_page_type
 from .model import Page
 from .pagetypes.core.specs import COMPOUND, TRANSITION, FSMSpec
 from .pagetypes.core.pagetype import PageType, initial_sections
-from .pagetypes._registry import discoverable_registry
+from .pagetypes._registry import registered_pagetypes
 from .statecharts import page_machine_qualname
 
 # Kinds that fire the *page-status* FSM (element_transition fires an element's own FSM, so it is an
@@ -241,7 +241,7 @@ def state_docs(page_type: PageType) -> dict[str, str]:
 
 def all_state_docs(registry: dict[str, PageType] | None = None) -> dict[str, str]:
     """Every page-type-state doc across the registry, keyed ``<tag>-<state>``."""
-    registry = discoverable_registry() if registry is None else registry
+    registry = registered_pagetypes() if registry is None else registry
     docs: dict[str, str] = {}
     for page_type in registry.values():
         docs.update(state_docs(page_type))
@@ -250,7 +250,7 @@ def all_state_docs(registry: dict[str, PageType] | None = None) -> dict[str, str
 
 def render_states_index(registry: dict[str, PageType] | None = None) -> str:
     """The generated ``states.md`` - a toctree over every state doc, so they are reachable."""
-    registry = discoverable_registry() if registry is None else registry
+    registry = registered_pagetypes() if registry is None else registry
     lines = [
         "# Page-type states",
         "",
