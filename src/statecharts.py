@@ -78,7 +78,7 @@ def page_machine_qualname(tag: str) -> str:
     Used by doc generation to point the ``statemachine-diagram`` directive at the right class.
     ``machine_class`` is cached per ``FSMSpec``, so the class for a registry type's FSM *is* the
     same object bound in that registry's module; we reverse-look-up that identity rather than
-    keeping a second hand-maintained tag→name map, so a newly registered type that forgets its
+    keeping a second hand-maintained tag->name map, so a newly registered type that forgets its
     binding raises loudly instead of silently going undocumented.
     """
     page_type = registered_pagetypes().get(tag)
