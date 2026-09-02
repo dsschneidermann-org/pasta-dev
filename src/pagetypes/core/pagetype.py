@@ -2,10 +2,10 @@
 
 Its post-init hook does the setup steps a declaration needs before anything reads it - resolves
 each block argument's vocabulary from the field it targets, derives the FSM transition table from
-the commands, and builds the status machine that table describes along with every element machine
-the type declares on its list fields. Whether the finished declaration
-is well-formed is a separate concern, checked by the validators in `validation.py` - including
-what the build settles, which is reported there rather than raised from here.
+the commands, and builds the machines those describe - the status machine, and every element
+machine the type declares on its list fields. Whether the finished declaration is well-formed is
+a separate concern, checked by the validators in `validation.py` - including what the build
+settles, which is reported there rather than raised from here.
 """
 
 from __future__ import annotations

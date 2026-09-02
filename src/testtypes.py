@@ -52,7 +52,7 @@ src.pagetypes) - so a fixture reads like a production type and doubles as covera
 helpers, while its command surface (names, args, legality, FSM edges, guards, ref-checks) stays
 exactly what it was when hand-written. The field-spec and command helpers are shared with
 src.pagetypes; only the element FSMs are declared locally, named distinctly so their diagram labels
-and cache identity never collide with production.
+and registered class names never collide with production.
 """
 
 from __future__ import annotations
@@ -91,7 +91,8 @@ from .pagetypes.core.pagetype import PageType
 
 
 # --- Element-level FSMs (a list element's own tiny lifecycle) -----------------
-# Named distinctly from production so their diagram labels and cache identity never collide.
+# Named distinctly from production so their diagram labels and registered class names never
+# collide: python-statemachine registers each class it builds under its qualname.
 _STEP_FSM = ElementFSMSpec(
     name="TestStep",
     initial="todo", states=("todo", "done", "skipped"),
