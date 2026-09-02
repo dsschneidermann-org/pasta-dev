@@ -111,6 +111,14 @@ def guard_production_type(tag: str) -> None:
         )
 
 
+def is_test_mode() -> bool:
+    """Whether the hand-authored test-* fixtures are standing in for the production page types.
+
+    The supported way to ask which registry is in play: a caller that has to branch on the mode
+    reads this rather than comparing maps by identity."""
+    return _test_mode
+
+
 def registered_pagetypes() -> dict[str, PageType]:
     """The page types that exist right now: the production registry, or the hand-authored test-*
     fixtures under test mode. The one map every consumer reads, so what resolves is exactly what is
