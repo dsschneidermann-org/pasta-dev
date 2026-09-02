@@ -32,7 +32,7 @@ from .toc import _TOC
 # Read page types through `registered_pagetypes()` rather than from this map: the accessor is what
 # applies test mode, handing back these types in production and the hand-authored fixtures under
 # test, so resolution, the describePageType listing and doc generation all agree on which types
-# exist. Under test mode this map is EMPTY (see `set_test_mode`), so a direct reader finds nothing
+# exist. Under test mode this map is empty (see `set_test_mode`), so a direct reader finds nothing
 # rather than a type the mode says is off-limits. Name REGISTRY directly only where the production
 # types specifically are the point, as the validator below does.
 REGISTRY: dict[str, PageType] = {

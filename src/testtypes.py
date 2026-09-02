@@ -272,7 +272,7 @@ TEST_LIFECYCLE = PageType(
     name="Lifecycle fixture",
     description="Test fixture: a rich status FSM with required-content gates, agency, guards, questions, and a pinned auto-child.",
     sections=(
-        # A WRAPPED multi-line instruction, which no other fixture carries: it is what makes a field
+        # A wrapped multi-line instruction, which no other fixture carries: it is what makes a field
         # description render as an indented block rather than inline after its marker, in the
         # generated docs and everywhere else a field's instruction is echoed.
         SectionSpec("summary", "Summary", (_prose("body", description="""
