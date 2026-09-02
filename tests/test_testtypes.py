@@ -13,7 +13,7 @@ import pytest
 
 from src.errors import ProductionTypeInTestError, ValidationError
 from src.pagetypes import _registry
-from src.pagetypes._registry import get_page_type, registered_pagetypes
+from src.pagetypes._registry import get_page_type, is_test_mode, registered_pagetypes
 from src.store import Store
 from src.testtypes import TEST_REGISTRY
 
@@ -44,6 +44,17 @@ def test_production_hands_back_the_production_types(production_mode):
     registry = registered_pagetypes()
     assert "feature-brief" in registry
     assert not any(tag.startswith("test-") for tag in registry)
+
+
+def test_is_test_mode_is_on_for_the_suite():
+    """conftest enters the mode at import, so every test but the one below sees it on."""
+    assert is_test_mode() is True
+
+
+def test_is_test_mode_is_off_for_a_live_server(production_mode):
+    """The mode is left for one test - which is what a live server sees - and restored after, so
+    the predicate has to follow the flag rather than a value captured at import."""
+    assert is_test_mode() is False
 
 
 # --- the mode empties the map, it does not merely gate it --------------------

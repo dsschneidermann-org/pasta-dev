@@ -8,16 +8,18 @@ test-blocks for the single-state case, test-child for a legal_in content lock.
 """
 
 import importlib
+from types import ModuleType
 
 import pytest
 
-from src import testcharts
+from src import docsgen, testcharts
 from src.commands import create_page, legal_commands
 from src.docsgen import (
     _bullet,
     _field_line,
     _seed_page,
     all_state_docs,
+    page_machine_qualname,
     reachable_states,
     render_states_index,
     state_docs,
@@ -26,7 +28,6 @@ from src.fsm import machine_class
 from src.pagetypes.core.pagetype import get_pagetype_command, get_pagetype_field
 from src.pagetypes.core.specs import status_guidance
 from src.pagetypes._registry import get_page_type, registered_pagetypes
-from src.statecharts import page_machine_qualname
 
 
 def _counter():
@@ -93,6 +94,33 @@ def test_page_machine_qualname_names_the_fixture_bindings():
 def test_page_machine_qualname_unknown_tag_raises():
     with pytest.raises(KeyError):
         page_machine_qualname("no-such-type")
+
+
+def test_page_machine_qualname_names_the_production_bindings(production_mode):
+    # Outside test mode the production types are the ones being documented, so their bindings are
+    # what the renderer resolves against.
+    from src import statecharts
+
+    assert page_machine_qualname("architecture") == f"{statecharts.__name__}.ArchitectureMachine"
+
+
+def test_page_machine_qualname_resolves_for_every_production_type(production_mode):
+    """The same guarantee as the fixture loop above, over the types the documentation site actually
+    publishes. The bindings are written out one per type rather than derived from the registry, so
+    this is what fails when a page type is added and its binding is not."""
+    for tag, page_type in registered_pagetypes().items():
+        qualname = page_machine_qualname(tag)
+        module_path, _, name = qualname.rpartition(".")
+        resolved = getattr(importlib.import_module(module_path), name)
+        assert resolved is machine_class(page_type.fsm), tag
+
+
+def test_page_machine_qualname_missing_binding_raises(monkeypatch):
+    # A registered type whose machine was never bound fails rather than naming a path that will
+    # not import. No real registry reaches this, so an empty module stands in for the bindings.
+    monkeypatch.setattr(docsgen, "_bindings_module", lambda: ModuleType("unbound-fixture"))
+    with pytest.raises(KeyError, match="No page-status machine is bound"):
+        page_machine_qualname("test-flow")
 
 
 # --- registry-wide coverage + index ------------------------------------------
