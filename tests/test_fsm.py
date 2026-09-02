@@ -74,13 +74,11 @@ def _ad_hoc_type(tag: str, name: str, states: tuple[str, ...], *commands: Comman
 def test_a_page_type_builds_its_status_machine_as_it_is_constructed():
     built = _ad_hoc_type("xtest-owned", "XOwned", ("draft", "done"),
                          transition_cmd("finish", "draft → done"))
-    assert built.machine_error is None
-    assert issubclass(built.machine, StateMachine)
+    assert built.fsm.machine_error is None
+    assert issubclass(built.fsm.machine, StateMachine)
     # python-statemachine registers every class it creates, so the machine being there is the
     # library's own record that the build happened - under a name only this type declares.
-    assert sm_registry._REGISTRY[f"src.fsm.{built.fsm.name}"] is built.machine
-    first = built.machine
-    assert built.machine is first
+    assert sm_registry._REGISTRY[f"src.fsm.{built.fsm.name}"] is built.fsm.machine
 
 
 def test_a_machine_that_cannot_be_built_is_kept_as_an_error_rather_than_raised():
@@ -88,16 +86,16 @@ def test_a_machine_that_cannot_be_built_is_kept_as_an_error_rather_than_raised()
     # created. Constructing the page type must not raise; the error is held for the validator.
     built = _ad_hoc_type("xtest-orphan", "XOrphan", ("draft", "done", "orphan"),
                          transition_cmd("finish", "draft → done"))
-    assert built.machine is None
-    assert "orphan" in str(built.machine_error)
+    assert built.fsm.machine is None
+    assert "orphan" in str(built.fsm.machine_error)
 
 
 def test_every_production_page_type_holds_its_machine(production_mode):
     """Nothing in this test builds a machine, so finding one on every type is evidence they were
     built with the declarations rather than on first use."""
     for tag, page_type in registered_pagetypes().items():
-        assert page_type.machine is not None, tag
-        assert page_type.machine_error is None, tag
+        assert page_type.fsm.machine is not None, tag
+        assert page_type.fsm.machine_error is None, tag
 
 
 def test_page_status_machines_do_not_enter_the_machine_cache(production_mode):

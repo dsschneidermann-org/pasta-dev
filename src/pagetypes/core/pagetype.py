@@ -49,16 +49,6 @@ class PageType:
         object.__setattr__(self.fsm, "transitions", _status_transitions(self))
         self._build_machine()
 
-    @property
-    def machine(self) -> Any:
-        """This type's status machine, or None when it could not be built."""
-        return self.fsm.machine
-
-    @property
-    def machine_error(self) -> Exception | None:
-        """What stopped the status machine from being built, or None when it was built."""
-        return self.fsm.machine_error
-
     def _build_machine(self) -> None:
         """Build the status machine now, keeping whichever of the class or the error comes back.
 

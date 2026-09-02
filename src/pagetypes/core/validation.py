@@ -388,7 +388,7 @@ def validate_page_machine(page_type: PageType) -> list[str]:
     written in: the library names a state by the attribute the class carries it under, which is an
     implementation detail of how the machine is built.
     """
-    error = page_type.machine_error
+    error = page_type.fsm.machine_error
     if error is None:
         return []
     return [f"the status machine could not be built: {_in_status_names(page_type.fsm, str(error))}"]
