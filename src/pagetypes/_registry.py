@@ -32,8 +32,9 @@ from .toc import _TOC
 # Read page types through `registered_pagetypes()` rather than from this map: the accessor is what
 # applies test mode, handing back these types in production and the hand-authored fixtures under
 # test, so resolution, the describePageType listing and doc generation all agree on which types
-# exist. Name REGISTRY directly only where the production types specifically are the point, as the
-# validator and the guard below do.
+# exist. Under test mode this map is EMPTY (see `set_test_mode`), so a direct reader finds nothing
+# rather than a type the mode says is off-limits. Name REGISTRY directly only where the production
+# types specifically are the point, as the validator below does.
 REGISTRY: dict[str, PageType] = {
     _ARCHITECTURE.tag: _ARCHITECTURE,
     _DECISION_RECORD.tag: _DECISION_RECORD,
@@ -73,29 +74,37 @@ def _test_registry() -> dict[str, PageType]:
 
 
 # --- Test mode: the fixtures stand in for the production page types ----------
-# Under test mode the hand-authored test-* fixtures replace the production registry, so a test can
-# only ever exercise a fixture. Production types stop resolving (`get_page_type`), stop being listed
-# (`registered_pagetypes`, hence the describePageType listing + doc-gen), and a page of one cannot be
-# created - every such attempt raises `ProductionTypeInTestError`, steering the author to a test-*
-# fixture. Flipped on for the whole suite by tests/conftest.py; never set in normal operation, where
-# the guard is entirely inert and the fixtures are out of reach.
+# `set_test_mode` below is the single explanation of what the mode does. While it is on the
+# production types live here rather than in REGISTRY.
 _test_mode = False
+_stashed_registry: dict[str, PageType] = {}
 
 
 def set_test_mode(on: bool = True) -> None:
     """Test-only: enter (or leave) test mode, in which the hand-authored test-* fixtures stand in for
     the production page types - production types do not resolve, are not listed, and cannot be
-    instantiated (see `ProductionTypeInTestError`). tests/conftest.py flips this on for the whole run
-    at import, ahead of collection, so a test module resolves its fixtures at module level. Never
-    called in normal operation."""
+    instantiated (see `ProductionTypeInTestError`), steering the author to a test-* fixture.
+
+    Entering EMPTIES `REGISTRY` into a private stash, and leaving puts it back: the production types
+    are then unreachable through the map itself rather than only behind the accessors, so a caller
+    holding it directly cannot depend on a page type the mode says is off-limits. The map is mutated
+    in place, never rebound, so a reference taken before the switch stays the live one.
+    tests/conftest.py flips this on for the whole run at import, ahead of collection, so a test module
+    resolves its fixtures at module level. Never called in normal operation."""
     global _test_mode
+    if on == _test_mode:
+        return
     _test_mode = on
+    source, target = (REGISTRY, _stashed_registry) if on else (_stashed_registry, REGISTRY)
+    target.update(source)
+    source.clear()
 
 
 def guard_production_type(tag: str) -> None:
     """Raise if `tag` names a production page type while in test mode - the shared guard behind both
-    resolution (`get_page_type`) and creation (`commands.create_page`)."""
-    if _test_mode and tag in REGISTRY:
+    resolution (`get_page_type`) and creation (`commands.create_page`). It reads the stash, which is
+    where the production types are while the mode is on."""
+    if _test_mode and tag in _stashed_registry:
         raise ProductionTypeInTestError(
             f"Production page type {tag!r} is off-limits in tests. Test new capabilities on a " +
             f"test-* page instead (always prefer an existing one; see src/testtypes.py)."
@@ -104,8 +113,8 @@ def guard_production_type(tag: str) -> None:
 
 def registered_pagetypes() -> dict[str, PageType]:
     """The page types that exist right now: the production registry, or the hand-authored test-*
-    fixtures under test mode. The one map behind resolution, the `describePageType` listing, doc-gen
-    enumeration and workspace-guidance discovery, so what resolves is exactly what is advertised."""
+    fixtures under test mode. The one map every consumer reads, so what resolves is exactly what is
+    advertised."""
     return _test_registry() if _test_mode else REGISTRY
 
 
