@@ -97,8 +97,8 @@ def test_page_machine_qualname_unknown_tag_raises():
 
 
 def test_page_machine_qualname_names_the_production_bindings(production_mode):
-    # Outside test mode the production bindings are the ones in play, so the renderer resolves
-    # against those instead - the choice it makes for itself.
+    # Outside test mode the production types are the ones being documented, so their bindings are
+    # what the renderer resolves against.
     from src import statecharts
 
     assert page_machine_qualname("architecture") == f"{statecharts.__name__}.ArchitectureMachine"
