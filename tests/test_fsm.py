@@ -76,14 +76,14 @@ def test_a_page_type_builds_its_status_machine_as_it_is_constructed():
                          transition_cmd("finish", "draft → done"))
     assert built.fsm.machine_error is None
     assert issubclass(built.fsm.machine, StateMachine)
-    # python-statemachine registers every class it creates, so the machine being there is the
-    # library's own record that the build happened - under a name only this type declares.
+    # python-statemachine registers every class it creates, so an entry under this type's own
+    # name is the library's record that the build happened.
     assert sm_registry._REGISTRY[f"src.fsm.{built.fsm.name}"] is built.fsm.machine
 
 
 def test_a_machine_that_cannot_be_built_is_kept_as_an_error_rather_than_raised():
-    # `orphan` is unreachable from `draft`, which python-statemachine rejects when the class is
-    # created. Constructing the page type must not raise; the error is held for the validator.
+    # `orphan` is unreachable from `draft`, which python-statemachine rejects. Constructing the
+    # page type must not raise; the error is held for the validator.
     built = _ad_hoc_type("xtest-orphan", "XOrphan", ("draft", "done", "orphan"),
                          transition_cmd("finish", "draft → done"))
     assert built.fsm.machine is None

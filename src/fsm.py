@@ -1,9 +1,9 @@
 """Pure FSM evaluation via python-statemachine.
 
 For each `FSMSpec` we build one `StateMachine` subclass - held by the page type that
-declares it, or memoized here for a spec no page type owns - then evaluate a transition
-on an *ephemeral* instance seeded at the page's current status. The machine is the single
-source of truth for legality and for the resulting state.
+declares it, memoized here otherwise - then evaluate a transition on an *ephemeral*
+instance seeded at the page's current status. The machine is the single source of truth
+for legality and for the resulting state.
 
 Design notes (verified against python-statemachine 3.2.0):
 
@@ -30,8 +30,8 @@ from .pagetypes.core.specs import ElementFSMSpec, FSMSpec
 def build_machine(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
     """Build a StateMachine subclass from an FSM spec.
 
-    Uncached: a caller that wants to keep the class keeps it itself. Raises `InvalidDefinition`
-    when the declared graph is not well formed, which is python-statemachine's own check.
+    Uncached - the caller keeps what it builds. Raises `InvalidDefinition` when the graph is
+    not well formed, which is python-statemachine's own check.
     """
     namespace: dict[str, object] = {}
     state_attr = {value: f"state_{value}" for value in fsm.states}
@@ -66,9 +66,8 @@ def try_build_machine(
 ) -> tuple[type[StateMachine] | None, InvalidDefinition | None]:
     """The machine built from `fsm`, or the definition error that stopped it.
 
-    Building a machine is the well-formedness check - python-statemachine rejects a graph whose
-    states are not all reachable when it creates the class - so a declaration that cannot build
-    hands its error back here instead of raising out of the declaration that triggered it.
+    Building is the well-formedness check, so a spec that cannot build hands its error back
+    rather than raising out of the class creation that triggered it.
     """
     try:
         return build_machine(fsm), None
@@ -88,15 +87,12 @@ def _current_value(machine: StateMachine) -> str:
 
 
 def machine_class(fsm: FSMSpec | ElementFSMSpec) -> Any:
-    """The concrete StateMachine subclass for an FSM spec: the one its owner built, else a
-    cached build.
+    """The StateMachine subclass for an FSM spec: the one its owner built, else a cached build.
 
-    A page type builds its machine as it is declared and keeps it, so its machine lives and dies
-    with the declaration rather than in the cache. Element specs have no such owner, and neither
-    does a page spec written outside a page type, so both still go through the cache.
-
-    Stable per spec either way, which is what lets ``src.statecharts`` expose one importable
-    class per page type for docs/introspection.
+    A page type builds its machine as it is declared and keeps it, so that machine is collected
+    with the declaration rather than held in the cache. Anything else - an element spec, or a
+    page spec no page type owns - goes through the cache. Either way the same class comes back
+    every time, which is what ``src.statecharts`` binds for docs/introspection.
     """
     owned = fsm.machine if isinstance(fsm, FSMSpec) else None
     return owned if owned is not None else _cached_machine(fsm)

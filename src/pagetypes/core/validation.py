@@ -383,10 +383,9 @@ def validate_page_machine(page_type: PageType) -> list[str]:
     """The type's status machine actually built.
 
     python-statemachine checks connectivity, unreachable states and trap states when it creates the
-    class, so the build the page type already performed IS this check and nothing is re-derived
-    here. Only what it returned is reported, rewritten into the vocabulary the declaration is
-    written in: the library names a state by the attribute the class carries it under, which is an
-    implementation detail of how the machine is built.
+    class, so the build the page type already performed is the check and nothing is re-derived
+    here. Its message is rewritten into the author's own status names, since the library reports a
+    state by the attribute the class carries it under.
     """
     error = page_type.fsm.machine_error
     if error is None:
@@ -407,8 +406,8 @@ def _in_status_names(fsm: FSMSpec, message: str) -> str:
 def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
     """Every status_guidance pair names a declared status, and no status twice.
 
-    Kept alongside the machine build rather than folded into it: python-statemachine has no notion
-    of guidance, and accepts a spec whose guidance names a status the type never declared.
+    Not folded into the machine build: python-statemachine has no notion of guidance, and accepts
+    a spec whose guidance names a status the type never declared.
     """
     errors: list[str] = []
     seen: set[str] = set()

@@ -91,8 +91,8 @@ class FSMSpec:
     case.
 
     `machine` and `machine_error` are filled in by the owning page type, which builds the machine
-    as it is declared (see `PageType.__post_init__`) and keeps whichever it got. They are set after
-    construction, so they take no part in the spec's identity.
+    as it is declared (see `PageType.__post_init__`). Being set after construction, they take no
+    part in the spec's identity.
     """
     name: str
     initial: str

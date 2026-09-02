@@ -3,8 +3,8 @@
 Its post-init hook does the setup steps a declaration needs before anything reads it - resolves
 each block argument's vocabulary from the field it targets, derives the FSM transition table from
 the commands, and builds the status machine that table describes. Whether the finished declaration
-is well-formed is a separate concern, checked by the validators in `validation.py`; the one part
-of it the build settles is reported there too, rather than raised from here.
+is well-formed is a separate concern, checked by the validators in `validation.py` - including
+what the build settles, which is reported there rather than raised from here.
 """
 
 from __future__ import annotations
@@ -50,12 +50,11 @@ class PageType:
         self._build_machine()
 
     def _build_machine(self) -> None:
-        """Build the status machine now, keeping whichever of the class or the error comes back.
+        """Build the status machine with the declaration rather than on first use.
 
-        The build is the type's own well-formedness check, so it happens with the declaration
-        rather than on first use. A failure is held rather than raised: `validate_page_types`
-        reports it alongside every other declaration error, so one malformed FSM does not stop
-        the module that declares it from importing.
+        A failure is held rather than raised, so one malformed FSM does not stop the module that
+        declares it from importing; `validate_page_types` reports it with every other declaration
+        error.
         """
         machine, error = try_build_machine(self.fsm)
         object.__setattr__(self.fsm, "machine", machine)
