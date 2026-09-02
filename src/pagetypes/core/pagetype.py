@@ -1,9 +1,10 @@
 """The page type itself: what a page of this type is made of, and how it is set up.
 
-Its post-init hook does the two setup steps a declaration needs before anything reads it -
-resolves each block argument's vocabulary from the field it targets, and derives the
-FSM transition table from the commands. Whether the finished declaration is well-formed is
-a separate concern, checked by the validators in `validation.py`.
+Its post-init hook does the setup steps a declaration needs before anything reads it - resolves
+each block argument's vocabulary from the field it targets, derives the FSM transition table from
+the commands, and builds the status machine that table describes. Whether the finished declaration
+is well-formed is a separate concern, checked by the validators in `validation.py`; the one part
+of it the build settles is reported there too, rather than raised from here.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from ...errors import ValidationError
+from ...fsm import try_build_machine
 from .args import ArgSpec
 from .commands import CommandSpec
 from .fields import FieldSpec, SectionSpec, get_element_blocks
@@ -45,6 +47,29 @@ class PageType:
     def __post_init__(self):
         self._resolve_block_vocabularies()
         object.__setattr__(self.fsm, "transitions", _status_transitions(self))
+        self._build_machine()
+
+    @property
+    def machine(self) -> Any:
+        """This type's status machine, or None when it could not be built."""
+        return self.fsm.machine
+
+    @property
+    def machine_error(self) -> Exception | None:
+        """What stopped the status machine from being built, or None when it was built."""
+        return self.fsm.machine_error
+
+    def _build_machine(self) -> None:
+        """Build the status machine now, keeping whichever of the class or the error comes back.
+
+        The build is the type's own well-formedness check, so it happens with the declaration
+        rather than on first use. A failure is held rather than raised: `validate_page_types`
+        reports it alongside every other declaration error, so one malformed FSM does not stop
+        the module that declares it from importing.
+        """
+        machine, error = try_build_machine(self.fsm)
+        object.__setattr__(self.fsm, "machine", machine)
+        object.__setattr__(self.fsm, "machine_error", error)
 
     def _resolve_block_vocabularies(self) -> None:
         """Fill each block-carrying argument's accepted kinds in from the field it targets.

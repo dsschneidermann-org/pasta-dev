@@ -20,15 +20,18 @@ from functools import lru_cache
 from typing import Any
 
 from statemachine import Event, State, StateMachine
-from statemachine.exceptions import TransitionNotAllowed
+from statemachine.exceptions import InvalidDefinition, TransitionNotAllowed
 
 from .errors import IllegalCommandError
 from .pagetypes.core.specs import ElementFSMSpec, FSMSpec
 
 
-@lru_cache(maxsize=None)
-def _machine_class(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
-    """Build (once) a StateMachine subclass from an FSM spec. Cached per spec."""
+def build_machine(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
+    """Build a StateMachine subclass from an FSM spec.
+
+    Uncached: a caller that wants to keep the class keeps it itself. Raises `InvalidDefinition`
+    when the declared graph is not well formed, which is python-statemachine's own check.
+    """
     namespace: dict[str, object] = {}
     state_attr = {value: f"state_{value}" for value in fsm.states}
 
@@ -57,23 +60,56 @@ def _machine_class(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
     return type(fsm.name, (StateMachine,), namespace)
 
 
+def try_build_machine(
+    fsm: FSMSpec | ElementFSMSpec,
+) -> tuple[type[StateMachine] | None, InvalidDefinition | None]:
+    """The machine built from `fsm`, or the definition error that stopped it.
+
+    Building a machine is the well-formedness check - python-statemachine rejects a graph whose
+    states are not all reachable when it creates the class - so a declaration that cannot build
+    hands its error back here instead of raising out of the declaration that triggered it.
+    """
+    try:
+        return build_machine(fsm), None
+    except InvalidDefinition as exc:
+        return None, exc
+
+
+@lru_cache(maxsize=None)
+def _machine_class(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
+    """Build (once) a StateMachine subclass from an FSM spec. Cached per spec."""
+    return build_machine(fsm)
+
+
+def _machine_for(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
+    """The machine to evaluate `fsm` against: the one its owner built, else a cached build.
+
+    A page type builds its machine as it is declared and keeps it, so its machine lives and dies
+    with the declaration rather than in the cache. Element specs have no such owner, and neither
+    does a page spec written outside a page type, so both still go through the cache.
+    """
+    owned = fsm.machine if isinstance(fsm, FSMSpec) else None
+    return owned if owned is not None else _machine_class(fsm)
+
+
 def _current_value(machine: StateMachine) -> str:
     """The single active state's value (these FSMs are flat, so there is exactly one)."""
     return next(iter(machine.configuration_values))
 
 
 def machine_class(fsm: FSMSpec | ElementFSMSpec) -> Any:
-    """The concrete (cached) StateMachine subclass for an FSM spec.
+    """The concrete StateMachine subclass for an FSM spec.
 
     A public handle on the built machine - used by ``src.statecharts`` to expose
-    one importable class per page type for docs/introspection.
+    one importable class per page type for docs/introspection. Stable per spec: the same
+    class comes back every time, whether it is owned by a page type or held in the cache.
     """
-    return _machine_class(fsm)
+    return _machine_for(fsm)
 
 
 def allowed_events(fsm: FSMSpec | ElementFSMSpec, current_status: str) -> set[str]:
     """The set of FSM event ids legal from `current_status` (topology only)."""
-    machine = _machine_class(fsm)(start_value=current_status)
+    machine = _machine_for(fsm)(start_value=current_status)
     return {event.id for event in machine.allowed_events}
 
 
@@ -82,7 +118,7 @@ def fire(fsm: FSMSpec | ElementFSMSpec, current_status: str, event: str) -> str:
 
     Raises `IllegalCommandError` if the event is not legal from that state.
     """
-    machine = _machine_class(fsm)(start_value=current_status)
+    machine = _machine_for(fsm)(start_value=current_status)
     try:
         machine.send(event)
     except TransitionNotAllowed as exc:

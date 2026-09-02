@@ -329,6 +329,7 @@ def validate_page_type(page_type: PageType) -> list[str]:
         for field in section.fields:
             errors.extend(validate_field_spec(field))
     errors.extend(validate_fsm_spec(page_type.fsm))
+    errors.extend(validate_page_machine(page_type))
     errors.extend(validate_pagetype_field_setters(page_type))
     errors.extend(validate_pagetype_setter_descriptions(page_type))
     errors.extend(validate_pagetype_block_args(page_type))
@@ -378,8 +379,37 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
             "Invalid page-type declarations:\n" + "\n".join(f"- {error}" for error in errors))
 
 
+def validate_page_machine(page_type: PageType) -> list[str]:
+    """The type's status machine actually built.
+
+    python-statemachine checks connectivity, unreachable states and trap states when it creates the
+    class, so the build the page type already performed IS this check and nothing is re-derived
+    here. Only what it returned is reported, rewritten into the vocabulary the declaration is
+    written in: the library names a state by the attribute the class carries it under, which is an
+    implementation detail of how the machine is built.
+    """
+    error = page_type.machine_error
+    if error is None:
+        return []
+    return [f"the status machine could not be built: {_in_status_names(page_type.fsm, str(error))}"]
+
+
+def _in_status_names(fsm: FSMSpec, message: str) -> str:
+    """`message` with each state attribute name replaced by the status as the author declared it.
+
+    Longest status first, so one status whose name starts another cannot be substituted inside it.
+    """
+    for status in sorted(fsm.states, key=len, reverse=True):
+        message = message.replace(f"state_{status}", status)
+    return message
+
+
 def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
-    """Every status_guidance pair names a declared status, and no status twice."""
+    """Every status_guidance pair names a declared status, and no status twice.
+
+    Kept alongside the machine build rather than folded into it: python-statemachine has no notion
+    of guidance, and accepts a spec whose guidance names a status the type never declared.
+    """
     errors: list[str] = []
     seen: set[str] = set()
     for status, _text in fsm.status_guidance:
