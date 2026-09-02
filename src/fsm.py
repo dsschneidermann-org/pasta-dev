@@ -1,8 +1,9 @@
 """Pure FSM evaluation via python-statemachine.
 
-For each `FSMSpec` we build one `StateMachine` subclass (cached), then evaluate a
-transition on an *ephemeral* instance seeded at the page's current status. The
-machine is the single source of truth for legality and for the resulting state.
+For each `FSMSpec` we build one `StateMachine` subclass - held by the page type that
+declares it, or memoized here for a spec no page type owns - then evaluate a transition
+on an *ephemeral* instance seeded at the page's current status. The machine is the single
+source of truth for legality and for the resulting state.
 
 Design notes (verified against python-statemachine 3.2.0):
 
@@ -81,35 +82,29 @@ def _cached_machine(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
     return build_machine(fsm)
 
 
-def _machine_for(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
-    """The machine to evaluate `fsm` against: the one its owner built, else a cached build.
-
-    A page type builds its machine as it is declared and keeps it, so its machine lives and dies
-    with the declaration rather than in the cache. Element specs have no such owner, and neither
-    does a page spec written outside a page type, so both still go through the cache.
-    """
-    owned = fsm.machine if isinstance(fsm, FSMSpec) else None
-    return owned if owned is not None else _cached_machine(fsm)
-
-
 def _current_value(machine: StateMachine) -> str:
     """The single active state's value (these FSMs are flat, so there is exactly one)."""
     return next(iter(machine.configuration_values))
 
 
 def machine_class(fsm: FSMSpec | ElementFSMSpec) -> Any:
-    """The concrete StateMachine subclass for an FSM spec.
+    """The concrete StateMachine subclass for an FSM spec: the one its owner built, else a
+    cached build.
 
-    A public handle on the built machine - used by ``src.statecharts`` to expose
-    one importable class per page type for docs/introspection. Stable per spec: the same
-    class comes back every time, whether it is owned by a page type or held in the cache.
+    A page type builds its machine as it is declared and keeps it, so its machine lives and dies
+    with the declaration rather than in the cache. Element specs have no such owner, and neither
+    does a page spec written outside a page type, so both still go through the cache.
+
+    Stable per spec either way, which is what lets ``src.statecharts`` expose one importable
+    class per page type for docs/introspection.
     """
-    return _machine_for(fsm)
+    owned = fsm.machine if isinstance(fsm, FSMSpec) else None
+    return owned if owned is not None else _cached_machine(fsm)
 
 
 def allowed_events(fsm: FSMSpec | ElementFSMSpec, current_status: str) -> set[str]:
     """The set of FSM event ids legal from `current_status` (topology only)."""
-    machine = _machine_for(fsm)(start_value=current_status)
+    machine = machine_class(fsm)(start_value=current_status)
     return {event.id for event in machine.allowed_events}
 
 
@@ -118,7 +113,7 @@ def fire(fsm: FSMSpec | ElementFSMSpec, current_status: str, event: str) -> str:
 
     Raises `IllegalCommandError` if the event is not legal from that state.
     """
-    machine = _machine_for(fsm)(start_value=current_status)
+    machine = machine_class(fsm)(start_value=current_status)
     try:
         machine.send(event)
     except TransitionNotAllowed as exc:
