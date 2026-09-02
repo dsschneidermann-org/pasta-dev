@@ -45,7 +45,7 @@ from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.session import ServerSession
 from reactivity import async_effect, derived
 from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader
-from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks, post_reload
+from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks
 from starlette.applications import Starlette
 from starlette.routing import Mount
 
@@ -64,19 +64,6 @@ _LIVE_REFRESH_FILE = str(Path(__file__).resolve().parent / "hmr_live_refresh.py"
 # console next to uvicorn's own output. A standalone module logger at INFO would be
 # dropped: uvicorn configures only its own loggers, not the root logger.
 logger = logging.getLogger("uvicorn.error")
-
-
-# --- Reload cleanup --------------------------------------------------------------------
-@post_reload
-def _clear_machine_cache():
-    """Drop the state machines a reload has orphaned.
-
-    ``fsm._cached_machine`` evicts nothing, so an edit that changes an FSM would otherwise leave
-    the class built from the previous declaration alive for the life of the process. It lives here
-    because ``src.fsm`` stays free of dev-only dependencies, and runs post-reload so the module is
-    reached through the reloader's finder rather than imported around it.
-    """
-    import_module("src.fsm")._cached_machine.cache_clear()
 
 
 # --- MCP session capture ---------------------------------------------------------------

@@ -1,8 +1,7 @@
 """Tests for the page-status machine bindings (src.statecharts).
 
 Page machines are served by a module-level ``__getattr__`` derived from the registry, so there is
-no binding to keep in step with the page types; the element machines are bound directly, at import.
-These cover that split: what resolves, what does not, and which half is a real module attribute.
+no binding to keep in step with the page types. These cover what resolves and what does not.
 """
 
 import pytest
@@ -25,8 +24,3 @@ def test_unknown_machine_name_raises(production_mode):
         getattr(statecharts, "NoSuchMachine")
 
 
-def test_element_machines_are_bound_directly():
-    """The element machines are real module attributes rather than resolved on access, so normal
-    lookup finds them before `__getattr__` is consulted."""
-    for name in ("StepMachine", "CaseMachine", "QuestionMachine", "DispatchMachine"):
-        assert name in vars(statecharts)
