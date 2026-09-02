@@ -86,7 +86,7 @@ class FSMSpec:
 
     `status_guidance` is the per-status stage instruction: what a page in that status is for and
     what the work in it consists of. It is a tuple of `(status, text)` pairs, not a mapping, so the
-    spec stays hashable: `ElementFSMSpec` keys the `@lru_cache` in `fsm._machine_class`, and a spec
+    spec stays hashable: `ElementFSMSpec` keys the `@lru_cache` in `fsm._cached_machine`, and a spec
     no page type owns is still built through that cache. Leaving a status undeclared is the normal
     case.
 

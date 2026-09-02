@@ -53,7 +53,7 @@ def test_is_valid_status():
 
 
 def test_status_guidance_keeps_fsmspec_hashable_for_the_machine_cache():
-    # A dict field here would raise "unhashable type" at the _machine_class cache.
+    # A dict field here would raise "unhashable type" at the _cached_machine cache.
     made = [FSMSpec(name="Guided", initial="draft", states=("draft", "open"),
                     transitions=(("open", "draft", "open", "agent"),),
                     status_guidance=(("open", "do the open work"),))
@@ -103,16 +103,16 @@ def test_every_production_page_type_holds_its_machine(production_mode):
 def test_page_status_machines_do_not_enter_the_machine_cache(production_mode):
     """A page type carries its own machine, so evaluating every production status leaves the cache
     exactly as it was - while an element FSM, which no page type owns, still lands in it."""
-    before = fsm._machine_class.cache_info().currsize
+    before = fsm._cached_machine.cache_info().currsize
     for page_type in registered_pagetypes().values():
         for status in page_type.fsm.states:
             fsm.allowed_events(page_type.fsm, status)
-    assert fsm._machine_class.cache_info().currsize == before
+    assert fsm._cached_machine.cache_info().currsize == before
 
     element = ElementFSMSpec(name="XElement", initial="todo", states=("todo", "done"),
                              transitions=(("markDone", "todo", "done", "agent"),))
     fsm.allowed_events(element, "todo")
-    assert fsm._machine_class.cache_info().currsize == before + 1
+    assert fsm._cached_machine.cache_info().currsize == before + 1
 
 
 def test_production_status_evaluation_matches_the_declared_transition_table(production_mode):

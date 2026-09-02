@@ -71,13 +71,13 @@ logger = logging.getLogger("uvicorn.error")
 def _clear_machine_cache():
     """Drop the state machines a reload has orphaned.
 
-    ``fsm._machine_class`` memoizes per spec and evicts nothing, so an edit that changes an FSM
+    ``fsm._cached_machine`` memoizes per spec and evicts nothing, so an edit that changes an FSM
     would otherwise leave the class built from the previous declaration alive for the life of the
     process. It runs from here rather than from ``src.fsm``, which stays free of dev-only
     dependencies, and after the reload rather than before it, so the module is reached through the
     reloader's finder like every other module in the reload set.
     """
-    import_module("src.fsm")._machine_class.cache_clear()
+    import_module("src.fsm")._cached_machine.cache_clear()
 
 
 # --- MCP session capture ---------------------------------------------------------------

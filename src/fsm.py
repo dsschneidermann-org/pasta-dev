@@ -76,8 +76,8 @@ def try_build_machine(
 
 
 @lru_cache(maxsize=None)
-def _machine_class(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
-    """Build (once) a StateMachine subclass from an FSM spec. Cached per spec."""
+def _cached_machine(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
+    """Build (once) a StateMachine subclass from an FSM spec, keyed on the spec itself."""
     return build_machine(fsm)
 
 
@@ -89,7 +89,7 @@ def _machine_for(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
     does a page spec written outside a page type, so both still go through the cache.
     """
     owned = fsm.machine if isinstance(fsm, FSMSpec) else None
-    return owned if owned is not None else _machine_class(fsm)
+    return owned if owned is not None else _cached_machine(fsm)
 
 
 def _current_value(machine: StateMachine) -> str:

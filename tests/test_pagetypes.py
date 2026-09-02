@@ -623,7 +623,7 @@ def test_field_spec_rejects_a_bad_block_vocabulary():
 
 # --- Block-bearing element fields --------------------------------------------
 def test_element_blocks_spec_is_hashable():
-    # FieldSpec is reachable from the FSMSpec that keys fsm._machine_class's lru_cache, so a
+    # FieldSpec is reachable from the FSMSpec that keys fsm._cached_machine's lru_cache, so a
     # declaration that cannot be hashed would break every page type at once.
     assert {ElementBlocksSpec("detail", (_code_block(),))} == {ElementBlocksSpec("detail", (_code_block(),))}
     field = FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
