@@ -16,10 +16,6 @@ below.
 
 import pytest
 
-# Imported before the flip on purpose: this module binds the element machines at import, reading
-# REGISTRY, which entering test mode empties. They are built here while the production types are
-# still in place. Its page machines resolve per call and need no such head start.
-import src.statecharts  # noqa: F401
 from src.pagetypes._registry import set_test_mode
 
 set_test_mode(True)

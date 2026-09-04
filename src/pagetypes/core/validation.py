@@ -7,7 +7,7 @@ from typing import Any
 
 from ...errors import ValidationError
 
-from .pagetype import PageType, get_pagetype_field
+from .pagetype import PageType, element_fsm_sites, get_pagetype_field
 from .args import BlockKindSpec, ElementBlocksSpec
 from .commands import CommandSpec, is_field_setter
 from .fields import FieldSpec, get_element_blocks
@@ -17,6 +17,7 @@ from .specs import (
     LIST,
     SET_PROSE,
     SET_SCALAR,
+    ElementFSMSpec,
     FSMSpec,
     BLOCK_ARRAY,
     INLINE_RUNS,
@@ -380,26 +381,33 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
 
 
 def validate_page_machine(page_type: PageType) -> list[str]:
-    """The type's status machine actually built.
+    """Every status and element machine this type declares actually built.
 
     python-statemachine checks connectivity, unreachable states and trap states when it creates the
-    class, so the build the page type already performed is the check and nothing is re-derived
-    here. Its message is rewritten into the author's own status names, since the library reports a
-    state by the attribute the class carries it under.
+    class, so the builds the page type already performed are the check and nothing is re-derived
+    here. Each message is rewritten into the names the spec declares, since the library reports a
+    state by the attribute the class carries it under. An element spec no page type declares is
+    unreachable and never built, so there is no ownerless failure to report.
     """
-    error = page_type.fsm.machine_error
-    if error is None:
-        return []
-    return [f"the status machine could not be built: {_in_status_names(page_type.fsm, str(error))}"]
+    errors: list[str] = []
+    if page_type.fsm.machine_error is not None:
+        errors.append("the status machine could not be built: "
+                      + _in_declared_names(page_type.fsm, str(page_type.fsm.machine_error)))
+    for section, field_key, element_fsm in element_fsm_sites(page_type):
+        if element_fsm.machine_error is not None:
+            errors.append(
+                f"element spec {element_fsm.name!r} on {section}.{field_key} could not be built: "
+                + _in_declared_names(element_fsm, str(element_fsm.machine_error)))
+    return errors
 
 
-def _in_status_names(fsm: FSMSpec, message: str) -> str:
-    """`message` with each state attribute name replaced by the status as the author declared it.
+def _in_declared_names(spec: FSMSpec | ElementFSMSpec, message: str) -> str:
+    """`message` with each state attribute name replaced by the state as the author declared it.
 
-    Longest status first, so one status whose name starts another cannot be substituted inside it.
+    Longest state first, so one state whose name starts another cannot be substituted inside it.
     """
-    for status in sorted(fsm.states, key=len, reverse=True):
-        message = message.replace(f"state_{status}", status)
+    for state in sorted(spec.states, key=len, reverse=True):
+        message = message.replace(f"state_{state}", state)
     return message
 
 

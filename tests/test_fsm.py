@@ -8,8 +8,8 @@ from statemachine import registry as sm_registry
 from src import fsm
 from src.errors import IllegalCommandError
 from src.pagetypes.core.commands import CommandSpec, transition_cmd
-from src.pagetypes.core.fields import SectionSpec, _prose
-from src.pagetypes.core.pagetype import PageType
+from src.pagetypes.core.fields import SectionSpec, _list, _prose
+from src.pagetypes.core.pagetype import PageType, element_fsm_sites
 from src.pagetypes.core.specs import ElementFSMSpec, FSMSpec
 from src.pagetypes._registry import get_page_type, registered_pagetypes
 
@@ -52,13 +52,24 @@ def test_is_valid_status():
     assert not fsm.is_valid_status(CHILD, "nonexistent")
 
 
-def test_status_guidance_keeps_fsmspec_hashable_for_the_machine_cache():
-    # A dict field here would raise "unhashable type" at the _cached_machine cache.
-    made = [FSMSpec(name="Guided", initial="draft", states=("draft", "open"),
-                    transitions=(("open", "draft", "open", "agent"),),
-                    status_guidance=(("open", "do the open work"),))
+def test_machine_class_raises_for_a_spec_no_page_type_declares():
+    # Nothing builds a machine on demand any more, so an unowned spec is a programming error
+    # rather than a silent per-call rebuild.
+    orphaned = FSMSpec(name="Unowned", initial="draft", states=("draft", "open"),
+                       transitions=(("open", "draft", "open", "agent"),))
+    with pytest.raises(LookupError, match="Unowned"):
+        fsm.machine_class(orphaned)
+
+
+def test_element_fsm_spec_starts_unbuilt_and_keeps_its_identity():
+    made = [ElementFSMSpec(name="XItem", initial="todo", states=("todo", "done"),
+                           transitions=(("markDone", "todo", "done", "agent"),))
             for _ in range(2)]
-    assert fsm.machine_class(made[0]) is fsm.machine_class(made[1])
+    assert made[0].machine is None and made[0].machine_error is None
+    # The two fields are declared compare=False, so a built spec and an unbuilt one with the
+    # same declaration must not diverge.
+    assert made[0] == made[1]
+    assert len({made[0], made[1]}) == 1
 
 
 # --- Page types own their status machine -------------------------------------
@@ -90,27 +101,55 @@ def test_a_machine_that_cannot_be_built_is_kept_as_an_error_rather_than_raised()
     assert "orphan" in str(built.fsm.machine_error)
 
 
+def _ad_hoc_list_type(tag: str, name: str, element_fsm: ElementFSMSpec) -> PageType:
+    """An ad-hoc page type whose one list field carries `element_fsm`."""
+    return PageType(
+        tag=tag, name=name, description="ad-hoc",
+        sections=(SectionSpec("items", "Items", (
+            _list("items", element_fields=("text", "status"), element_fsm=element_fsm,
+                  description="items"),)),),
+        commands=(),
+        fsm=FSMSpec(name=name, initial="active", states=("active",)))
+
+
+def test_every_production_element_machine_is_built(production_mode):
+    """Nothing here builds a machine, so finding one on every element spec is evidence they are
+    built with the declaration that carries them."""
+    for tag, page_type in registered_pagetypes().items():
+        for section, field_key, element_fsm in element_fsm_sites(page_type):
+            assert element_fsm.machine is not None, (tag, section, field_key)
+            assert element_fsm.machine_error is None, (tag, section, field_key)
+
+
+def test_an_element_spec_declared_twice_is_built_once():
+    # One spec object on two page types: it carries one machine, so the second declaration must
+    # leave the first's class alone rather than replace it.
+    shared = ElementFSMSpec(name="XShared", initial="todo", states=("todo", "done"),
+                            transitions=(("markDone", "todo", "done", "agent"),))
+    _ad_hoc_list_type("xtest-shared-a", "XSharedA", shared)
+    first = shared.machine
+    assert first is not None
+    _ad_hoc_list_type("xtest-shared-b", "XSharedB", shared)
+    assert shared.machine is first
+
+
+def test_an_element_machine_that_cannot_be_built_is_kept_as_an_error():
+    # `orphan` is unreachable from `todo`, which python-statemachine rejects. Constructing the
+    # page type must not raise; the error is held for the validator.
+    orphan = ElementFSMSpec(name="XOrphanItem", initial="todo",
+                            states=("todo", "done", "orphan"),
+                            transitions=(("markDone", "todo", "done", "agent"),))
+    _ad_hoc_list_type("xtest-orphan-item", "XOrphanItem", orphan)
+    assert orphan.machine is None
+    assert "orphan" in str(orphan.machine_error)
+
+
 def test_every_production_page_type_holds_its_machine(production_mode):
     """Nothing in this test builds a machine, so finding one on every type is evidence they were
     built with the declarations rather than on first use."""
     for tag, page_type in registered_pagetypes().items():
         assert page_type.fsm.machine is not None, tag
         assert page_type.fsm.machine_error is None, tag
-
-
-def test_page_status_machines_do_not_enter_the_machine_cache(production_mode):
-    """A page type carries its own machine, so evaluating every production status leaves the cache
-    exactly as it was - while an element FSM, which no page type owns, still lands in it."""
-    before = fsm._cached_machine.cache_info().currsize
-    for page_type in registered_pagetypes().values():
-        for status in page_type.fsm.states:
-            fsm.allowed_events(page_type.fsm, status)
-    assert fsm._cached_machine.cache_info().currsize == before
-
-    element = ElementFSMSpec(name="XElement", initial="todo", states=("todo", "done"),
-                             transitions=(("markDone", "todo", "done", "agent"),))
-    fsm.allowed_events(element, "todo")
-    assert fsm._cached_machine.cache_info().currsize == before + 1
 
 
 def test_production_status_evaluation_matches_the_declared_transition_table(production_mode):

@@ -85,9 +85,8 @@ class FSMSpec:
     the terminal status in `legal_in`.
 
     `status_guidance` is the per-status stage instruction: what a page in that status is for and
-    what the work in it consists of. It is a tuple of `(status, text)` pairs, not a mapping, so the
-    spec stays hashable: `ElementFSMSpec` keys the `@lru_cache` in `fsm._cached_machine`, and a spec
-    no page type owns is still built through that cache. Leaving a status undeclared is the normal
+    what the work in it consists of. It is a tuple of `(status, text)` pairs, not a mapping, which
+    keeps the spec hashable and comparable by value. Leaving a status undeclared is the normal
     case.
 
     `machine` and `machine_error` are filled in by the owning page type, which builds the machine
@@ -133,6 +132,10 @@ class ElementFSMSpec:
     For an element rendered as a task checkbox, `checkmark_done` names the state shown as a checked box
     `[x]`; the FSM's `initial` state is then the unchecked box `[ ]`, and every other state - and every
     element FSM that leaves this None - renders with no box.
+
+    `machine` and `machine_error` are filled in by a page type that declares this spec on one of its
+    list fields (see `PageType.__post_init__`). Being set after construction, they take no part in
+    the spec's identity, so one spec declared by several page types stays a single value.
     """
     name: str
     initial: str
@@ -140,6 +143,9 @@ class ElementFSMSpec:
     # (event, source, dest, agency)
     transitions: tuple[tuple[str, str, str, str], ...]
     checkmark_done: str | None = None
+    # the built StateMachine subclass, or the definition error that stopped it (never both)
+    machine: Any = field(default=None, init=False, compare=False, repr=False)
+    machine_error: Exception | None = field(default=None, init=False, compare=False, repr=False)
 
 
 @dataclass(frozen=True)

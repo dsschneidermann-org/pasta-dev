@@ -1,9 +1,9 @@
 """Pure FSM evaluation via python-statemachine.
 
-For each `FSMSpec` we build one `StateMachine` subclass - held by the page type that
-declares it, memoized here otherwise - then evaluate a transition on an *ephemeral*
-instance seeded at the page's current status. The machine is the single source of truth
-for legality and for the resulting state.
+For each `FSMSpec` we build one `StateMachine` subclass, held by the page type that
+declares it - its own status FSM and every element FSM on its list fields - then evaluate a
+transition on an *ephemeral* instance seeded at the current status. The machine is the single
+source of truth for legality and for the resulting state.
 
 Design notes (verified against python-statemachine 3.2.0):
 
@@ -17,7 +17,6 @@ Design notes (verified against python-statemachine 3.2.0):
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from statemachine import Event, State, StateMachine
@@ -75,27 +74,25 @@ def try_build_machine(
         return None, exc
 
 
-@lru_cache(maxsize=None)
-def _cached_machine(fsm: FSMSpec | ElementFSMSpec) -> type[StateMachine]:
-    """Build (once) a StateMachine subclass from an FSM spec, keyed on the spec itself."""
-    return build_machine(fsm)
-
-
 def _current_value(machine: StateMachine) -> str:
     """The single active state's value (these FSMs are flat, so there is exactly one)."""
     return next(iter(machine.configuration_values))
 
 
 def machine_class(fsm: FSMSpec | ElementFSMSpec) -> Any:
-    """The StateMachine subclass for an FSM spec: the one its owner built, else a cached build.
+    """The StateMachine subclass built for this spec when its page type was declared.
 
-    A page type builds its machine as it is declared and keeps it, so that machine is collected
-    with the declaration rather than held in the cache. Anything else - an element spec, or a
-    page spec no page type owns - goes through the cache. Either way the same class comes back
-    every time, which is what ``src.statecharts`` binds for docs/introspection.
+    Every spec a page type declares - its own status FSM, and every element FSM on its list
+    fields - carries its machine from construction, so this never builds. A spec no page type
+    declares is unreachable in normal operation and is a programming error here rather than
+    something to build on demand: rebuilding would hand out a fresh class per call.
     """
-    owned = fsm.machine if isinstance(fsm, FSMSpec) else None
-    return owned if owned is not None else _cached_machine(fsm)
+    if fsm.machine is None:
+        raise LookupError(
+            f"No machine was built for FSM spec {fsm.name!r}. A spec is built by the page type "
+            f"that declares it; this one is declared by none, or its build failed and "
+            f"validate_page_types would have reported it.")
+    return fsm.machine
 
 
 def allowed_events(fsm: FSMSpec | ElementFSMSpec, current_status: str) -> set[str]:
