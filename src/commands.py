@@ -8,6 +8,7 @@ the in-memory "copy-edit" half of the storage pattern in `store.py`.
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any
@@ -23,6 +24,7 @@ from .pagetypes.core.specs import (
     BLOCK_ARRAY,
     COMPOUND,
     ELEMENT_TRANSITION,
+    FSMSpec,
     REMOVE_BLOCK,
     REMOVE_ELEMENT,
     REORDER_BLOCK,
@@ -188,16 +190,66 @@ def _field_setter_edge(page: Page, page_type: PageType, section: str, field: str
     }
 
 
+def _distance_from_initial(fsm_spec: FSMSpec) -> dict[str, int]:
+    """Edge count from the FSM's initial status to each status it can reach (breadth-first).
+
+    A status absent from the result is unreachable, which is how the stage-entry fallback tells
+    'not arrived at yet' from 'never arrives at'.
+    """
+    outgoing: dict[str, set[str]] = {}
+    for _event, source, dest, _agency in fsm_spec.transitions:
+        outgoing.setdefault(source, set()).add(dest)
+    distance = {fsm_spec.initial: 0}
+    queue = deque([fsm_spec.initial])
+    while queue:
+        current = queue.popleft()
+        for following in outgoing.get(current, ()):
+            if following not in distance:
+                distance[following] = distance[current] + 1
+                queue.append(following)
+    return distance
+
+
+def stage_entry_statuses(fsm_spec: FSMSpec, legal_in: Collection[str]) -> set[str]:
+    """The statuses in `legal_in` where the work that scope covers first becomes available.
+
+    A scoped status qualifies when no other scoped status transitions into it - arriving from
+    outside the scope still counts as arriving first, which is what makes a single-status scope
+    always qualify. A page FSM is not strictly ordered, so a scope whose statuses enter each
+    other leaves that empty and would open nowhere; there the fallback takes the scoped statuses
+    nearest the initial status - the entry the page reaches soonest - and keeps every one at that
+    distance rather than breaking a tie arbitrarily. Unreachable statuses are not candidates, so
+    a scope no path reaches stays silent.
+    """
+    scoped = set(legal_in)
+    incoming: dict[str, set[str]] = {}
+    for _event, source, dest, _agency in fsm_spec.transitions:
+        incoming.setdefault(dest, set()).add(source)
+    unentered = {status for status in scoped if not (incoming.get(status, set()) & scoped)}
+    if unentered:
+        return unentered
+    distance = _distance_from_initial(fsm_spec)
+    reachable = {status for status in scoped if status in distance}
+    if not reachable:
+        return set()
+    nearest = min(distance[status] for status in reachable)
+    return {status for status in reachable if distance[status] == nearest}
+
+
 def field_setter_edges(page: Page, page_type: PageType,
                        blocked_events: Collection[str] = ()) -> list[dict[str, Any]]:
-    """The stage-relevant field-setter `do` edges for `page` in its current status (pure).
+    """The field-setter `do` edges for `page` in its current status (pure).
 
-    A field's setter belongs in `do` only when authoring that field is what advances the current
-    stage: its (section, field) is a required precondition (`requires`) of a transition TOPOLOGICALLY
-    legal from the current status, AND the setter is legal right now. Derived generically from the
-    FSM - no per-page-type knowledge - so a status-scoped setter surfaces only where its field is a
-    stage requirement, and the `legal_in=None` 'always legal' setters no longer add noise in statuses
-    where their field is not the goal (e.g. setSummary while building).
+    A legal setter is surfaced for either of two reasons, and the two sets are unioned and
+    deduplicated by (section, field). It is stage-required when its (section, field) is a required
+    precondition (`requires`) of a transition TOPOLOGICALLY legal from the current status - authoring
+    it is what advances the stage. It is stage-entry when the page sits in one of the statuses where
+    its own `legal_in` scope opens (see `stage_entry_statuses`) - work that becomes available on
+    arriving here though no transition demands it. A stage-entry edge is unconditional while the page
+    is in that status, so it does not blink out once its field holds content. Both are derived
+    generically from the FSM and `legal_in` - no per-page-type knowledge - and a `legal_in=None`
+    setter has no scope to enter, so it is surfaced only when stage-required and adds no noise where
+    its field is not the goal (e.g. setSummary while building).
 
     `blocked_events` names events the CALLER has determined cannot fire for a reason that no
     authoring on this page can clear - it is dropped from the topology before requirements are
@@ -206,24 +258,26 @@ def field_setter_edges(page: Page, page_type: PageType,
     child whose feature-brief is still `grounding` therefore stays silent instead of emitting
     addStep/addCase while the base is still being established. A CHILD-state guard is deliberately
     NOT passed - 'my children are unfinished' does not make my own authoring premature (a brief in
-    `planning` must still surface askQuestion while its plan children are unready).
+    `planning` must still surface askQuestion while its plan children are unready). A stage-entry
+    edge hangs on no transition, so the same reasoning is applied to it directly: a stage whose every
+    legal event is blocked offers nothing at all.
 
     Every entry has one shape: `kind='field'` with the (section, field), the instruction, and the
-    single `command` that authors it (see `_field_setter_edge`). A field is one edge naming one
-    command, because a field's whole authoring content is reachable in a single command - a blocks
-    field takes its blocks as an array, and a list field's add carries the blocks its element is
-    created holding. remove, reorder and the element-scoped block adds are never surfaced here;
-    describeMutations reports them.
+    single `command` that authors it (see `_field_setter_edge`) - a stage-entry edge is not marked
+    out from a stage-required one. A field is one edge naming one command, because a field's whole
+    authoring content is reachable in a single command - a blocks field takes its blocks as an array,
+    and a list field's add carries the blocks its element is created holding. remove, reorder and the
+    element-scoped block adds are never surfaced here; describeMutations reports them.
     """
-    allowed = fsm.allowed_events(page_type.fsm, page.status) - set(blocked_events)
+    allowed = fsm.allowed_events(page_type.fsm, page.status)
+    stage_events = allowed - set(blocked_events)
     required = {
         section_field
         for command in page_type.commands
-        if _is_status_transition(command) and command.event in allowed
+        if _is_status_transition(command) and command.event in stage_events
         for section_field in command.requires
     }
-    if not required:
-        return []
+    entry_open = not allowed or bool(stage_events)
     legal = legal_commands(page, page_type)
     # PageType's post-init rejects a type declaring two setters for one field, so the first
     # legal one found is the only one there is.
@@ -232,11 +286,12 @@ def field_setter_edges(page: Page, page_type: PageType,
         section, field = command.section, command.field
         if section is None or field is None:      # transitions / addLink / setTitle target no field
             continue
-        target = (section, field)
-        if target not in required or not legal.get(command.name):
+        if not legal.get(command.name) or not is_field_setter(command):
             continue
-        if is_field_setter(command):
-            setters.setdefault(target, command.name)
+        stage_entry = (entry_open and command.legal_in is not None
+                       and page.status in stage_entry_statuses(page_type.fsm, command.legal_in))
+        if (section, field) in required or stage_entry:
+            setters.setdefault((section, field), command.name)
     return [_field_setter_edge(page, page_type, section, field, command_name)
             for (section, field), command_name in setters.items()]
 

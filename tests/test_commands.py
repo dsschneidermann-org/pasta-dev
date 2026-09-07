@@ -10,13 +10,15 @@ from src.commands import (
     is_field_setter,
     legal_commands,
     resolve_anchored_slot,
+    stage_entry_statuses,
 )
 from src.errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from src.model import Page
 from src.pagetypes.core.specs import FSMSpec
 from src.pagetypes.core.args import ElementBlocksSpec, _table_block, _text, standard_blocks
-from src.pagetypes.core.commands import add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
-from src.pagetypes.core.fields import SectionSpec, _blocks, _list, _prose
+from src.pagetypes.core.commands import (add_link_cmd, set_title_cmd, blocks_cmds, list_cmds,
+                                         set_prose_cmd, set_scalar_cmd, transition_cmd)
+from src.pagetypes.core.fields import SectionSpec, _blocks, _list, _prose, _scalar
 from src.pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
 from src.pagetypes._registry import get_page_type
 
@@ -754,6 +756,127 @@ def test_field_setter_edges_drop_blocked_events():
     assert field_setter_edges(child, CHILD, {"markReady"}) == []
     # An unrelated blocked event leaves the topology (and so the edges) untouched.
     assert "addStep" in {e["command"] for e in field_setter_edges(child, CHILD, {"reopen"})}
+
+
+# --- stage-ENTRY field-setter `do` edges -------------------------------------
+# A second ad-hoc type, whose `url` is scoped to a cyclic pair (open <-> review, as building <->
+# review is on a brief) and whose `submit`/`bounce` transitions require nothing - so `open` has no
+# stage-required content and any edge there can only be a stage-entry one.
+def _stage_entry_page_type() -> PageType:
+    return PageType(
+        tag="xtest-stage-entry", name="Stage entry fixture",
+        description="ad-hoc stage-entry-edge fixture",
+        sections=(
+            SectionSpec("summary", "Summary", (_prose("body", description="the summary instruction"),)),
+            SectionSpec("release", "Release", (_scalar("url", description="the release url"),)),
+        ),
+        commands=(
+            set_prose_cmd("summary"),
+            set_scalar_cmd("release", field="url", legal_in=("open", "review")),
+            transition_cmd("begin", "draft -> open", requires=(("summary", "body"),)),
+            transition_cmd("submit", "open -> review"),
+            transition_cmd("bounce", "review -> open"),
+            add_link_cmd(), set_title_cmd(),
+        ),
+        fsm=FSMSpec(name="XStageEntry", initial="draft", states=("draft", "open", "review")),
+    )
+
+
+def _stage_entry_page(page_type: PageType, status: str) -> Page:
+    return Page(id="xtest-stage-entry:1", type="xtest-stage-entry", title="X", status=status,
+                sections=initial_sections(page_type))
+
+
+def test_field_setter_edges_surface_a_stage_entry_setter_no_transition_requires():
+    """A setter scoped by legal_in enters `do` where its scope opens, even though no transition
+    legal there requires its field - and even though the status has no stage-required content at
+    all, which used to make the function return early."""
+    entry = _stage_entry_page_type()
+    edges = {e["command"]: e for e in field_setter_edges(_stage_entry_page(entry, "open"), entry)}
+    assert "setUrl" in edges
+    url = edges["setUrl"]
+    assert url["kind"] == "field" and url["section"] == "release" and url["field"] == "url"
+    # Identical in shape to a stage-required edge - the instruction is inline and no key marks it out.
+    assert url["instruction"] == "the release url"
+    assert set(url) == {"pageId", "pageType", "kind", "section", "field", "instruction",
+                        "command", "statusRevisionToken"}
+
+
+def test_field_setter_edges_stage_entry_is_the_nearest_status_of_a_cyclic_scope():
+    """open <-> review is a cycle, so the scope opens at whichever the page reaches first. The
+    edge shows in `open` and not in `review`, so the nudge fires once rather than in every status
+    the setter stays legal in."""
+    entry = _stage_entry_page_type()
+    assert "setUrl" in {e["command"] for e in field_setter_edges(_stage_entry_page(entry, "open"), entry)}
+    assert "setUrl" not in {e["command"] for e in field_setter_edges(_stage_entry_page(entry, "review"), entry)}
+    # And not in a status its legal_in does not name at all.
+    assert "setUrl" not in {e["command"] for e in field_setter_edges(_stage_entry_page(entry, "draft"), entry)}
+
+
+def test_field_setter_edges_stage_entry_respects_the_parent_gate():
+    """A wholly parent-gated stage offers nothing at all, stage-entry edges included. test-child's
+    draft-scoped adds (addCheck, addNote, addDecisions) are stage-entry edges no transition
+    requires, so without the gate a pinned child would advertise its whole authoring surface the
+    moment it is created - the exact leak the parent guard exists to prevent."""
+    child = new_child(make_counter())                      # test-child in `draft`
+    open_commands = {e["command"] for e in field_setter_edges(child, CHILD)}
+    assert {"addCheck", "addNote", "addDecisions"} <= open_commands
+    assert field_setter_edges(child, CHILD, {"markReady"}) == []
+
+
+# --- stage-entry statuses (stage_entry_statuses) -----------------------------
+# Ad-hoc FSMs built straight from FSMSpec: the helper reads only `initial` and the
+# transition table, so a page type would add nothing but noise here.
+_LINE = FSMSpec(name="XLine", initial="draft", states=("draft", "open", "review", "done"),
+                transitions=(("begin", "draft", "open", "agent"),
+                             ("submit", "open", "review", "agent"),
+                             ("bounce", "review", "open", "agent"),
+                             ("finish", "review", "done", "agent")))
+
+
+def test_stage_entry_statuses_single_status_scope_always_qualifies():
+    """The trivial case: a scope of one status has no other scoped status to be entered from,
+    so it qualifies however many transitions arrive from outside it."""
+    assert stage_entry_statuses(_LINE, ("review",)) == {"review"}
+
+
+def test_stage_entry_statuses_ignore_edges_from_outside_the_scope():
+    """Only edges between scoped statuses disqualify. `review` is entered from `open`, but with
+    `open` outside the scope `review` is still where the scope opens; `done` is entered from
+    `review`, which is inside it, so it is not."""
+    assert stage_entry_statuses(_LINE, ("review", "done")) == {"review"}
+
+
+def test_stage_entry_statuses_fall_back_to_nearest_initial_when_the_scope_is_cyclic():
+    """`open` and `review` enter each other, so no scoped status is unentered. The fallback picks
+    the one the page reaches soonest from the FSM's initial status: draft->open is one edge,
+    draft->open->review is two."""
+    assert stage_entry_statuses(_LINE, ("open", "review")) == {"open"}
+
+
+def test_stage_entry_statuses_fallback_keeps_every_status_at_the_shortest_distance():
+    """A tie is not broken arbitrarily - both branches are entry points."""
+    fork = FSMSpec(name="XFork", initial="draft", states=("draft", "a", "b"),
+                   transitions=(("toA", "draft", "a", "agent"), ("toB", "draft", "b", "agent"),
+                                ("aToB", "a", "b", "agent"), ("bToA", "b", "a", "agent")))
+    assert stage_entry_statuses(fork, ("a", "b")) == {"a", "b"}
+
+
+def test_stage_entry_statuses_empty_scope_and_unreachable_scope_yield_nothing():
+    """Total over any input: an empty scope has nothing to offer, and a cyclic scope no path from
+    the initial status reaches has no entry point rather than an arbitrary one."""
+    assert stage_entry_statuses(_LINE, ()) == set()
+    island = FSMSpec(name="XIsland", initial="draft", states=("draft", "x", "y"),
+                     transitions=(("xToY", "x", "y", "agent"), ("yToX", "y", "x", "agent")))
+    assert stage_entry_statuses(island, ("x", "y")) == set()
+
+
+def test_stage_entry_statuses_tolerate_a_status_the_fsm_does_not_declare():
+    """A scope naming an unknown status neither raises nor disturbs the real entry statuses. The
+    result is matched against a page's actual status, which such a name can never equal, so it is
+    carried rather than filtered."""
+    assert "review" in stage_entry_statuses(_LINE, ("nope", "review"))
+    assert stage_entry_statuses(_LINE, ("nope", "review", "done")) == {"nope", "review"}
 
 
 # --- block-bearing element fields --------------------------------------------
