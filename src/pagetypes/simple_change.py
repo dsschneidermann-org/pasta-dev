@@ -80,7 +80,7 @@ _SIMPLE_CHANGE = PageType(
         )),
     ),
     workspace_guidance=(
-        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("done",), MERGE_PROCESS_DESC),
         WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
         WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("open",), GROUNDING_TOOL_DESC),
     ),
@@ -96,7 +96,8 @@ _SIMPLE_CHANGE = PageType(
         transition_cmd("submitForReview", "open -> review"),
         # review -> done marks the change built and reviewed, but not yet shippable or merged to main.
         transition_cmd("markDone", "review -> done"),
-        transition_cmd("requestChanges", "review -> open", agency="either"),
+        transition_cmd("requestChanges", "review or done -> open",
+                       legal_in=("review", "done"), agency="either"),
         # close is a human gate: a person confirms the change is shippable/merged before it lands.
         transition_on_add_cmd("close", "done -> closed", section="resolution", field="changeCommits",
                      description="record a change commit AND close the change", agency="human",

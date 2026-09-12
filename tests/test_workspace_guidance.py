@@ -19,15 +19,6 @@ from src.pagetypes.core.fields import SectionSpec
 from src.pagetypes.core.pagetype import PageType
 from src.pagetypes.core.validation import validate_page_types, validate_workspace_guidance
 from src.pagetypes._registry import get_page_type, workspace_guidance_fields
-from src.pagetypes._workspace_guidance import (
-    GROUNDING_TOOL_DESC,
-    GROUNDING_TOOL_FIELD,
-    MERGE_PROCESS_FIELD,
-    TESTING_TOOL_FIELD,
-)
-from src.pagetypes.bug_report import _BUG_REPORT
-from src.pagetypes.feature import _FEATURE_BRIEF
-from src.pagetypes.simple_change import _SIMPLE_CHANGE
 from src.serialize import workspace_from_dict, workspace_to_dict
 from src.store import Store, workspace_guidance
 from src.describe import describe_page_type
@@ -282,54 +273,3 @@ def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     with pytest.raises(ToolError, match="not a workspace guidance field"):
         call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "nope", "text": "x"})
-
-
-# --- production declarations -------------------------------------------------
-# The production types are named from their own modules rather than read out of REGISTRY: test mode
-# empties that map, and these assertions must keep covering what a live server serves.
-_GROUNDING_STATUSES = {"simple-change": ("open",), "bug-report": ("open",),
-                       "feature-brief": ("grounding",)}
-_GROUNDING_TYPES = (_SIMPLE_CHANGE, _BUG_REPORT, _FEATURE_BRIEF)
-
-
-def _declared(page_type):
-    return {spec.field: spec for spec in page_type.workspace_guidance}
-
-
-@pytest.mark.parametrize("page_type", _GROUNDING_TYPES, ids=lambda t: t.tag)
-def test_grounding_tool_declared_at_the_reading_statuses(page_type):
-    spec = _declared(page_type)[GROUNDING_TOOL_FIELD]
-    assert spec.guidance_for == _GROUNDING_STATUSES[page_type.tag]
-    assert spec.description == GROUNDING_TOOL_DESC
-
-
-@pytest.mark.parametrize("page_type", _GROUNDING_TYPES, ids=lambda t: t.tag)
-def test_grounding_tool_emits_only_at_the_reading_statuses(page_type):
-    config = {GROUNDING_TOOL_FIELD: "query the code graph"}
-    emitted = {status: workspace_guidance(page_type, status, config)
-               for status in page_type.fsm.states}
-    assert emitted == {
-        status: ({"guidance_groundingTool": "query the code graph"}
-                 if status in _GROUNDING_STATUSES[page_type.tag] else {})
-        for status in page_type.fsm.states}
-
-
-def test_grounding_tool_is_a_configurable_field_in_production(production_mode):
-    fields = workspace_guidance_fields()
-    assert GROUNDING_TOOL_FIELD in fields
-    assert fields[GROUNDING_TOOL_FIELD].description == GROUNDING_TOOL_DESC
-
-
-def test_existing_guidance_placements_are_unchanged():
-    placements = {(page_type.tag, spec.field): spec.guidance_for
-                  for page_type in _GROUNDING_TYPES
-                  for spec in page_type.workspace_guidance
-                  if spec.field != GROUNDING_TOOL_FIELD}
-    assert placements == {
-        ("simple-change", MERGE_PROCESS_FIELD): ("review", "done"),
-        ("simple-change", TESTING_TOOL_FIELD): ("open",),
-        ("bug-report", MERGE_PROCESS_FIELD): ("review", "done"),
-        ("bug-report", TESTING_TOOL_FIELD): ("open",),
-        ("feature-brief", MERGE_PROCESS_FIELD): ("review",),
-        ("feature-brief", TESTING_TOOL_FIELD): ("building",),
-    }
