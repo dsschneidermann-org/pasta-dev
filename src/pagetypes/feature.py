@@ -34,7 +34,7 @@ from .core.specs import (
     RefCheck,
     WorkspaceGuidanceSpec,
 )
-from .core.args import ElementBlocksSpec, _boolean, _code_block, _paragraph_runs, _text, _heading_text, _paragraph_text, BlockKindSpec
+from .core.args import _boolean, _code_block, _paragraph_runs, _text, _heading_text, _paragraph_text, BlockKindSpec
 from .core.commands import (
     add_link_cmd,
     set_title_cmd,
@@ -47,7 +47,7 @@ from .core.commands import (
     set_scalar_cmd,
     transition_cmd,
 )
-from .core.fields import SectionSpec, _blocks, _list, _prose, _scalar
+from .core.fields import ElementBlocksSpec, SectionSpec, _blocks, _list, _prose, _scalar
 from .core.pagetype import PageType
 
 _STEP_FSM = ElementFSMSpec(
