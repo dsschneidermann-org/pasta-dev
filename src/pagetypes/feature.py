@@ -17,10 +17,13 @@ from ._stage_guidance import (
 from ._workspace_guidance import (
     GROUNDING_TOOL_DESC,
     GROUNDING_TOOL_FIELD,
+    GROUNDING_TOOL_LABEL,
     MERGE_PROCESS_DESC,
     MERGE_PROCESS_FIELD,
+    MERGE_PROCESS_LABEL,
     TESTING_TOOL_DESC,
     TESTING_TOOL_FIELD,
+    TESTING_TOOL_LABEL,
 )
 from .core.specs import (
     AutoChildSpec,
@@ -187,9 +190,9 @@ _FEATURE_BRIEF = PageType(
         )),
     ),
     workspace_guidance=(
-        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
-        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),
-        WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("grounding",), GROUNDING_TOOL_DESC),
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC, MERGE_PROCESS_LABEL),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC, TESTING_TOOL_LABEL),
+        WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("grounding",), GROUNDING_TOOL_DESC, GROUNDING_TOOL_LABEL),
     ),
     commands=(
         set_prose_cmd("summary"),
