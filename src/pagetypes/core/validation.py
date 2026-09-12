@@ -8,9 +8,9 @@ from typing import Any
 from ...errors import ValidationError
 
 from .pagetype import PageType, element_fsm_sites, get_pagetype_field
-from .args import BlockKindSpec, ElementBlocksSpec
+from .args import BlockKindSpec
 from .commands import CommandSpec, is_field_setter
-from .fields import FieldSpec, get_element_blocks
+from .fields import ElementBlocksSpec, FieldSpec, get_element_blocks
 from .specs import (
     ADD_ELEMENT,
     BLOCKS,

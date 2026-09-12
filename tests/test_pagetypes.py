@@ -41,9 +41,10 @@ from src.pagetypes.core.specs import (
     FSMSpec,
     status_guidance,
 )
-from src.pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
+from src.pagetypes.core.args import BlockKindSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
 from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
 from src.pagetypes.core.fields import (
+    ElementBlocksSpec,
     FieldSpec,
     SectionSpec,
     _blocks,
