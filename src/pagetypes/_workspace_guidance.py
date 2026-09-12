@@ -20,3 +20,10 @@ TESTING_TOOL_DESC = (
     "The test runner and command this workspace uses to write and run tests - for example, "
     "pytest, run with --testmon for red-green testing."
 )
+
+GROUNDING_TOOL_FIELD = "groundingTool"
+GROUNDING_TOOL_DESC = (
+    "The repository index or code-graph tool this workspace uses to locate and read code while "
+    "grounding - for example, a knowledge-graph MCP server queried instead of grepping and "
+    "loading whole files."
+)

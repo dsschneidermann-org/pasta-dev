@@ -15,6 +15,8 @@ from ._stage_guidance import (
     SPEC,
 )
 from ._workspace_guidance import (
+    GROUNDING_TOOL_DESC,
+    GROUNDING_TOOL_FIELD,
     MERGE_PROCESS_DESC,
     MERGE_PROCESS_FIELD,
     TESTING_TOOL_DESC,
@@ -187,6 +189,7 @@ _FEATURE_BRIEF = PageType(
     workspace_guidance=(
         WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
         WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),
+        WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("grounding",), GROUNDING_TOOL_DESC),
     ),
     commands=(
         set_prose_cmd("summary"),

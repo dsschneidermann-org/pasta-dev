@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from ._stage_guidance import REVIEW, SIMPLE_CHANGE_DRAFT, SIMPLE_CHANGE_OPEN
 from ._workspace_guidance import (
+    GROUNDING_TOOL_DESC,
+    GROUNDING_TOOL_FIELD,
     MERGE_PROCESS_DESC,
     MERGE_PROCESS_FIELD,
     TESTING_TOOL_DESC,
@@ -80,6 +82,7 @@ _SIMPLE_CHANGE = PageType(
     workspace_guidance=(
         WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
         WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
+        WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("open",), GROUNDING_TOOL_DESC),
     ),
     commands=(
         set_scalar_cmd("change", "component"),
