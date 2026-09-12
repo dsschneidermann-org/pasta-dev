@@ -43,7 +43,8 @@ workspace, read before writing, then follow the `next` block echoed by every wri
 planning a command sequence up front.
 
 **HTTP** — `app = FastAPI(...)` with six routes: `route_index` (`/`), `route_tree`,
-`route_page` (`/ws:{id}/{pageId}`), plus three form-post mutations, `route_archive_page`,
+`route_page` (`/ws:{workspaceIdPart}/page/{pageId}`), plus three form-post mutations,
+`route_archive_page`,
 `route_unarchive_page`, and `route_set_page_status`. `http_exception_handler` renders
 `error.html`. Jinja templates live in `src/templates/`, with `/static` and `/sphinx`
 `StaticFiles` mounts for CSS, images, and the built Sphinx docsite.

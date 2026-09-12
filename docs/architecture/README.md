@@ -23,6 +23,11 @@ belongs in a feature brief, not here.
 | 09 | [Dev server & HMR](09-dev-server-hmr.md) | subsystem | `src/hmr_server.py`, `hmr_live_refresh.py`, `_hmr_debug.py` | 44 |
 | 10 | [Lifecycle & cleanup](10-lifecycle-cleanup.md) | module | `src/cleanup.py` | 40 |
 
+See [COMPARISON.md](COMPARISON.md) for how these pages relate to the 10 hand-authored
+`architecture` pages in the pasta workspace (`ws:mrteq0c5-238cf6`) — the differing decompositions,
+nine confirmed drift defects in the workspace set, gaps on both sides, and a recommendation on
+which approach to keep as primary.
+
 ## The layer stack
 
 `check` over the graph reports **zero circular file imports** (0 cycles, 0 components), so the
