@@ -215,7 +215,11 @@ class WorkspaceGuidanceSpec:
     membership. `description`, non-empty, says what the field means and must match across any types
     that share the field. Construction does not validate; these rules are checked when the registry
     is validated at load.
+
+    `label` is the fixed wording the stored text is emitted behind, so a reader can tell the texts
+    surfaced together apart. It is optional: a field declaring none emits its text bare.
     """
     field: str
     guidance_for: tuple[str, ...]
     description: str
+    label: str = ""

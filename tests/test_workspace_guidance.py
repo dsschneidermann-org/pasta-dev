@@ -14,6 +14,12 @@ from fastmcp.exceptions import ToolError
 import src.server as server
 from src.errors import ValidationError
 from src.model import Workspace
+from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
+from src.pagetypes._workspace_guidance import (
+    GROUNDING_TOOL_LABEL,
+    MERGE_PROCESS_LABEL,
+    TESTING_TOOL_LABEL,
+)
 from src.pagetypes.core.specs import FSMSpec, WorkspaceGuidanceSpec, status_guidance
 from src.pagetypes.core.fields import SectionSpec
 from src.pagetypes.core.pagetype import PageType
@@ -157,10 +163,28 @@ def test_validate_page_types_clean_for_good_workspace_guidance():
 # --- workspace_guidance (pure emission) ----------------------------------
 def test_workspace_guidance_emits_only_in_set_with_text():
     config = {"buildTool": "use pytest", "reviewHint": "look hard"}
-    assert workspace_guidance(LIFECYCLE, "building", config) == {"guidance_buildTool": "use pytest"}
+    assert workspace_guidance(LIFECYCLE, "building", config) == {
+        "guidance_buildTool": "BUILD TOOL GUIDANCE: use pytest"}
     # review is in both buildTool and reviewHint sets.
     assert workspace_guidance(LIFECYCLE, "review", config) == {
-        "guidance_buildTool": "use pytest", "guidance_reviewHint": "look hard"}
+        "guidance_buildTool": "BUILD TOOL GUIDANCE: use pytest",
+        "guidance_reviewHint": "REVIEW HINT GUIDANCE: look hard"}
+
+
+def test_workspace_guidance_prefixes_with_the_declared_label():
+    # The label is declared on the spec, so a field that declares none is emitted unprefixed.
+    labelled = _wg_type("wg-l", ("draft",),
+                        WorkspaceGuidanceSpec("f", ("draft",), "d", "SOME LABEL: "))
+    bare = _wg_type("wg-n", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d"))
+    assert workspace_guidance(labelled, "draft", {"f": "x"}) == {"guidance_f": "SOME LABEL: x"}
+    assert workspace_guidance(bare, "draft", {"f": "x"}) == {"guidance_f": "x"}
+
+
+def test_production_guidance_fields_declare_their_labels():
+    # The three shared fields carry fixed labels rather than ones derived from the field name.
+    assert MERGE_PROCESS_LABEL == "MERGE PROCESS GUIDANCE: "
+    assert TESTING_TOOL_LABEL == "TESTING TOOL GUIDANCE: "
+    assert GROUNDING_TOOL_LABEL == "GROUNDING TOOL GUIDANCE: "
 
 
 def test_workspace_guidance_skips_out_of_set_absent_and_empty():
@@ -225,14 +249,14 @@ def test_next_actions_injects_guidance_for_focused_page(store):
 
     store.set_page_status(wid, pid, "review")
     actions = store.next_actions(wid, pid)
-    assert actions["guidance_buildTool"] == "use pytest"          # review in buildTool's set
-    assert actions["guidance_reviewHint"] == "look hard"          # review in reviewHint's set
-    # Stage guidance for the focused page is included too.
-    assert actions["guidance"] == status_guidance(LIFECYCLE.fsm, "review")
+    assert actions["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
+    assert actions["guidance_reviewHint"] == "REVIEW HINT GUIDANCE: look hard"
+    # Stage guidance for the focused page is included too, behind its own label.
+    assert actions["guidance"] == PAGE_STATUS_GUIDANCE + status_guidance(LIFECYCLE.fsm, "review")
 
     store.set_page_status(wid, pid, "building")
     actions = store.next_actions(wid, pid)
-    assert actions["guidance_buildTool"] == "use pytest"          # building in buildTool's set
+    assert actions["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
     assert "guidance_reviewHint" not in actions                   # building not in reviewHint's set
 
 
@@ -255,10 +279,10 @@ def test_set_workspace_guidance_tool_and_response_keys(mcp):
     # A subsequent write response carries guidance_buildTool (page is at `building`), inside `next`.
     written = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
                                    "commands": [{"command": "setSummary", "args": {"text": "S2"}}]})
-    assert written["next"]["guidance_buildTool"] == "use pytest"
+    assert written["next"]["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
     # `next` is the payload nextActions returns for the page, so the two agree by construction.
     actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
-    assert actions["guidance_buildTool"] == "use pytest"
+    assert actions["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
 
 
 def test_create_page_response_carries_workspace_guidance(mcp):
@@ -266,7 +290,7 @@ def test_create_page_response_carries_workspace_guidance(mcp):
     call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "draftHint", "text": "drafting"})
     created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
     assert created["status"] == "draft"
-    assert created["next"]["guidance_draftHint"] == "drafting"   # draft is in draftHint's set
+    assert created["next"]["guidance_draftHint"] == "DRAFT HINT GUIDANCE: drafting"
 
 
 def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):

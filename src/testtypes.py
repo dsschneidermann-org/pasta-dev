@@ -341,9 +341,12 @@ TEST_LIFECYCLE = PageType(
     # Workspace-guidance fields for the tests: one shown across two statuses, one at a single status,
     # and one at the initial status.
     workspace_guidance=(
-        WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses"),
-        WorkspaceGuidanceSpec("reviewHint", ("review",), "a hint shown while reviewing"),
-        WorkspaceGuidanceSpec("draftHint", ("draft",), "a hint shown while drafting"),
+        WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses",
+                              "BUILD TOOL GUIDANCE: "),
+        WorkspaceGuidanceSpec("reviewHint", ("review",), "a hint shown while reviewing",
+                              "REVIEW HINT GUIDANCE: "),
+        WorkspaceGuidanceSpec("draftHint", ("draft",), "a hint shown while drafting",
+                              "DRAFT HINT GUIDANCE: "),
     ),
 )
 

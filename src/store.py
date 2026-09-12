@@ -35,6 +35,7 @@ from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSIT
 from .pagetypes.core.commands import CommandSpec
 from .pagetypes.core.pagetype import PageType, get_pagetype_command
 from .pagetypes.core.validation import collect_ref_ids
+from .pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from .pagetypes._registry import (
     get_page_type,
     is_auto_child_type,
@@ -65,7 +66,7 @@ def workspace_guidance(page_type: PageType, status: str,
         if status in spec.guidance_for:
             text = config.get(spec.field)
             if text:
-                out[f"guidance_{spec.field}"] = text
+                out[f"guidance_{spec.field}"] = spec.label + text
     return out
 @dataclass
 class CreatePageResult:
@@ -479,7 +480,7 @@ class Store:
                 if focus_type is not None:
                     guidance = status_guidance(focus_type.fsm, focus.status)
                     if guidance is not None:
-                        result["guidance"] = guidance
+                        result["guidance"] = PAGE_STATUS_GUIDANCE + guidance
                     result.update(workspace_guidance(
                         focus_type, focus.status, workspace.guidance_config))
         return result
