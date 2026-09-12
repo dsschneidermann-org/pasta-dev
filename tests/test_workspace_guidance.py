@@ -99,13 +99,14 @@ def _building_lifecycle(mcp):
 
 # --- WorkspaceGuidanceSpec construction --------------------------------------
 def test_workspace_guidance_spec_holds_its_fields():
-    spec = WorkspaceGuidanceSpec("mergeProcess", ("review",), "a desc")
-    assert (spec.field, spec.guidance_for, spec.description) == ("mergeProcess", ("review",), "a desc")
+    spec = WorkspaceGuidanceSpec("mergeProcess", ("review",), "a desc", "A LABEL: ")
+    assert (spec.field, spec.guidance_for, spec.description, spec.label) == (
+        "mergeProcess", ("review",), "a desc", "A LABEL: ")
 
 
 def test_workspace_guidance_spec_does_not_validate_at_construction():
     # A malformed one (empty field, no statuses) constructs without raising - validation is deferred.
-    spec = WorkspaceGuidanceSpec("", (), "")
+    spec = WorkspaceGuidanceSpec("", (), "", "")
     assert spec.field == "" and spec.guidance_for == ()
 
 
@@ -122,41 +123,58 @@ def test_workspace_guidance_empty_when_none_declared():
 # --- validate_workspace_guidance ---------------------------------------------
 def test_validate_workspace_guidance_flags_each_problem():
     unknown_status = _wg_type("wg-a", ("draft",),
-                              WorkspaceGuidanceSpec("f", ("nope",), "d"))
-    empty_for = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("g", (), "d"))
-    empty_field = _wg_type("wg-c", ("draft",), WorkspaceGuidanceSpec("", ("draft",), "d"))
-    empty_desc = _wg_type("wg-d", ("draft",), WorkspaceGuidanceSpec("h", ("draft",), ""))
+                              WorkspaceGuidanceSpec("f", ("nope",), "d", "L: "))
+    empty_for = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("g", (), "d", "L: "))
+    empty_field = _wg_type("wg-c", ("draft",), WorkspaceGuidanceSpec("", ("draft",), "d", "L: "))
+    empty_desc = _wg_type("wg-d", ("draft",), WorkspaceGuidanceSpec("h", ("draft",), "", "L: "))
+    empty_label = _wg_type("wg-e", ("draft",), WorkspaceGuidanceSpec("i", ("draft",), "d", ""))
     errors = validate_workspace_guidance({t.tag: t for t in
-                                          (unknown_status, empty_for, empty_field, empty_desc)})
+                                          (unknown_status, empty_for, empty_field, empty_desc,
+                                           empty_label)})
     joined = "\n".join(errors)
     assert "wg-a" in joined and "unknown status 'nope'" in joined
     assert "wg-b" in joined and "no guidance_for" in joined
     assert "wg-c" in joined and "empty field name" in joined
     assert "wg-d" in joined and "empty description" in joined
+    assert "wg-e" in joined and "empty label" in joined
 
 
 def test_validate_workspace_guidance_flags_disagreeing_descriptions():
-    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "one"))
-    b = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "two"))
+    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "one", "L: "))
+    b = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "two", "L: "))
     errors = validate_workspace_guidance({a.tag: a, b.tag: b})
     assert any("description disagrees" in e for e in errors)
 
 
+def test_validate_workspace_guidance_flags_disagreeing_labels():
+    # A shared field read behind different wording per page type is the drift this rule stops.
+    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same", "ONE: "))
+    b = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same", "TWO: "))
+    errors = validate_workspace_guidance({a.tag: a, b.tag: b})
+    assert any("label disagrees" in e for e in errors)
+
+
 def test_validate_workspace_guidance_clean_when_descriptions_agree():
-    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same"))
-    b = _wg_type("wg-b", ("open", "draft"), WorkspaceGuidanceSpec("shared", ("open",), "same"))
+    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same", "L: "))
+    b = _wg_type("wg-b", ("open", "draft"), WorkspaceGuidanceSpec("shared", ("open",), "same", "L: "))
     assert validate_workspace_guidance({a.tag: a, b.tag: b}) == []
 
 
 # --- aggregated load raise ---------------------------------------------------
 def test_validate_page_types_raises_on_bad_workspace_guidance():
-    bad = _wg_type("wg-bad", ("draft",), WorkspaceGuidanceSpec("f", ("missing",), "d"))
+    bad = _wg_type("wg-bad", ("draft",), WorkspaceGuidanceSpec("f", ("missing",), "d", "L: "))
     with pytest.raises(ValueError, match="unknown status 'missing'"):
         validate_page_types({bad.tag: bad})
 
 
+def test_validate_page_types_raises_on_a_missing_label():
+    bad = _wg_type("wg-nolabel", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d", ""))
+    with pytest.raises(ValueError, match="empty label"):
+        validate_page_types({bad.tag: bad})
+
+
 def test_validate_page_types_clean_for_good_workspace_guidance():
-    good = _wg_type("wg-ok", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d"))
+    good = _wg_type("wg-ok", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d", "L: "))
     assert validate_page_types({good.tag: good}) is None
 
 
@@ -172,12 +190,10 @@ def test_workspace_guidance_emits_only_in_set_with_text():
 
 
 def test_workspace_guidance_prefixes_with_the_declared_label():
-    # The label is declared on the spec, so a field that declares none is emitted unprefixed.
+    # The wording comes off the spec, so emission reads it rather than deriving one from the field.
     labelled = _wg_type("wg-l", ("draft",),
                         WorkspaceGuidanceSpec("f", ("draft",), "d", "SOME LABEL: "))
-    bare = _wg_type("wg-n", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d"))
     assert workspace_guidance(labelled, "draft", {"f": "x"}) == {"guidance_f": "SOME LABEL: x"}
-    assert workspace_guidance(bare, "draft", {"f": "x"}) == {"guidance_f": "x"}
 
 
 def test_production_guidance_fields_declare_their_labels():

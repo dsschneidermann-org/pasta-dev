@@ -341,6 +341,7 @@ def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
     """Validate the workspace-guidance declarations across the registry, collecting the errors."""
     errors: list[str] = []
     descriptions: dict[str, tuple[str, str]] = {}   # field -> (description, first tag to declare it)
+    labels: dict[str, tuple[str, str]] = {}         # field -> (label, first tag to declare it)
     for tag, page_type in registry.items():
         statuses = set(page_type.fsm.states)
         for spec in page_type.workspace_guidance:
@@ -355,12 +356,20 @@ def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
                         f"{tag}: workspace guidance '{spec.field}' names unknown status '{status}'.")
             if not spec.description:
                 errors.append(f"{tag}: workspace guidance '{spec.field}' has an empty description.")
+            if not spec.label:
+                errors.append(f"{tag}: workspace guidance '{spec.field}' has an empty label.")
             prior = descriptions.get(spec.field)
             if prior is None:
                 descriptions[spec.field] = (spec.description, tag)
             elif prior[0] != spec.description:
                 errors.append(
                     f"{tag}: workspace guidance '{spec.field}' description disagrees with '{prior[1]}'.")
+            prior_label = labels.get(spec.field)
+            if prior_label is None:
+                labels[spec.field] = (spec.label, tag)
+            elif prior_label[0] != spec.label:
+                errors.append(
+                    f"{tag}: workspace guidance '{spec.field}' label disagrees with '{prior_label[1]}'.")
     return errors
 
 
