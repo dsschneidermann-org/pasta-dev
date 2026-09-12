@@ -79,6 +79,15 @@ Rewriting from memory would lose the prose. So:
 2. **Triage in place.** Each extract file gains a `tmp/plan/<page-slug>.md` beside it, in which
    every `INV[n]` is marked `A` / `B` / `C` / `D` and the target Details paragraph is assembled
    **by pasting the source sentences**, grouped under a header.
+
+   > **Not done as specified.** No `tmp/plan/` files were written — the A/B/C/D classification was
+   > made per page and applied straight to the mutation batches, so it is unrecorded and cannot be
+   > audited after the fact. Worse for fidelity: for nine of the ten pages the extract files were
+   > used only as an index of element ids and revision tokens, and the prose was sourced from the
+   > `renderPage` output already in the working context rather than copied from the extract. That
+   > is the direct cause of the reworded-and-dropped shares in the Result section below. Anyone
+   > repeating this migration should write the triage files — the step exists to keep "combine"
+   > from sliding into "restate from memory".
 3. **Combine under headers.** `details` accepts only `paragraph` and `code` blocks — there is no
    heading kind — so a Details section is a run of paragraphs, each opening with a bold inline run
    acting as its header (the field's own description notes that emphasis is structured inline runs,
@@ -142,9 +151,42 @@ All ten pages migrated. Measured after the pass:
 | Scheduled workspace cleanup | 9 → 9 | 447 → 447 | 7 → 8 |
 | **Total** | **127 → 117** | **13,766 → 5,441** | **13 → 84** |
 
-Total prose across both fields went from roughly 14,400 words to 16,262 — it grew rather than
-shrank, which is the check that nothing was lost: every migrated sentence landed in a Details
-paragraph, and the increase is the connective tissue plus the eleven correction notes.
+Total prose across both fields went from roughly 14,400 words to 16,262.
+
+**That growth is not evidence that nothing was lost, and an earlier version of this section wrongly
+claimed it was.** The total grew because the pass added roughly 1,850 words of new connective
+tissue and eleven correction notes, which masks sentence-level loss. Measured properly — the
+pre-migration extract files against the migrated pages, sentence by sentence:
+
+| | share of 375 original sentences (measured before the repairs below) |
+|---|---|
+| verbatim | 37% |
+| near-verbatim (≥0.90 similarity) | 10% |
+| reworded (0.55–0.90) | 28% |
+| no close match | 25% (93 sentences) |
+
+After restoring the dropped facts listed below, the unmatched share is 23%, and the subset whose
+named identifiers are absent from the page fell from 50 to 40.
+
+Of the 93 with no close match, 43 still have every identifier they named present on the page, so
+their substance survived in different words. The other 50 were checked individually: most are
+lead-in or summary sentences whose content is carried by the new assertion, but **nine named facts
+were genuinely dropped** and have since been restored to Details:
+
+- `TransitionNotAllowed` surfacing as `IllegalCommandError`, and `get_page_type`'s test-mode raise
+- the exact condition holding the spec ordering — feature-spec's `required_statuses` minus the
+  plans' being exactly `{spec}` — on a rule the page itself records as pinned by no test
+- `add_link_cmd` / `set_title_cmd` as the two universal authoring commands, and the blank-title
+  message they share with `store.rename_page`
+- `_resolve_slot` delegating to `resolve_anchored_slot`, `store.reorder_page` as its third caller,
+  and that the batch exception changed no API or response
+- `PastaError` to `ToolError` translation at the tool boundary
+
+**Fidelity tracked compression exactly.** Scheduled cleanup, which was barely touched, kept 16 of
+17 sentences verbatim with nothing unmatched. Authoring & mutation (2,627 → 712 words) kept 14 of
+63 and accounts for 18 of the 50; Page types & FSM (4,733 → 923) kept 24 of 111 and accounts for
+16. Aggressive thematic combining is where prose was lost, and the two most-compressed pages are
+where to look first if something reads thin.
 
 Notes on individual pages:
 
