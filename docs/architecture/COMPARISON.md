@@ -63,6 +63,11 @@ named source.
 | D7 | Scheduled workspace cleanup | "`PASTA_CLEANUP=1` force-enables it on any transport including `--stdio`. Unset means on for the HTTP server and off for `--stdio`." | `scheduler_enabled()` is `os.environ.get("PASTA_CLEANUP", "1") != "0"` — no transport branch. The stdio behaviour is incidental: `start_scheduler` is called only from `server.app_lifespan` and `hmr_server.reloader_lifespan`, and `mcp.run(transport="stdio")` runs neither, so `PASTA_CLEANUP=1` cannot force-enable it under stdio. |
 | D8 | Authoring & mutation | Code reference: `src/pagetypes/core/args.py; symbol: set_title_cmd`. | `set_title_cmd` is in `core/commands.py`. (Its own Invariants section names the right module, so the reference row is the stale part.) |
 | D9 | Search & introspection | "the SAME `BlockKindSpec.body_args()` the validator reads" | `body_args` is a dataclass **field** on `BlockKindSpec`, read as `block.body_args`. Minor: the capability is intact, the call syntax is stale. |
+| D10 | Pasta Project Overview | "each MCP tool is a thin sync function (resolve inputs -> run a store transaction -> return a JSON-able dict)" | All 24 `@mcp.tool` functions are `async def`; none is sync. |
+| D11 | Authoring & mutation | "because the single (stdio or HTTP) server runs sync tools on FastMCP worker threads, that lock fully serializes conflicting read-modify-write cycles" | Follows from D10: the threading-model premise does not hold. The serialization itself is intact, but it rests on the per-workspace transaction lock rather than on tools running on worker threads. |
+
+D10 and D11 were found while migrating the invariants (see
+[INVARIANT-MIGRATION-PLAN.md](INVARIANT-MIGRATION-PLAN.md)), not in the original comparison.
 
 **Two of these are internal contradictions, not just staleness** — the workspace set disagrees with
 itself, and in both cases the newer page is right:
@@ -222,22 +227,25 @@ capabilities, not as modules.
 
 What to take from the repo set:
 
-1. **Fix the nine confirmed defects** (D1–D9), starting with the three mechanism-level ones (D1/D2
-   `os.replace`, D3 `mutatePage`, D4 `includeArchived`) that would actively mislead.
-2. **Re-stamp every page's sync commit to a reachable one.** Six currently point at orphaned
-   objects, which silently disables the drift check the field exists to provide. Consider pinning
-   the stamp to a tag or asserting reachability in `scripts/validate_workspace.py`.
+1. ~~**Fix the confirmed defects**~~ — **done.** All eleven (D1–D11) are corrected in the
+   workspace pages, each with a "Corrections at `a35b133`" paragraph in Details recording what the
+   code actually does, so the correction is visible rather than silent.
+2. ~~**Re-stamp every page's sync commit to a reachable one.**~~ — **done.** All ten now read
+   `a35b133`. Still worth automating: consider asserting sync-commit reachability in
+   `scripts/validate_workspace.py`, since nothing prevents the next history re-cut from orphaning
+   them again.
 3. **Verify code references mechanically.** A script over `codeReferences` resolving each
    file+symbol would have caught D8 and D9 for free. This is the single highest-value addition —
-   the type already stores the pointers in a structured form.
-4. **Move rationale out of Invariants into Details,** and reduce each invariant to the checkable
-   assertion plus what breaks. The content is already written; it is filed in the wrong section, and
-   the page type's own guidance says so.
-5. **Populate `dependencies`** on the eight pages that leave it empty.
+   the type already stores the pointers in a structured form. *(Still open; D8 was fixed by hand.)*
+4. ~~**Move rationale out of Invariants into Details.**~~ — **done.** See
+   [INVARIANT-MIGRATION-PLAN.md](INVARIANT-MIGRATION-PLAN.md) for the method and the
+   before/after numbers: 127 invariants / 13,766 words of invariant prose became 117 / 5,441, and
+   the Details sections went from 13 blocks to 84.
+5. **Populate `dependencies`** on the eight pages that leave it empty. *(Still open.)*
 6. **Add the missing module map** as one page — not ten. A single "Code layout" architecture page
    naming each module, the layering, and the zero-cycles property covers the newcomer-orientation
    gap without duplicating the capability pages. `docs/architecture/README.md` is a usable draft of
-   it.
+   it. *(Still open.)*
 
 Keep this repo directory as a dated, verified snapshot and as the source for items 3 and 6. It is
 the better *map*; the workspace set is the better *documentation*. Do not maintain both as primary —
