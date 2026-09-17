@@ -28,3 +28,26 @@ def production_mode():
     set_test_mode(False)
     yield
     set_test_mode(True)
+
+
+@pytest.fixture
+def invalid_declarations(monkeypatch):
+    """Leave the page-type registry in the state a half-finished edit leaves it in: a field setter
+    whose target field has been deleted, which is what `validate_pagetype_setter_descriptions`
+    rejects. Patches `registered_pagetypes` rather than the gates themselves, so a gate under test
+    runs the real validator over a genuinely invalid registry. Returns the error text it must
+    surface."""
+    from src.pagetypes import _registry
+    from src.pagetypes.core.commands import set_scalar_cmd
+    from src.pagetypes.core.fields import SectionSpec, _scalar
+    from src.pagetypes.core.pagetype import PageType
+    from src.pagetypes.core.specs import FSMSpec
+
+    orphan = PageType(
+        tag="xtest-orphan-setter", name="Orphan setter", description="ad-hoc",
+        sections=(SectionSpec("report", "Report", (_scalar("component", description="x"),)),),
+        commands=(set_scalar_cmd("report", "platform"),),
+        fsm=FSMSpec(name="XOrphan", initial="open", states=("open",)),
+    )
+    monkeypatch.setattr(_registry, "registered_pagetypes", lambda: {orphan.tag: orphan})
+    return "field setter 'setPlatform' targets unknown field 'report.platform'"

@@ -1111,6 +1111,22 @@ def test_validate_registry_passes_over_the_production_registry(production_mode):
     assert validate_registry() is None
 
 
+def test_declaration_errors_answers_for_the_types_actually_being_served(invalid_declarations):
+    # The serving gates cannot use `validate_registry`: it raises, and it names REGISTRY, which is
+    # the half a failed reload leaves behind. `declaration_errors` asks the same question of the
+    # types in play and hands back the message instead of raising, so a gate can refuse a request.
+    from src.pagetypes._registry import declaration_errors
+    errors = declaration_errors()
+    assert errors is not None
+    assert invalid_declarations in errors
+
+
+def test_declaration_errors_is_none_for_the_production_registry(production_mode):
+    # No false quarantine: the real registry validates, so the gates stay out of the way.
+    from src.pagetypes._registry import declaration_errors
+    assert declaration_errors() is None
+
+
 def test_production_types_are_exactly_the_registered_ones(production_mode):
     # PRODUCTION_TYPES is written out by hand so the invariants above survive test mode emptying
     # REGISTRY; this is what fails when a page type is added or removed and the list is not.
