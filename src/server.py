@@ -15,12 +15,18 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import Middleware, MiddlewareContext
 
 from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
-from .pagetypes._registry import get_page_type, registered_pagetypes, validate_registry
+from .pagetypes._registry import (
+    declaration_errors,
+    get_page_type,
+    registered_pagetypes,
+    validate_registry,
+)
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
 from .serialize import page_to_dict
@@ -53,6 +59,43 @@ app.mount("/static", StaticFiles(directory="src/static"), name="static")
 app.mount("/sphinx", StaticFiles(directory="docsite/_build/html"), name="sphinx")
 
 templates = Jinja2Templates(directory="src/templates")
+
+
+# --- Declaration quarantine --------------------------------------------------
+# `validate_registry()` above is a statement in this module's body, so it guards the instant this
+# module executes - not the surface it was meant to gate. Under hot reload (src.hmr_server) the two
+# come apart: the page-type modules re-execute with the half-finished declaration, this module's
+# re-exec raises on that same declaration and is swallowed, and the `app` and `mcp` built by the
+# LAST good exec stay mounted - now answering out of a registry the validator has already rejected.
+# What that served was a describePageType listing the fields that survived while its own command
+# list still advertised a setter for the deleted one, and that setter writing a value to disk that
+# nothing renders.
+#
+# So ask again per request, in the two places every caller passes through. The gates work from a
+# stale module because the question is answered against the LIVE registry, which is the half that
+# did reload; and they need no reset, because a later reload that declares valid types simply
+# answers None. A cold start is still fatal at `validate_registry()` - nothing should boot invalid.
+#
+# Registered BEFORE `add_no_cache_headers` so that one stays the outer middleware and stamps the
+# refusal too: a cached 503 would outlive the fix (pinned by a test in tests/test_web.py).
+@app.middleware("http")
+async def refuse_invalid_declarations(request: Request, call_next):
+    errors = declaration_errors()
+    # /static carries the stylesheet and the theme assets the refusal page itself renders with.
+    if errors is None or request.url.path.startswith("/static"):
+        return await call_next(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="error.html",
+        context={
+            "message": "The page-type declarations are invalid; the wiki is not being served.",
+            "trace": ("The page-type declarations are invalid, so this server is refusing to serve "
+                      "rather than answer out of them:\n\n"
+                      f"{errors}\n\n"
+                      "Fix the declaration and save - the reload will bring this page back."),
+        },
+        status_code=503,
+    )
 
 
 # --- No HTTP caching ---------------------------------------------------------
@@ -230,6 +273,36 @@ async def http_exception_handler(request: Request, exc: InternalError):
 
 # --- MCP -------------------------------------------------------------------
 app.mount("/pasta", mcp_app)  # MCP endpoint at /pasta/mcp
+
+
+class _RefuseInvalidDeclarations(Middleware):
+    """The MCP half of the declaration quarantine (see the HTTP gate above for why it exists).
+
+    Hung on `on_call_tool` rather than each tool, so it covers every one of them including any
+    added later - and rather than on `on_initialize`, so a client can still connect and reconnect
+    while the surface is down. The refusal carries the declaration errors themselves: an agent
+    drives this surface and never sees the dev console, so the tool error is the only place it can
+    learn why the server stopped answering, and what to fix.
+    """
+
+    async def on_call_tool(self, context: MiddlewareContext, call_next):
+        errors = declaration_errors()
+        if errors is None:
+            return await call_next(context)
+        # Name the reload log by absolute path, resolved from the RUNNING server's package rather
+        # than the caller's cwd: an agent hitting this is often working in a different checkout
+        # (or worktree) than the server it is talking to, and would otherwise look in the wrong
+        # tree - or not know the log exists. It holds the full traceback behind these errors,
+        # which the aggregated message above deliberately does not carry.
+        from ._hmr_debug import LOG_PATH
+        raise ToolError(
+            "The page-type declarations are invalid, so this server is refusing to serve rather "
+            f"than answer out of them:\n{errors}\n"
+            f"The full reload traceback is at {LOG_PATH}.\n"
+            "Fix the declaration and save; the reload restores the tools.")
+
+
+mcp.add_middleware(_RefuseInvalidDeclarations())
 
 
 @contextmanager
