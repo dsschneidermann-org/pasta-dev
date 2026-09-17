@@ -111,7 +111,7 @@ Each status carries the instruction for the work it is for. Reach `building`, an
 
 Bug reports get their own discipline (`draft → open → review → done → closed`), where `draft` insists on a repro someone else can follow and an expected behaviour grounded in something outside the agent itself, and `open` opens with *reproduce it yourself first*.
 
-None of this needs a restart to change. The dev server hot reloads its modules in place, so an edit to a status, an edge or a line of stage guidance is live on the very next MCP request; connected agent sessions stay connected and are simply told the tool list changed. You can tune your process against a session that is already running, which is the only practical way to find out whether an instruction actually lands. And a half-finished edit does not quietly become the running server: if the reload leaves a page type invalid, the console says so and both surfaces refuse — the browser with the declaration error, a tool call with the same list — until the next save that validates.
+None of this needs a restart to change. The dev server hot reloads its modules in place, so an edit to a status, an edge or a line of stage guidance is live on the very next MCP request; connected agent sessions stay connected and are simply told the tool list changed. You can tune your process against a session that is already running, which is the only practical way to find out whether an instruction actually lands.
 
 ### The model is readable, by you and by the agent
 
