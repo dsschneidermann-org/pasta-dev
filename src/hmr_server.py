@@ -71,16 +71,13 @@ logger = logging.getLogger("uvicorn.error")
 class _LoggingErrorFilter(ErrorFilter):
     """Restate a swallowed reload failure through the dev console's error logger.
 
-    hmr reports a module whose re-exec raised by handing it to ``sys.excepthook`` and then
-    swallowing it, so the dev server keeps running. What that puts on the console is a bare
-    traceback wedged between uvicorn's INFO lines - no level to scan for, no prefix, and nothing
-    saying what the failure cost. It reads as noise, and the next access-log line is an ordinary
-    200, because the modules loaded BEFORE the failed reload are still the ones serving.
+    hmr hands a module whose re-exec raised to ``sys.excepthook`` and then swallows it, so the dev
+    server keeps running - leaving a bare traceback among uvicorn's own lines, at no level and
+    saying nothing of what the failure cost. What the reader needs is the consequence: the edit did
+    not take, so the modules loaded before it are the ones still serving.
 
-    So log the consequence, not just the error, at ERROR where the developer is already reading
-    the ``[HMR]`` lines. Only the summary line is logged; the full traceback still goes to
-    ``sys.excepthook`` via ``super()``, which is also what tees it to hmr_debug.log
-    (src._hmr_debug), so nothing is lost and nothing is printed twice.
+    Only that summary is logged. The traceback itself still reaches ``sys.excepthook``, which is
+    what tees it to the reload log, so nothing is lost and nothing is printed twice.
     """
 
     def __exit__(self, exc_type, exc_value, traceback_):
@@ -215,17 +212,15 @@ def build_dev_app() -> Starlette:
     class Reloader(AsyncReloader):
         def __init__(self):
             super().__init__(_PACKAGE_DIR, includes=[_PACKAGE_DIR], excludes=[_LIVE_REFRESH_FILE])
-            # Swap in the reporting filter, keeping the frame exclusions the base built - it is the
-            # one hmr wraps every re-exec in, so this is where a swallowed failure can be seen.
+            # Every re-exec is wrapped in this filter, so reporting belongs here. Keep the frame
+            # exclusions the base built.
             self.error_filter = _LoggingErrorFilter(*self.error_filter.exclude_filenames)
             self.error_filter.exclude_filenames.add(__file__)
 
         def on_changes(self, files):
             # Reload the changed modules (reactive propagation), then refresh browsers. The refresh
-            # is unconditional on purpose, a failed reload included: the page types the reload left
-            # invalid are refused by the gates in src.server, and the refreshed tab lands on that
-            # refusal instead of a plausible-looking render. It is also how the tab recovers - the
-            # refusal page keeps the reloader socket, so the next clean reload pulls it back.
+            # is unconditional, a failed reload included: what a tab should land on then is the
+            # refusal, and since that page keeps the socket it is also how the tab recovers.
             super().on_changes(files)
             with suppress(RuntimeError):
                 asyncio.get_running_loop().create_task(ws_reloader.refresh())

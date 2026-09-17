@@ -358,35 +358,33 @@ def test_status_revision_surfaced_and_echoed_via_server(mcp):
 
 
 # --- Declaration quarantine --------------------------------------------------
-# Under hot reload this module can go stale while the page-type modules reload invalid, leaving the
-# already-built `mcp` mounted and answering from a registry the validator would have rejected. The
-# gate therefore re-asks per call; these drive it through the real tool path.
+# The gate is asked per call rather than at load, so that it holds even when this module is the
+# stale half of a reload. These drive it through the real tool path.
 
 def test_tool_calls_are_refused_while_a_page_type_declaration_is_invalid(mcp, invalid_declarations):
-    # The reported defect: describePageType answered from an invalid declaration, listing the
-    # surviving fields while its own command list still advertised a setter for the deleted one.
+    # A describe answered from an invalid declaration contradicts itself, listing the fields that
+    # survived while the command list still advertises a setter for the deleted one.
     with pytest.raises(ToolError, match="page-type declarations"):
         call(mcp, "describePageType", {"type": "xtest-orphan-setter"})
 
 
 def test_a_write_cannot_reach_disk_while_a_page_type_declaration_is_invalid(mcp, invalid_declarations):
-    # The orphaned setter's write was durable, readable back, and invisible in the render. Refusing
-    # the call is what stops it, so the gate has to cover writes and not only the describe surface.
+    # An orphaned setter's write is durable and readable back, yet never rendered, since the
+    # renderer iterates the spec. Refusing the call is what stops it, so writes are gated too.
     with pytest.raises(ToolError, match="page-type declarations"):
         call(mcp, "createWorkspace", {"name": "demo"})
 
 
 def test_the_refusal_names_the_declaration_error(mcp, invalid_declarations):
-    # An agent drives MCP and never sees the dev console, so the refusal itself has to carry the
-    # reason - otherwise the only record of why the surface is down is a log it cannot read.
+    # The caller here is an agent, which never sees the dev console, so the refusal has to carry
+    # the reason itself.
     with pytest.raises(ToolError, match="setPlatform"):
         call(mcp, "listWorkspaces")
 
 
 def test_the_refusal_points_at_the_running_servers_reload_log(mcp, invalid_declarations):
-    # The aggregated message names the declaration errors but carries no traceback; that is in
-    # hmr_debug.log. An agent is usually working in a different checkout than the server it is
-    # talking to, so the path has to be absolute and resolved from the server, not from its cwd.
+    # The message names the errors but carries no traceback, so it has to say where one is. The
+    # caller is usually in a different checkout than the server, hence absolute and server-resolved.
     from src._hmr_debug import LOG_PATH
     with pytest.raises(ToolError, match="hmr_debug.log"):
         call(mcp, "listWorkspaces")

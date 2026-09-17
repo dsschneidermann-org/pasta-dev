@@ -62,11 +62,10 @@ def declaration_errors() -> str | None:
     """The same check as `validate_registry`, asked as a question: the aggregated error text, or
     None when every page type in play is well-formed.
 
-    Two differences, and both are why the serving gates in `src.server` call this rather than
-    `validate_registry`. It answers instead of raising, so a gate can refuse one request rather
-    than fail a load. And it reads `registered_pagetypes()` rather than REGISTRY, so it reports on
-    the types actually being served - which under hot reload is the half that DID reload, while the
-    module whose body called `validate_registry` may be the stale one."""
+    Two differences, and both are what a serving gate needs. It answers instead of raising, so a
+    caller can refuse one request rather than fail a load. And it reads `registered_pagetypes()`
+    rather than REGISTRY, so it reports on the types actually being served - which under hot reload
+    is the half that reloaded, while the module that validated at load may be the stale one."""
     try:
         validate_page_types(registered_pagetypes())
     except ValueError as exc:

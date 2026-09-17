@@ -180,9 +180,9 @@ def test_page_view_renders_the_structured_body(client):
 
 
 # --- Declaration quarantine --------------------------------------------------
-# The render iterates the spec, so an invalid declaration renders a plausible-looking 200 that is
-# quietly missing the deleted field - and the reloader has just told the browser the page is
-# current. These pin the refusal that replaces it.
+# The renderer iterates the spec, so an invalid declaration still renders a plausible page - one
+# quietly missing the deleted field, on a tab the reloader has just called current. These pin the
+# refusal that replaces it.
 
 def test_a_page_is_refused_while_a_page_type_declaration_is_invalid(client, invalid_declarations):
     workspace = server.STORE.create_workspace("demo")

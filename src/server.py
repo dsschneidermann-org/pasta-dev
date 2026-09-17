@@ -62,26 +62,20 @@ templates = Jinja2Templates(directory="src/templates")
 
 
 # --- Declaration quarantine --------------------------------------------------
-# `validate_registry()` above is a statement in this module's body, so it guards the instant this
-# module executes - not the surface it was meant to gate. Under hot reload (src.hmr_server) the two
-# come apart: the page-type modules re-execute with the half-finished declaration, this module's
-# re-exec raises on that same declaration and is swallowed, and the `app` and `mcp` built by the
-# LAST good exec stay mounted - now answering out of a registry the validator has already rejected.
-# What that served was a describePageType listing the fields that survived while its own command
-# list still advertised a setter for the deleted one, and that setter writing a value to disk that
-# nothing renders.
+# Validating in this module's body guards the moment it executes, not the surface it goes on to
+# serve. Under hot reload the two come apart: the page types can reload invalid while this module's
+# own re-exec fails, leaving the objects built by the last good exec mounted and answering out of a
+# registry that no longer validates. So ask again per request, against the live registry, at the
+# two points every caller passes through - which is what lets a gate hold even from a stale module.
+# Neither needs a reset: a reload that declares valid types simply answers None, and a cold start
+# still fails outright above.
 #
-# So ask again per request, in the two places every caller passes through. The gates work from a
-# stale module because the question is answered against the LIVE registry, which is the half that
-# did reload; and they need no reset, because a later reload that declares valid types simply
-# answers None. A cold start is still fatal at `validate_registry()` - nothing should boot invalid.
-#
-# Registered BEFORE `add_no_cache_headers` so that one stays the outer middleware and stamps the
-# refusal too: a cached 503 would outlive the fix (pinned by a test in tests/test_web.py).
+# Registered ahead of `add_no_cache_headers` so that one stays the outer middleware and stamps this
+# response too, since a cached refusal would outlive the fix.
 @app.middleware("http")
 async def refuse_invalid_declarations(request: Request, call_next):
     errors = declaration_errors()
-    # /static carries the stylesheet and the theme assets the refusal page itself renders with.
+    # The refusal page renders with the stylesheet and theme assets served from /static.
     if errors is None or request.url.path.startswith("/static"):
         return await call_next(request)
     return templates.TemplateResponse(
@@ -276,24 +270,21 @@ app.mount("/pasta", mcp_app)  # MCP endpoint at /pasta/mcp
 
 
 class _RefuseInvalidDeclarations(Middleware):
-    """The MCP half of the declaration quarantine (see the HTTP gate above for why it exists).
+    """The tool-call half of the declaration quarantine above.
 
-    Hung on `on_call_tool` rather than each tool, so it covers every one of them including any
-    added later - and rather than on `on_initialize`, so a client can still connect and reconnect
-    while the surface is down. The refusal carries the declaration errors themselves: an agent
-    drives this surface and never sees the dev console, so the tool error is the only place it can
-    learn why the server stopped answering, and what to fix.
+    Hung on the call rather than on each tool, so it covers any tool added later, and not on the
+    handshake, so a client can still connect while the surface is down. The refusal carries the
+    errors themselves: this surface is driven by an agent, which never sees the dev console and has
+    nowhere else to learn why the server stopped answering.
     """
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         errors = declaration_errors()
         if errors is None:
             return await call_next(context)
-        # Name the reload log by absolute path, resolved from the RUNNING server's package rather
-        # than the caller's cwd: an agent hitting this is often working in a different checkout
-        # (or worktree) than the server it is talking to, and would otherwise look in the wrong
-        # tree - or not know the log exists. It holds the full traceback behind these errors,
-        # which the aggregated message above deliberately does not carry.
+        # Resolved from the running server's package rather than the caller's cwd: a caller is
+        # often working in a different checkout than the server it is talking to. The log holds the
+        # traceback behind these errors, which the aggregated message deliberately does not carry.
         from ._hmr_debug import LOG_PATH
         raise ToolError(
             "The page-type declarations are invalid, so this server is refusing to serve rather "
