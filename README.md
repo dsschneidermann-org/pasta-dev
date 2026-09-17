@@ -10,6 +10,8 @@ So a process you write down once (TDD, reproduce-before-you-fix, spec-then-plan)
 
 <img src="docs/pasta-ui-bug-example.png" width="550" alt="A bug report page in the pasta web UI">
 
+Code documentation lives at **[pasta.dennis-s.dk](https://pasta.dennis-s.dk)**.
+
 ## The problem with putting your process in a prompt
 
 Agents don't fail because they can't write code. They fail at the seams: they fix the symptom without reproducing the bug, plan against code they never opened, mark a test passed they never ran, and declare victory one step before the part that actually matters.
@@ -149,6 +151,8 @@ just main        # run the server
 just docs        # generate page-type docs + Sphinx site
 just dev         # server and a live docs site, in parallel
 ```
+
+`just docs` builds the same site that is published at [pasta.dennis-s.dk](https://pasta.dennis-s.dk): the page-type reference with a rendered state diagram per type, and the API documentation for the code under `src/`.
 
 The core is pure and I/O-free (`model`, `pagetypes`, `fsm`, `commands`, `serialize`) with a thin stateful shell (`store`, `server`) around it, the same split the stage guidance keeps asking agents to respect.
 
