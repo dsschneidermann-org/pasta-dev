@@ -83,6 +83,8 @@ def workspace_guidance(page_type: PageType, status: str,
             if text:
                 out[f"guidance_{spec.field}"] = spec.label + text
     return out
+
+
 @dataclass
 class CreatePageResult:
     page: Page
