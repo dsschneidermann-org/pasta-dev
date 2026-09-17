@@ -442,6 +442,33 @@ def test_search_ranks_and_resolves_partial_id(store):
     assert archived[0]["archived"] is True
 
 
+def test_search_matches_a_term_wrapped_in_emphasis_or_quotes(store):
+    # A wrapped term is the same word to a reader, so search has to reach it. Stripping the
+    # query too keeps the two sides symmetric, so either may carry the wrapper and still meet.
+    workspace = store.create_workspace("demo")
+    page = store.create_page(
+        workspace.id, "test-fields", "Move `ElementBlocksSpec` from `args.py` to `fields.py`").page
+    _mutate(store, workspace.id, page.id, [
+        {"command": "setBody", "args": {"text": "declare *groundingTool*, _mergeProcess_, "
+                                                "'testingTool' and \"statusRevisionToken\" here"}}])
+
+    def ids(query):
+        return [hit["pageId"] for hit in store.search(workspace.id, query)["hits"]]
+
+    # the reported case: a backticked identifier carried only by the title
+    assert ids("ElementBlocksSpec") == [page.id]
+    assert ids("elementblocksspec") == [page.id]          # still case-insensitive
+    assert ids("args") == [page.id]                       # `args.py` keeps its internal dot
+    # every other wrapper an author reaches for
+    assert ids("groundingTool") == [page.id]              # *emphasis*
+    assert ids("mergeProcess") == [page.id]               # _emphasis_
+    assert ids("testingTool") == [page.id]                # 'single quotes'
+    assert ids("statusRevisionToken") == [page.id]        # "double quotes"
+    # and a query that carries the wrapper reaches the bare word just the same
+    assert ids("`ElementBlocksSpec`") == [page.id]
+    assert ids('"groundingTool"') == [page.id]
+
+
 def test_text_search_excludes_descendants_of_an_archived_page(store):
     # Archiving cascades onto PINNED children only, so an ordinary descendant keeps archived=False.
     # The tree hides it anyway (it recurses and stops at the archived ancestor), so text search has

@@ -48,6 +48,10 @@ from .serialize import workspace_from_dict, workspace_to_dict
 # The search prefix that switches a query from text matching to page-id resolution.
 ID_QUERY_PREFIX = "id:"
 
+# Emphasis and quote marks wrap a word in prose without being part of it. Stripping them from
+# each end leaves the word reachable by a bare term, while punctuation inside it is kept.
+NON_SEARCH_CHARS = "`*_'\"‘’“”"
+
 # Subdirectory for pre-prune backups. Not beside the live files: list_workspaces globs
 # "*.json" non-recursively, so a backup there would be listed as a duplicate workspace.
 BACKUP_DIRNAME = "backups"
@@ -55,6 +59,17 @@ BACKUP_DIRNAME = "backups"
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def search_words(text: str) -> list[str]:
+    """`text` lowercased and split into the words search matches on, each stripped of its
+    wrapping characters.
+
+    The one tokeniser for both sides of the match, so a bare term and a wrapped one reach the
+    same word. A word of only wrappers drops out rather than matching as an empty prefix.
+    """
+    return [stripped for word in text.lower().split()
+            if (stripped := word.strip(NON_SEARCH_CHARS))]
 
 
 def workspace_guidance(page_type: PageType, status: str,
@@ -318,13 +333,13 @@ class Store:
                 if token in page.id.lower():
                     add(page, 10_001 if token == page.id.lower() else 10_000, f"id: {page.id}")
         else:
-            terms = [term.lower() for term in query.split() if term]
+            terms = search_words(query)
             for page in workspace.pages.values():
                 page_type = get_page_type(page.type)
                 if page_type is None or not terms or self._archived_in_ancestry(workspace, page):
                     continue
                 text = render.page_text(page, page_type)
-                words = text.lower().split()
+                words = search_words(text)
                 score = sum(1 for word in words for term in terms if word.startswith(term))
                 if score:
                     add(page, score, self._snippet(text, terms))
