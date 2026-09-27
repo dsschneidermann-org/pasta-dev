@@ -41,6 +41,7 @@ from pathlib import Path
 from weakref import WeakSet
 
 import uvicorn
+from fastapi import FastAPI, Request
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.session import ServerSession
@@ -49,6 +50,8 @@ from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter
 from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks
 from starlette.applications import Starlette
 from starlette.routing import Mount
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .hmr_live_refresh import ws_reloader
 
@@ -87,6 +90,25 @@ class _LoggingErrorFilter(ErrorFilter):
                 "[HMR] reload FAILED - the edit did not take, and the modules loaded before it "
                 "are still serving:\n%s", reason)
         return super().__exit__(exc_type, exc_value, traceback_)
+
+
+# --- Logging ---------------------------------------------------------------------------s
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        client_ip = request.client.host
+        method = request.method
+        url = request.url.path
+        try:
+            req_body = await request.json()
+        except Exception:
+            req_body = None
+
+        response = await call_next(request)
+        status_code = response.status_code
+        if status_code // 100 == 4 or status_code // 100 == 5:
+            logger.error(f"Response: {method} {url} returned {status_code} to {client_ip}\nRequest body: {str(req_body)}")
+
+        return response
 
 
 # --- MCP session capture ---------------------------------------------------------------
@@ -267,9 +289,11 @@ def build_dev_app() -> Starlette:
         last_fastapi_app = fastapi_app
         await fastapi_app(scope, receive, send)
 
+
     return Starlette(
         routes=[Mount("/pasta", app=mcp_asgi), Mount("/", app=fastapi_dispatch)],
         lifespan=combine_lifespans(mcp_asgi.lifespan, reloader_lifespan),
+        middleware=[Middleware(LoggingMiddleware)]
     )
 
 
