@@ -33,15 +33,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import traceback
 from asyncio import Event, Lock, TaskGroup
 from contextlib import asynccontextmanager, suppress
 from importlib import import_module
 from pathlib import Path
+from typing import cast, override
 from weakref import WeakSet
 
 import uvicorn
-from fastapi import FastAPI, Request
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.session import ServerSession
@@ -49,9 +50,11 @@ from reactivity import async_effect, derived
 from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter
 from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks
 from starlette.applications import Starlette
-from starlette.routing import Mount
 from starlette.middleware import Middleware
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.routing import Mount
 
 from .hmr_live_refresh import ws_reloader
 
@@ -92,21 +95,66 @@ class _LoggingErrorFilter(ErrorFilter):
         return super().__exit__(exc_type, exc_value, traceback_)
 
 
-# --- Logging ---------------------------------------------------------------------------s
+# --- Request logging -------------------------------------------------------------------
+# A 4xx/5xx is the response worth a console line: the request reached us and we turned it down,
+# which is the one thing the caller - an MCP client or a browser - cannot see from its end. The
+# request body goes with it, since for JSON-RPC the method and params are the whole story of
+# what was asked.
+#
+# Values under password/token/secret-ish keys are stamped out on the way to the log. Bodies are
+# logged only on failure, and a 401 body is exactly where a credential sits - so without the
+# redaction this would single out the requests most likely to be carrying one.
+#
+# Mounted on the OUTER app (see build_dev_app) so one copy covers both surfaces - /pasta and the
+# reloaded FastAPI app. BaseHTTPMiddleware only sees HTTP scopes, so the /ws/reloader websocket
+# passes through untouched.
+_REDACTED = "[redacted]"
+_SENSITIVE_KEY = re.compile(r"pass|secret|token|auth|cred|cookie|api[-_]?key", re.IGNORECASE)
+
+
+def _redact(value: object) -> object:
+    """Blank out the values under sensitive-looking keys, at any depth."""
+    if isinstance(value, dict):
+        return {
+            key: _REDACTED if isinstance(key, str) and _SENSITIVE_KEY.search(key) else _redact(item)
+            for key, item in cast("dict[object, object]", value).items()
+        }
+    if isinstance(value, list):
+        return [_redact(item) for item in cast("list[object]", value)]
+    return value
+
+
 class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        client_ip = request.client.host
+    @override
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        # `client` is absent from the scope for transports that have no peer address (a unix
+        # socket, some proxies). Reading `.host` off that None would fail the request here,
+        # BEFORE it reaches the app - turning a logging concern into an outage.
+        client_ip = request.client.host if request.client else "-"
         method = request.method
         url = request.url.path
+        # Read before call_next, since afterwards the app has consumed the stream. Starlette's
+        # BaseHTTPMiddleware caches the body and replays it downstream, so reading it here does
+        # not starve the app of it.
         try:
             req_body = await request.json()
         except Exception:
             req_body = None
 
-        response = await call_next(request)
-        status_code = response.status_code
-        if status_code // 100 == 4 or status_code // 100 == 5:
-            logger.error(f"Response: {method} {url} returned {status_code} to {client_ip}\nRequest body: {str(req_body)}")
+        try:
+            response = await call_next(request)
+        except Exception:
+            # Nothing started a response, so the status check below never runs. This is the
+            # reload-failure path - `fastapi_dispatch` raising because the reloaded module left
+            # no app to serve - which is the 500 most worth a line. Re-raised untouched, so
+            # uvicorn still prints the traceback.
+            logger.error("Response: %s %s raised before any response, to %s\nRequest body: %s",
+                         method, url, client_ip, _redact(req_body))
+            raise
+
+        if response.status_code >= 400:
+            logger.error("Response: %s %s returned %s to %s\nRequest body: %s",
+                         method, url, response.status_code, client_ip, _redact(req_body))
 
         return response
 
@@ -289,11 +337,10 @@ def build_dev_app() -> Starlette:
         last_fastapi_app = fastapi_app
         await fastapi_app(scope, receive, send)
 
-
     return Starlette(
         routes=[Mount("/pasta", app=mcp_asgi), Mount("/", app=fastapi_dispatch)],
         lifespan=combine_lifespans(mcp_asgi.lifespan, reloader_lifespan),
-        middleware=[Middleware(LoggingMiddleware)]
+        middleware=[Middleware(LoggingMiddleware)],
     )
 
 
