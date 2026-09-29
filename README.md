@@ -95,6 +95,10 @@ planReview   read the plan against the spec, while fixing it is still cheap
 building     write the code, test-first, one step at a time
   │
 review       verify every step and case against a run you actually saw
+  │
+done         the work is done - not merged, not shipped. Update the recorded
+  │          shas if they moved, follow the workspace's merge process if there
+  │          is one, and nothing else
   │          <- human gate
 shipped
 ```
