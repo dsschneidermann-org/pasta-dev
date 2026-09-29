@@ -198,6 +198,8 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 # Drives the Archive/Unarchive button at the bottom of the page (see page.html).
                 "page_id": page.id,
                 "archived": page.archived,
+                # Drives the Set to delete / Cancel delete button beside it.
+                "delete_scheduled": page.delete_scheduled,
                 # Drives the status dropdown next to the Archive button: every status of this
                 # page's type, with the current one preselected.
                 "statuses": page_type.fsm.states if page_type is not None else (),
@@ -226,6 +228,28 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         STORE.unarchive_page(workspace_id, pageId)
+        await ws_reloader.refresh()
+        return PlainTextResponse(status_code=202)
+
+
+# Schedule/cancel a page's deletion from its web view, behind the button beside Archive/Unarchive.
+# There is no MCP equivalent, like the status override below: scheduling is a decision a person
+# makes in the browser. Scheduling also archives, so a page queued for deletion is never left in a
+# live view; the sweep deletes it only once the grace period has passed.
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/schedule-delete", response_class=PlainTextResponse)
+async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
+    with _guard_http():
+        workspace_id = f"ws:{workspaceIdPart}"
+        STORE.schedule_page_deletion(workspace_id, pageId)
+        await ws_reloader.refresh()
+        return PlainTextResponse(status_code=202)
+
+
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/unschedule-delete", response_class=PlainTextResponse)
+async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
+    with _guard_http():
+        workspace_id = f"ws:{workspaceIdPart}"
+        STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
