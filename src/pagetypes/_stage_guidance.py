@@ -173,8 +173,9 @@ rather than mark it done with a known gap.
 FEATURE_BRIEF_DONE = """
 done - the build is verified and the work is done. It is not merged, not shipped and
 not signed off: this status says the agent has nothing left to build, and it says
-nothing more than that. There are two things to do here, and only if it applies:
+nothing more than that. The work of it:
 
+- Update the README.md or other file-based docs that need to be ready at the gate.
 - Update the recorded commits if their shas moved, flagging as stale any sha that has
   left history. If none moved, there is nothing to do.
 - Follow the merge process guidance beside this text, if this workspace configured
@@ -183,7 +184,7 @@ nothing more than that. There are two things to do here, and only if it applies:
 
 Reconciling the documentation pages the brief named as going stale waits for ship too:
 the sign-off is what authorizes both, and doing either here would cross the gate.
-Shipping is a human edge: drive up to it and stop. If anything turns up outstanding,
+Shipping is a human gate: drive up to it and stop. If anything turns up outstanding,
 use requestChanges to go back to building rather than leave a known gap at the gate.
 """
 
@@ -218,14 +219,15 @@ open rather than mark it done with a known gap.
 DONE = """
 done - the work is written, verified and done. It is not merged, not closed and not
 signed off: this status says the agent has nothing left to build, and it says nothing
-more than that. There is one thing to do here, and only if it applies:
+more than that. The work of it:
 
+- Update the README.md or other file-based docs that need to be ready at the gate.
 - Follow the merge process guidance beside this text, if this workspace configured
   one, and leave the pull request url on the page if that produces one. If there is no
   merge process, there is nothing to do.
 
 Nothing is built here and no commit is recorded: close records it. Closing is a human
-edge, and closing is where the work is actually merged - drive up to that gate and
+gate, and closing is where the work is actually merged - drive up to that gate and
 stop. If anything turns up outstanding, use requestChanges to go back to open rather
 than leave a known gap at the gate.
 """
