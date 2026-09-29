@@ -138,9 +138,8 @@ def classify(workspace: Workspace, now: datetime) -> Sweep:
     roots, so a nested expired page is removed once, with its parent.
     """
     reach = reachability(workspace)
-    # Out of sight is no longer enough: an archived page is a deletion candidate only once
-    # someone schedules it. Pages filed nowhere remain candidates on their own, because
-    # nobody can reach one to schedule it.
+    # A page out of sight is a deletion candidate only once someone schedules it. A page filed
+    # nowhere is one on its own, because nobody can reach it to schedule it.
     scheduled = {page_id for page_id in reach.hidden
                  if workspace.pages[page_id].delete_scheduled}
     targets = scheduled | reach.unfiled

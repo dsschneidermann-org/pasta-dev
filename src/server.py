@@ -232,10 +232,10 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
         return PlainTextResponse(status_code=202)
 
 
-# Schedule/cancel a page's deletion from its web view, behind the button beside Archive/Unarchive.
-# There is no MCP equivalent, like the status override below: scheduling is a decision a person
-# makes in the browser. Scheduling also archives, so a page queued for deletion is never left in a
-# live view; the sweep deletes it only once the grace period has passed.
+# Schedule or cancel a page's deletion from its web view, behind the button beside the archive
+# control. Scheduling also archives, so a page queued for deletion is never left in a live view,
+# and the sweep destroys it only once its grace period has passed. Deciding this is a human act in
+# the browser, so there is no MCP counterpart.
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/schedule-delete", response_class=PlainTextResponse)
 async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
