@@ -28,9 +28,10 @@ def _ws(*pages: Page, roots: list[str]) -> Workspace:
     return Workspace(id="ws:t", name="t", root_page_ids=roots, pages={p.id: p for p in pages})
 
 
-def _p(page_id, children=(), archived=False, expires_at=None) -> Page:
+def _p(page_id, children=(), archived=False, expires_at=None, delete_scheduled=False) -> Page:
     return Page(id=page_id, type="test-fields", title=page_id, status="active",
-                child_ids=list(children), archived=archived, expires_at=expires_at)
+                child_ids=list(children), archived=archived, expires_at=expires_at,
+                delete_scheduled=delete_scheduled)
 
 
 def test_expiry_is_noon_utc_five_days_out():
@@ -98,14 +99,16 @@ SOON = "2026-08-18T12:00:00+00:00"      # what expiry_for(NOW) returns
 PAST = "2026-08-01T12:00:00+00:00"      # already elapsed
 
 
-def test_classify_stamps_hidden_and_unfiled_only():
-    ws = _ws(_p("root", ["live", "arch"]), _p("live"), _p("arch", archived=True),
+def test_classify_stamps_scheduled_and_unfiled_only():
+    ws = _ws(_p("root", ["live", "arch"]), _p("live"),
+             _p("arch", archived=True, delete_scheduled=True),
              _p("lost"), roots=["root"])
     assert cleanup.classify(ws, NOW).stamp == {"arch": SOON, "lost": SOON}
 
 
 def test_classify_never_restamps_an_existing_expiry():
-    ws = _ws(_p("root", ["arch"]), _p("arch", archived=True, expires_at=PAST), roots=["root"])
+    ws = _ws(_p("root", ["arch"]),
+             _p("arch", archived=True, delete_scheduled=True, expires_at=PAST), roots=["root"])
     assert cleanup.classify(ws, NOW).stamp == {}
 
 
@@ -117,7 +120,7 @@ def test_classify_clears_a_stamp_when_the_page_is_findable_again():
 def test_classify_prunes_only_maximal_subtree_roots():
     # Parent and child both expired: only the parent is named.
     ws = _ws(_p("root", ["arch"]),
-             _p("arch", ["kid"], archived=True, expires_at=PAST),
+             _p("arch", ["kid"], archived=True, delete_scheduled=True, expires_at=PAST),
              _p("kid", expires_at=PAST), roots=["root"])
     assert cleanup.classify(ws, NOW).prune == ["arch"]
 
@@ -130,6 +133,40 @@ def test_classify_prunes_an_expired_unfiled_orphan():
 def test_classify_does_not_prune_an_unfiled_orphan_before_its_expiry():
     ws = _ws(_p("root"), _p("lost", expires_at=SOON), roots=["root"])
     assert cleanup.classify(ws, NOW).prune == []
+
+
+def test_classify_does_not_stamp_an_archived_page_nobody_scheduled():
+    ws = _ws(_p("root", ["arch"]), _p("arch", archived=True), roots=["root"])
+    assert cleanup.classify(ws, NOW).stamp == {}
+
+
+def test_classify_clears_the_stamp_of_an_archived_page_nobody_scheduled():
+    # A stamp written under the old rule is dropped by the next sweep, not acted on.
+    ws = _ws(_p("root", ["arch"]), _p("arch", archived=True, expires_at=PAST), roots=["root"])
+    sweep = cleanup.classify(ws, NOW)
+    assert sweep.clear == ["arch"]
+    assert sweep.prune == []
+
+
+def test_classify_does_not_stamp_a_hidden_descendant_of_a_scheduled_page():
+    # The decision is recorded on one page; the subtree goes with it when that page prunes.
+    ws = _ws(_p("root", ["arch"]),
+             _p("arch", ["kid"], archived=True, delete_scheduled=True), _p("kid"), roots=["root"])
+    assert cleanup.classify(ws, NOW).stamp == {"arch": SOON}
+
+
+def test_classify_ignores_a_scheduled_page_that_is_still_findable():
+    # Only reachable by hand-editing the file; a page a user can see must never be deleted.
+    ws = _ws(_p("root", ["odd"]), _p("odd", delete_scheduled=True, expires_at=PAST), roots=["root"])
+    sweep = cleanup.classify(ws, NOW)
+    assert sweep.stamp == {}
+    assert sweep.clear == ["odd"]
+    assert sweep.prune == []
+
+
+def test_classify_still_stamps_an_unfiled_orphan_nobody_scheduled():
+    ws = _ws(_p("root"), _p("lost"), roots=["root"])
+    assert cleanup.classify(ws, NOW).stamp == {"lost": SOON}
 
 
 def test_delete_subtree_removes_every_descendant():
@@ -164,7 +201,7 @@ def test_run_once_sweeps_every_workspace(tmp_path):
     for name in ("one", "two"):
         workspace = store.create_workspace(name)
         page = store.create_page(workspace.id, "test-fields", "Bye").page
-        store.archive_page(workspace.id, page.id)
+        store.schedule_page_deletion(workspace.id, page.id)
 
     reports = cleanup.run_once(store, now=NOW)
 

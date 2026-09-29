@@ -1,9 +1,8 @@
 """The recurring workspace cleanup job: stamp, back up, prune.
 
-Hourly at five past, each workspace is swept and a uniform expiry stamped on pages
-that can no longer be found - archived pages, the pages hidden underneath them, and
-pages filed nowhere. Once that expiry passes the page and its subtree are deleted,
-backup first.
+Hourly at five past, each workspace is swept and a uniform expiry stamped on pages that
+are out of sight and scheduled for deletion, and on pages filed nowhere. Once that
+expiry passes the page and its subtree are deleted, backup first.
 
 Classification is pure, so it unit-tests with no filesystem; the store owns the
 transaction. This module never imports store - the dependency runs store -> cleanup.
@@ -134,11 +133,17 @@ def classify(workspace: Workspace, now: datetime) -> Sweep:
 
     A page already carrying an expiry is never re-stamped, or the deadline would move
     every hour and nothing would ever expire; a page that is findable again has its
-    stamp dropped. `prune` names only maximal subtree roots, so a nested expired page
-    is removed once, with its parent.
+    stamp dropped. A hidden page is a target only once someone schedules it, while a
+    page filed nowhere is a target on its own. `prune` names only maximal subtree
+    roots, so a nested expired page is removed once, with its parent.
     """
     reach = reachability(workspace)
-    targets = reach.hidden | reach.unfiled          # both orphan arms
+    # Out of sight is no longer enough: an archived page is a deletion candidate only once
+    # someone schedules it. Pages filed nowhere remain candidates on their own, because
+    # nobody can reach one to schedule it.
+    scheduled = {page_id for page_id in reach.hidden
+                 if workspace.pages[page_id].delete_scheduled}
+    targets = scheduled | reach.unfiled
     expiry = expiry_for(now)
     stamp = {page_id: expiry for page_id in sorted(targets)
              if workspace.pages[page_id].expires_at is None}
