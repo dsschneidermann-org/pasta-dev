@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from ._stage_guidance import (
     BUILDING,
+    FEATURE_BRIEF_DONE,
     FEATURE_BRIEF_REVIEW,
     GROUNDING,
     PLANNING,
@@ -80,7 +81,7 @@ _FINDING_ACTIONS = ("addStep", "addCase", "addConstraint", "askQuestion", "edit"
 
 
 # States allowing modifications to the commit log.
-_COMMIT_LOG_STATES = ("building", "review", "shipped")
+_COMMIT_LOG_STATES = ("building", "review", "done", "shipped")
 
 
 _FEATURE_BRIEF = PageType(
@@ -190,7 +191,7 @@ _FEATURE_BRIEF = PageType(
         )),
     ),
     workspace_guidance=(
-        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC, MERGE_PROCESS_LABEL),
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("done",), MERGE_PROCESS_DESC, MERGE_PROCESS_LABEL),
         WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC, TESTING_TOOL_LABEL),
         WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("grounding",), GROUNDING_TOOL_DESC, GROUNDING_TOOL_LABEL),
     ),
@@ -219,7 +220,7 @@ _FEATURE_BRIEF = PageType(
                                    description="how the finding was applied to the plan")),
                    legal_in=("planReview",)),
         set_scalar_cmd("pull_request", "url", name="setPullRequestUrl", label="pull request url",
-                       legal_in=("review",)),
+                       legal_in=("review", "done")),
         *list_cmds("commits", add_name="recordCommit", label="recorded commit", remove=False,
                    add_args=(_text("sha"), _text("message")),
                    legal_in=_COMMIT_LOG_STATES),
@@ -268,8 +269,10 @@ _FEATURE_BRIEF = PageType(
                             section="cases", field="items"),
         )),
         transition_cmd("reopenPlanning", "building -> planning"),
-        transition_cmd("requestChanges", "review -> building", agency="either"),
-        transition_cmd("ship", "review -> shipped (human gate)", agency="human", guards=(
+        transition_cmd("markDone", "review -> done"),
+        transition_cmd("requestChanges", "review or done -> building",
+                       legal_in=("review", "done"), agency="either"),
+        transition_cmd("ship", "done -> shipped (human gate)", agency="human", guards=(
             ChildStateGuard("implementation-plan", ("done", "skipped"),
                             "every implementation-plan step must be done or skipped",
                             section="steps", field="items"),
@@ -286,7 +289,7 @@ _FEATURE_BRIEF = PageType(
         name="FeatureBrief",
         initial="draft",
         states=("draft", "grounding", "spec", "planning", "planReview", "building", "review",
-                "shipped", "abandoned"),
+                "done", "shipped", "abandoned"),
         terminal_states=("shipped", "abandoned"),
         status_guidance=(
             ("grounding", GROUNDING),
@@ -295,6 +298,7 @@ _FEATURE_BRIEF = PageType(
             ("planReview", PLAN_REVIEW),
             ("building", BUILDING),
             ("review", FEATURE_BRIEF_REVIEW),
+            ("done", FEATURE_BRIEF_DONE),
         ),
     ),
     # On createPage, create the three pinned children in the same commit; author into those.
@@ -307,13 +311,13 @@ _FEATURE_BRIEF = PageType(
 # a stage before the plans are.
 _FEATURE_IN_SPEC_OR_LATER = ParentStateGuard(
     parent_type="feature-brief",
-    required_statuses=("spec", "planning", "planReview", "building", "review", "shipped"),
+    required_statuses=("spec", "planning", "planReview", "building", "review", "done", "shipped"),
     message="the feature-brief must be in spec or later",
 )
 
 _FEATURE_IN_PLANNING_OR_LATER = ParentStateGuard(
     parent_type="feature-brief",
-    required_statuses=("planning", "planReview", "building", "review", "shipped"),
+    required_statuses=("planning", "planReview", "building", "review", "done", "shipped"),
     message="the feature-brief must be in planning or later",
 )
 

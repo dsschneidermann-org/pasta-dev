@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ._stage_guidance import REVIEW, SIMPLE_CHANGE_DRAFT, SIMPLE_CHANGE_OPEN
+from ._stage_guidance import DONE, REVIEW, SIMPLE_CHANGE_DRAFT, SIMPLE_CHANGE_OPEN
 from ._workspace_guidance import (
     GROUNDING_TOOL_DESC,
     GROUNDING_TOOL_FIELD,
@@ -127,6 +127,7 @@ _SIMPLE_CHANGE = PageType(
             ("draft", SIMPLE_CHANGE_DRAFT),
             ("open", SIMPLE_CHANGE_OPEN),
             ("review", REVIEW),
+            ("done", DONE),
         ),
     ),
 )
