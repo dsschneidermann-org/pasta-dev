@@ -23,6 +23,7 @@ def page_to_dict(page: Page) -> dict[str, Any]:
         "archived": page.archived,
         "links": [dict(link) for link in page.links],
         "expires_at": page.expires_at,
+        "delete_scheduled": page.delete_scheduled,
         "status_revision_token": page.status_revision_token,
     }
 
@@ -39,6 +40,7 @@ def page_from_dict(data: dict[str, Any]) -> Page:
         archived=data.get("archived", False),
         links=[dict(link) for link in data.get("links", [])],
         expires_at=data.get("expires_at"),
+        delete_scheduled=data.get("delete_scheduled", False),
         status_revision_token=data.get("status_revision_token"),
     )
 

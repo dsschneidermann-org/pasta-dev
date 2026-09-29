@@ -71,6 +71,20 @@ def test_page_expires_at_defaults_to_none_for_legacy_files():
     assert page_from_dict(data).expires_at is None
 
 
+def test_page_delete_scheduled_round_trips():
+    page = _sample_page()
+    page.delete_scheduled = True
+    assert page_to_dict(page)["delete_scheduled"] is True
+    assert page_from_dict(page_to_dict(page)).delete_scheduled is True
+
+
+def test_page_delete_scheduled_defaults_to_false_for_legacy_files():
+    # a legacy page dict (written before deletion was scheduled explicitly) loads with False
+    data = page_to_dict(_sample_page())
+    del data["delete_scheduled"]
+    assert page_from_dict(data).delete_scheduled is False
+
+
 def test_page_status_revision_token_round_trips():
     page = _sample_page()
     page.status_revision_token = "042917"
