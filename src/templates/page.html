@@ -11,6 +11,11 @@
               action="/{{ workspace_id }}/page/{{ page_id }}/{% if archived %}unarchive{% else %}archive{% endif %}">
             <button type="submit">{% if archived %}Unarchive page{% else %}Archive page{% endif %}</button>
         </form>
+        {# Scheduling also archives, so the page leaves the live views as it is queued for deletion. #}
+        <form id="delete-schedule-form" method="post"
+              action="/{{ workspace_id }}/page/{{ page_id }}/{% if delete_scheduled %}unschedule-delete{% else %}schedule-delete{% endif %}">
+            <button type="submit">{% if delete_scheduled %}Cancel delete{% else %}Set to delete{% endif %}</button>
+        </form>
         {% if statuses %}
         {# Direct state override: pick any of the type's FSM states and Apply (POSTs to /status). #}
         <form id="status-form" method="post" style="display: flex; align-items: center;"
@@ -27,6 +32,9 @@
     </div>
     <script>
         document.getElementById("archive-form").addEventListener("submit", function(event) {
+            window.scrollTo(0, 0);
+        })
+        document.getElementById("delete-schedule-form").addEventListener("submit", function(event) {
             window.scrollTo(0, 0);
         })
         document.getElementById("status-form").addEventListener("submit", function(event) {

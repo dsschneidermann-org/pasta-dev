@@ -1265,6 +1265,63 @@ def test_archiving_parent_cascades_to_pinned_children(store):
     assert all(reloaded.pages[cid].archived is False for cid in child_ids)   # restored with the parent
 
 
+def test_schedule_page_deletion_also_archives(store):
+    # Scheduling implies archiving, so a page queued for deletion is never left in a live view.
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Page title").page
+    store.schedule_page_deletion(workspace.id, page.id)
+    stored = store.get_page(workspace.id, page.id)
+    assert stored.delete_scheduled is True
+    assert stored.archived is True
+
+
+def test_unschedule_page_deletion_leaves_the_page_archived(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Page title").page
+    store.schedule_page_deletion(workspace.id, page.id)
+    store.unschedule_page_deletion(workspace.id, page.id)
+    stored = store.get_page(workspace.id, page.id)
+    assert stored.delete_scheduled is False
+    assert stored.archived is True                                          # only the deletion is called off
+
+
+def test_unarchiving_cancels_a_scheduled_deletion(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Page title").page
+    store.schedule_page_deletion(workspace.id, page.id)
+    store.unarchive_page(workspace.id, page.id)
+    stored = store.get_page(workspace.id, page.id)
+    assert stored.archived is False
+    assert stored.delete_scheduled is False                                 # anything findable is not scheduled
+
+
+def test_archiving_a_page_does_not_schedule_it(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Page title").page
+    store.archive_page(workspace.id, page.id)
+    assert store.get_page(workspace.id, page.id).delete_scheduled is False
+
+
+def test_scheduling_a_parent_cascades_to_pinned_children(store):
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Feat")
+    parent_id = result.page.id
+    child_ids = [c.id for c in result.children]
+    store.schedule_page_deletion(workspace.id, parent_id)
+    reloaded = store.load_workspace(workspace.id)
+    assert reloaded.pages[parent_id].delete_scheduled is True
+    assert all(reloaded.pages[cid].delete_scheduled is True for cid in child_ids)
+    assert all(reloaded.pages[cid].archived is True for cid in child_ids)
+
+
+def test_pinned_child_cannot_be_scheduled_individually(store):
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Feat")
+    child = _child(result, "test-child")
+    with pytest.raises(IllegalCommandError):
+        store.schedule_page_deletion(workspace.id, child.id)
+
+
 def test_non_pinned_child_is_still_mutable(store):
     workspace = store.create_workspace("demo")
     parent_id = store.create_page(workspace.id, "test-lifecycle", "Feat").page.id
@@ -1314,10 +1371,10 @@ def test_backup_is_a_loadable_workspace_document(store):
     assert restored.pages[page.id].title == "Keep me"
 
 
-def test_cleanup_stamps_an_archived_page_but_does_not_delete_it(store):
+def test_cleanup_stamps_a_scheduled_page_but_does_not_delete_it(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "Bye").page
-    store.archive_page(workspace.id, page.id)
+    store.schedule_page_deletion(workspace.id, page.id)
 
     report = store.cleanup_workspace(workspace.id, NOW)
 
@@ -1328,7 +1385,7 @@ def test_cleanup_stamps_an_archived_page_but_does_not_delete_it(store):
 def test_cleanup_prunes_only_after_the_expiry_passes(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "Bye").page
-    store.archive_page(workspace.id, page.id)
+    store.schedule_page_deletion(workspace.id, page.id)
     store.cleanup_workspace(workspace.id, NOW)                  # stamps for 2026-08-18
 
     store.cleanup_workspace(workspace.id, NOW)                  # same hour: still no-op
@@ -1343,7 +1400,7 @@ def test_cleanup_prunes_only_after_the_expiry_passes(store):
 def test_cleanup_writes_a_backup_before_pruning(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "Bye").page
-    store.archive_page(workspace.id, page.id)
+    store.schedule_page_deletion(workspace.id, page.id)
     store.cleanup_workspace(workspace.id, NOW)
 
     report = store.cleanup_workspace(workspace.id, AFTER_EXPIRY)
@@ -1357,7 +1414,7 @@ def test_cleanup_writes_a_backup_before_pruning(store):
 def test_cleanup_clears_the_stamp_when_a_page_is_unarchived(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "Back").page
-    store.archive_page(workspace.id, page.id)
+    store.schedule_page_deletion(workspace.id, page.id)
     store.cleanup_workspace(workspace.id, NOW)
     store.unarchive_page(workspace.id, page.id)
 
@@ -1367,19 +1424,58 @@ def test_cleanup_clears_the_stamp_when_a_page_is_unarchived(store):
     assert store.get_page(workspace.id, page.id).expires_at is None
 
 
-def test_cleanup_prunes_an_archived_parent_with_its_shadowed_children(store):
+def test_cleanup_prunes_a_scheduled_parent_with_its_shadowed_children(store):
     workspace = store.create_workspace("demo")
     parent = store.create_page(workspace.id, "test-fields", "Parent").page
     child = store.create_page(workspace.id, "test-fields", "Child", parent_id=parent.id).page
-    store.archive_page(workspace.id, parent.id)
-    # The child is not flagged archived - it is hidden only because its parent is.
+    store.schedule_page_deletion(workspace.id, parent.id)
+    # The child is neither archived nor scheduled - it is hidden only because its parent is.
     assert store.get_page(workspace.id, child.id).archived is False
+    assert store.get_page(workspace.id, child.id).delete_scheduled is False
 
     store.cleanup_workspace(workspace.id, NOW)
     report = store.cleanup_workspace(workspace.id, AFTER_EXPIRY)
 
     assert sorted(report.pruned) == sorted([parent.id, child.id])
     assert store.load_workspace(workspace.id).root_page_ids == []
+
+
+def test_cleanup_does_not_stamp_an_archived_page_nobody_scheduled(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Keep me").page
+    store.archive_page(workspace.id, page.id)
+
+    report = store.cleanup_workspace(workspace.id, NOW)
+
+    assert report.stamped == 0 and report.pruned == []
+    assert store.get_page(workspace.id, page.id).expires_at is None
+
+
+def test_cleanup_clears_a_stamp_left_on_an_archived_page_nobody_scheduled(store):
+    # A stamp written under the old rule is dropped by the next sweep rather than acted on.
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Keep me").page
+    store.schedule_page_deletion(workspace.id, page.id)
+    store.cleanup_workspace(workspace.id, NOW)
+    store.unschedule_page_deletion(workspace.id, page.id)
+
+    report = store.cleanup_workspace(workspace.id, AFTER_EXPIRY)
+
+    assert report.cleared == 1 and report.pruned == []
+    assert store.get_page(workspace.id, page.id).expires_at is None
+
+
+def test_cleanup_deletes_a_scheduled_page_once_its_expiry_passes(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Bye").page
+    store.schedule_page_deletion(workspace.id, page.id)
+    store.cleanup_workspace(workspace.id, NOW)
+    assert store.get_page(workspace.id, page.id).expires_at == "2026-08-18T12:00:00+00:00"
+
+    report = store.cleanup_workspace(workspace.id, AFTER_EXPIRY)
+
+    assert page.id in report.pruned
+    assert report.backup is not None                    # deleted only behind a backup
 
 
 def test_cleanup_rejects_a_naive_datetime(store):
@@ -1393,7 +1489,7 @@ def test_cleanup_rejects_a_naive_datetime(store):
 def test_cleanup_aborts_without_deleting_when_the_backup_cannot_be_written(store, monkeypatch):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "Bye").page
-    store.archive_page(workspace.id, page.id)
+    store.schedule_page_deletion(workspace.id, page.id)
     store.cleanup_workspace(workspace.id, NOW)
 
     def boom(*args, **kwargs):
