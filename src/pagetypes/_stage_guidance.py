@@ -173,7 +173,7 @@ rather than mark it done with a known gap.
 FEATURE_BRIEF_DONE = """
 done - the build is verified and the work is done. It is not merged, not shipped and
 not signed off: this status says the agent has nothing left to build, and it says
-nothing more than that. There are two things to do here, and each only if it applies:
+nothing more than that. There are two things to do here, and only if it applies:
 
 - Update the recorded commits if their shas moved, flagging as stale any sha that has
   left history. If none moved, there is nothing to do.
@@ -181,13 +181,10 @@ nothing more than that. There are two things to do here, and each only if it app
   one, and leave the pull request url on the page if that produces one. If there is no
   merge process, there is nothing to do.
 
-With neither applying there is nothing to do at done at all, which is the expected
-outcome and not a sign something was missed. Recording the final commits waits until
-after ship, once the shas are final, and reconciling the documentation pages the brief
-named as going stale waits for ship too: the sign-off is what authorizes both, and
-doing either here would cross the gate rather than drive up to it. Shipping is a human
-edge: drive up to it and stop. If anything turns up outstanding, use requestChanges to
-go back to building rather than leave a known gap for the ship gate to find.
+Reconciling the documentation pages the brief named as going stale waits for ship too:
+the sign-off is what authorizes both, and doing either here would cross the gate.
+Shipping is a human edge: drive up to it and stop. If anything turns up outstanding,
+use requestChanges to go back to building rather than leave a known gap at the gate.
 """
 
 # --- simple-change and bug-report, shared ------------------------------------
@@ -224,9 +221,8 @@ signed off: this status says the agent has nothing left to build, and it says no
 more than that. There is one thing to do here, and only if it applies:
 
 - Follow the merge process guidance beside this text, if this workspace configured
-  one, and leave the pull request url on the page if that produces one. With no merge
-  process configured there is nothing to do at all, which is the expected outcome and
-  not a sign something was missed.
+  one, and leave the pull request url on the page if that produces one. If there is no
+  merge process, there is nothing to do.
 
 Nothing is built here and no commit is recorded: close records it. Closing is a human
 edge, and closing is where the work is actually merged - drive up to that gate and
