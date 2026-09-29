@@ -141,7 +141,8 @@ improvisation. Record each commit as you make it.
 """
 
 FEATURE_BRIEF_REVIEW = """
-review - the build is done, and this is the last stop before the human ship gate.
+review - the build is done, and this is the last stop before it is marked done and
+left for the human ship gate.
 This status is for verifying, not for finishing off. The work of it:
 
 - Re-read the spec's design section and confirm every requirement it states is
@@ -160,14 +161,33 @@ This status is for verifying, not for finishing off. The work of it:
   tone and single line comments that are self-evident by code should be removed.
 
 Three things are deliberately not part of this status, so do not start them here:
-rebasing onto main happens at ship, not before; recording commits happens after ship,
+integrating the work happens at done, not before; recording commits happens at done,
 once the shas are final; and reconciling the documentation pages the brief named as
-going stale also happens at ship.
+going stale also happens at done.
 
 If any of this turns up outstanding work, use requestChanges to go back to building
-rather than ship with a known gap.
+rather than mark it done with a known gap.
 """
 
+
+FEATURE_BRIEF_DONE = """
+done - the build is verified and the agent's part of the work is over. This status is
+the three things review deferred, and nothing else. The work of it:
+
+- Integrate the work the way this workspace integrates finished work; the merge
+  process guidance beside this text says how. Review deferred this on purpose, and
+  this is where it comes due.
+- Record every commit the feature now rests on, with the sha it ended up with, and
+  flag as stale any recorded commit whose sha left history on the way here.
+- Reconcile the documentation pages the brief named as going stale, so the wiki and
+  the code agree before anyone is asked to sign the work off.
+- Leave the pull request url on the page when the merge process produces one, so the
+  person at the ship gate has the thing they are being asked to look at.
+
+Nothing new is built here. Shipping is a human edge: drive up to it and stop. If any
+of this turns up outstanding work, use requestChanges to go back to building rather
+than leave a known gap for the ship gate to find.
+"""
 
 # --- simple-change and bug-report, shared ------------------------------------
 REVIEW = """
@@ -196,6 +216,24 @@ record here. If any of this turns up outstanding work, use requestChanges to go 
 open rather than mark it done with a known gap.
 """
 
+
+DONE = """
+done - the work is written and verified, and what is left is to make it integrable
+and hand it to a person. The work of it:
+
+- Integrate the work the way this workspace integrates finished work; the merge
+  process guidance beside this text says how. This status owns that step, because
+  review deliberately deferred it.
+- Leave a pull request url on the page when the merge process produces one, so the
+  person at the close gate has the thing they are being asked to look at.
+- Say plainly what is still outstanding, rather than letting the close gate be the
+  thing that discovers it.
+
+Nothing new is built here, and the commit is recorded by close itself, so there is
+nothing to record. Closing is a human edge: drive up to it and stop. If any of this
+turns up outstanding work, use requestChanges to go back to open rather than leave a
+known gap at the gate.
+"""
 
 # --- simple-change -----------------------------------------------------------
 SIMPLE_CHANGE_DRAFT = """
