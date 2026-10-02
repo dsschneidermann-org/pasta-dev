@@ -42,7 +42,31 @@ from src.pagetypes.core.specs import (
     status_guidance,
 )
 from src.pagetypes.core.args import BlockKindSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
-from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
+from src.pagetypes.core.commands import (
+    AddBlockCommand,
+    AddElementCommand,
+    AddLinkCommand,
+    BlockCommand,
+    CompoundCommand,
+    RemoveBlockCommand,
+    RemoveElementCommand,
+    ReorderBlockCommand,
+    ReorderElementCommand,
+    SetProseCommand,
+    SetScalarCommand,
+    SetTitleCommand,
+    StatusTransitionCommand,
+    TransitionCommand,
+    add_link_cmd,
+    blocks_cmds,
+    element_blocks_cmds,
+    list_cmds,
+    set_prose_cmd,
+    set_scalar_cmd,
+    set_title_cmd,
+    transition_cmd,
+    transition_on_add_cmd,
+)
 from src.pagetypes.core.fields import (
     ElementBlocksSpec,
     FieldSpec,
@@ -193,6 +217,8 @@ def test_requires_reference_real_fields(tag: str):
     """Every required-content precondition must point at a field the page type actually has."""
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
+        if not isinstance(command, StatusTransitionCommand):
+            continue
         for section_key, field_key in command.requires:
             assert get_pagetype_field(page_type, section_key, field_key) is not None, (
                 f"{tag}.{command.name} requires missing field {section_key}.{field_key}"
@@ -257,12 +283,13 @@ def test_every_ordered_field_has_a_reorder_command(tag: str):
     reorder_kind_by_target = {
         (command.section, command.field): command.kind
         for command in page_type.commands
-        if command.kind in (REORDER_ELEMENT, REORDER_BLOCK) and command.element_field is None
+        if isinstance(command, ReorderElementCommand)
+        or (isinstance(command, ReorderBlockCommand) and command.element_field is None)
     }
     element_block_reorders = {
         (command.section, command.field, command.element_field)
         for command in page_type.commands
-        if command.kind == REORDER_BLOCK and command.element_field is not None
+        if isinstance(command, ReorderBlockCommand) and command.element_field is not None
     }
     for section in page_type.sections:
         for field_spec in section.fields:
@@ -303,7 +330,7 @@ def test_list_cmds_threads_ref_check_onto_the_add_only():
                                      add_args=(ArgSpec("workstreamId"),), ref_check=ref)
     assert (add.name, remove.name, reorder.name) == ("addDispatch", "removeDispatch", "reorderDispatch")
     assert add.ref_check is ref
-    assert remove.ref_check is None and reorder.ref_check is None
+    assert not hasattr(remove, "ref_check") and not hasattr(reorder, "ref_check")
 
 
 @pytest.mark.parametrize("tag", list(ALL_TYPES))
@@ -327,7 +354,6 @@ def _drift_type(setter_description: str, field_description: str):
     """A one-setter page type whose setter and field descriptions are both caller-controlled, so a
     test can pick which branch of the field-setter validation fires."""
     from src.pagetypes.core.args import _text
-    from src.pagetypes.core.commands import CommandSpec
     from src.pagetypes.core.specs import FSMSpec
     from src.pagetypes.core.fields import SectionSpec, _prose
     from src.pagetypes.core.pagetype import PageType
@@ -335,8 +361,8 @@ def _drift_type(setter_description: str, field_description: str):
         tag="xtest-drift", name="Drift", description="ad-hoc",
         sections=(SectionSpec("summary", "Summary",
                               (_prose("body", description=field_description),)),),
-        commands=(CommandSpec("setSummary", SET_PROSE, setter_description,
-                              section="summary", field="body", args=(_text(),)),),
+        commands=(SetProseCommand(name="setSummary", description=setter_description,
+                                  section="summary", field="body", args=(_text(),)),),
         fsm=FSMSpec(name="XDrift", initial="active", states=("active",)),
     )
 
@@ -359,15 +385,14 @@ def test_field_setter_repeating_a_single_line_field_instruction_is_rejected():
 def test_field_setter_targeting_an_unknown_field_is_still_rejected():
     # The pre-existing check must survive the guard rewrite it sat beside.
     from src.pagetypes.core.args import _text
-    from src.pagetypes.core.commands import CommandSpec
     from src.pagetypes.core.specs import FSMSpec
     from src.pagetypes.core.fields import SectionSpec, _prose
     from src.pagetypes.core.pagetype import PageType
     ghost = PageType(
         tag="xtest-ghost", name="Ghost", description="ad-hoc",
         sections=(SectionSpec("summary", "Summary", (_prose("body", description="x"),)),),
-        commands=(CommandSpec("setGhost", SET_PROSE, "set the ghost",
-                              section="summary", field="missing", args=(_text(),)),),
+        commands=(SetProseCommand(name="setGhost", description="set the ghost",
+                                  section="summary", field="missing", args=(_text(),)),),
         fsm=FSMSpec(name="XGhost", initial="active", states=("active",)),
     )
     assert any("unknown field" in error for error in validate_pagetype_setter_descriptions(ghost))
@@ -805,7 +830,7 @@ def test_blocks_cmds_is_three_commands_named_from_the_label():
     assert add.args[0].block_kinds == body.block_kinds
     assert add.args[0].required
     # It writes no raw argument onto anything - it converts the array into id'd blocks.
-    assert dict(add.element_map) == {}
+    assert not hasattr(add, "element_map")
 
 
 def test_blocks_cmds_label_and_name_overrides():
@@ -932,11 +957,11 @@ def test_a_block_argument_is_resolved_from_its_field():
         tag="xtest-resolved", name="Resolved", description="ad-hoc",
         sections=(SectionSpec("body", "Body", (body,)),),
         commands=(
-            CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
-                        section="body", field="body",
-                        args=(_array("blocks", content=BLOCK_ARRAY), _text("precedingId"))),
-            CommandSpec("removeBlock", REMOVE_BLOCK, "remove a block",
-                        section="body", field="body", args=(_text("blockId"),)),
+            AddBlockCommand(name="addBody", description="add blocks to the body",
+                            section="body", field="body",
+                            args=(_array("blocks", content=BLOCK_ARRAY), _text("precedingId"))),
+            RemoveBlockCommand(name="removeBlock", description="remove a block",
+                               section="body", field="body", args=(_text("blockId"),)),
         ),
         fsm=FSMSpec(name="XTestResolved", initial="active", states=("active",)))
     add, remove = page_type.commands
@@ -951,8 +976,8 @@ def _targeted_vocabulary(page_type, command, arg):
     resolution step - so the two can be compared rather than one trusting the other."""
     field_spec = get_pagetype_field(page_type, command.section, command.field)
     assert field_spec is not None
-    element_field = command.element_field or (
-        arg.name if command.kind == ADD_ELEMENT else None)
+    element_field = (command.element_field if isinstance(command, BlockCommand)
+                     else arg.name if isinstance(command, AddElementCommand) else None)
     if element_field is None:
         return field_spec.block_kinds
     element_blocks = get_element_blocks(field_spec, element_field)
@@ -990,9 +1015,9 @@ def test_a_block_argument_that_cannot_be_resolved_is_reported_by_the_validator()
             sections=(section_spec,), commands=(command,),
             fsm=FSMSpec(name="XTestUnresolvable", initial="active", states=("active",)))
 
-    add = CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
-                      section="body", field="body",
-                      args=(_array("blocks", content=BLOCK_ARRAY),))
+    add = AddBlockCommand(name="addBody", description="add blocks to the body",
+                          section="body", field="body",
+                          args=(_array("blocks", content=BLOCK_ARRAY),))
     undeclared = page_type(
         SectionSpec("body", "Body", (_blocks("other", block_kinds=standard_blocks()),)), add)
     assert any("not a declared field" in e for e in validate_pagetype_block_args(undeclared))
@@ -1000,15 +1025,15 @@ def test_a_block_argument_that_cannot_be_resolved_is_reported_by_the_validator()
     assert any("not a blocks field" in e for e in validate_pagetype_block_args(non_blocks))
 
     items = _list("items", element_fields=("text", "detail"))
-    element_add = CommandSpec("addItemDetail", ADD_BLOCK, "add blocks to an item's detail",
-                              section="items", field="items", element_field="detail",
-                              args=(_text("itemId"), _array("blocks", content=BLOCK_ARRAY)))
+    element_add = AddBlockCommand(name="addItemDetail", description="add blocks to an item's detail",
+                                  section="items", field="items", element_field="detail",
+                                  args=(_text("itemId"), _array("blocks", content=BLOCK_ARRAY)))
     bad_element = page_type(SectionSpec("items", "Items", (items,)), element_add)
     assert any("block-bearing element field" in e for e in validate_pagetype_block_args(bad_element))
 
     # A block-carrying command that names no field at all is the fourth reason.
-    no_field = CommandSpec("addLoose", ADD_BLOCK, "add loose blocks",
-                           args=(_array("blocks", content=BLOCK_ARRAY),))
+    no_field = AddLinkCommand(name="addLoose", description="add loose blocks",
+                              args=(_array("blocks", content=BLOCK_ARRAY),))
     loose = page_type(SectionSpec("body", "Body", (_prose("body"),)), no_field)
     assert any("targets no field" in e for e in validate_pagetype_block_args(loose))
 
@@ -1016,9 +1041,9 @@ def test_a_block_argument_that_cannot_be_resolved_is_reported_by_the_validator()
 def test_an_unresolvable_block_argument_is_left_unfilled_rather_than_raising():
     """Resolution is best-effort setup: a block argument whose target cannot be resolved
     constructs without raising and keeps block_kinds None (the not-a-block-argument sentinel)."""
-    add = CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
-                      section="body", field="body",
-                      args=(_array("blocks", content=BLOCK_ARRAY),))
+    add = AddBlockCommand(name="addBody", description="add blocks to the body",
+                          section="body", field="body",
+                          args=(_array("blocks", content=BLOCK_ARRAY),))
     built = PageType(
         tag="xtest-unfilled", name="Unfilled", description="ad-hoc",
         sections=(SectionSpec("body", "Body", (_prose("body"),)),), commands=(add,),
@@ -1132,3 +1157,42 @@ def test_production_types_are_exactly_the_registered_ones(production_mode):
     # REGISTRY; this is what fails when a page type is added or removed and the list is not.
     from src.pagetypes._registry import registered_pagetypes
     assert registered_pagetypes() == PRODUCTION_TYPES
+
+
+# --- one dataclass per command kind ------------------------------------------
+def test_factories_build_the_class_of_their_kind():
+    add, remove, reorder = list_cmds("items")
+    assert type(add) is AddElementCommand and add.kind == ADD_ELEMENT
+    assert type(remove) is RemoveElementCommand and type(reorder) is ReorderElementCommand
+    assert type(set_prose_cmd("summary")) is SetProseCommand
+    assert type(set_scalar_cmd("kind", "value")) is SetScalarCommand
+    block_add, block_remove, block_reorder = blocks_cmds("body")
+    assert (type(block_add), type(block_remove), type(block_reorder)) == (
+        AddBlockCommand, RemoveBlockCommand, ReorderBlockCommand)
+    assert block_add.element_field is None
+    assert type(transition_cmd("go", "a -> b")) is TransitionCommand
+    assert type(add_link_cmd()) is AddLinkCommand and type(set_title_cmd()) is SetTitleCommand
+
+
+def test_compound_holds_its_add_as_a_typed_field():
+    compound = transition_on_add_cmd("close", "open -> closed", section="resolution",
+                                     field="commits", add_args=(_text("sha"),))
+    assert type(compound) is CompoundCommand and compound.kind == COMPOUND
+    assert (compound.event, compound.dest, compound.legal_in) == ("close", "closed", ("open",))
+    assert type(compound.add) is AddElementCommand
+    assert (compound.add.section, compound.add.field) == ("resolution", "commits")
+    assert compound.add.element_map == (("sha", "sha"),)
+
+
+def test_kind_is_a_class_constant_not_a_constructor_argument():
+    with pytest.raises(TypeError):
+        SetProseCommand(name="x", kind=SET_PROSE, section="s", field="f")  # type: ignore[call-arg]
+    assert SetProseCommand(name="x", section="s", field="f").kind == SET_PROSE
+
+
+def test_is_field_setter_by_class():
+    page_add, *_ = blocks_cmds("body")
+    element_add, *_ = element_blocks_cmds("steps", "detail")
+    assert is_field_setter(page_add) and not is_field_setter(element_add)
+    assert is_field_setter(set_prose_cmd("summary"))
+    assert not is_field_setter(transition_cmd("go", "a -> b"))
