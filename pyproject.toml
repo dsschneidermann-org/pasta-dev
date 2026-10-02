@@ -39,4 +39,5 @@ testpaths = ["tests"]
 typeCheckingMode = "recommended"
 reportAny = false
 reportExplicitAny = false
+reportPrivateUsage = false
 include = ["src/**/*"]
