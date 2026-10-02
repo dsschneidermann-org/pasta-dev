@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import ClassVar
 
 from ...errors import ValidationError
 from .args import (
@@ -43,48 +43,145 @@ from .specs import (
 )
 
 
-@dataclass(frozen=True)
-class CommandSpec:
+@dataclass(frozen=True, kw_only=True)
+class BaseCommand:
+    """What every command carries. A command's fields are exactly the ones its kind uses, so each
+    kind is its own class and `kind` is a class constant rather than a constructor argument."""
+    kind: ClassVar[str]
     name: str
-    kind: str
     description: str = ""
-    section: str | None = None
-    field: str | None = None
     args: tuple[ArgSpec, ...] = ()
-    event: str | None = None                    # FSM event for TRANSITION / COMPOUND
-    # for TRANSITION / COMPOUND: the destination status. Paired with `legal_in` (the source status(es)),
-    # this is the single home for a status edge - `_status_transitions(page_type)` derives the whole
-    # page FSM table from these.
-    dest: str | None = None
-    # for ADD_ELEMENT / SET_ELEMENT_FIELD / ELEMENT_TRANSITION: (elementField, argName) pairs
-    # mapping args onto the element. The id-taking kinds treat args[0] as the target element id.
-    element_map: tuple[tuple[str, str], ...] = ()
-    # for SET_ELEMENT_FIELD / ELEMENT_TRANSITION: literal (elementField, value) pairs to stamp
-    # onto the target element (the flag-setting shape).
-    element_const: tuple[tuple[str, Any], ...] = ()
-    # for ADD_BLOCK / REMOVE_BLOCK / REORDER_BLOCK: the LIST element field holding the blocks.
-    # None = the section's own blocks field. When set, args[0] is the element id and - for
-    # remove/reorder - args[1] is the block id.
-    element_field: str | None = None
-    # for COMPOUND: ordered sub-commands applied atomically. (ELEMENT_TRANSITION fires the
-    # element-FSM event named in `event` on the target element.)
-    steps: tuple["CommandSpec", ...] = ()
-    # for TRANSITION / COMPOUND: (section, field) pairs that must be populated before the
-    # transition is legal - a required-content precondition on top of the FSM topology.
-    requires: tuple[tuple[str, str], ...] = ()
     # Where this command is legal (None = any status). The uniform "where-legal" declaration:
     #   - content command: the statuses it may run in (a status-scoped lock);
-    #   - TRANSITION / COMPOUND: the SOURCE status(es) of the edge (paired with `dest`), from which the
+    #   - status transition: the SOURCE status(es) of the edge (paired with `dest`), from which the
     #     page FSM table is derived. Not surfaced in the command summary for transitions (the source
     #     is already reported via the derived FSM transition list), so describe output is unchanged.
     legal_in: tuple[str, ...] | None = None
-    # cross-page integrity check / transition guard (evaluated in the store)
+    agency: str = "agent"                       # "agent" | "human" | "either" (informational this pass)
+
+
+@dataclass(frozen=True, kw_only=True)
+class FieldCommand(BaseCommand):
+    """A command that writes into one (section, field) of the page."""
+    section: str
+    field: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class SetScalarCommand(FieldCommand):
+    kind: ClassVar[str] = SET_SCALAR
+
+
+@dataclass(frozen=True, kw_only=True)
+class SetProseCommand(FieldCommand):
+    kind: ClassVar[str] = SET_PROSE
+
+
+@dataclass(frozen=True, kw_only=True)
+class AddElementCommand(FieldCommand):
+    kind: ClassVar[str] = ADD_ELEMENT
+    # (elementField, argName) pairs mapping args onto the new element.
+    element_map: tuple[tuple[str, str], ...] = ()
+    # cross-page integrity check on an arg naming an element elsewhere (evaluated in the store)
     ref_check: RefCheck | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class RemoveElementCommand(FieldCommand):
+    kind: ClassVar[str] = REMOVE_ELEMENT
+
+
+@dataclass(frozen=True, kw_only=True)
+class ReorderElementCommand(FieldCommand):
+    kind: ClassVar[str] = REORDER_ELEMENT
+
+
+@dataclass(frozen=True, kw_only=True)
+class ElementWriteCommand(FieldCommand):
+    """A command on an existing list element, identified by args[0]."""
+    # (elementField, argName) pairs mapping args onto the element.
+    element_map: tuple[tuple[str, str], ...] = ()
+    # literal (elementField, flag) pairs to stamp onto the element (the flag-setting shape).
+    element_const: tuple[tuple[str, bool], ...] = ()
+
+
+@dataclass(frozen=True, kw_only=True)
+class SetElementFieldCommand(ElementWriteCommand):
+    kind: ClassVar[str] = SET_ELEMENT_FIELD
+
+
+@dataclass(frozen=True, kw_only=True)
+class ElementTransitionCommand(ElementWriteCommand):
+    kind: ClassVar[str] = ELEMENT_TRANSITION
+    event: str                                  # the element-FSM event fired on the element
+
+
+@dataclass(frozen=True, kw_only=True)
+class BlockCommand(FieldCommand):
+    """A command on a blocks array - the section's own, or one held by a list element."""
+    # The LIST element field holding the blocks; None = the section's own blocks field. When set,
+    # args[0] is the element id and - for remove/reorder - args[1] is the block id.
+    element_field: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class AddBlockCommand(BlockCommand):
+    kind: ClassVar[str] = ADD_BLOCK
+
+
+@dataclass(frozen=True, kw_only=True)
+class RemoveBlockCommand(BlockCommand):
+    kind: ClassVar[str] = REMOVE_BLOCK
+
+
+@dataclass(frozen=True, kw_only=True)
+class ReorderBlockCommand(BlockCommand):
+    kind: ClassVar[str] = REORDER_BLOCK
+
+
+@dataclass(frozen=True, kw_only=True)
+class StatusTransitionCommand(BaseCommand):
+    """A command that moves the page's own status along one FSM edge."""
+    event: str
+    # The destination status. Paired with `legal_in` (the source status(es)), this is the single
+    # home for a status edge - `_status_transitions(page_type)` derives the whole page FSM table
+    # from these.
+    dest: str
+    # (section, field) pairs that must be populated before the transition is legal - a
+    # required-content precondition on top of the FSM topology.
+    requires: tuple[tuple[str, str], ...] = ()
+    # cross-page transition guards (evaluated in the store)
     guards: tuple[ChildStateGuard, ...] = ()
     # cross-page guard over the PARENT's status (evaluated in the store) - see ParentStateGuard
     parent_guards: tuple[ParentStateGuard, ...] = ()
-    agency: str = "agent"                       # "agent" | "human" | "either" (informational this pass)
-    generated: bool = False
+
+
+@dataclass(frozen=True, kw_only=True)
+class TransitionCommand(StatusTransitionCommand):
+    kind: ClassVar[str] = TRANSITION
+
+
+@dataclass(frozen=True, kw_only=True)
+class CompoundCommand(StatusTransitionCommand):
+    """Adds an element and fires the transition in one atomic command."""
+    kind: ClassVar[str] = COMPOUND
+    add: AddElementCommand
+
+
+@dataclass(frozen=True, kw_only=True)
+class AddLinkCommand(BaseCommand):
+    kind: ClassVar[str] = ADD_LINK
+
+
+@dataclass(frozen=True, kw_only=True)
+class SetTitleCommand(BaseCommand):
+    kind: ClassVar[str] = SET_TITLE
+
+
+type CommandSpec = (SetScalarCommand | SetProseCommand | AddElementCommand | RemoveElementCommand
+                    | ReorderElementCommand | SetElementFieldCommand | ElementTransitionCommand
+                    | AddBlockCommand | RemoveBlockCommand | ReorderBlockCommand
+                    | TransitionCommand | CompoundCommand | AddLinkCommand | SetTitleCommand)
 
 
 # --- Field-op command helpers (the CommandSpec analog of _scalar/_prose/_list/_blocks) --------
@@ -131,9 +228,9 @@ def set_prose_cmd(section: str, *, field: str = "body", name: str | None = None,
                   legal_in: tuple[str, ...] | None = None) -> CommandSpec:
     """A SET_PROSE command for a prose field; name defaults to set<Section> (setSummary, setOverview)
     and the description to 'set the <section>'. The field's instruction is not copied here."""
-    return CommandSpec(name or f"set{_cap(section)}", SET_PROSE,
-                       f"set the {_setter_label(section, field, label)}",
-                       section=section, field=field, args=(_text(),), legal_in=legal_in)
+    return SetProseCommand(name=name or f"set{_cap(section)}",
+                           description=f"set the {_setter_label(section, field, label)}",
+                           section=section, field=field, args=(_text(),), legal_in=legal_in)
 
 
 def set_scalar_cmd(section: str, field: str, *, name: str | None = None,
@@ -143,10 +240,10 @@ def set_scalar_cmd(section: str, field: str, *, name: str | None = None,
     """A SET_SCALAR command; name defaults to set<Field> (setKind, setComponent) and the description
     to 'set the <field>'. The single arg is named after the field and carries the field's `choices`
     when it is an enum. The field's instruction is not copied here."""
-    return CommandSpec(name or f"set{_cap(field)}", SET_SCALAR,
-                       f"set the {_setter_label(section, field, label)}",
-                       section=section, field=field,
-                       args=(_text(field, choices=choices),), legal_in=legal_in)
+    return SetScalarCommand(name=name or f"set{_cap(field)}",
+                            description=f"set the {_setter_label(section, field, label)}",
+                            section=section, field=field,
+                            args=(_text(field, choices=choices),), legal_in=legal_in)
 
 
 def list_cmds(section: str, *, field: str = "items", singular: str | None = None,
@@ -183,25 +280,27 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
         for name in element_blocks)
     out: list[CommandSpec] = []
     if add:
-        out.append(CommandSpec(add_name or f"add{cap}", ADD_ELEMENT, f"add {_a(label)} {label}",
-                               section=section, field=field,
-                               args=(*(add_args or tuple()), *block_args, _INDEX, _PRECEDING),
-                               element_map=_same_named(add_args or tuple()),
-                               ref_check=ref_check, legal_in=legal_in))
+        out.append(AddElementCommand(name=add_name or f"add{cap}", description=f"add {_a(label)} {label}",
+                                     section=section, field=field,
+                                     args=(*(add_args or tuple()), *block_args, _INDEX, _PRECEDING),
+                                     element_map=_same_named(add_args or tuple()),
+                                     ref_check=ref_check, legal_in=legal_in))
     if remove:
-        out.append(CommandSpec(remove_name or f"remove{cap}", REMOVE_ELEMENT, f"remove {_a(label)} {label}",
-                               section=section, field=field, args=(_text(id_arg),), legal_in=legal_in))
+        out.append(RemoveElementCommand(name=remove_name or f"remove{cap}",
+                                        description=f"remove {_a(label)} {label}",
+                                        section=section, field=field, args=(_text(id_arg),),
+                                        legal_in=legal_in))
     if reorder:
-        out.append(CommandSpec(
-            reorder_name or f"reorder{cap}", REORDER_ELEMENT,
-            f"move {_a(label)} {label} to an anchored position (precedingId guards a stale read)",
+        out.append(ReorderElementCommand(
+            name=reorder_name or f"reorder{cap}",
+            description=f"move {_a(label)} {label} to an anchored position (precedingId guards a stale read)",
             section=section, field=field,
             args=(_text(id_arg), _integer("toIndex"), _PRECEDING), legal_in=legal_in))
     return tuple(out)
 
 
 def element_cmds(section: str, *, field: str = "items", singular: str | None = None,
-                 marks: tuple[tuple[str, str, str, Any] | tuple[str, str, str], ...], legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
+                 marks: tuple[tuple[str, str, str, tuple[ArgSpec, ...]] | tuple[str, str, str], ...], legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
     """ELEMENT_TRANSITION commands for an element-FSM list. Each `marks` entry is
     (name, event, description) or (name, event, description, extra_args) - the derived `<noun>Id` arg
     identifies the element, and any `extra_args` are appended and mapped onto same-named element fields
@@ -210,21 +309,21 @@ def element_cmds(section: str, *, field: str = "items", singular: str | None = N
     out: list[CommandSpec] = []
     for mark in marks:
         name, event, description = mark[0], mark[1], mark[2]
-        extra = mark[3] if len(mark) > 3 else ()
-        out.append(CommandSpec(name, ELEMENT_TRANSITION, description, section=section, field=field,
-                               event=event, args=(_text(id_arg), *extra),
-                               element_map=_same_named(extra), legal_in=legal_in))
+        extra = mark[3] if len(mark) == 4 else ()
+        out.append(ElementTransitionCommand(name=name, description=description, section=section,
+                                            field=field, event=event, args=(_text(id_arg), *extra),
+                                            element_map=_same_named(extra), legal_in=legal_in))
     return tuple(out)
 
 
-def set_element_field_cmd(section: str, *, name: str, const: tuple[str, Any], description: str = "",
+def set_element_field_cmd(section: str, *, name: str, const: tuple[str, bool], description: str = "",
                           field: str = "items", singular: str | None = None,
                           legal_in: tuple[str, ...] | None = None) -> CommandSpec:
     """A SET_ELEMENT_FIELD command that stamps a constant `(field, value)` onto the id'd element - the
     flag-setting shape (raise a fixed flag on one element without touching the rest)."""
     id_arg = f"{singular or _singular(section)}Id"
-    return CommandSpec(name, SET_ELEMENT_FIELD, description, section=section, field=field,
-                       args=(_text(id_arg),), element_const=(const,), legal_in=legal_in)
+    return SetElementFieldCommand(name=name, description=description, section=section, field=field,
+                                  args=(_text(id_arg),), element_const=(const,), legal_in=legal_in)
 
 
 def is_field_setter(command: CommandSpec) -> bool:
@@ -242,9 +341,9 @@ def is_field_setter(command: CommandSpec) -> bool:
     rollup because PageType's post-init validation needs it too and this module cannot import
     commands.py, so the rollup and the declaration-time check read one rule.
     """
-    if command.kind == ADD_BLOCK:
+    if isinstance(command, AddBlockCommand):
         return command.element_field is None
-    return command.kind in (SET_SCALAR, SET_PROSE, ADD_ELEMENT)
+    return isinstance(command, (SetScalarCommand, SetProseCommand, AddElementCommand))
 
 
 def blocks_cmds(section: str, *, field: str = "body", label: str | None = None,
@@ -275,18 +374,19 @@ def blocks_cmds(section: str, *, field: str = "body", label: str | None = None,
     cap = _cap(noun)
     reorder_desc = reorder_desc or (
         "move a block to an anchored position (precedingId guards a stale read)")
-    add = CommandSpec(
-        add_name or f"add{cap}", ADD_BLOCK, f"add blocks to the {noun}",
+    add = AddBlockCommand(
+        name=add_name or f"add{cap}", description=f"add blocks to the {noun}",
         section=section, field=field,
         args=(_array("blocks", content=BLOCK_ARRAY,
                      description="the blocks to add, each naming its own kind"),
               _INDEX, _PRECEDING),
         legal_in=legal_in)
-    remove = CommandSpec(remove_name, REMOVE_BLOCK, remove_desc, section=section, field=field,
-                         args=(_text("blockId"),), legal_in=legal_in)
-    reorder = CommandSpec(reorder_name, REORDER_BLOCK, reorder_desc, section=section, field=field,
-                          args=(_text("blockId"), _integer("toIndex"), _PRECEDING),
-                          legal_in=legal_in)
+    remove = RemoveBlockCommand(name=remove_name, description=remove_desc, section=section,
+                                field=field, args=(_text("blockId"),), legal_in=legal_in)
+    reorder = ReorderBlockCommand(name=reorder_name, description=reorder_desc, section=section,
+                                  field=field,
+                                  args=(_text("blockId"), _integer("toIndex"), _PRECEDING),
+                                  legal_in=legal_in)
     return (add, remove, reorder)
 
 
@@ -301,7 +401,7 @@ def element_blocks_cmds(section: str, element_field: str, *, field: str = "items
 
     The element noun leads and the declared field key follows, with no pluralizing, so a step's
     detail reads addStepDetail. remove and reorder keep the names they have always had.
-    Every command carries CommandSpec.element_field, which is the single seam routing it to an
+    Every command carries BlockCommand.element_field, which is the single seam routing it to an
     element's block array instead of the section's own.
 
     The add that creates an element holding its blocks stays on list_cmds; this is the surface
@@ -311,24 +411,24 @@ def element_blocks_cmds(section: str, element_field: str, *, field: str = "items
     noun = singular or _singular(field if field != "items" else section)
     id_arg, cap, fcap = f"{noun}Id", _cap(noun), _cap(element_field)
     return (
-        CommandSpec(f"add{cap}{fcap}", ADD_BLOCK,
-                    f"add blocks to {_a(noun)} {noun}'s {element_field}",
-                    section=section, field=field, element_field=element_field,
-                    args=(_text(id_arg),
-                          _array("blocks", content=BLOCK_ARRAY,
-                                 description="the blocks to add, each naming its own kind"),
-                          _INDEX, _PRECEDING),
-                    legal_in=legal_in),
-        CommandSpec(f"remove{cap}{fcap}", REMOVE_BLOCK,
-                    f"remove a block from {_a(noun)} {noun}'s {element_field}",
-                    section=section, field=field, element_field=element_field,
-                    args=(_text(id_arg), _text("blockId")), legal_in=legal_in),
-        CommandSpec(f"reorder{cap}{fcap}", REORDER_BLOCK,
-                    f"move a block in {_a(noun)} {noun}'s {element_field} to an anchored "
-                    f"position (precedingId guards a stale read)",
-                    section=section, field=field, element_field=element_field,
-                    args=(_text(id_arg), _text("blockId"), _integer("toIndex"), _PRECEDING),
-                    legal_in=legal_in),
+        AddBlockCommand(name=f"add{cap}{fcap}",
+                        description=f"add blocks to {_a(noun)} {noun}'s {element_field}",
+                        section=section, field=field, element_field=element_field,
+                        args=(_text(id_arg),
+                              _array("blocks", content=BLOCK_ARRAY,
+                                     description="the blocks to add, each naming its own kind"),
+                              _INDEX, _PRECEDING),
+                        legal_in=legal_in),
+        RemoveBlockCommand(name=f"remove{cap}{fcap}",
+                           description=f"remove a block from {_a(noun)} {noun}'s {element_field}",
+                           section=section, field=field, element_field=element_field,
+                           args=(_text(id_arg), _text("blockId")), legal_in=legal_in),
+        ReorderBlockCommand(name=f"reorder{cap}{fcap}",
+                            description=f"move a block in {_a(noun)} {noun}'s {element_field} to an "
+                                        f"anchored position (precedingId guards a stale read)",
+                            section=section, field=field, element_field=element_field,
+                            args=(_text(id_arg), _text("blockId"), _integer("toIndex"), _PRECEDING),
+                            legal_in=legal_in),
     )
 
 
@@ -349,8 +449,9 @@ def transition_cmd(name: str, description: str, *, legal_in: tuple[str, ...] | N
     if not arrow or not words:
         raise ValueError(f"transition_cmd({name!r}): description must read 'from -> to', got {description!r}")
     sources = tuple(legal_in) if legal_in is not None else (before.strip(),)
-    return CommandSpec(name, TRANSITION, description, event=event or name, dest=words[0], legal_in=sources,
-                       agency=agency, requires=requires, guards=guards, parent_guards=parent_guards)
+    return TransitionCommand(name=name, description=description, event=event or name, dest=words[0],
+                             legal_in=sources, agency=agency, requires=requires, guards=guards,
+                             parent_guards=parent_guards)
 
 
 def transition_on_add_cmd(name: str, t_description: str, *, legal_in: tuple[str, ...] | None = None, section: str,
@@ -361,21 +462,19 @@ def transition_on_add_cmd(name: str, t_description: str, *, legal_in: tuple[str,
     """A COMPOUND that atomically adds an element to a list field AND fires a page transition.
     `t_description` carries the edge as 'from -> to'. The outer command owns
     the FSM edge (event/source/dest/agency) and its args; the element_map is derived
-    from `add_args` (same-named); the two inner steps are the add and the transition."""
+    from `add_args` (same-named) onto the inner add."""
     t_description = t_description.replace("->", "→")
     before, arrow, after = t_description.partition("→")
     words = after.split()
     if not arrow or not words:
         raise ValueError(f"transition_on_add_cmd({name!r}): t_description must read 'from -> to', got {t_description!r}")
     sources = tuple(legal_in) if legal_in is not None else (before.strip(),)
-    return CommandSpec(
-        name, COMPOUND, f"{description} ({t_description})", event=event or name, dest=words[0], legal_in=sources, agency=agency,
+    return CompoundCommand(
+        name=name, description=f"{description} ({t_description})", event=event or name, dest=words[0],
+        legal_in=sources, agency=agency,
         args=add_args, requires=requires, guards=guards, parent_guards=parent_guards,
-        steps=(
-            CommandSpec(f"_{name}Add", ADD_ELEMENT, section=section, field=field,
-                        element_map=_same_named(add_args)),
-            CommandSpec(f"_{name}", TRANSITION, event=event or name),
-        ),
+        add=AddElementCommand(name=f"_{name}Add", section=section, field=field,
+                              element_map=_same_named(add_args)),
     )
 
 
@@ -385,9 +484,8 @@ def add_link_cmd() -> CommandSpec:
     a page command and not only through the separate top-level `link` tool. Always legal - no legal_in /
     requires - so it runs in any status. The store's _check_link precheck enforces the cross-page rules
     shared with link_page, before the pure core appends."""
-    return CommandSpec(
+    return AddLinkCommand(
         name="addLink",
-        kind=ADD_LINK,
         description="add a typed reference link from this page to another (this --role--> toId)",
         args=(_text("toId", description="the target page id to link to"),
               _text("role", description="the edge role, e.g. depends-on / relates-to")),
@@ -401,9 +499,8 @@ def set_title_cmd() -> CommandSpec:
     every authorable page type EXCEPT the command-less toc. Always legal - no legal_in / requires - so it
     runs in any status (locked only in a terminal status, as all authoring is). The pure core sets
     Page.title after rejecting a blank title, exactly as renamePage does."""
-    return CommandSpec(
+    return SetTitleCommand(
         name="setTitle",
-        kind=SET_TITLE,
         description="set this page's title (an alias for the renamePage operation)",
         args=(_text("title", description="the new page title (must be non-empty)"),),
     )
