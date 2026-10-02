@@ -9,14 +9,18 @@ from ...errors import ValidationError
 
 from .pagetype import PageType, element_fsm_sites, get_pagetype_field
 from .args import BlockKindSpec
-from .commands import CommandSpec, is_field_setter
+from .commands import (
+    AddElementCommand,
+    BlockCommand,
+    FieldCommand,
+    SetProseCommand,
+    SetScalarCommand,
+    is_field_setter,
+)
 from .fields import ElementBlocksSpec, FieldSpec, get_element_blocks
 from .specs import (
-    ADD_ELEMENT,
     BLOCKS,
     LIST,
-    SET_PROSE,
-    SET_SCALAR,
     ElementFSMSpec,
     FSMSpec,
     BLOCK_ARRAY,
@@ -229,7 +233,7 @@ def validate_pagetype_field_setters(page_type: PageType) -> list[str]:
     errors: list[str] = []
     seen: dict[tuple[str, str], str] = {}
     for command in page_type.commands:
-        if command.section is None or command.field is None:
+        if not isinstance(command, FieldCommand):
             continue
         if not is_field_setter(command):
             continue
@@ -253,11 +257,9 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
     """
     errors: list[str] = []
     for command in page_type.commands:
-        if command.kind not in (SET_SCALAR, SET_PROSE, ADD_ELEMENT):
+        if not isinstance(command, (SetScalarCommand, SetProseCommand, AddElementCommand)):
             continue
-        section, field = command.section, command.field
-        field_spec = (get_pagetype_field(page_type, section, field)
-                      if section is not None and field is not None else None)
+        field_spec = get_pagetype_field(page_type, command.section, command.field)
         if field_spec is None:
             errors.append(
                 f"field setter '{command.name}' targets unknown field " +
@@ -293,7 +295,7 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
         for arg in command.args:
             if arg.content != BLOCK_ARRAY:
                 continue
-            if command.section is None or command.field is None:
+            if not isinstance(command, FieldCommand):
                 errors.append(f"command '{command.name}' carries blocks but targets no field.")
                 continue
             field_spec = get_pagetype_field(page_type, command.section, command.field)
@@ -302,8 +304,8 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
                     f"command '{command.name}' carries blocks for "
                     f"{command.section}.{command.field}, which is not a declared field.")
                 continue
-            element_field = command.element_field or (
-                arg.name if command.kind == ADD_ELEMENT else None)
+            element_field = (command.element_field if isinstance(command, BlockCommand)
+                             else arg.name if isinstance(command, AddElementCommand) else None)
             if element_field is None:
                 if field_spec.kind != BLOCKS:
                     errors.append(

@@ -16,16 +16,13 @@ from typing import Any
 from ...errors import ValidationError
 from ...fsm import try_build_machine
 from .args import ArgSpec
-from .commands import CommandSpec
+from .commands import AddElementCommand, BlockCommand, CommandSpec, FieldCommand, StatusTransitionCommand
 from .fields import FieldSpec, SectionSpec, get_element_blocks
 from .specs import (
-    ADD_ELEMENT,
     BLOCKS,
     BLOCK_ARRAY,
-    COMPOUND,
     LIST,
     PROSE,
-    TRANSITION,
     AutoChildSpec,
     ElementFSMSpec,
     FSMSpec,
@@ -86,15 +83,15 @@ class PageType:
         """
         if arg.content != BLOCK_ARRAY:
             return arg
-        if command.section is None or command.field is None:
+        if not isinstance(command, FieldCommand):
             return arg
         field_spec = get_pagetype_field(self, command.section, command.field)
         if field_spec is None:
             return arg
         # A list add carries one block argument per block-bearing element field, named after
         # it; an element-scoped block command names that field on the command instead.
-        element_field = command.element_field or (
-            arg.name if command.kind == ADD_ELEMENT else None)
+        element_field = (command.element_field if isinstance(command, BlockCommand)
+                         else arg.name if isinstance(command, AddElementCommand) else None)
         if element_field is None:
             if field_spec.kind != BLOCKS:
                 return arg
@@ -144,15 +141,13 @@ def element_fsm_sites(page_type: PageType) -> tuple[tuple[str, str, ElementFSMSp
 def _status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], ...]:
     """The page's status-FSM transition table, DERIVED from its transition/compound commands.
 
-    Each top-level command with a page-status event (kind TRANSITION or COMPOUND, `event` set) owns one
-    edge: `legal_in` is its source status(es) and `dest` its destination. A command legal in several
-    statuses expands to one `(event, source, dest, agency)` per source.
-    Nested COMPOUND sub-steps are NOT walked - the outer command carries the edge - so the inner
-    transition step does not double-count. Iteration follows command-declaration order.
+    Each status-transition command (a transition or a compound) owns one edge: `legal_in` is its
+    source status(es) and `dest` its destination. A command legal in several statuses expands to
+    one `(event, source, dest, agency)` per source. Iteration follows command-declaration order.
     """
     edges: list[tuple[str, str, str, str]] = []
     for command in page_type.commands:
-        if command.kind in (TRANSITION, COMPOUND) and command.event is not None and command.dest is not None:
+        if isinstance(command, StatusTransitionCommand):
             for source in (command.legal_in or ()):
                 edges.append((command.event, source, command.dest, command.agency))
     return tuple(edges)
