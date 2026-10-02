@@ -154,11 +154,15 @@ This status is for verifying, not for finishing off. The work of it:
   what the plan called for: an unrelated change here is a change nobody reviewed.
 - Confirm the pure logic stayed free of effects and the shell around it stayed free
   of rules.
+- Remove tests that have now run but are conditioned on removed parts of the code,
+  such as asserting that a removed field no longer exists: once the removal is
+  verified they only pin the previous implementation.
 - Review the comments added for the change. Avoid verbosity of comments and avoid
   naming the specifics of other parts of code and instead keep comments to general
   principles and intents. Comments should only refer to the current code, not the
   previous implementation. Uppercase words and emphasis markers are inappropriate in
-  tone and single line comments that are self-evident by code should be removed.
+  tone and single line comments that are self-evident by code should be removed, as
+  should wordy explanations of well-known technology concepts.
 
 Three things are deliberately not part of this status, so do not start them here:
 following the merge process happens at done, not before; recording commits happens
@@ -203,11 +207,15 @@ work of it:
   the work called for: an unrelated change here is a change nobody reviewed.
 - Confirm the pure logic stayed free of effects and the shell around it stayed free of
   rules.
+- Remove tests that have now run but are conditioned on removed parts of the code,
+  such as asserting that a removed field no longer exists: once the removal is
+  verified they only pin the previous implementation.
 - Review the comments added for the change. Avoid verbosity of comments and avoid
   naming the specifics of other parts of code and instead keep comments to general
   principles and intents. Comments should only refer to the current code, not the
   previous implementation. Uppercase words and emphasis markers are inappropriate in
-  tone and single line comments that are self-evident by code should be removed.
+  tone and single line comments that are self-evident by code should be removed, as
+  should wordy explanations of well-known technology concepts.
 
 Two things are deliberately not part of this status: rebasing onto main happens at
 close, not before, and the commit is recorded by close itself, so there is nothing to
