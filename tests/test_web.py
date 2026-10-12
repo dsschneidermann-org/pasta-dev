@@ -107,6 +107,56 @@ def test_unarchive_route_restores_page(client):
     assert server.STORE.get_page(workspace.id, page.id).archived is False
 
 
+def test_page_view_shows_set_to_delete_button(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    part = workspace.id.removeprefix("ws:")
+
+    response = client.get(f"/ws:{part}/page/{page.id}")
+    assert response.status_code == 200
+    assert "Set to delete" in response.text                             # not-yet-scheduled label
+    assert f'action="/{workspace.id}/page/{page.id}/schedule-delete"' in response.text
+
+
+def test_page_view_button_flips_to_cancel_delete_when_scheduled(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    part = workspace.id.removeprefix("ws:")
+    server.STORE.schedule_page_deletion(workspace.id, page.id)
+
+    # No archived=true needed: the page route resolves through get_page, which does not
+    # filter on archived - only the tree and search views apply the subtree rule.
+    response = client.get(f"/ws:{part}/page/{page.id}")
+    assert response.status_code == 200
+    assert "Cancel delete" in response.text
+    assert f'action="/{workspace.id}/page/{page.id}/unschedule-delete"' in response.text
+
+
+def test_schedule_delete_route_schedules_and_archives(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    part = workspace.id.removeprefix("ws:")
+
+    response = client.post(f"/ws:{part}/page/{page.id}/schedule-delete")
+    assert response.status_code == 202
+    stored = server.STORE.get_page(workspace.id, page.id)
+    assert stored.delete_scheduled is True
+    assert stored.archived is True
+
+
+def test_unschedule_delete_route_cancels_but_keeps_the_page_archived(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    part = workspace.id.removeprefix("ws:")
+    server.STORE.schedule_page_deletion(workspace.id, page.id)
+
+    response = client.post(f"/ws:{part}/page/{page.id}/unschedule-delete")
+    assert response.status_code == 202
+    stored = server.STORE.get_page(workspace.id, page.id)
+    assert stored.delete_scheduled is False
+    assert stored.archived is True
+
+
 def test_page_view_shows_state_dropdown_next_to_archive(client):
     # test-flow's FSM is draft -> open -> closed; a fresh page is `draft`.
     workspace = server.STORE.create_workspace("demo")

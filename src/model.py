@@ -27,6 +27,10 @@ class Page:
     # UTC ISO-8601 instant after which the cleanup sweep deletes this page, or None.
     # Written and cleared only by the sweep, never by a page-type command.
     expires_at: str | None = None
+    # A deliberate decision that this page may be destroyed. The sweep deletes a page only
+    # when this is set and the page is also out of sight; archiving alone keeps a page
+    # indefinitely.
+    delete_scheduled: bool = False
     # A short optimistic-concurrency stamp on the lifecycle status: created with the page and
     # regenerated on every status transition. Written only by the store, never by a page-type
     # command; None on a page created before the feature, until its first transition.
@@ -45,6 +49,7 @@ class Page:
             archived=self.archived,
             links=[dict(link) for link in self.links],
             expires_at=self.expires_at,
+            delete_scheduled=self.delete_scheduled,
             status_revision_token=self.status_revision_token,
         )
 

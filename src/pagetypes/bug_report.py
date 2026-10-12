@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ._stage_guidance import BUG_REPORT_DRAFT, BUG_REPORT_OPEN, REVIEW
+from ._stage_guidance import BUG_REPORT_DRAFT, BUG_REPORT_OPEN, DONE, REVIEW
 from ._workspace_guidance import (
     GROUNDING_TOOL_DESC,
     GROUNDING_TOOL_FIELD,
@@ -140,6 +140,7 @@ _BUG_REPORT = PageType(
             ("draft", BUG_REPORT_DRAFT),
             ("open", BUG_REPORT_OPEN),
             ("review", REVIEW),
+            ("done", DONE),
         ),
     ),
 )

@@ -4,8 +4,8 @@ Exercises the full path: MCP tool call -> store transaction -> pure core -> disk
 and back. The module-global STORE is repointed at a per-test temp directory.
 
 The behavioural flows use the hand-authored fixtures (src.testtypes); only the
-`describePageType` listing assertion pins to the production set (the advertised surface a real
-client sees), since the fixtures are hidden from discovery.
+`listPageTypes` production-set assertion (via the `production_mode` fixture) pins to the
+advertised surface a real client sees, since the fixtures are hidden from discovery.
 """
 
 import asyncio
@@ -398,3 +398,52 @@ def test_the_refusal_points_at_the_running_servers_reload_log(mcp, invalid_decla
 def test_tool_calls_run_normally_once_the_declarations_validate(mcp):
     # No lingering quarantine: the gate is a live question, so a valid registry answers as usual.
     assert call(mcp, "listWorkspaces") == []
+
+
+# --- describePageType requires a type ----------------------------------------
+def test_describe_page_type_requires_a_type(mcp):
+    # The type argument is required; a call without it is rejected rather than treated as a listing.
+    with pytest.raises(ToolError):
+        call(mcp, "describePageType", {})
+
+
+def test_describe_page_type_unknown_type_lists_registered(mcp):
+    with pytest.raises(ToolError, match="Unknown page type"):
+        call(mcp, "describePageType", {"type": "nope"})
+
+
+def test_describe_page_type_valid_type_returns_schema(mcp):
+    described = call(mcp, "describePageType", {"type": "test-flow"})
+    assert described["tag"] == "test-flow"
+    assert "fsm" in described and "sections" in described and "commands" in described
+
+
+# --- listPageTypes -----------------------------------------------------------
+def test_list_page_types_returns_registered_fixtures(mcp):
+    result = call(mcp, "listPageTypes")
+    assert "test-flow" in result["types"]
+
+
+def test_list_page_types_returns_production_types_in_production_mode(mcp, production_mode):
+    result = call(mcp, "listPageTypes")
+    assert "feature-brief" in result["types"]
+
+
+# --- instructions projects the request schemas and guidance setup ------------
+def test_instructions_lists_named_request_tool_schemas(mcp):
+    text = call(mcp, "instructions")
+    assert "## Request tool schemas" in text
+    # Tools the prose names carry a schema entry...
+    assert '"name": "mutatePageBatch"' in text
+    assert '"name": "createPage"' in text
+    # ...while unnamed tools and the two non-advertised tools do not.
+    assert '"name": "getPage"' not in text
+    assert '"name": "listPageTypes"' not in text
+    assert '"name": "instructions"' not in text
+
+
+def test_instructions_lists_workspace_guidance_setup(mcp):
+    text = call(mcp, "instructions")
+    assert "## Workspace guidance setup" in text
+    assert "setWorkspaceGuidance" in text
+    assert "buildTool" in text          # a fixture guidance field, in test mode

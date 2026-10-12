@@ -141,7 +141,8 @@ improvisation. Record each commit as you make it.
 """
 
 FEATURE_BRIEF_REVIEW = """
-review - the build is done, and this is the last stop before the human ship gate.
+review - the build is done, and this is the last stop before it is marked done and
+left for the human ship gate.
 This status is for verifying, not for finishing off. The work of it:
 
 - Re-read the spec's design section and confirm every requirement it states is
@@ -153,21 +154,43 @@ This status is for verifying, not for finishing off. The work of it:
   what the plan called for: an unrelated change here is a change nobody reviewed.
 - Confirm the pure logic stayed free of effects and the shell around it stayed free
   of rules.
+- Remove tests that have now run but are conditioned on removed parts of the code,
+  such as asserting that a removed field no longer exists: once the removal is
+  verified they only pin the previous implementation.
 - Review the comments added for the change. Avoid verbosity of comments and avoid
   naming the specifics of other parts of code and instead keep comments to general
   principles and intents. Comments should only refer to the current code, not the
   previous implementation. Uppercase words and emphasis markers are inappropriate in
-  tone and single line comments that are self-evident by code should be removed.
+  tone and single line comments that are self-evident by code should be removed, as
+  should wordy explanations of well-known technology concepts.
 
 Three things are deliberately not part of this status, so do not start them here:
-rebasing onto main happens at ship, not before; recording commits happens after ship,
-once the shas are final; and reconciling the documentation pages the brief named as
-going stale also happens at ship.
+following the merge process happens at done, not before; recording commits happens
+after ship, once the shas are final; and reconciling the documentation pages the brief
+named as going stale also happens at ship.
 
 If any of this turns up outstanding work, use requestChanges to go back to building
-rather than ship with a known gap.
+rather than mark it done with a known gap.
 """
 
+
+FEATURE_BRIEF_DONE = """
+done - the build is verified and the work is done. It is not merged, not shipped and
+not signed off: this status says the agent has nothing left to build, and it says
+nothing more than that. The work of it:
+
+- Update the README.md or other file-based docs that need to be ready at the gate.
+- Update the recorded commits if their shas moved, flagging as stale any sha that has
+  left history. If none moved, there is nothing to do.
+- Follow the merge process guidance beside this text, if this workspace configured
+  one, and leave the pull request url on the page if that produces one. If there is no
+  merge process, there is nothing to do.
+
+Reconciling the documentation pages the brief named as going stale waits for ship too:
+the sign-off is what authorizes both, and doing either here would cross the gate.
+Shipping is a human gate: drive up to it and stop. If anything turns up outstanding,
+use requestChanges to go back to building rather than leave a known gap at the gate.
+"""
 
 # --- simple-change and bug-report, shared ------------------------------------
 REVIEW = """
@@ -184,11 +207,15 @@ work of it:
   the work called for: an unrelated change here is a change nobody reviewed.
 - Confirm the pure logic stayed free of effects and the shell around it stayed free of
   rules.
+- Remove tests that have now run but are conditioned on removed parts of the code,
+  such as asserting that a removed field no longer exists: once the removal is
+  verified they only pin the previous implementation.
 - Review the comments added for the change. Avoid verbosity of comments and avoid
   naming the specifics of other parts of code and instead keep comments to general
   principles and intents. Comments should only refer to the current code, not the
   previous implementation. Uppercase words and emphasis markers are inappropriate in
-  tone and single line comments that are self-evident by code should be removed.
+  tone and single line comments that are self-evident by code should be removed, as
+  should wordy explanations of well-known technology concepts.
 
 Two things are deliberately not part of this status: rebasing onto main happens at
 close, not before, and the commit is recorded by close itself, so there is nothing to
@@ -196,6 +223,22 @@ record here. If any of this turns up outstanding work, use requestChanges to go 
 open rather than mark it done with a known gap.
 """
 
+
+DONE = """
+done - the work is written, verified and done. It is not merged, not closed and not
+signed off: this status says the agent has nothing left to build, and it says nothing
+more than that. The work of it:
+
+- Update the README.md or other file-based docs that need to be ready at the gate.
+- Follow the merge process guidance beside this text, if this workspace configured
+  one, and leave the pull request url on the page if that produces one. If there is no
+  merge process, there is nothing to do.
+
+Nothing is built here and no commit is recorded: close records it. Closing is a human
+gate, and closing is where the work is actually merged - drive up to that gate and
+stop. If anything turns up outstanding, use requestChanges to go back to open rather
+than leave a known gap at the gate.
+"""
 
 # --- simple-change -----------------------------------------------------------
 SIMPLE_CHANGE_DRAFT = """

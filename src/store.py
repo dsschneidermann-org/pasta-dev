@@ -667,7 +667,15 @@ class Store:
             )
 
     # --- archiving -----------------------------------------------------------
-    def _set_page_archived(self, workspace_id: str, page_id: str, archived: bool) -> Page:
+    def _set_page_archive_state(
+        self, workspace_id: str, page_id: str, *,
+        archived: bool | None = None, delete_scheduled: bool | None = None,
+    ) -> Page:
+        """Set either archive flag on a page, leaving a flag passed as None as it was.
+
+        Both flags move through here so the pinned-child rules are applied once and the two
+        can never disagree on a pinned child.
+        """
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
             page = workspace.get_page(page_id)
@@ -677,21 +685,37 @@ class Store:
                 raise IllegalCommandError(
                     f"Page '{page_id}' is a pinned auto-created child; archive/unarchive its parent instead."
                 )
-            page.archived = archived
+
+            def apply(target: Page) -> None:
+                if archived is not None:
+                    target.archived = archived
+                if delete_scheduled is not None:
+                    target.delete_scheduled = delete_scheduled
+
+            apply(page)
             # A pinned child's archived state mirrors its parent's: cascade onto this page's pinned children.
             parent_type = get_page_type(page.type)
             for child_id in page.child_ids:
                 child = workspace.pages.get(child_id)
                 if child is not None and is_auto_child_type(parent_type, child.type):
-                    child.archived = archived
+                    apply(child)
             self._touch_and_save(workspace)
             return page
 
     def archive_page(self, workspace_id: str, page_id: str) -> Page:
-        return self._set_page_archived(workspace_id, page_id, True)
+        return self._set_page_archive_state(workspace_id, page_id, archived=True)
 
     def unarchive_page(self, workspace_id: str, page_id: str) -> Page:
-        return self._set_page_archived(workspace_id, page_id, False)
+        # Unarchiving is the rescue path, so it also calls off a scheduled deletion.
+        return self._set_page_archive_state(workspace_id, page_id, archived=False, delete_scheduled=False)
+
+    def schedule_page_deletion(self, workspace_id: str, page_id: str) -> Page:
+        # Scheduling implies archiving, so a page queued for deletion is never left in a live view.
+        return self._set_page_archive_state(workspace_id, page_id, archived=True, delete_scheduled=True)
+
+    def unschedule_page_deletion(self, workspace_id: str, page_id: str) -> Page:
+        # The page stays archived; only the deletion is called off.
+        return self._set_page_archive_state(workspace_id, page_id, delete_scheduled=False)
 
     # --- direct status override ---------------------------------------------
     def set_page_status(self, workspace_id: str, page_id: str, status: str) -> Page:

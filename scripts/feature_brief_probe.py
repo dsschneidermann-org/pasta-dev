@@ -2,10 +2,10 @@
 
 Drives a real feature-brief through its whole lifecycle against a running
 pasta MCP endpoint - draft -> grounding -> spec -> planning -> planReview ->
-building -> review - authoring the content each stage gates on, then archives the
-page. After every step it prints the `do` / `blocked` / `humanGates` / `attention`
-rollup for the brief's whole subtree, so you can watch WHICH instructions the
-server hands an agent at WHICH stage.
+building -> review -> done - authoring the content each stage gates on, then
+archives the page. After every step it prints the `do` / `blocked` /
+`humanGates` / `attention` rollup for the brief's whole subtree, so you can
+watch WHICH instructions the server hands an agent at WHICH stage.
 
 `do` edges are printed as SHAPES - kind, page type, commands, target field - with
 each field's instruction elided to `INSTRUCTION_WIDTH` characters. The point is
@@ -26,7 +26,7 @@ stage at a time:
 The closing summary tallies the edge count per stage, so a regression shows up as
 a stage that got noisy - most usefully, an addStep appearing during `spec`.
 
-The run STOPS at `review`: `ship` is a human gate and the probe never crosses one.
+The run STOPS at `done`: `ship` is a human gate and the probe never crosses one.
 It then archives the brief (and its pinned subtree) so repeated runs do not litter
 the workspace - pass --keep to leave it for inspection.
 
@@ -338,9 +338,13 @@ def walk(probe: Probe, width: int, keep: bool) -> None:
         probe.mutate(brief, cmd("recordCommit", sha="0000000", message="probe: walk the lifecycle"))
         record("13. BUILDING complete (every step done, every case passed)", brief)
 
-        # 8. review - `ship` is a human gate, so this is where the probe stops.
+        # 8. review - the last verification stage before the work is marked done.
         probe.mutate(brief, cmd("submitForReview"))
-        record("14. REVIEW (ship is a human gate - stopping here)", brief)
+        record("14. REVIEW (markDone is the last agent edge)", brief)
+
+        # 9. done - `ship` is a human gate, so this is where the probe stops.
+        probe.mutate(brief, cmd("markDone"))
+        record("15. DONE (ship is a human gate - stopping here)", brief)
 
     except Exception:
         print(f"\n!! FAILED - the brief is left at {brief} for inspection.")
