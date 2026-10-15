@@ -9,6 +9,13 @@ from textwrap import dedent
 from .args import BlockKindSpec
 from .specs import BLOCKS, LIST, PROSE, SCALAR, TITLE_ELEMENT_FIELDS, ElementFSMSpec
 
+# The module's interface, underscore-named declaration helpers included: page-type modules use them.
+__all__ = [
+    "FieldSpec", "ElementBlocksSpec", "SectionSpec",
+    "get_element_blocks", "block_element_fields", "title_element_field",
+    "_scalar", "_prose", "_list", "_blocks",
+]
+
 
 @dataclass(frozen=True)
 class FieldSpec:

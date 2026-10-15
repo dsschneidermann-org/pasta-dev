@@ -17,6 +17,14 @@ from .specs import (
     RefCheck,
 )
 
+# The module's interface, underscore-named declaration helpers included: page-type modules use them.
+__all__ = [
+    "ArgSpec", "BlockKindSpec",
+    "_text", "_integer", "_boolean", "_array", "_same_named", "_INDEX", "_PRECEDING",
+    "_paragraph_runs", "_heading_runs", "_code_block", "_list_block", "_quote_block",
+    "_table_block", "_divider_block", "_paragraph_text", "_heading_text", "standard_blocks",
+]
+
 
 @dataclass(frozen=True)
 class ArgSpec:
