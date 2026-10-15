@@ -10,8 +10,6 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Any
 
-from ...errors import ValidationError
-
 
 # --- Command kinds -----------------------------------------------------------
 SET_SCALAR = "set_scalar"

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import ClassVar
 
-from ...errors import ValidationError
 from .args import (
     _INDEX,
     _PRECEDING,
@@ -15,17 +14,13 @@ from .args import (
     _same_named,
     _text,
 )
-from .fields import FieldSpec, SectionSpec
 from .specs import (
     ADD_BLOCK,
     ADD_ELEMENT,
     ADD_LINK,
-    BLOCKS,
     BLOCK_ARRAY,
     COMPOUND,
     ELEMENT_TRANSITION,
-    LIST,
-    PROSE,
     REMOVE_BLOCK,
     REMOVE_ELEMENT,
     REORDER_BLOCK,
@@ -35,9 +30,7 @@ from .specs import (
     SET_SCALAR,
     SET_TITLE,
     TRANSITION,
-    AutoChildSpec,
     ChildStateGuard,
-    FSMSpec,
     ParentStateGuard,
     RefCheck,
 )

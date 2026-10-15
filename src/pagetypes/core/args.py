@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...errors import ValidationError
 from .specs import (
     INLINE_RUNS,
     INLINE_RUN_GRID,
@@ -71,12 +70,6 @@ def _boolean(name: str, *, required: bool = True, description: str = "") -> ArgS
 def _array(name: str, *, content: str | None = None, required: bool = True, description: str = "",
            block_kinds: tuple[BlockKindSpec, ...] | None = None) -> ArgSpec:
     return ArgSpec(name, type="array", required=required, content=content, description=description,
-                   block_kinds=block_kinds)
-
-
-def _object(name: str, *, content: str | None = None, required: bool = True, description: str = "",
-            block_kinds: tuple[BlockKindSpec, ...] | None = None) -> ArgSpec:
-    return ArgSpec(name, type="object", required=required, content=content, description=description,
                    block_kinds=block_kinds)
 
 
