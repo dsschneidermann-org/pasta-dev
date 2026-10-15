@@ -89,7 +89,7 @@ class _LoggingErrorFilter(ErrorFilter):
         if exc_value is not None:
             reason = "".join(traceback.format_exception_only(exc_type, exc_value)).strip()
             logger.error(
-                "[HMR] reload FAILED - the edit did not take, and the modules loaded before it "
+                "[HMR] reload FAILED - the edit did not take, and the modules loaded before it " +
                 "are still serving:\n%s", reason)
         # hmr annotates these as never None, though a clean exit passes None and its __exit__ handles it.
         return super().__exit__(exc_type, exc_value, traceback_)  # pyright: ignore[reportArgumentType]

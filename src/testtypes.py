@@ -439,7 +439,7 @@ TEST_CHILD = PageType(
         *blocks_cmds("decisions",
                      remove_name="removeDecision", remove_desc="remove a decision",
                      reorder_name="reorderDecision",
-                     reorder_desc="move a decision to an anchored position "
+                     reorder_desc="move a decision to an anchored position " +
                                   "(precedingId guards a stale read)",
                      legal_in=("draft",)),
         transition_cmd("markReady", "draft -> ready", requires=(("steps", "items"),),

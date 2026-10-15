@@ -424,7 +424,7 @@ def element_blocks_cmds(section: str, element_field: str, *, field: str = "items
                            section=section, field=field, element_field=element_field,
                            args=(_text(id_arg), _text("blockId")), legal_in=legal_in),
         ReorderBlockCommand(name=f"reorder{cap}{fcap}",
-                            description=f"move a block in {_a(noun)} {noun}'s {element_field} to an "
+                            description=f"move a block in {_a(noun)} {noun}'s {element_field} to an " +
                                         f"anchored position (precedingId guards a stale read)",
                             section=section, field=field, element_field=element_field,
                             args=(_text(id_arg), _text("blockId"), _integer("toIndex"), _PRECEDING),

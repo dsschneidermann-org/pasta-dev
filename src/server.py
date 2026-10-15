@@ -322,9 +322,9 @@ class _RefuseInvalidDeclarations(Middleware):
         # traceback behind these errors, which the aggregated message deliberately does not carry.
         from ._hmr_debug import LOG_PATH
         raise ToolError(
-            "The page-type declarations are invalid, so this server is refusing to serve rather "
-            f"than answer out of them:\n{errors}\n"
-            f"The full reload traceback is at {LOG_PATH}.\n"
+            "The page-type declarations are invalid, so this server is refusing to serve rather " +
+            f"than answer out of them:\n{errors}\n" +
+            f"The full reload traceback is at {LOG_PATH}.\n" +
             "Fix the declaration and save; the reload restores the tools.")
 
 

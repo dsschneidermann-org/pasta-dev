@@ -948,7 +948,7 @@ class Store:
         valid = workspace_guidance_fields()
         if field not in valid:
             raise ValidationError(
-                f"'{field}' is not a workspace guidance field. "
+                f"'{field}' is not a workspace guidance field. " +
                 f"Declared: {', '.join(sorted(valid)) or '(none)'}."
             )
         with self._transaction_lock_for(workspace_id):
