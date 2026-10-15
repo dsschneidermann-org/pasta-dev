@@ -36,6 +36,7 @@ from .pagetypes.core.commands import (
     AddElementCommand,
     AddLinkCommand,
     CommandSpec,
+    CompoundCommand,
     StatusTransitionCommand,
 )
 from .pagetypes.core.pagetype import PageType, get_pagetype_command
@@ -592,6 +593,11 @@ class Store:
                         self._check_inline_refs(workspace, command_spec, args)
                         self._check_guards(workspace, working, command_spec)
                         self._check_link(workspace, workspace_id, working, command_spec, args)
+                        if isinstance(command_spec, CompoundCommand):
+                            for step in command_spec.steps:
+                                step_args = commands.step_args(step, args)
+                                self._check_ref(workspace, working, step, step_args)
+                                self._check_link(workspace, workspace_id, working, step, step_args)
                     status_before = working.status
                     result = commands.apply_command(
                         working, page_type, command, args, self._id_factory,

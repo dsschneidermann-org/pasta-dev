@@ -1174,14 +1174,21 @@ def test_factories_build_the_class_of_their_kind():
     assert type(add_link_cmd()) is AddLinkCommand and type(set_title_cmd()) is SetTitleCommand
 
 
-def test_compound_holds_its_add_as_a_typed_field():
+def test_compound_holds_its_add_as_a_step():
     compound = transition_on_add_cmd("close", "open -> closed", section="resolution",
                                      field="commits", add_args=(_text("sha"),))
     assert type(compound) is CompoundCommand and compound.kind == COMPOUND
     assert (compound.event, compound.dest, compound.legal_in) == ("close", "closed", ("open",))
-    assert type(compound.add) is AddElementCommand
-    assert (compound.add.section, compound.add.field) == ("resolution", "commits")
-    assert compound.add.element_map == (("sha", "sha"),)
+    (add,) = compound.steps
+    assert type(add) is AddElementCommand
+    assert (add.section, add.field) == ("resolution", "commits")
+    assert add.args == compound.args and add.element_map == (("sha", "sha"),)
+
+
+def test_compound_rejects_a_status_transition_step():
+    with pytest.raises(ValueError, match="status transition"):
+        CompoundCommand(name="close", event="close", dest="closed",
+                        steps=(transition_cmd("go", "a -> b"),))  # type: ignore[arg-type]
 
 
 def test_kind_is_a_class_constant_not_a_constructor_argument():

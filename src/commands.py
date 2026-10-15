@@ -22,6 +22,7 @@ from .pagetypes.core.commands import (
     AddBlockCommand,
     AddElementCommand,
     AddLinkCommand,
+    AuthoringCommand,
     BaseCommand,
     BlockCommand,
     CommandSpec,
@@ -165,20 +166,24 @@ def legal_commands(page: Page, page_type: PageType, ignore_requirements: bool = 
     `legal_in` status-lock, and the terminal-status authoring lock are unaffected. Not exposed through
     the live describeMutations tool.
     """
+    return {command.name: _is_legal(page, page_type, command, ignore_requirements)
+            for command in page_type.commands}
+
+
+def _is_legal(page: Page, page_type: PageType, command: CommandSpec,
+              ignore_requirements: bool = False) -> bool:
+    """Whether `command` is legal for `page` right now - the rule `legal_commands` documents."""
     allowed = fsm.allowed_events(page_type.fsm, page.status)
     in_terminal = page.status in page_type.fsm.terminal_states
-    return {
-        command.name: (
-            _topology_ok(command, allowed)
-            and _status_ok(page, command)
-            and (ignore_requirements or not unmet_requirements(page, command))
-            # Terminal status: lock authoring, leave transitions (e.g. reopen) legal, and let a
-            # command naming this status in `legal_in` opt back in.
-            and (not in_terminal or _is_status_transition(command)
-                 or _opts_into_terminal_status(page, command))
-        )
-        for command in page_type.commands
-    }
+    return (
+        _topology_ok(command, allowed)
+        and _status_ok(page, command)
+        and (ignore_requirements or not unmet_requirements(page, command))
+        # Terminal status: lock authoring, leave transitions (e.g. reopen) legal, and let a
+        # command naming this status in `legal_in` opt back in.
+        and (not in_terminal or _is_status_transition(command)
+             or _opts_into_terminal_status(page, command))
+    )
 
 
 def _field_setter_edge(page: Page, page_type: PageType, section: str, field: str,
@@ -264,8 +269,6 @@ def apply_command(
             f"Unknown command '{command_name}' for page type '{page_type.tag}'. " +
             f"Known commands: {', '.join(c.name for c in page_type.commands)}."
         )
-    _validate_args(command, args)
-    _check_legal(page, page_type, command)
 
     working = page.copy()
     # Backfill any section/field the page type declares now but this page predates - e.g. a
@@ -308,10 +311,9 @@ def _validate_args(command: CommandSpec, args: dict[str, Any]) -> None:
 
 
 def _check_legal(page: Page, page_type: PageType, command: CommandSpec) -> None:
-    legal = legal_commands(page, page_type)
-    if legal.get(command.name, False):
+    if _is_legal(page, page_type, command):
         return
-    legal_now = sorted(name for name, ok in legal.items() if ok)
+    legal_now = sorted(name for name, ok in legal_commands(page, page_type).items() if ok)
     # Distinguish an unmet content precondition (the FSM allows the event, but required
     # fields are still empty) from a wrong-status transition, so the message names what to fix.
     allowed = fsm.allowed_events(page_type.fsm, page.status)
@@ -330,6 +332,12 @@ def _check_legal(page: Page, page_type: PageType, command: CommandSpec) -> None:
 
 
 # --- application (dispatch by command kind) ----------------------------------
+def step_args(step: AuthoringCommand, args: dict[str, Any]) -> dict[str, Any]:
+    """The subset of a compound's args that one of its steps declares."""
+    declared = {arg.name for arg in step.args}
+    return {name: value for name, value in args.items() if name in declared}
+
+
 def _apply(
     page: Page,
     page_type: PageType,
@@ -338,11 +346,14 @@ def _apply(
     id_factory: IdFactory,
     batch_context: BatchContext | None = None,
 ) -> tuple[str | None, list[str]]:
-    """Apply one command, returning (the id reported positionally, every id it created).
+    """Validate one command's args and legality, then apply it, returning (the id reported
+    positionally, every id it created). A compound applies each of its steps through this same path.
 
     The two differ only for a block add, which creates a whole run while `createdIds` stays one
     id per command; every other command creates at most one and reports it as both.
     """
+    _validate_args(command, args)
+    _check_legal(page, page_type, command)
     match command:
         case SetScalarCommand() | SetProseCommand():
             page.sections[command.section][command.field] = args[command.args[0].name]
@@ -384,10 +395,16 @@ def _apply(
             page.status = fsm.fire(page_type.fsm, page.status, command.event)
             return None, []
         case CompoundCommand():
-            created, created_ids = _add_element(page, page_type, command.add, args, id_factory,
-                                                batch_context)
+            created_id: str | None = None
+            created_ids: list[str] = []
+            for step in command.steps:
+                step_created, step_ids = _apply(page, page_type, step, step_args(step, args),
+                                                id_factory, batch_context)
+                if step_created is not None:
+                    created_id = step_created
+                created_ids.extend(step_ids)
             page.status = fsm.fire(page_type.fsm, page.status, command.event)
-            return created, created_ids
+            return created_id, created_ids
         case _:
             assert_never(command)
 

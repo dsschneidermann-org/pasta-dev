@@ -15,7 +15,7 @@ from src.errors import ConflictError, IllegalCommandError, NotFoundError, Valida
 from src.model import Page
 from src.pagetypes.core.specs import FSMSpec
 from src.pagetypes.core.args import _table_block, _text, standard_blocks
-from src.pagetypes.core.commands import add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
+from src.pagetypes.core.commands import AddElementCommand, CompoundCommand, add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
 from src.pagetypes.core.fields import ElementBlocksSpec, SectionSpec, _blocks, _list, _prose
 from src.pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
 from src.pagetypes._registry import get_page_type
@@ -343,6 +343,26 @@ def test_compound_close_illegal_from_draft():
     page = new_flow(factory)
     with pytest.raises(IllegalCommandError):
         _ = apply_command(page, FLOW, "close", {"sha": "a", "message": "m"}, factory)  # not open yet
+
+
+def test_a_compound_step_is_checked_for_legality_like_a_command():
+    # The step's legal_in excludes the page's status, so the step - not the compound - is illegal.
+    step = AddElementCommand(name="_closeAdd", section="resolution", field="commits",
+                             args=(_text("sha"),), element_map=(("sha", "sha"),), legal_in=("closed",))
+    page_type = PageType(
+        tag="xtest-compound-step", name="Compound step", description="ad-hoc compound fixture",
+        sections=(SectionSpec("resolution", "Resolution", (_list("commits", ("sha",)),)),),
+        commands=(CompoundCommand(name="close", description="record a commit AND close (open -> closed)",
+                                  event="close", dest="closed", legal_in=("open",), args=step.args,
+                                  steps=(step,)),
+                  add_link_cmd(), set_title_cmd()),
+        fsm=FSMSpec(name="XTestCompoundStep", initial="open", states=("open", "closed")),
+    )
+    page = Page(id="xtest-compound-step:1", type="xtest-compound-step", title="X", status="open",
+                sections=initial_sections(page_type))
+    with pytest.raises(IllegalCommandError, match="_closeAdd"):
+        _ = apply_command(page, page_type, "close", {"sha": "abc"}, make_counter())
+    assert page.sections["resolution"]["commits"] == [] and page.status == "open"
 
 
 def test_legal_commands_content_always_transitions_gated():

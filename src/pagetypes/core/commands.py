@@ -163,9 +163,15 @@ class TransitionCommand(StatusTransitionCommand):
 
 @dataclass(frozen=True, kw_only=True)
 class CompoundCommand(StatusTransitionCommand):
-    """Adds an element and fires the transition in one atomic command."""
+    """Applies its steps in order, each as a command in its own right, then fires its own transition."""
     kind: ClassVar[str] = COMPOUND
-    add: AddElementCommand
+    steps: tuple[AuthoringCommand, ...]
+
+    def __post_init__(self) -> None:
+        for step in self.steps:
+            if isinstance(step, StatusTransitionCommand):
+                raise ValueError(f"CompoundCommand({self.name!r}): step {step.name!r} is a status " +
+                                 "transition - a compound fires only its own event")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -178,10 +184,11 @@ class SetTitleCommand(BaseCommand):
     kind: ClassVar[str] = SET_TITLE
 
 
-type CommandSpec = (SetScalarCommand | SetProseCommand | AddElementCommand | RemoveElementCommand
-                    | ReorderElementCommand | SetElementFieldCommand | ElementTransitionCommand
-                    | AddBlockCommand | RemoveBlockCommand | ReorderBlockCommand
-                    | TransitionCommand | CompoundCommand | AddLinkCommand | SetTitleCommand)
+type AuthoringCommand = (SetScalarCommand | SetProseCommand | AddElementCommand | RemoveElementCommand
+                         | ReorderElementCommand | SetElementFieldCommand | ElementTransitionCommand
+                         | AddBlockCommand | RemoveBlockCommand | ReorderBlockCommand
+                         | AddLinkCommand | SetTitleCommand)
+type CommandSpec = AuthoringCommand | TransitionCommand | CompoundCommand
 
 
 # --- Field-op command helpers (the CommandSpec analog of _scalar/_prose/_list/_blocks) --------
@@ -461,8 +468,8 @@ def transition_on_add_cmd(name: str, t_description: str, *, legal_in: tuple[str,
                  parent_guards: tuple[ParentStateGuard, ...] = ()) -> CommandSpec:
     """A COMPOUND that atomically adds an element to a list field AND fires a page transition.
     `t_description` carries the edge as 'from -> to'. The outer command owns
-    the FSM edge (event/source/dest/agency) and its args; the element_map is derived
-    from `add_args` (same-named) onto the inner add."""
+    the FSM edge (event/source/dest/agency) and its args; its single step is the add, declaring
+    `add_args` and mapping them same-named onto the new element."""
     t_description = t_description.replace("->", "→")
     before, arrow, after = t_description.partition("→")
     words = after.split()
@@ -473,8 +480,8 @@ def transition_on_add_cmd(name: str, t_description: str, *, legal_in: tuple[str,
         name=name, description=f"{description} ({t_description})", event=event or name, dest=words[0],
         legal_in=sources, agency=agency,
         args=add_args, requires=requires, guards=guards, parent_guards=parent_guards,
-        add=AddElementCommand(name=f"_{name}Add", section=section, field=field,
-                              element_map=_same_named(add_args)),
+        steps=(AddElementCommand(name=f"_{name}Add", section=section, field=field, args=add_args,
+                                 element_map=_same_named(add_args)),),
     )
 
 
