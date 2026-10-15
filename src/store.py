@@ -31,8 +31,14 @@ from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import Page, Workspace
-from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck, status_guidance
-from .pagetypes.core.commands import CommandSpec
+from .pagetypes.core.specs import BLOCK_ARRAY, LIST, RefCheck, status_guidance
+from .pagetypes.core.commands import (
+    AddElementCommand,
+    AddLinkCommand,
+    CommandSpec,
+    CompoundCommand,
+    StatusTransitionCommand,
+)
 from .pagetypes.core.pagetype import PageType, get_pagetype_command
 from .pagetypes.core.validation import collect_ref_ids
 from .pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
@@ -449,7 +455,7 @@ class Store:
             # and its setters are withheld from `do` (see the field_setter_edges call below).
             parent_blocked: set[str] = set()
             for command in page_type.commands:
-                if command.kind not in (TRANSITION, COMPOUND) or command.event is None:
+                if not isinstance(command, StatusTransitionCommand):
                     continue
                 if command.event not in allowed:
                     continue                        # not available from the current status
@@ -582,11 +588,16 @@ class Store:
                         raise ConflictError(self._revision_conflict(
                             presented_revision, working.status_revision_token, stored_revision))
                     if command_spec is not None:
-                        self._check_ref(workspace, working, command_spec, args)
-                        self._check_block_refs(workspace, working, command_spec, args)
-                        self._check_inline_refs(workspace, command_spec, args)
-                        self._check_guards(workspace, working, command_spec)
-                        self._check_link(workspace, workspace_id, working, command_spec, args)
+                        check_specs: list[tuple[CommandSpec, dict[str, Any]]] = [(command_spec, args)]
+                        if isinstance(command_spec, CompoundCommand):
+                            check_specs += [(step, commands.step_args(step, args))
+                                            for step in command_spec.steps]
+                        for spec, spec_args in check_specs:
+                            self._check_ref(workspace, working, spec, spec_args)
+                            self._check_block_refs(workspace, working, spec, spec_args)
+                            self._check_inline_refs(workspace, spec, spec_args)
+                            self._check_guards(workspace, working, spec)
+                            self._check_link(workspace, workspace_id, working, spec, spec_args)
                     status_before = working.status
                     result = commands.apply_command(
                         working, page_type, command, args, self._id_factory,
@@ -988,7 +999,7 @@ class Store:
     @staticmethod
     def _check_ref(workspace: Workspace, page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
         """Enforce a command's cross-page ref - a list add naming an element on the parent."""
-        if command.ref_check is not None:
+        if isinstance(command, AddElementCommand) and command.ref_check is not None:
             Store._resolve_ref(workspace, page, command.ref_check,
                                args.get(command.ref_check.arg), command.name)
 
@@ -1051,6 +1062,8 @@ class Store:
         Looks DOWN at `page`'s children. A failure says other pages' work is unfinished; it does not
         make authoring on THIS page premature, so it never suppresses a field setter.
         """
+        if not isinstance(command, StatusTransitionCommand):
+            return None
         for guard in command.guards:
             for child_id in page.child_ids:
                 child = workspace.pages.get(child_id)
@@ -1075,6 +1088,8 @@ class Store:
         nothing authored HERE can clear it - so `next_actions` also withholds the field setters that
         would only serve this transition (see `commands.field_setter_edges`).
         """
+        if not isinstance(command, StatusTransitionCommand):
+            return None
         for parent_guard in command.parent_guards:
             parent = workspace.pages.get(page.parent_id) if page.parent_id else None
             # Only constrain a page that actually hangs under a parent of the guarded type; a page
@@ -1098,6 +1113,6 @@ class Store:
         """Cross-page precheck for the universal `addLink` command: validate the outgoing edge against
         the live workspace (and the working copy's links) before the pure core appends it, so it obeys
         exactly the same rules as the top-level `link` tool. A no-op for any other command."""
-        if command.kind != ADD_LINK:
+        if not isinstance(command, AddLinkCommand):
             return
         _ = Store._validate_link(workspace, workspace_id, page, args.get("toId"), args.get("role"))

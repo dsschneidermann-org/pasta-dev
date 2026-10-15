@@ -1190,6 +1190,34 @@ def test_add_link_command_enforces_link_rules_and_is_atomic(store):
     assert store.get_page(workspace.id, a.id).links == []   # atomic: the aborted batch wrote nothing
 
 
+def test_compound_step_gets_the_link_precheck(store, monkeypatch):
+    # A compound whose step is an addLink must reject a missing target exactly as addLink does.
+    from src.pagetypes import _registry
+    from src.pagetypes.core.commands import CompoundCommand, add_link_cmd, set_title_cmd
+    from src.pagetypes.core.pagetype import PageType
+    from src.pagetypes.core.specs import FSMSpec
+
+    link = add_link_cmd()
+    adhoc = PageType(
+        tag="xtest-link-close", name="Link and close", description="ad-hoc compound with a link step",
+        sections=(),
+        commands=(CompoundCommand(name="linkAndClose", description="link AND close (open -> closed)",
+                                  event="linkAndClose", dest="closed", legal_in=("open",),
+                                  args=link.args, steps=(link,)),
+                  add_link_cmd(), set_title_cmd()),
+        fsm=FSMSpec(name="XTestLinkClose", initial="open", states=("open", "closed")),
+    )
+    registered = _registry.registered_pagetypes
+    monkeypatch.setattr(_registry, "registered_pagetypes", lambda: {**registered(), adhoc.tag: adhoc})
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, adhoc.tag, "A").page
+    with pytest.raises(NotFoundError):
+        _mutate(store, workspace.id, page.id,
+                [{"command": "linkAndClose", "args": {"toId": "test-flow:missing", "role": "rel"}}])
+    after = store.get_page(workspace.id, page.id)
+    assert after.links == [] and after.status == "open"
+
+
 def test_unlink_missing_edge_rejected(store):
     workspace = store.create_workspace("demo")
     a = store.create_page(workspace.id, "test-fields", "A").page
