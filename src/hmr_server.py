@@ -222,6 +222,8 @@ def build_dev_app() -> Starlette:
             # exclusions the base built.
             self.error_filter: ErrorFilter = _LoggingErrorFilter(*self.error_filter.exclude_filenames)
             self.error_filter.exclude_filenames.add(__file__)
+            # The loop holds a task only weakly; a pending refresh is kept here until it finishes.
+            self._refresh_tasks: set[asyncio.Task[None]] = set()
 
         @override
         def on_changes(self, files: set[Path]):
@@ -230,7 +232,9 @@ def build_dev_app() -> Starlette:
             # refusal, and since that page keeps the socket it is also how the tab recovers.
             super().on_changes(files)
             with suppress(RuntimeError):
-                asyncio.get_running_loop().create_task(ws_reloader.refresh())
+                task = asyncio.get_running_loop().create_task(ws_reloader.refresh())
+                self._refresh_tasks.add(task)
+                task.add_done_callback(self._refresh_tasks.discard)
 
     # /pasta/mcp is served by the stable proxy's ASGI app (built once). Its session manager is
     # started by mcp_asgi.lifespan; the reloader lifespan drives module reloads + mounts.
