@@ -1780,6 +1780,19 @@ def test_a_ref_checked_block_created_with_its_element_is_checked(store):
         ])
 
 
+@pytest.mark.parametrize("blocks", [5, True, 1.5])
+def test_a_non_array_block_argument_is_left_to_validation(store, blocks):
+    """The block-ref precheck reads arguments before they are validated, so a value of the wrong
+    shape must reach the argument validation and be rejected there, not crash the precheck."""
+    workspace = store.create_workspace("demo")
+    child = _child(store.create_page(workspace.id, "test-lifecycle", "Dark mode"), "test-child")
+    with pytest.raises(ValidationError, match="must be of type 'array'"):
+        _mutate(store, workspace.id, child.id, [
+            {"command": "addDecisions", "args": {"blocks": blocks}}
+        ])
+    assert store.get_page(workspace.id, child.id).sections["decisions"]["body"] == []
+
+
 # --- status_revision_token: the per-command optimistic-concurrency stamp ---------
 @pytest.fixture
 def revstore(tmp_path):
