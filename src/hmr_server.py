@@ -38,6 +38,8 @@ from asyncio import Event, Lock, TaskGroup
 from contextlib import asynccontextmanager, suppress
 from importlib import import_module
 from pathlib import Path
+from types import TracebackType
+from typing import Any, override
 from weakref import WeakSet
 
 import uvicorn
@@ -49,6 +51,7 @@ from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter
 from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks
 from starlette.applications import Starlette
 from starlette.routing import Mount
+from starlette.types import Receive, Scope, Send
 
 from .hmr_live_refresh import ws_reloader
 
@@ -80,13 +83,16 @@ class _LoggingErrorFilter(ErrorFilter):
     what tees it to the reload log, so nothing is lost and nothing is printed twice.
     """
 
-    def __exit__(self, exc_type, exc_value, traceback_):
+    @override
+    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None,
+                 traceback_: TracebackType | None):
         if exc_value is not None:
             reason = "".join(traceback.format_exception_only(exc_type, exc_value)).strip()
             logger.error(
                 "[HMR] reload FAILED - the edit did not take, and the modules loaded before it "
                 "are still serving:\n%s", reason)
-        return super().__exit__(exc_type, exc_value, traceback_)
+        # hmr annotates these as never None, though a clean exit passes None and its __exit__ handles it.
+        return super().__exit__(exc_type, exc_value, traceback_)  # pyright: ignore[reportArgumentType]
 
 
 # --- MCP session capture ---------------------------------------------------------------
@@ -102,7 +108,7 @@ def _patch_session_init():
     _pending_session_patches += 1
     original_init = ServerSession.__init__
 
-    def capture_init(self: ServerSession, *args, **kwargs):
+    def capture_init(self: ServerSession, *args: Any, **kwargs: Any):
         original_init(self, *args, **kwargs)
         _active_sessions.add(self)
         global _pending_session_patches
@@ -127,7 +133,7 @@ def build_dev_app() -> Starlette:
     # Capture each new client session created while the proxy's low-level server runs.
     _original_run = base_app._mcp_server.run
 
-    async def _run_with_session_capture(*args, **kwargs):
+    async def _run_with_session_capture(*args: Any, **kwargs: Any):
         unpatch = _patch_session_init()
         try:
             await _original_run(*args, **kwargs)
@@ -190,7 +196,7 @@ def build_dev_app() -> Starlette:
         # A live previous mount means this run is a reload, not the initial mount.
         is_reload = stop_event is not None and finish_event is not None
         # Tear down the previous mount (if any) before swapping in the reloaded server.
-        if is_reload:
+        if stop_event is not None and finish_event is not None:
             stop_event.set()
             await finish_event.wait()
         mcp = current_mcp()  # subscribe to reloads
@@ -214,10 +220,11 @@ def build_dev_app() -> Starlette:
             super().__init__(_PACKAGE_DIR, includes=[_PACKAGE_DIR], excludes=[_LIVE_REFRESH_FILE])
             # Every re-exec is wrapped in this filter, so reporting belongs here. Keep the frame
             # exclusions the base built.
-            self.error_filter = _LoggingErrorFilter(*self.error_filter.exclude_filenames)
+            self.error_filter: ErrorFilter = _LoggingErrorFilter(*self.error_filter.exclude_filenames)
             self.error_filter.exclude_filenames.add(__file__)
 
-        def on_changes(self, files):
+        @override
+        def on_changes(self, files: set[Path]):
             # Reload the changed modules (reactive propagation), then refresh browsers. The refresh
             # is unconditional, a failed reload included: what a tab should land on then is the
             # refusal, and since that page keeps the socket it is also how the tab recovers.
@@ -230,7 +237,7 @@ def build_dev_app() -> Starlette:
     mcp_asgi = base_app.http_app(path="/mcp")
 
     @asynccontextmanager
-    async def reloader_lifespan(_app):
+    async def reloader_lifespan(_app: Starlette):
         nonlocal task_group
         call_pre_reload_hooks()
         async with TaskGroup() as tg:
@@ -254,7 +261,7 @@ def build_dev_app() -> Starlette:
     # The FastAPI app object last served; a reload swaps in a new one (see below).
     last_fastapi_app: object = None
 
-    async def fastapi_dispatch(scope, receive, send):
+    async def fastapi_dispatch(scope: Scope, receive: Receive, send: Send):
         # Forward every non-/pasta/mcp request (incl. the /ws/reloader websocket) to the
         # freshly reloaded FastAPI app, re-pulled per request.
         nonlocal last_fastapi_app
