@@ -588,11 +588,11 @@ class Store:
                         raise ConflictError(self._revision_conflict(
                             presented_revision, working.status_revision_token, stored_revision))
                     if command_spec is not None:
-                        prechecked: list[tuple[CommandSpec, dict[str, Any]]] = [(command_spec, args)]
+                        check_specs: list[tuple[CommandSpec, dict[str, Any]]] = [(command_spec, args)]
                         if isinstance(command_spec, CompoundCommand):
-                            prechecked += [(step, commands.step_args(step, args))
-                                           for step in command_spec.steps]
-                        for spec, spec_args in prechecked:
+                            check_specs += [(step, commands.step_args(step, args))
+                                            for step in command_spec.steps]
+                        for spec, spec_args in check_specs:
                             self._check_ref(workspace, working, spec, spec_args)
                             self._check_block_refs(workspace, working, spec, spec_args)
                             self._check_inline_refs(workspace, spec, spec_args)
