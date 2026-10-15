@@ -43,18 +43,9 @@ from .pagetypes.core.commands import (
     is_field_setter,
 )
 from .pagetypes.core.fields import FieldSpec
-from .pagetypes.core.validation import validate_blocks, validate_inline_content
+from .pagetypes.core.validation import validate_arg_value
 from .pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
 from .pagetypes._registry import guard_production_type
-
-_PYTHON_TYPE = {
-    "string": str,
-    "boolean": bool,
-    "integer": int,
-    "number": (int, float),
-    "array": list,
-    "object": dict,
-}
 
 
 @dataclass(frozen=True)
@@ -301,23 +292,7 @@ def _validate_args(command: CommandSpec, args: dict[str, Any]) -> None:
             raise ValidationError(f"Command '{command.name}' requires argument '{arg.name}'.")
         if not present:
             continue
-        value: JSONValue = args[arg.name]
-        expected = _PYTHON_TYPE.get(arg.type, str)
-        # bool is a subclass of int - guard against int slipping through as bool and vice versa
-        if arg.type == "integer" and isinstance(value, bool):
-            raise ValidationError(f"Argument '{arg.name}' must be an integer, got a boolean.")
-        if not isinstance(value, expected):
-            raise ValidationError(
-                f"Argument '{arg.name}' must be of type '{arg.type}', got {type(value).__name__}."
-            )
-        if arg.choices is not None and value not in arg.choices:
-            raise ValidationError(
-                f"Argument '{arg.name}' must be one of {list(arg.choices)}, got {value!r}."
-            )
-        if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
-            validate_blocks(value, arg.block_kinds)
-        elif arg.content is not None:
-            validate_inline_content(arg.content, value)
+        validate_arg_value(arg, args[arg.name])
 
 
 def _check_legal(page: Page, page_type: PageType, command: CommandSpec) -> None:

@@ -725,6 +725,26 @@ def test_validate_block_accepts_a_kind_the_standard_table_does_not_know():
         validate_block({"kind": "decision", "text": "we chose X"}, decision)
 
 
+@pytest.mark.parametrize("block", [
+    {"kind": "heading", "level": "2", "inlines": ["Title"]},
+    {"kind": "heading", "level": True, "inlines": ["Title"]},
+    {"kind": "list", "ordered": "yes", "items": [["a"]]},
+    {"kind": "code", "language": "py", "source": 5},
+    {"kind": "code", "language": ["py"], "source": "x = 1"},
+])
+def test_validate_block_type_checks_a_plain_body_arg(block):
+    """A body arg is checked the way the same arg on a command is, not only when it holds runs."""
+    with pytest.raises(ValidationError, match="must be"):
+        validate_block(block, _kinds("heading", "list", "code"))
+
+
+@pytest.mark.parametrize("text", [5, ["x"], {"a": 1}])
+def test_validate_block_type_checks_a_custom_kinds_text_arg(text):
+    decision = (BlockKindSpec("decision", body_args=(_text("questionId"), _text())),)
+    with pytest.raises(ValidationError, match="must be of type 'string'"):
+        validate_block({"kind": "decision", "questionId": "q:1", "text": text}, decision)
+
+
 def test_validate_blocks_accepts_declared_kinds():
     validate_blocks([{"kind": "code", "language": "py", "source": "x = 1"}], _kinds("code"))
     validate_blocks([], _kinds("code"))                          # an empty array is legal

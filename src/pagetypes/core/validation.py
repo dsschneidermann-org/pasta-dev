@@ -9,7 +9,7 @@ from ...errors import ValidationError
 from ...model import JSONValue
 
 from .pagetype import PageType, element_fsm_sites, get_pagetype_field
-from .args import BlockKindSpec
+from .args import ArgSpec, BlockKindSpec
 from .commands import (
     AddElementCommand,
     BlockCommand,
@@ -113,6 +113,38 @@ def validate_inline_content(content: str, value: JSONValue) -> None:
                 )
 
 
+_PYTHON_TYPE = {
+    "string": str,
+    "boolean": bool,
+    "integer": int,
+    "number": (int, float),
+    "array": list,
+    "object": dict,
+}
+
+
+def validate_arg_value(arg: ArgSpec, value: JSONValue) -> None:
+    """Validate one present argument value against its spec - its JSON type, its choices, and the
+    inline-run or block shape it declares (raises ValidationError). A command's args and a block's
+    body args are both checked through it."""
+    expected = _PYTHON_TYPE.get(arg.type, str)
+    # bool is a subclass of int - guard against int slipping through as bool and vice versa
+    if arg.type == "integer" and isinstance(value, bool):
+        raise ValidationError(f"Argument '{arg.name}' must be an integer, got a boolean.")
+    if not isinstance(value, expected):
+        raise ValidationError(
+            f"Argument '{arg.name}' must be of type '{arg.type}', got {type(value).__name__}."
+        )
+    if arg.choices is not None and value not in arg.choices:
+        raise ValidationError(
+            f"Argument '{arg.name}' must be one of {list(arg.choices)}, got {value!r}."
+        )
+    if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
+        validate_blocks(value, arg.block_kinds)
+    elif arg.content is not None:
+        validate_inline_content(arg.content, value)
+
+
 def validate_block(entry: JSONValue, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """Validate one block against the block kinds its field declares.
 
@@ -139,8 +171,8 @@ def validate_block(entry: JSONValue, block_kinds: tuple[BlockKindSpec, ...]) -> 
         present = arg.name in entry and entry[arg.name] is not None
         if arg.required and not present:
             raise ValidationError(f"A '{kind}' block requires '{arg.name}'.")
-        if present and arg.content is not None:
-            validate_inline_content(arg.content, entry[arg.name])
+        if present:
+            validate_arg_value(arg, entry[arg.name])
     if kind == "table":
         validate_table(entry.get("header", []), entry.get("rows", []), entry.get("align"))
 
