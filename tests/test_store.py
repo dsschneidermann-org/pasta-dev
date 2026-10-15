@@ -154,6 +154,24 @@ def test_add_decision_ref_integrity(store):
     assert result.sections["decisions"]["body"][0]["questionId"] == asked_created[0]
 
 
+@pytest.mark.parametrize("text", [5, ["x"], {"a": 1}])
+def test_a_block_text_arg_of_the_wrong_type_is_rejected_not_stored(store, text):
+    """A block's plain-text arg is type-checked like the same arg on a command, so a value that is
+    not a string aborts the batch instead of being written."""
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
+    parent, child = result.page, _child(result, "test-child")
+    _, asked = _mutate(store, workspace.id, parent.id, [
+        {"command": "askQuestion", "args": {"text": "contrast?"}}
+    ])
+    with pytest.raises(ValidationError, match="must be of type 'string'"):
+        _mutate(store, workspace.id, child.id, [
+            {"command": "addDecisions", "args": {"blocks": [
+                {"kind": "decision", "questionId": asked[0], "text": text}]}}
+        ])
+    assert store.get_page(workspace.id, child.id).sections["decisions"]["body"] == []
+
+
 def test_list_add_ref_check_rejects_a_dangling_parent_reference(store):
     """The ref check is kind-agnostic: a list add carries it as the blocks addDecision above does,
     so a dangling id aborts the whole batch before anything is written."""
