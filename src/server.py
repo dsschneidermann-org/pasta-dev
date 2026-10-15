@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import asyncio
 from contextlib import contextmanager, asynccontextmanager
-from typing import Any, override
+from typing import Annotated, Any, override
 from collections.abc import Generator
 import traceback
 
@@ -161,7 +161,7 @@ async def route_index(request: Request, archived: str | None = None):
 
 
 @app.get("/ws:{workspaceIdPart}", response_class=HTMLResponse)
-async def route_tree(request: Request, workspaceIdPart: str, archived: str | None = None, markdown: str | None = None):
+async def route_tree(request: Request, workspaceIdPart: str, archived: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
@@ -224,7 +224,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
 async def route_archive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.archive_page(workspace_id, pageId)
+        _ = STORE.archive_page(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -233,7 +233,7 @@ async def route_archive_page(workspaceIdPart: str, pageId: str):
 async def route_unarchive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.unarchive_page(workspace_id, pageId)
+        _ = STORE.unarchive_page(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -246,7 +246,7 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
 async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.schedule_page_deletion(workspace_id, pageId)
+        _ = STORE.schedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -255,7 +255,7 @@ async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
 async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.unschedule_page_deletion(workspace_id, pageId)
+        _ = STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -265,10 +265,10 @@ async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
 # can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
 # routes it fires the live-reload refresh and 202s (no MCP equivalent - a browser can't call MCP).
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
-async def route_set_page_status(workspaceIdPart: str, pageId: str, status: str = Form(...)):
+async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annotated[str, Form()]):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.set_page_status(workspace_id, pageId, status)
+        _ = STORE.set_page_status(workspace_id, pageId, status)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -322,9 +322,9 @@ class _RefuseInvalidDeclarations(Middleware):
         # traceback behind these errors, which the aggregated message deliberately does not carry.
         from ._hmr_debug import LOG_PATH
         raise ToolError(
-            "The page-type declarations are invalid, so this server is refusing to serve rather "
-            f"than answer out of them:\n{errors}\n"
-            f"The full reload traceback is at {LOG_PATH}.\n"
+            "The page-type declarations are invalid, so this server is refusing to serve rather " +
+            f"than answer out of them:\n{errors}\n" +
+            f"The full reload traceback is at {LOG_PATH}.\n" +
             "Fix the declaration and save; the reload restores the tools.")
 
 
@@ -632,4 +632,4 @@ async def unlink(workspaceId: str, fromId: str, toId: str, role: str) -> dict[st
 
 
 # --- capture HMR reload errors to hmr_debug.log (see src/_hmr_debug.py) -------
-from . import _hmr_debug  # noqa: E402, F401
+from . import _hmr_debug  # pyright: ignore[reportUnusedImport]

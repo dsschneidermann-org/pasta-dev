@@ -273,7 +273,7 @@ def validate_pagetype_field_setters(page_type: PageType) -> list[str]:
         target = (command.section, command.field)
         if target in seen:
             errors.append(
-                f"{target[0]}.{target[1]} has two field setters "
+                f"{target[0]}.{target[1]} has two field setters " +
                 f"('{seen[target]}' and '{command.name}') - a `do` edge names one command."
             )
             continue
@@ -334,7 +334,7 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
             field_spec = get_pagetype_field(page_type, command.section, command.field)
             if field_spec is None:
                 errors.append(
-                    f"command '{command.name}' carries blocks for "
+                    f"command '{command.name}' carries blocks for " +
                     f"{command.section}.{command.field}, which is not a declared field.")
                 continue
             element_field = (command.element_field if isinstance(command, BlockCommand)
@@ -342,13 +342,13 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
             if element_field is None:
                 if field_spec.kind != BLOCKS:
                     errors.append(
-                        f"command '{command.name}' carries blocks for "
+                        f"command '{command.name}' carries blocks for " +
                         f"{command.section}.{command.field}, which is not a blocks field.")
                 continue
             if get_element_blocks(field_spec, element_field) is None:
                 errors.append(
-                    f"command '{command.name}' carries blocks for "
-                    f"{command.section}.{command.field}.{element_field}, which is not declared "
+                    f"command '{command.name}' carries blocks for " +
+                    f"{command.section}.{command.field}.{element_field}, which is not declared " +
                     f"as a block-bearing element field.")
     return errors
 
