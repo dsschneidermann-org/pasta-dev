@@ -5,10 +5,11 @@ projection used by search. No I/O - takes model objects + page types in, returns
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from .model import Page, Workspace
+from .model import JSONValue, Page, Workspace
 from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR, ElementFSMSpec
 from .pagetypes.core.fields import FieldSpec, block_element_fields
 from .pagetypes.core.pagetype import PageType
@@ -207,7 +208,7 @@ def render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None =
         elif kind == "code":
             out.append(f"```{block.get('language', '')}\n{block.get('source', '')}\n```")
         elif kind == "list":
-            marker = (lambda i: f"{i}.") if block.get("ordered") else (lambda i: "-")
+            marker: Callable[[int], str] = (lambda i: f"{i}.") if block.get("ordered") else (lambda i: "-")
             out.append("\n".join(f"{marker(i)} {_render_inlines(item, ref_context)}"
                                  for i, item in enumerate(block.get("items", []), start=1)))
         elif kind == "quote":
@@ -229,7 +230,7 @@ def render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None =
 _NONE = "*None.*"
 
 
-def _field_content(field_spec: FieldSpec, value, ref_context: RefContext | None = None) -> str:
+def _field_content(field_spec: FieldSpec, value: Any, ref_context: RefContext | None = None) -> str:
     """One field's Markdown, or the italic `*None.*` fallback when it holds no content.
 
     Scalars keep their `**key:**` label so the field stays named even when empty; prose, list, and
@@ -417,10 +418,15 @@ def render_workspace_links(tree: dict[str, Any], show_archived: bool = False, sh
     return "\n".join(walk(tree.get("nodes", []), 0))
 
 
-def _runs_text(runs: list[Any]) -> str:
+def _as_list(value: JSONValue) -> list[JSONValue]:
+    """`value` if it is an array, else no entries - the search projection reads content of any shape."""
+    return value if isinstance(value, list) else []
+
+
+def _runs_text(runs: JSONValue) -> str:
     """The plain text carried by an inline-run array (text/code runs; refs are ids, skipped)."""
     words: list[str] = []
-    for run in runs:
+    for run in _as_list(runs):
         if isinstance(run, str):
             words.append(run)
         elif isinstance(run, dict):
@@ -431,19 +437,19 @@ def _runs_text(runs: list[Any]) -> str:
     return " ".join(words)
 
 
-def _block_inline_text(block: dict[str, Any]) -> str:
+def _block_inline_text(block: dict[str, JSONValue]) -> str:
     """The text held in a block's inline runs (its bounded `text`/`source` are captured elsewhere)."""
     segments: list[str] = []
     if "inlines" in block:
         segments.append(_runs_text(block["inlines"]))
-    for item in block.get("items", []) or []:
+    for item in _as_list(block.get("items")):
         segments.append(_runs_text(item))
-    for paragraph in block.get("paragraphs", []) or []:
+    for paragraph in _as_list(block.get("paragraphs")):
         segments.append(_runs_text(paragraph))
-    for cell in block.get("header", []) or []:
+    for cell in _as_list(block.get("header")):
         segments.append(_runs_text(cell))
-    for row in block.get("rows", []) or []:
-        for cell in row:
+    for row in _as_list(block.get("rows")):
+        for cell in _as_list(row):
             segments.append(_runs_text(cell))
     return " ".join(segment for segment in segments if segment)
 
@@ -453,7 +459,7 @@ def page_text(page: Page, page_type: PageType) -> str:
     parts = [page.title]
     for section in page_type.sections:
         for field_spec in section.fields:
-            value = page.sections.get(section.key, {}).get(field_spec.key)
+            value: JSONValue = page.sections.get(section.key, {}).get(field_spec.key)
             if isinstance(value, str):
                 parts.append(value)
             elif isinstance(value, list):
@@ -466,7 +472,7 @@ def page_text(page: Page, page_type: PageType) -> str:
                         parts.append(_block_inline_text(entry))
                     # an element's block fields carry their text one level deeper again
                     for block_field in block_element_fields(field_spec):
-                        for block in entry.get(block_field) or []:
+                        for block in _as_list(entry.get(block_field)):
                             if not isinstance(block, dict):
                                 continue
                             parts += [str(v) for k, v in block.items()
