@@ -173,7 +173,7 @@ def _bullet(marker: str, description: str, notes: list[str]) -> str:
 
 
 def _field_line(field: dict[str, Any]) -> str:
-    notes = []
+    notes: list[str] = []
     if field["choices"]:
         notes.append("one of " + ", ".join(f"`{choice}`" for choice in field["choices"]))
     if field["elementFields"]:
@@ -189,7 +189,7 @@ def _field_line(field: dict[str, Any]) -> str:
 
 
 def _command_line(command: dict[str, Any]) -> str:
-    notes = []
+    notes: list[str] = []
     if command["requires"]:
         notes.append("requires " + ", ".join(f"`{req['section']}.{req['field']}`"
                                               for req in command["requires"]))

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import asyncio
 from contextlib import contextmanager, asynccontextmanager
-from typing import Any
+from typing import Any, override
 from collections.abc import Generator
 import traceback
 
@@ -15,7 +15,11 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
-from fastmcp.server.middleware import Middleware, MiddlewareContext
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
+from fastmcp.tools import ToolResult
+import mcp.types as mt
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from . import cleanup
 from .describe import describe_mutations, describe_page_type
@@ -75,7 +79,7 @@ templates = Jinja2Templates(directory="src/templates")
 # Registered ahead of `add_no_cache_headers` so that one stays the outer middleware and stamps this
 # response too, since a cached refusal would outlive the fix.
 @app.middleware("http")
-async def refuse_invalid_declarations(request: Request, call_next):
+async def refuse_invalid_declarations(request: Request, call_next: RequestResponseEndpoint) -> Response:
     errors = declaration_errors()
     # The refusal page renders with the stylesheet and theme assets served from /static.
     if errors is None or request.url.path.startswith("/static"):
@@ -101,7 +105,7 @@ async def refuse_invalid_declarations(request: Request, call_next):
 # per-route responses alone wouldn't cover those. CSS stylesheet is excepted.
 # BaseHTTPMiddleware only sees HTTP scopes, the /ws/reloader websocket passes through.
 @app.middleware("http")
-async def add_no_cache_headers(request: Request, call_next):
+async def add_no_cache_headers(request: Request, call_next: RequestResponseEndpoint) -> Response:
     response = await call_next(request)
     if not request.url.path.endswith(".css"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -304,7 +308,12 @@ class _RefuseInvalidDeclarations(Middleware):
     nowhere else to learn why the server stopped answering.
     """
 
-    async def on_call_tool(self, context: MiddlewareContext, call_next):
+    @override
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
         errors = declaration_errors()
         if errors is None:
             return await call_next(context)

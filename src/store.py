@@ -30,7 +30,7 @@ from typing import Any, final
 from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
-from .model import Page, Workspace
+from .model import JSONValue, Page, Workspace
 from .pagetypes.core.specs import BLOCK_ARRAY, LIST, RefCheck, status_guidance
 from .pagetypes.core.commands import (
     AddElementCommand,
@@ -988,7 +988,8 @@ class Store:
         if ref_value is None:
             return
         target = workspace.pages.get(page.parent_id) if page.parent_id and ref.scope == "parent" else None
-        candidates = (target.sections.get(ref.section, {}).get(ref.field, []) if target else [])
+        candidates: list[dict[str, Any]] = (target.sections.get(ref.section, {}).get(ref.field, [])
+                                            if target else [])
         if ref_value not in {element.get("id") for element in candidates}:
             where = f"{ref.scope} page's {ref.section}.{ref.field}"
             raise ValidationError(
@@ -1016,7 +1017,8 @@ class Store:
         for arg in command.args:
             if arg.content != BLOCK_ARRAY or arg.block_kinds is None:
                 continue
-            for entry in args.get(arg.name) or []:
+            value: JSONValue = args.get(arg.name)
+            for entry in value if isinstance(value, list) else []:
                 if not isinstance(entry, dict):
                     continue                  # left for the grammar validation to reject
                 block = next((block for block in arg.block_kinds

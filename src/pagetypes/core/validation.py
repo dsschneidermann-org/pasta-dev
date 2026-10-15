@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ...errors import ValidationError
+from ...model import JSONValue
 
 from .pagetype import PageType, element_fsm_sites, get_pagetype_field
 from .args import BlockKindSpec
@@ -46,7 +47,7 @@ def _reject_markdown(text: str) -> None:
             )
 
 
-def _validate_run(run: Any) -> None:
+def _validate_run(run: JSONValue) -> None:
     """Validate one inline run against the run grammar."""
     if isinstance(run, str):
         _reject_markdown(run)
@@ -78,14 +79,14 @@ def _validate_run(run: Any) -> None:
     raise ValidationError("An inline run object must be a text run, {'code': …}, or {'ref': …}.")
 
 
-def _validate_runs(runs: Any) -> None:
+def _validate_runs(runs: JSONValue) -> None:
     if not isinstance(runs, list):
         raise ValidationError("An inline-run value must be an array of runs.")
     for run in runs:
         _validate_run(run)
 
 
-def validate_inline_content(content: str, value: Any) -> None:
+def validate_inline_content(content: str, value: JSONValue) -> None:
     """Validate `value` against the declared inline-content `content` shape (raises ValidationError)."""
     if content == INLINE_RUNS:
         _validate_runs(value)
@@ -112,7 +113,7 @@ def validate_inline_content(content: str, value: Any) -> None:
                 )
 
 
-def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
+def validate_block(entry: JSONValue, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """Validate one block against the block kinds its field declares.
 
     A block is an object carrying a `kind` the field declares plus exactly that kind's body args,
@@ -144,7 +145,7 @@ def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
         validate_table(entry.get("header", []), entry.get("rows", []), entry.get("align"))
 
 
-def validate_blocks(value: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
+def validate_blocks(value: JSONValue, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """Validate an array of blocks against the block kinds its field declares."""
     if not isinstance(value, list):
         raise ValidationError("A blocks value must be an array of blocks.")
@@ -152,7 +153,7 @@ def validate_blocks(value: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
         validate_block(entry, block_kinds)
 
 
-def collect_ref_ids(content: str, value: Any,
+def collect_ref_ids(content: str, value: JSONValue,
                     block_kinds: tuple[BlockKindSpec, ...] | None = None) -> list[str]:
     """Every `{ref: pageId}` page id carried by an arg `value` of the given `content` shape.
 
@@ -168,10 +169,10 @@ def collect_ref_ids(content: str, value: Any,
     """
     ids: list[str] = []
 
-    def from_runs(runs: Any) -> None:
+    def from_runs(runs: JSONValue) -> None:
         if isinstance(runs, list):
-            ids.extend(run["ref"] for run in runs
-                       if isinstance(run, dict) and isinstance(run.get("ref"), str))
+            ids.extend(ref for run in runs
+                       if isinstance(run, dict) and isinstance(ref := run.get("ref"), str))
 
     if content == INLINE_RUNS:
         from_runs(value)
@@ -190,7 +191,7 @@ def collect_ref_ids(content: str, value: Any,
     return ids
 
 
-def _block_ref_ids(entry: Any, block_kinds: tuple[BlockKindSpec, ...] | None) -> list[str]:
+def _block_ref_ids(entry: JSONValue, block_kinds: tuple[BlockKindSpec, ...] | None) -> list[str]:
     """Every inline page ref one block carries, read through the body args its kind declares.
 
     Stays defensive like its caller: this runs before the grammar validation, so a malformed

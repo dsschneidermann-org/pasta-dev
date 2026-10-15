@@ -15,7 +15,7 @@ from typing import Any, TypeIs, assert_never
 from . import fsm
 from .errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory
-from .model import Page
+from .model import JSONValue, Page
 from .pagetypes.core.specs import BLOCK_ARRAY
 from .pagetypes.core.args import ArgSpec, BlockKindSpec
 from .pagetypes.core.commands import (
@@ -92,7 +92,7 @@ def create_page(page_type: PageType, title: str, parent_id: str | None, id_facto
     )
 
 
-def _is_populated(value: Any) -> bool:
+def _is_populated(value: JSONValue) -> bool:
     """Whether a field value counts as "set" for a required-content precondition.
 
     Prose must be non-blank, a list must be non-empty, a scalar must be non-null.
@@ -291,7 +291,7 @@ def _validate_args(command: CommandSpec, args: dict[str, Any]) -> None:
             raise ValidationError(f"Command '{command.name}' requires argument '{arg.name}'.")
         if not present:
             continue
-        value = args[arg.name]
+        value: JSONValue = args[arg.name]
         expected = _PYTHON_TYPE.get(arg.type, str)
         # bool is a subclass of int - guard against int slipping through as bool and vice versa
         if arg.type == "integer" and isinstance(value, bool):
@@ -510,7 +510,7 @@ def _target_entries(page: Page, command: FieldCommand, args: dict[str, Any]) -> 
         return entries
     element = _find_element_by_id(entries, args[command.args[0].name],
                                   f"{command.section}.{command.field}")
-    blocks = element.get(element_field)
+    blocks: list[dict[str, Any]] | None = element.get(element_field)
     if not isinstance(blocks, list):
         blocks = []
         element[element_field] = blocks
