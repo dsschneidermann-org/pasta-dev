@@ -588,16 +588,16 @@ class Store:
                         raise ConflictError(self._revision_conflict(
                             presented_revision, working.status_revision_token, stored_revision))
                     if command_spec is not None:
-                        self._check_ref(workspace, working, command_spec, args)
-                        self._check_block_refs(workspace, working, command_spec, args)
-                        self._check_inline_refs(workspace, command_spec, args)
-                        self._check_guards(workspace, working, command_spec)
-                        self._check_link(workspace, workspace_id, working, command_spec, args)
+                        prechecked: list[tuple[CommandSpec, dict[str, Any]]] = [(command_spec, args)]
                         if isinstance(command_spec, CompoundCommand):
-                            for step in command_spec.steps:
-                                step_args = commands.step_args(step, args)
-                                self._check_ref(workspace, working, step, step_args)
-                                self._check_link(workspace, workspace_id, working, step, step_args)
+                            prechecked += [(step, commands.step_args(step, args))
+                                           for step in command_spec.steps]
+                        for spec, spec_args in prechecked:
+                            self._check_ref(workspace, working, spec, spec_args)
+                            self._check_block_refs(workspace, working, spec, spec_args)
+                            self._check_inline_refs(workspace, spec, spec_args)
+                            self._check_guards(workspace, working, spec)
+                            self._check_link(workspace, workspace_id, working, spec, spec_args)
                     status_before = working.status
                     result = commands.apply_command(
                         working, page_type, command, args, self._id_factory,
