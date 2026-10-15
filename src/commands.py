@@ -239,7 +239,7 @@ def field_setter_edges(page: Page, page_type: PageType,
         if target not in required or not legal.get(command.name):
             continue
         if is_field_setter(command):
-            setters.setdefault(target, command.name)
+            _ = setters.setdefault(target, command.name)
     return [_field_setter_edge(page, page_type, section, field, command_name)
             for (section, field), command_name in setters.items()]
 

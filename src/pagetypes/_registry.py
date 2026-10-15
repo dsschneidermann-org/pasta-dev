@@ -160,5 +160,5 @@ def workspace_guidance_fields() -> dict[str, WorkspaceGuidanceSpec]:
     fields: dict[str, WorkspaceGuidanceSpec] = {}
     for page_type in registered_pagetypes().values():
         for spec in page_type.workspace_guidance:
-            fields.setdefault(spec.field, spec)
+            _ = fields.setdefault(spec.field, spec)
     return fields

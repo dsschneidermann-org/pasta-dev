@@ -185,7 +185,7 @@ def build_dev_app() -> Starlette:
             unmount = mount_mcp(mcp)
             try:
                 await notify_sessions()  # tell live sessions the tool set may have changed
-                await stop.wait()
+                _ = await stop.wait()
             finally:
                 unmount()
                 finish.set()
@@ -198,13 +198,13 @@ def build_dev_app() -> Starlette:
         # Tear down the previous mount (if any) before swapping in the reloaded server.
         if stop_event is not None and finish_event is not None:
             stop_event.set()
-            await finish_event.wait()
+            _ = await finish_event.wait()
         mcp = current_mcp()  # subscribe to reloads
         if is_reload:
             logger.info("[HMR] FastMCP server reloaded (src.server.mcp)")
         stop_event, finish_event = Event(), Event()
         assert task_group is not None
-        task_group.create_task(serve_mcp(mcp, stop_event, finish_event))
+        _ = task_group.create_task(serve_mcp(mcp, stop_event, finish_event))
 
     # Reading an attribute subscribes this effect to src.cleanup, so an edit
     # re-executes it promptly - ReactiveModule.load is otherwise lazy. Its on_dispose
@@ -256,7 +256,7 @@ def build_dev_app() -> Starlette:
                 mcp_reload_effect.dispose()
                 if stop_event is not None:
                     stop_event.set()
-                watch_task.cancel()
+                _ = watch_task.cancel()
 
     # The FastAPI app object last served; a reload swaps in a new one (see below).
     last_fastapi_app: object = None

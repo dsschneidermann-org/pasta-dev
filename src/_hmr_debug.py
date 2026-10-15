@@ -28,7 +28,7 @@ LOG_PATH = Path(__file__).resolve().parent.parent / "hmr_debug.log"
 def _log(header: str, text: str) -> None:
     stamp = datetime.now().isoformat(timespec="milliseconds")
     with LOG_PATH.open("a", encoding="utf-8") as f:
-        f.write(f"\n===== {stamp} {header} =====\n{text.rstrip()}\n")
+        _ = f.write(f"\n===== {stamp} {header} =====\n{text.rstrip()}\n")
 
 
 def _fmt(exc_type: type[BaseException] | None, exc_value: BaseException | None,
@@ -80,7 +80,7 @@ if _loop is not None and not getattr(_loop, "_hmr_dbg_installed", False):
         else:
             _log("asyncio", str(context))
         if _loop_orig is not None:
-            _loop_orig(loop, context)
+            _ = _loop_orig(loop, context)
         else:
             loop.default_exception_handler(context)
 

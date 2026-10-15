@@ -224,7 +224,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
 async def route_archive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.archive_page(workspace_id, pageId)
+        _ = STORE.archive_page(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -233,7 +233,7 @@ async def route_archive_page(workspaceIdPart: str, pageId: str):
 async def route_unarchive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.unarchive_page(workspace_id, pageId)
+        _ = STORE.unarchive_page(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -246,7 +246,7 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
 async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.schedule_page_deletion(workspace_id, pageId)
+        _ = STORE.schedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -255,7 +255,7 @@ async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
 async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.unschedule_page_deletion(workspace_id, pageId)
+        _ = STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -268,7 +268,7 @@ async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
 async def route_set_page_status(workspaceIdPart: str, pageId: str, status: str = Form(...)):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.set_page_status(workspace_id, pageId, status)
+        _ = STORE.set_page_status(workspace_id, pageId, status)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
