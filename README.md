@@ -148,7 +148,7 @@ Tasks run through [just](https://github.com/casey/just):
 ```text
 just test        # full suite
 just testincr    # incremental (pytest --testmon)
-just types       # basedpyright
+just types       # basedpyright - passes only with 0 errors and 0 warnings
 just main        # run the server
 just docs        # generate page-type docs + Sphinx site
 just dev         # server and a live docs site, in parallel
