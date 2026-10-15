@@ -977,20 +977,22 @@ class Store:
         return children
 
     @staticmethod
-    def _resolve_ref(workspace: Workspace, page: Page, ref: RefCheck, ref_value: Any,
+    def _resolve_ref(workspace: Workspace, page: Page, ref: RefCheck, ref_value: JSONValue,
                      command_name: str) -> None:
         """Enforce one cross-page ref: the referenced id must exist on the target page.
 
         A missing/None value is left to `apply_command`'s arg validation; a present-but-dangling
-        id aborts here before anything is written. Shared by the command-level check and the
-        per-block one, so the rule and its message live once.
+        id aborts here before anything is written. The value is not validated yet, and only a
+        string can be an element id, so any other value references nothing and aborts the same
+        way. Shared by the command-level check and the per-block one, so the rule and its message
+        live once.
         """
         if ref_value is None:
             return
         target = workspace.pages.get(page.parent_id) if page.parent_id and ref.scope == "parent" else None
         candidates: list[dict[str, Any]] = (target.sections.get(ref.section, {}).get(ref.field, [])
                                             if target else [])
-        if ref_value not in {element.get("id") for element in candidates}:
+        if not isinstance(ref_value, str) or ref_value not in {element.get("id") for element in candidates}:
             where = f"{ref.scope} page's {ref.section}.{ref.field}"
             raise ValidationError(
                 f"Command '{command_name}': '{ref.arg}={ref_value}' does not reference an " +
