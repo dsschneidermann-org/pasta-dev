@@ -578,10 +578,10 @@ class Store:
             created_so_far: set[str] = set()
             for index, entry in enumerate(batch):
                 command = entry.get("command")
-                args = dict(entry.get("args") or {})
-                presented_revision = args.pop("statusRevisionToken", None)
-                command_spec = get_pagetype_command(page_type, command) if command else None
                 try:
+                    args = commands.batch_args(entry)
+                    presented_revision = args.pop("statusRevisionToken", None)
+                    command_spec = get_pagetype_command(page_type, command) if command else None
                     if command is None:
                         raise ValidationError("Unknown command None.")
                     if presented_revision != working.status_revision_token:

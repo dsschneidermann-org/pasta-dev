@@ -4,6 +4,7 @@ import pytest
 
 from src.commands import (
     apply_command,
+    batch_args,
     BatchContext,
     create_page,
     field_setter_edges,
@@ -1272,3 +1273,17 @@ def test_every_declared_content_shape_is_checked_through_the_array_path():
             "itemId": item_id,
             "blocks": [{"kind": "list", "ordered": False,
                         "items": [["a **bold** item"]]}]}, factory)
+
+
+def test_batch_args_copies_an_object_and_reads_absent_args_as_empty():
+    args = {"text": "x"}
+    assert batch_args({"command": "c", "args": args}) == args
+    assert batch_args({"command": "c", "args": args}) is not args
+    assert batch_args({"command": "c"}) == {}
+    assert batch_args({"command": "c", "args": None}) == {}
+
+
+@pytest.mark.parametrize("args", [["abc"], "abc", 5, True, [], "", 0, [["text", "x"]]])
+def test_batch_args_rejects_args_that_are_not_an_object(args):
+    with pytest.raises(ValidationError, match="A command's args must be an object"):
+        _ = batch_args({"command": "c", "args": args})

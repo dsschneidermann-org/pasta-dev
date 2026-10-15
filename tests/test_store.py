@@ -742,6 +742,18 @@ def test_mutate_page_batch_aborts_and_writes_nothing(store):
     assert store.get_page(workspace.id, page.id).sections["summary"]["body"] == ""   # rolled back
 
 
+@pytest.mark.parametrize("args", [["abc123"], "abc", 5])
+def test_a_command_whose_args_is_not_an_object_aborts_the_batch(store, args):
+    """A command's args are read before anything else about it is checked, so a value that is not an
+    object must abort the batch with a validation error naming the command, not crash the read."""
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "A").page
+    with pytest.raises(ValidationError, match=r"Batch aborted at command 0 \('setTitle'\): "
+                                              r"A command's args must be an object"):
+        store.mutate_page_batch(workspace.id, page.id, [{"command": "setTitle", "args": args}])
+    assert store.get_page(workspace.id, page.id).title == "A"
+
+
 # --- batch opaque-id chaining (a batch's own not-yet-committed ids are opaque to the anchor guard) -
 def _texts(store, workspace_id, page_id):
     return [it["text"] for it in store.get_page(workspace_id, page_id).sections["items"]["items"]]

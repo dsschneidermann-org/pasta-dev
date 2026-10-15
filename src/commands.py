@@ -253,6 +253,16 @@ def field_setter_edges(page: Page, page_type: PageType,
             for (section, field), command_name in setters.items()]
 
 
+def batch_args(entry: dict[str, Any]) -> dict[str, Any]:
+    """A copy of one batch command's args, which must be an object when given."""
+    args: JSONValue = entry.get("args")
+    if args is None:
+        return {}
+    if not isinstance(args, dict):
+        raise ValidationError(f"A command's args must be an object, got {type(args).__name__}.")
+    return dict(args)
+
+
 def apply_command(
     page: Page,
     page_type: PageType,
