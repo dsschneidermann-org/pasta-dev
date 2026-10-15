@@ -19,6 +19,8 @@ import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
+from types import TracebackType
+from typing import Any
 
 LOG_PATH = Path(__file__).resolve().parent.parent / "hmr_debug.log"
 
@@ -29,17 +31,18 @@ def _log(header: str, text: str) -> None:
         f.write(f"\n===== {stamp} {header} =====\n{text.rstrip()}\n")
 
 
-def _fmt(exc_type, exc_value, tb) -> str:
+def _fmt(exc_type: type[BaseException] | None, exc_value: BaseException | None,
+         tb: TracebackType | None) -> str:
     return "".join(traceback.format_exception(exc_type, exc_value, tb))
 
 
 # --- sys.excepthook (what ErrorFilter.__exit__ calls) ------------------------
 if not getattr(sys, "_hmr_dbg_excepthook_orig", None):
-    sys._hmr_dbg_excepthook_orig = sys.excepthook  # type: ignore[attr-defined]
-_excepthook_orig = sys._hmr_dbg_excepthook_orig  # type: ignore[attr-defined]
+    setattr(sys, "_hmr_dbg_excepthook_orig", sys.excepthook)
+_excepthook_orig = getattr(sys, "_hmr_dbg_excepthook_orig")
 
 
-def _excepthook(exc_type, exc_value, tb):
+def _excepthook(exc_type: type[BaseException], exc_value: BaseException, tb: TracebackType | None):
     _log("sys.excepthook", _fmt(exc_type, exc_value, tb))
     _excepthook_orig(exc_type, exc_value, tb)
 
@@ -48,11 +51,11 @@ sys.excepthook = _excepthook
 
 # --- sys.unraisablehook ------------------------------------------------------
 if not getattr(sys, "_hmr_dbg_unraisable_orig", None):
-    sys._hmr_dbg_unraisable_orig = sys.unraisablehook  # type: ignore[attr-defined]
-_unraisable_orig = sys._hmr_dbg_unraisable_orig  # type: ignore[attr-defined]
+    setattr(sys, "_hmr_dbg_unraisable_orig", sys.unraisablehook)
+_unraisable_orig = getattr(sys, "_hmr_dbg_unraisable_orig")
 
 
-def _unraisablehook(args):
+def _unraisablehook(args: sys.UnraisableHookArgs):
     tail = _fmt(args.exc_type, args.exc_value, args.exc_traceback)
     _log("sys.unraisablehook", f"{args.err_msg or ''}\n{tail}")
     _unraisable_orig(args)
@@ -69,8 +72,8 @@ except RuntimeError:
 if _loop is not None and not getattr(_loop, "_hmr_dbg_installed", False):
     _loop_orig = _loop.get_exception_handler()
 
-    def _loop_handler(loop, context):
-        exc = context.get("exception")
+    def _loop_handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]):
+        exc: BaseException | None = context.get("exception")
         msg = context.get("message", "")
         if exc is not None:
             _log("asyncio", f"{msg}\n" + _fmt(type(exc), exc, exc.__traceback__))
@@ -82,6 +85,6 @@ if _loop is not None and not getattr(_loop, "_hmr_dbg_installed", False):
             loop.default_exception_handler(context)
 
     _loop.set_exception_handler(_loop_handler)
-    _loop._hmr_dbg_installed = True  # type: ignore[attr-defined]
+    setattr(_loop, "_hmr_dbg_installed", True)
 
 _log("armed", f"HMR reload-error capture armed (excepthook + unraisable + asyncio); log at {LOG_PATH}")
