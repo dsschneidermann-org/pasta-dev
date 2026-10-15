@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import asyncio
 from contextlib import contextmanager, asynccontextmanager
-from typing import Any, override
+from typing import Annotated, Any, override
 from collections.abc import Generator
 import traceback
 
@@ -265,7 +265,7 @@ async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
 # can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
 # routes it fires the live-reload refresh and 202s (no MCP equivalent - a browser can't call MCP).
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
-async def route_set_page_status(workspaceIdPart: str, pageId: str, status: str = Form(...)):
+async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annotated[str, Form()]):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.set_page_status(workspace_id, pageId, status)
@@ -632,4 +632,4 @@ async def unlink(workspaceId: str, fromId: str, toId: str, role: str) -> dict[st
 
 
 # --- capture HMR reload errors to hmr_debug.log (see src/_hmr_debug.py) -------
-from . import _hmr_debug  # noqa: E402, F401
+from . import _hmr_debug  # pyright: ignore[reportUnusedImport]

@@ -46,9 +46,9 @@ import uvicorn
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.session import ServerSession
-from reactivity import async_effect, derived
-from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter
-from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks
+from reactivity import async_effect, derived  # pyright: ignore[reportMissingTypeStubs]
+from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter  # pyright: ignore[reportMissingTypeStubs]
+from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks  # pyright: ignore[reportMissingTypeStubs]
 from starlette.applications import Starlette
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
