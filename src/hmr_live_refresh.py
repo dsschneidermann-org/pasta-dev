@@ -26,7 +26,7 @@ class ReloaderConnectionManager:
         self.active.remove(websocket)
 
     async def refresh(self):
-        dead = []
+        dead: list[WebSocket] = []
         for conn in self.active:
             try:
                 await conn.send_text('{"refresh": 1}')
