@@ -161,7 +161,7 @@ async def route_index(request: Request, archived: str | None = None):
 
 
 @app.get("/ws:{workspaceIdPart}", response_class=HTMLResponse)
-async def route_tree(request: Request, workspaceIdPart: str, archived: str | None = None, markdown: str | None = None):
+async def route_tree(request: Request, workspaceIdPart: str, archived: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
