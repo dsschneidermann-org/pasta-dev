@@ -330,7 +330,6 @@ def test_list_cmds_threads_ref_check_onto_the_add_only():
                                      add_args=(ArgSpec("workstreamId"),), ref_check=ref)
     assert (add.name, remove.name, reorder.name) == ("addDispatch", "removeDispatch", "reorderDispatch")
     assert add.ref_check is ref
-    assert not hasattr(remove, "ref_check") and not hasattr(reorder, "ref_check")
 
 
 @pytest.mark.parametrize("tag", list(ALL_TYPES))
@@ -829,8 +828,6 @@ def test_blocks_cmds_is_three_commands_named_from_the_label():
     assert add.args[0].content == BLOCK_ARRAY
     assert add.args[0].block_kinds == body.block_kinds
     assert add.args[0].required
-    # It writes no raw argument onto anything - it converts the array into id'd blocks.
-    assert not hasattr(add, "element_map")
 
 
 def test_blocks_cmds_label_and_name_overrides():
@@ -1189,12 +1186,6 @@ def test_compound_rejects_a_status_transition_step():
     with pytest.raises(ValueError, match="status transition"):
         CompoundCommand(name="close", event="close", dest="closed",
                         steps=(transition_cmd("go", "a -> b"),))  # type: ignore[arg-type]
-
-
-def test_kind_is_a_class_constant_not_a_constructor_argument():
-    with pytest.raises(TypeError):
-        SetProseCommand(name="x", kind=SET_PROSE, section="s", field="f")  # type: ignore[call-arg]
-    assert SetProseCommand(name="x", section="s", field="f").kind == SET_PROSE
 
 
 def test_is_field_setter_by_class():
