@@ -177,6 +177,24 @@ def test_list_add_ref_check_rejects_a_dangling_parent_reference(store):
     assert noted.sections["notes"]["items"][0]["questionId"] == asked_created[0]
 
 
+@pytest.mark.parametrize("command", [
+    {"command": "addNote", "args": {"questionId": ["x"], "text": "x"}},
+    {"command": "addNote", "args": {"questionId": {"a": 1}, "text": "x"}},
+    {"command": "addDecisions", "args": {"blocks": [
+        {"kind": "decision", "questionId": ["x"], "text": "x"}]}},
+])
+def test_a_ref_argument_that_is_not_an_id_is_rejected_not_crashed(store, command):
+    """The ref check reads its argument before it is validated, so an array or object where an id
+    belongs must be rejected as a reference to nothing rather than crash the check."""
+    workspace = store.create_workspace("demo")
+    child = _child(store.create_page(workspace.id, "test-lifecycle", "Dark mode"), "test-child")
+    with pytest.raises(ValidationError, match="does not reference an existing element"):
+        _mutate(store, workspace.id, child.id, [command])
+    page = store.get_page(workspace.id, child.id)
+    assert page.sections["notes"]["items"] == []
+    assert page.sections["decisions"]["body"] == []
+
+
 def test_inline_ref_integrity_mutate_page(store):
     workspace = store.create_workspace("demo")
     target = store.create_page(workspace.id, "test-fields", "Target").page
