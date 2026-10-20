@@ -22,6 +22,44 @@ body.dark {
   --text-on-error: #000;
 }
 
+/* Pink palette. Set on the root rather than on body so the page scrollbar, which water.css
+   draws from the html element, follows the theme too. */
+:root:has(> body.light) {
+  --background-body: #fff0f6;
+  --background: #ffdeeb;
+  --background-alt: #ffe8f1;
+  --selection: #f783ac;
+  --text-main: #3d2433;
+  --text-bright: #24101b;
+  --text-muted: #8a4f6d;
+  --links: #c2185b;
+  --focus: rgba(214, 51, 132, 0.67);
+  --border: #f3bcd4;
+  --code: #8c1d4f;
+  --button-base: #f8c8dc;
+  --button-hover: #f09cc0;
+  --scrollbar-thumb: #e79bbf;
+  --form-placeholder: #9c6b84;
+  --form-text: #2b1622;
+}
+:root:has(> body.dark) {
+  --background-body: #2a1a24;
+  --background: #1f121a;
+  --background-alt: #24151e;
+  --selection: #a3195b;
+  --text-main: #f2dbe6;
+  --text-bright: #ffffff;
+  --text-muted: #c9a3b6;
+  --links: #ff8cc6;
+  --focus: rgba(255, 140, 198, 0.67);
+  --border: #7a4462;
+  --code: #ffb3d1;
+  --button-base: #170c13;
+  --button-hover: #0b0509;
+  --form-placeholder: #a98a9a;
+  --form-text: #ffffff;
+}
+
 /* Structured page render (src/render_html.py). Scoped under .pasta-page so it cannot reach the
    sidebar, the workspace index or the tree view. Every colour is a water.css custom property,
    which both its light and dark sheets define, so the whole block follows the theme. */

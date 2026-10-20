@@ -8,6 +8,9 @@ type (architecture): the toggle points at that page type's generated Sphinx doc,
 production types are documentable - a fixture has no doc to link to.
 """
 
+import colorsys
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -264,3 +267,76 @@ def test_pages_serve_normally_once_the_declarations_validate(client):
     # No lingering quarantine on the HTTP side either.
     server.STORE.create_workspace("demo")
     assert client.get("/").status_code == 200
+
+
+# --- Pink palette ------------------------------------------------------------
+# The web UI's theme is water.css's colour custom properties, redefined per theme in the
+# overrides sheet. These pin that each theme reads as pink and keeps its text readable.
+
+_TEXT_COLOURS = ("--text-main", "--text-bright", "--text-muted", "--links", "--code", "--text-error")
+_SURFACES = ("--background-body", "--background", "--background-alt")
+
+
+def _theme_palette(css: str, theme: str) -> dict[str, str]:
+    """Custom properties a theme defines in the overrides sheet: the declarations of the
+    ':root:has(> body.<theme>)' block, then of the 'body.<theme>' block, later winning."""
+    palette: dict[str, str] = {}
+    for selector in (f":root:has(> body.{theme})", f"body.{theme}"):
+        block = re.search(rf"^{re.escape(selector)}\s*\{{(.*?)\}}", css, re.MULTILINE | re.DOTALL)
+        if block:
+            palette.update(re.findall(r"(--[\w-]+)\s*:\s*([^;]+?)\s*;", block.group(1)))
+    return palette
+
+
+def _rgb(colour: str) -> tuple[float, float, float]:
+    assert re.fullmatch(r"#[0-9a-fA-F]{6}", colour), f"{colour} is not #rrggbb"
+    red, green, blue = (int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return red, green, blue
+
+
+def _contrast_ratio(foreground: str, background: str) -> float:
+    """WCAG 2.x contrast ratio between two '#rrggbb' colours."""
+    def luminance(colour: str) -> float:
+        red, green, blue = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+                            for c in _rgb(colour))
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    lighter, darker = sorted((luminance(foreground), luminance(background)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _hue(colour: str) -> float | None:
+    """HSL hue in degrees [0, 360) of a '#rrggbb' colour, None for a grey with no hue."""
+    hue, _, saturation = colorsys.rgb_to_hls(*_rgb(colour))
+    return hue * 360 if saturation else None
+
+
+def test_palette_helpers_measure_known_colours():
+    assert _contrast_ratio("#000000", "#ffffff") == pytest.approx(21)
+    assert _contrast_ratio("#ffffff", "#000000") == pytest.approx(21)   # order-independent
+    assert _contrast_ratio("#777777", "#777777") == pytest.approx(1)
+    assert _hue("#ff0000") == pytest.approx(0)
+    assert _hue("#ff00ff") == pytest.approx(300)
+    assert _hue("#808080") is None
+    css = ":root:has(> body.dark) {\n  --links: #111111;\n  --code: #222222;\n}\nbody.dark {\n  --code: #333333;\n}\n"
+    assert _theme_palette(css, "dark") == {"--links": "#111111", "--code": "#333333"}
+    assert _theme_palette(css, "light") == {}
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_each_theme_has_a_pink_palette(client, theme):
+    response = client.get("/static/styles.css")
+    assert response.status_code == 200
+    palette = _theme_palette(response.text, theme)
+    for prop in ("--background-body", "--links"):
+        hue = _hue(palette[prop])
+        assert hue is not None and 300 <= hue <= 350, f"{theme} {prop} {palette[prop]} is not pink"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_each_theme_keeps_text_legible(client, theme):
+    palette = _theme_palette(client.get("/static/styles.css").text, theme)
+    pairs = [(text, surface) for text in _TEXT_COLOURS for surface in _SURFACES]
+    pairs += [("--form-text", "--button-base"), ("--form-text", "--button-hover")]
+    for foreground, background in pairs:
+        ratio = _contrast_ratio(palette[foreground], palette[background])
+        assert ratio >= 4.5, f"{theme} {foreground} on {background} is {ratio:.2f}:1"
