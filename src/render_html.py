@@ -275,7 +275,8 @@ def _pinned_child_ids(page_type: PageType, page: Page, ref_context: RefContext) 
 def _contents_html(page_type: PageType, page: Page, ref_context: RefContext | None) -> str:
     """A strip of links to every section, each carrying its element count when it has one, so a
     page of long lists can be navigated without scrolling it. Pinned children are linked by
-    title, standing in for the Child pages anchor once every child is pinned."""
+    title, standing in for the Child pages anchor once every child is pinned, and the strip ends
+    with the page's parent."""
     links: list[str] = []
     for section in page_type.sections:
         count = _section_count(section, page)
@@ -290,6 +291,8 @@ def _contents_html(page_type: PageType, page: Page, ref_context: RefContext | No
                   f"{_escape(ref_context.titles[child_id])}</a>" for child_id in pinned]
     if not pinned or len(pinned) < len(page.child_ids):
         links.append('<a href="#section-children">Child pages</a>')
+    if ref_context is not None and page.parent_id is not None and page.parent_id in ref_context.titles:
+        links.append(f'<a href="{_page_href(page.parent_id, ref_context)}">Parent page</a>')
     return f'<nav class="page-contents" aria-label="Sections">{"".join(links)}</nav>'
 
 

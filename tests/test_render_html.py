@@ -374,6 +374,43 @@ def test_contents_strip_pinned_child_links_keep_the_archived_view():
     assert '<a href="/ws:demo/page/c:1?archived=true">Plan &lt;one&gt;</a>' in nav
 
 
+def test_contents_strip_ends_with_the_parent_page_link_on_a_pinned_child():
+    page = Page(id="c:1", type="test-child", title="Plan", status="draft", parent_id="p:1")
+    nav = _nav(render_page_html(page, CHILD, _tree_context()))
+    assert nav.endswith('<a href="/ws:demo/page/p:1">Parent page</a></nav>')
+
+
+def test_contents_strip_parent_link_follows_the_child_pages_anchor_on_an_unpinned_child():
+    page = Page(id="f:1", type="test-fields", title="Loose", status="active", parent_id="p:1")
+    nav = _nav(render_page_html(page, FIELDS, _tree_context()))
+    assert nav.endswith('<a href="#section-children">Child pages</a>' +
+                        '<a href="/ws:demo/page/p:1">Parent page</a></nav>')
+
+
+def test_contents_strip_parent_link_keeps_the_archived_view():
+    page = Page(id="c:1", type="test-child", title="Plan", status="draft", parent_id="p:1")
+    nav = _nav(render_page_html(page, CHILD, _tree_context(show_archived=True)))
+    assert nav.endswith('<a href="/ws:demo/page/p:1?archived=true">Parent page</a></nav>')
+
+
+def test_contents_strip_has_no_parent_link_on_a_root_page():
+    page = Page(id="p:1", type="test-lifecycle", title="Brief", status="draft", child_ids=["c:1"])
+    assert "Parent page" not in _nav(render_page_html(page, LIFECYCLE, _tree_context()))
+
+
+def test_contents_strip_has_no_parent_link_when_the_parent_does_not_resolve():
+    page = Page(id="c:9", type="test-child", title="Orphan", status="draft", parent_id="gone:1")
+    assert "Parent page" not in _nav(render_page_html(page, CHILD, _tree_context()))
+
+
+def test_contents_strip_without_a_context_keeps_todays_links():
+    page = Page(id="p:1", type="test-lifecycle", title="Brief", status="draft",
+                parent_id="t:1", child_ids=["c:1"])
+    nav = _nav(render_page_html(page, LIFECYCLE, None))
+    assert nav.endswith('<a href="#section-references">References</a>' +
+                        '<a href="#section-children">Child pages</a></nav>')
+
+
 def test_render_page_html_escapes_the_page_title():
     factory = _counter()
     page = create_page(FIELDS, "a <b> & c", None, factory)
