@@ -30,6 +30,10 @@ md2html = Wenmode(github)
 # Shown for an empty field, so a page's shape is visible before it is filled.
 _NONE_HTML = '<p class="empty">None.</p>'
 
+# Follows the label of a strip entry that opens another page, setting it apart from the
+# anchors that only scroll this one.
+_PAGE_LINK_MARK = "&nbsp;\N{LINK SYMBOL}"
+
 _PARAGRAPH_BREAK = re.compile(r"\n\s*\n")
 
 
@@ -274,25 +278,22 @@ def _pinned_child_ids(page_type: PageType, page: Page, ref_context: RefContext) 
 
 def _contents_html(page_type: PageType, page: Page, ref_context: RefContext | None) -> str:
     """A strip of links to every section, each carrying its element count when it has one, so a
-    page of long lists can be navigated without scrolling it. Pinned children are linked by
-    title, standing in for the Child pages anchor once every child is pinned, and the strip ends
-    with the page's parent."""
+    page of long lists can be navigated without scrolling it. The strip opens with the page's
+    parent and closes with its pinned children, linked by title."""
     links: list[str] = []
+    if ref_context is not None and page.parent_id is not None and page.parent_id in ref_context.titles:
+        links.append(f'<a href="{_page_href(page.parent_id, ref_context)}">Parent{_PAGE_LINK_MARK}</a>')
     for section in page_type.sections:
         count = _section_count(section, page)
         badge = f'<span class="count">{count}</span>' if count else ""
         links.append(f'<a href="#section-{_escape(section.key)}">' +
                      f"{_escape(section.name)}{badge}</a>")
     links.append('<a href="#section-references">References</a>')
-    pinned: list[str] = []
+    links.append('<a href="#section-children">Child pages</a>')
     if ref_context is not None:
-        pinned = _pinned_child_ids(page_type, page, ref_context)
         links += [f'<a href="{_page_href(child_id, ref_context)}">' +
-                  f"{_escape(ref_context.titles[child_id])}</a>" for child_id in pinned]
-    if not pinned or len(pinned) < len(page.child_ids):
-        links.append('<a href="#section-children">Child pages</a>')
-    if ref_context is not None and page.parent_id is not None and page.parent_id in ref_context.titles:
-        links.append(f'<a href="{_page_href(page.parent_id, ref_context)}">Parent page</a>')
+                  f"{_escape(ref_context.titles[child_id])}{_PAGE_LINK_MARK}</a>"
+                  for child_id in _pinned_child_ids(page_type, page, ref_context)]
     return f'<nav class="page-contents" aria-label="Sections">{"".join(links)}</nav>'
 
 

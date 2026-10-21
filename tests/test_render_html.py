@@ -321,6 +321,11 @@ def test_render_page_html_contents_strip_counts_list_elements():
     assert '<a href="#section-basics">Basics</a>' in out          # no badge, no list elements
 
 
+# Follows the label of every strip entry that opens another page.
+_LINK_MARK = "&nbsp;\N{LINK SYMBOL}"
+_STRIP_OPEN = '<nav class="page-contents" aria-label="Sections">'
+
+
 def _tree_context(show_archived=False):
     """A small tree: p:1 (test-lifecycle) over pinned c:1 and c:2 (test-child) and unpinned f:1."""
     return RefContext(
@@ -339,23 +344,23 @@ def _nav(out: str) -> str:
     return out[start:out.index("</nav>", start) + len("</nav>")]
 
 
-def test_contents_strip_links_pinned_children_in_place_of_the_child_pages_anchor():
+def test_contents_strip_links_pinned_children_after_the_child_pages_anchor():
     page = Page(id="p:1", type="test-lifecycle", title="Brief", status="draft",
                 child_ids=["c:1", "c:2"])
     nav = _nav(render_page_html(page, LIFECYCLE, _tree_context()))
-    assert '<a href="/ws:demo/page/c:1">Plan &lt;one&gt;</a>' in nav     # the title, escaped
-    assert '<a href="/ws:demo/page/c:2">Spec</a>' in nav
-    assert nav.index("#section-references") < nav.index("page/c:1") < nav.index("page/c:2")
-    assert "#section-children" not in nav
+    assert nav.endswith('<a href="#section-references">References</a>' +
+                        '<a href="#section-children">Child pages</a>' +
+                        f'<a href="/ws:demo/page/c:1">Plan &lt;one&gt;{_LINK_MARK}</a>' +
+                        f'<a href="/ws:demo/page/c:2">Spec{_LINK_MARK}</a></nav>')
 
 
-def test_contents_strip_keeps_the_child_pages_anchor_beside_an_unpinned_child():
+def test_contents_strip_names_only_the_pinned_children():
     page = Page(id="p:1", type="test-lifecycle", title="Brief", status="draft",
                 child_ids=["c:1", "f:1"])
     nav = _nav(render_page_html(page, LIFECYCLE, _tree_context()))
-    assert '<a href="/ws:demo/page/c:1">Plan &lt;one&gt;</a>' in nav
+    assert nav.endswith('<a href="#section-children">Child pages</a>' +
+                        f'<a href="/ws:demo/page/c:1">Plan &lt;one&gt;{_LINK_MARK}</a></nav>')
     assert "page/f:1" not in nav                                       # unpinned: not named
-    assert nav.index("page/c:1") < nav.index('<a href="#section-children">Child pages</a>')
 
 
 def test_contents_strip_keeps_the_child_pages_anchor_without_pinned_children():
@@ -371,42 +376,45 @@ def test_contents_strip_keeps_the_child_pages_anchor_without_pinned_children():
 def test_contents_strip_pinned_child_links_keep_the_archived_view():
     page = Page(id="p:1", type="test-lifecycle", title="Brief", status="draft", child_ids=["c:1"])
     nav = _nav(render_page_html(page, LIFECYCLE, _tree_context(show_archived=True)))
-    assert '<a href="/ws:demo/page/c:1?archived=true">Plan &lt;one&gt;</a>' in nav
+    assert f'<a href="/ws:demo/page/c:1?archived=true">Plan &lt;one&gt;{_LINK_MARK}</a>' in nav
 
 
-def test_contents_strip_ends_with_the_parent_page_link_on_a_pinned_child():
+def test_contents_strip_leads_with_the_parent_link_on_a_pinned_child():
     page = Page(id="c:1", type="test-child", title="Plan", status="draft", parent_id="p:1")
     nav = _nav(render_page_html(page, CHILD, _tree_context()))
-    assert nav.endswith('<a href="/ws:demo/page/p:1">Parent page</a></nav>')
+    assert nav.startswith(_STRIP_OPEN + f'<a href="/ws:demo/page/p:1">Parent{_LINK_MARK}</a>' +
+                          '<a href="#section-')
 
 
-def test_contents_strip_parent_link_follows_the_child_pages_anchor_on_an_unpinned_child():
+def test_contents_strip_leads_with_the_parent_link_on_an_unpinned_child():
     page = Page(id="f:1", type="test-fields", title="Loose", status="active", parent_id="p:1")
     nav = _nav(render_page_html(page, FIELDS, _tree_context()))
-    assert nav.endswith('<a href="#section-children">Child pages</a>' +
-                        '<a href="/ws:demo/page/p:1">Parent page</a></nav>')
+    assert nav.startswith(_STRIP_OPEN + f'<a href="/ws:demo/page/p:1">Parent{_LINK_MARK}</a>' +
+                          '<a href="#section-basics">Basics</a>')
 
 
 def test_contents_strip_parent_link_keeps_the_archived_view():
     page = Page(id="c:1", type="test-child", title="Plan", status="draft", parent_id="p:1")
     nav = _nav(render_page_html(page, CHILD, _tree_context(show_archived=True)))
-    assert nav.endswith('<a href="/ws:demo/page/p:1?archived=true">Parent page</a></nav>')
+    assert nav.startswith(_STRIP_OPEN +
+                          f'<a href="/ws:demo/page/p:1?archived=true">Parent{_LINK_MARK}</a>')
 
 
 def test_contents_strip_has_no_parent_link_on_a_root_page():
     page = Page(id="p:1", type="test-lifecycle", title="Brief", status="draft", child_ids=["c:1"])
-    assert "Parent page" not in _nav(render_page_html(page, LIFECYCLE, _tree_context()))
+    assert f"Parent{_LINK_MARK}" not in _nav(render_page_html(page, LIFECYCLE, _tree_context()))
 
 
 def test_contents_strip_has_no_parent_link_when_the_parent_does_not_resolve():
     page = Page(id="c:9", type="test-child", title="Orphan", status="draft", parent_id="gone:1")
-    assert "Parent page" not in _nav(render_page_html(page, CHILD, _tree_context()))
+    assert f"Parent{_LINK_MARK}" not in _nav(render_page_html(page, CHILD, _tree_context()))
 
 
 def test_contents_strip_without_a_context_keeps_todays_links():
     page = Page(id="p:1", type="test-lifecycle", title="Brief", status="draft",
                 parent_id="t:1", child_ids=["c:1"])
     nav = _nav(render_page_html(page, LIFECYCLE, None))
+    assert f"Parent{_LINK_MARK}" not in nav
     assert nav.endswith('<a href="#section-references">References</a>' +
                         '<a href="#section-children">Child pages</a></nav>')
 

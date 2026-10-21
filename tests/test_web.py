@@ -234,6 +234,7 @@ def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
     created = server.STORE.create_page(workspace.id, "test-lifecycle", "Brief")
     parent, child = created.page, created.children[0]
     part = workspace.id.removeprefix("ws:")
+    link_mark = "&nbsp;\N{LINK SYMBOL}"
 
     def strip(page_id: str) -> str:
         text = client.get(f"/ws:{part}/page/{page_id}").text
@@ -241,10 +242,11 @@ def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
         return text[start:text.index("</nav>", start)]
 
     parent_strip, child_strip = strip(parent.id), strip(child.id)
-    assert f'<a href="/{workspace.id}/page/{child.id}">Child fixture</a>' in parent_strip
-    assert "#section-children" not in parent_strip
-    assert "Parent page" not in parent_strip
-    assert child_strip.endswith(f'<a href="/{workspace.id}/page/{parent.id}">Parent page</a>')
+    assert parent_strip.endswith('<a href="#section-children">Child pages</a>' +
+                                 f'<a href="/{workspace.id}/page/{child.id}">Child fixture{link_mark}</a>')
+    assert f"Parent{link_mark}" not in parent_strip
+    assert child_strip.startswith('<nav class="page-contents" aria-label="Sections">' +
+                                  f'<a href="/{workspace.id}/page/{parent.id}">Parent{link_mark}</a>')
 
 
 # --- Declaration quarantine --------------------------------------------------
