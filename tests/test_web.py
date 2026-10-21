@@ -229,6 +229,24 @@ def test_page_view_renders_the_structured_body(client):
     assert 'id="sidebar"' in response.text              # the Markdown-rendered nav is untouched
 
 
+def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
+    workspace = server.STORE.create_workspace("demo")
+    created = server.STORE.create_page(workspace.id, "test-lifecycle", "Brief")
+    parent, child = created.page, created.children[0]
+    part = workspace.id.removeprefix("ws:")
+
+    def strip(page_id: str) -> str:
+        text = client.get(f"/ws:{part}/page/{page_id}").text
+        start = text.index('<nav class="page-contents"')
+        return text[start:text.index("</nav>", start)]
+
+    parent_strip, child_strip = strip(parent.id), strip(child.id)
+    assert f'<a href="/{workspace.id}/page/{child.id}">Child fixture</a>' in parent_strip
+    assert "#section-children" not in parent_strip
+    assert "Parent page" not in parent_strip
+    assert child_strip.endswith(f'<a href="/{workspace.id}/page/{parent.id}">Parent page</a>')
+
+
 # --- Declaration quarantine --------------------------------------------------
 # The renderer iterates the spec, so an invalid declaration still renders a plausible page - one
 # quietly missing the deleted field, on a tab the reloader has just called current. These pin the
