@@ -20,6 +20,7 @@ from .model import Page
 from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR
 from .pagetypes.core.fields import FieldSpec, SectionSpec, block_element_fields, title_element_field
 from .pagetypes.core.pagetype import PageType
+from .pagetypes._registry import is_auto_child_type
 from .render import RefContext, checkbox_state, render_blocks
 
 # The one Markdown-to-HTML engine, defined here because this is where HTML is produced.
@@ -264,9 +265,17 @@ def _section_count(section: SectionSpec, page: Page) -> int:
     return total
 
 
-def _contents_html(page_type: PageType, page: Page) -> str:
+def _pinned_child_ids(page_type: PageType, page: Page, ref_context: RefContext) -> list[str]:
+    """The page's direct children its type auto-creates, in stored child order."""
+    return [child_id for child_id in page.child_ids
+            if child_id in ref_context.types
+            and is_auto_child_type(page_type, ref_context.types[child_id])]
+
+
+def _contents_html(page_type: PageType, page: Page, ref_context: RefContext | None) -> str:
     """A strip of links to every section, each carrying its element count when it has one, so a
-    page of long lists can be navigated without scrolling it."""
+    page of long lists can be navigated without scrolling it. Pinned children are linked by
+    title, standing in for the Child pages anchor once every child is pinned."""
     links: list[str] = []
     for section in page_type.sections:
         count = _section_count(section, page)
@@ -274,7 +283,13 @@ def _contents_html(page_type: PageType, page: Page) -> str:
         links.append(f'<a href="#section-{_escape(section.key)}">' +
                      f"{_escape(section.name)}{badge}</a>")
     links.append('<a href="#section-references">References</a>')
-    links.append('<a href="#section-children">Child pages</a>')
+    pinned: list[str] = []
+    if ref_context is not None:
+        pinned = _pinned_child_ids(page_type, page, ref_context)
+        links += [f'<a href="{_page_href(child_id, ref_context)}">' +
+                  f"{_escape(ref_context.titles[child_id])}</a>" for child_id in pinned]
+    if not pinned or len(pinned) < len(page.child_ids):
+        links.append('<a href="#section-children">Child pages</a>')
     return f'<nav class="page-contents" aria-label="Sections">{"".join(links)}</nav>'
 
 
@@ -317,4 +332,4 @@ def render_page_html(page: Page, page_type: PageType,
             '<h2 class="section-title">Child pages</h2>'
             f"{_children_html(page, ref_context)}</section>")
     return (f'<article class="pasta-page">{head}'
-            f"{_contents_html(page_type, page)}{sections}{tail}</article>")
+            f"{_contents_html(page_type, page, ref_context)}{sections}{tail}</article>")
