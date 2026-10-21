@@ -13,7 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any
 
-from ...errors import ValidationError
 from ...fsm import try_build_machine
 from .args import ArgSpec
 from .commands import AddElementCommand, BlockCommand, CommandSpec, FieldCommand, StatusTransitionCommand

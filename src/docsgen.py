@@ -115,7 +115,7 @@ def _stem(tag: str, state: str) -> str:
     return f"{tag}-{state}"
 
 
-def _diagram_block(qualname: str, tag: str, state: str, events: list[str]) -> str:
+def _diagram_block(qualname: str, events: list[str]) -> str:
     lines = ["```{statemachine-diagram} " + qualname, f":format: {_DIAGRAM_FORMAT}"]
     if events:
         lines.append(":events: " + ", ".join(events))
@@ -241,7 +241,7 @@ def _render_state_doc(page_type: PageType, state: str, events: list[str],
     parts = [
         f"# {tag} - {state}",
         intro,
-        _diagram_block(qualname, tag, state, events),
+        _diagram_block(qualname, events),
         _all_states_line(tag, state, states),
         "## Transitions\n\n" + _transitions_section(tag, state, transitions, event_dest),
         "## Authoring commands\n\n" + _authoring_section(state, authoring),

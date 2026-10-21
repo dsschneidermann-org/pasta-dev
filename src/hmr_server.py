@@ -46,9 +46,9 @@ import uvicorn
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.session import ServerSession
-from reactivity import async_effect, derived
-from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter
-from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks
+from reactivity import async_effect, derived  # pyright: ignore[reportMissingTypeStubs]
+from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter  # pyright: ignore[reportMissingTypeStubs]
+from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks  # pyright: ignore[reportMissingTypeStubs]
 from starlette.applications import Starlette
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
@@ -89,7 +89,7 @@ class _LoggingErrorFilter(ErrorFilter):
         if exc_value is not None:
             reason = "".join(traceback.format_exception_only(exc_type, exc_value)).strip()
             logger.error(
-                "[HMR] reload FAILED - the edit did not take, and the modules loaded before it "
+                "[HMR] reload FAILED - the edit did not take, and the modules loaded before it " +
                 "are still serving:\n%s", reason)
         # hmr annotates these as never None, though a clean exit passes None and its __exit__ handles it.
         return super().__exit__(exc_type, exc_value, traceback_)  # pyright: ignore[reportArgumentType]
@@ -185,7 +185,7 @@ def build_dev_app() -> Starlette:
             unmount = mount_mcp(mcp)
             try:
                 await notify_sessions()  # tell live sessions the tool set may have changed
-                await stop.wait()
+                _ = await stop.wait()
             finally:
                 unmount()
                 finish.set()
@@ -198,13 +198,13 @@ def build_dev_app() -> Starlette:
         # Tear down the previous mount (if any) before swapping in the reloaded server.
         if stop_event is not None and finish_event is not None:
             stop_event.set()
-            await finish_event.wait()
+            _ = await finish_event.wait()
         mcp = current_mcp()  # subscribe to reloads
         if is_reload:
             logger.info("[HMR] FastMCP server reloaded (src.server.mcp)")
         stop_event, finish_event = Event(), Event()
         assert task_group is not None
-        task_group.create_task(serve_mcp(mcp, stop_event, finish_event))
+        _ = task_group.create_task(serve_mcp(mcp, stop_event, finish_event))
 
     # Reading an attribute subscribes this effect to src.cleanup, so an edit
     # re-executes it promptly - ReactiveModule.load is otherwise lazy. Its on_dispose
@@ -222,6 +222,8 @@ def build_dev_app() -> Starlette:
             # exclusions the base built.
             self.error_filter: ErrorFilter = _LoggingErrorFilter(*self.error_filter.exclude_filenames)
             self.error_filter.exclude_filenames.add(__file__)
+            # The loop holds a task only weakly; a pending refresh is kept here until it finishes.
+            self._refresh_tasks: set[asyncio.Task[None]] = set()
 
         @override
         def on_changes(self, files: set[Path]):
@@ -230,7 +232,9 @@ def build_dev_app() -> Starlette:
             # refusal, and since that page keeps the socket it is also how the tab recovers.
             super().on_changes(files)
             with suppress(RuntimeError):
-                asyncio.get_running_loop().create_task(ws_reloader.refresh())
+                task = asyncio.get_running_loop().create_task(ws_reloader.refresh())
+                self._refresh_tasks.add(task)
+                task.add_done_callback(self._refresh_tasks.discard)
 
     # /pasta/mcp is served by the stable proxy's ASGI app (built once). Its session manager is
     # started by mcp_asgi.lifespan; the reloader lifespan drives module reloads + mounts.
@@ -256,7 +260,7 @@ def build_dev_app() -> Starlette:
                 mcp_reload_effect.dispose()
                 if stop_event is not None:
                     stop_event.set()
-                watch_task.cancel()
+                _ = watch_task.cancel()
 
     # The FastAPI app object last served; a reload swaps in a new one (see below).
     last_fastapi_app: object = None
