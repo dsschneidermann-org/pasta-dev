@@ -192,6 +192,12 @@ def _field_html(field_spec: FieldSpec, value: Any, ref_context: RefContext | Non
     return _NONE_HTML
 
 
+def _page_href(page_id: str, ref_context: RefContext) -> str:
+    """The escaped web route of a page, keeping the archived view when the context shows it."""
+    query = "?archived=true" if ref_context.show_archived else ""
+    return f"/{_escape(ref_context.workspace_id)}/page/{_escape(page_id)}{query}"
+
+
 def _page_link(page_id: str, ref_context: RefContext | None) -> str | None:
     """The titled `type · status` link for a page id, or None when it resolves to no page.
 
@@ -206,9 +212,8 @@ def _page_link(page_id: str, ref_context: RefContext | None) -> str | None:
         return None
     flag = ('<strong class="archived-flag">(A)</strong> '
             if page_id in ref_context.archived_ids else "")
-    query = "?archived=true" if ref_context.show_archived else ""
     return (f"{flag}" +
-            f'<a href="/{_escape(ref_context.workspace_id)}/page/{_escape(page_id)}{query}">' +
+            f'<a href="{_page_href(page_id, ref_context)}">' +
             f"{_escape(ref_context.titles[page_id])}</a>" +
             f' <span class="link-type">{_escape(ref_context.types[page_id])}&nbsp;·</span>' +
             f' <span class="link-status">{_escape(ref_context.statuses[page_id])}</span>')
