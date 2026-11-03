@@ -777,6 +777,53 @@ def test_field_setter_edges_drop_blocked_events():
     assert "addStep" in {e["command"] for e in field_setter_edges(child, CHILD, {"reopen"})}
 
 
+def test_field_setter_edges_omit_the_instruction_of_a_populated_field_when_asked():
+    """With omit_populated_instructions, a field that already holds content keeps its edge - it may
+    still be edited - but without its instruction; a field still empty keeps its instruction."""
+    seal = _field_setter_page_type()
+    page = _field_setter_page(seal, "draft")
+    page.sections["overview"]["body"] = "written"
+    by_field = {(e["section"], e["field"]): e
+                for e in field_setter_edges(page, seal, omit_populated_instructions=True)}
+    assert list(by_field[("overview", "body")]) == [
+        "pageId", "pageType", "kind", "section", "field", "command", "statusRevisionToken"]
+    assert by_field[("overview", "body")]["command"] == "setOverview"
+    assert by_field[("design", "body")]["instruction"] == "the design instruction"
+
+
+def test_field_setter_edges_omit_a_populated_blocks_field_instruction():
+    seal = _field_setter_page_type()
+    page = _field_setter_page(seal, "draft")
+    page.sections["design"]["body"] = [{"id": "b1", "kind": "paragraph", "inlines": ["x"]}]
+    design = next(e for e in field_setter_edges(page, seal, omit_populated_instructions=True)
+                  if e["section"] == "design")
+    assert design["command"] == "addDesign" and "instruction" not in design
+
+
+def test_field_setter_edges_keep_every_instruction_by_default():
+    """Without the flag the edges are unchanged: a populated field still carries its instruction."""
+    seal = _field_setter_page_type()
+    page = _field_setter_page(seal, "draft")
+    page.sections["overview"]["body"] = "written"
+    overview = next(e for e in field_setter_edges(page, seal) if e["section"] == "overview")
+    assert overview["instruction"] == "the overview instruction"
+
+
+def test_field_setter_edges_keep_the_instruction_of_blank_or_missing_content():
+    """Blank prose, an empty blocks field and a section the page predates count as unpopulated, so
+    clearing a field brings its instruction back."""
+    seal = _field_setter_page_type()
+    page = _field_setter_page(seal, "draft")
+    page.sections["overview"]["body"] = "   "
+    page.sections["design"]["body"] = []
+    edges = field_setter_edges(page, seal, omit_populated_instructions=True)
+    assert len(edges) == 2 and all(e["instruction"] for e in edges)
+    del page.sections["overview"]
+    overview = next(e for e in field_setter_edges(page, seal, omit_populated_instructions=True)
+                    if e["section"] == "overview")
+    assert overview["instruction"] == "the overview instruction"
+
+
 # --- block-bearing element fields --------------------------------------------
 ELEMENT_BLOCKS = get_page_type("test-element-blocks")
 
