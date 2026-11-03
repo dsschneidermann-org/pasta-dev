@@ -35,7 +35,7 @@ Every create and every write returns a `next` block. There is nothing else to co
 
 | bucket | what it means | who |
 | --- | --- | --- |
-| `do` | transitions that are legal, plus the field setters *this stage* needs, each carrying its own authoring instruction | agent |
+| `do` | transitions that are legal, plus the field setters *this stage* needs, each carrying its own authoring instruction (a write's `next` leaves it off a field that is already filled; `nextActions` always carries it) | agent |
 | `blocked` | an edge that isn't available yet; `reason` names the fix ("requires: steps.items", or the parent status that hasn't unlocked it) | agent |
 | `humanGates` | sign-offs such as shipping a feature or closing a bug, listed whether or not their preconditions are met, so the agent can never silently drive past one | you |
 | `attention` | a question the agent escalated instead of guessing | you |
