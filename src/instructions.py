@@ -60,7 +60,7 @@ If calling `tree` reveals an empty workspace, no project overview doc or the `to
 `mutatePageBatch` returns:
 
 - **`mutatePageBatch` success message:** _"Ran N command(s) … in one atomic commit."_ (All-or-nothing: a rejected command aborts the whole batch, and the error names the failing index + command + reason.)
-- **Every successful write echoes a `next` summary object same as `nextActions`:** `{ do: [...], blocked: [...], humanGates: [...], attention: [...] }`.
+- **Every successful write echoes a `next` summary object like `nextActions`:** `{ do: [...], blocked: [...], humanGates: [...], attention: [...] }`, except that a `do` field edge whose field is already populated on its page comes without its `instruction`. Call `nextActions` to read every instruction again, for example when resuming work.
 
 `createPage` returns:
 
