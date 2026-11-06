@@ -16,9 +16,12 @@ below.
 
 import pytest
 
+from src.event_cache import set_cache_disabled
 from src.pagetypes._registry import set_test_mode
 
 set_test_mode(True)
+# A test that exercises the event cache asks for the ``event_cache`` fixture below.
+set_cache_disabled(True)
 
 
 @pytest.fixture
@@ -32,16 +35,16 @@ def production_mode():
 
 @pytest.fixture
 def event_cache(monkeypatch):
-    """Turn the event cache on for one test, which is off by default in test mode, on a fresh
-    cache so its entries cannot reach another test. Returns that cache, and the switch follows
-    the mode again afterwards."""
+    """Turn the event cache on for one test, which is disabled for the rest of the run, on a fresh
+    cache so its entries cannot reach another test. Returns that cache, and disables the cache
+    again afterwards."""
     from src import server
-    from src.event_cache import EventCache, set_enabled
+    from src.event_cache import EventCache
 
     monkeypatch.setattr(server, "page_events", EventCache())
-    set_enabled(True)
+    set_cache_disabled(False)
     yield server.page_events
-    set_enabled(None)
+    set_cache_disabled(True)
 
 
 @pytest.fixture
