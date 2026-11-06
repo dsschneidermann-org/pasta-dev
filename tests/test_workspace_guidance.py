@@ -6,6 +6,7 @@ mode, so the configurable-field set is the fixtures', not production's.
 """
 
 import asyncio
+import time
 
 import pytest
 from fastmcp import Client
@@ -330,3 +331,38 @@ def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     with pytest.raises(ToolError, match="not a workspace guidance field"):
         call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "nope", "text": "x"})
+
+
+# --- the event cache behind a write's full next -------------------------------
+def _guidance_is_due(cache, wid, pid):
+    return cache.is_due(wid, pid, server.GUIDANCE_EMITTED, time.monotonic())
+
+
+def _lapse_guidance(cache, wid, pid):
+    """Backdate a page's last full delivery to just past its window."""
+    ttl = server.GUIDANCE_TTL_SECONDS
+    cache.record(wid, pid, server.GUIDANCE_EMITTED, time.monotonic() - ttl - 1, ttl)
+
+
+def _flow_page(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    return wid, call(mcp, "createPage", {"workspaceId": wid, "type": "test-flow", "title": "F"})["id"]
+
+
+def test_create_page_counts_as_a_delivery(mcp, event_cache):
+    wid, pid = _flow_page(mcp)
+    assert not _guidance_is_due(event_cache, wid, pid)
+
+
+def test_a_focused_next_actions_counts_as_a_delivery(mcp, event_cache):
+    wid, pid = _flow_page(mcp)
+    _lapse_guidance(event_cache, wid, pid)
+    call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
+    assert not _guidance_is_due(event_cache, wid, pid)
+
+
+def test_a_whole_workspace_next_actions_records_nothing(mcp, event_cache):
+    wid, pid = _flow_page(mcp)
+    _lapse_guidance(event_cache, wid, pid)
+    call(mcp, "nextActions", {"workspaceId": wid})
+    assert _guidance_is_due(event_cache, wid, pid)

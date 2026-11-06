@@ -5,6 +5,7 @@ import asyncio
 from contextlib import contextmanager, asynccontextmanager
 from typing import Annotated, Any, override
 from collections.abc import Generator
+import time
 import traceback
 
 from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
@@ -24,6 +25,7 @@ from starlette.responses import Response
 from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
+from .event_cache import page_events
 from .hmr_live_refresh import ws_reloader
 from .instructions import render_instructions
 from .pagetypes._registry import (
@@ -45,6 +47,15 @@ validate_registry()
 
 DATA_DIR = os.environ.get("PASTA_DATA_DIR", ".pasta-data")
 STORE = Store(DATA_DIR)
+
+# The event behind a write's full `next`, and how long one full delivery stays fresh.
+GUIDANCE_EMITTED = "guidanceEmitted"
+GUIDANCE_TTL_SECONDS = 300.0
+
+
+def _record_guidance_emitted(workspace_id: str, page_id: str) -> None:
+    page_events.record(workspace_id, page_id, GUIDANCE_EMITTED, time.monotonic(),
+                       GUIDANCE_TTL_SECONDS)
 
 
 @asynccontextmanager
@@ -442,7 +453,10 @@ async def nextActions(workspaceId: str, pageId: str | None = None) -> dict[str, 
     legal now), `blocked` (agent edges with the unmet precondition to fix), `humanGates`
     (sign-off edges - stop), and `attention` (items awaiting a human)."""
     with _guard_tool():
-        return STORE.next_actions(workspaceId, pageId)
+        result = STORE.next_actions(workspaceId, pageId)
+        if pageId is not None:
+            _record_guidance_emitted(workspaceId, pageId)
+        return result
 
 
 @mcp.tool
@@ -473,6 +487,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         result = STORE.create_page(workspaceId, type, title, parentId)
         page = result.page
         next_actions = STORE.next_actions(workspaceId, page.id)
+        _record_guidance_emitted(workspaceId, page.id)
         await ws_reloader.refresh()
         return {
             "id": page.id,

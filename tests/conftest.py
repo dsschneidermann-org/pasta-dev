@@ -31,6 +31,18 @@ def production_mode():
 
 
 @pytest.fixture
+def event_cache(monkeypatch):
+    """Turn the event cache on for one test, which is off by default in test mode, on a fresh
+    cache so its entries cannot reach another test. Returns that cache."""
+    from src import server
+    from src.event_cache import EventCache
+
+    monkeypatch.setenv("PASTA_EVENT_CACHE", "1")
+    monkeypatch.setattr(server, "page_events", EventCache())
+    return server.page_events
+
+
+@pytest.fixture
 def invalid_declarations(monkeypatch):
     """Leave the page-type registry in the state a half-finished edit leaves it in: a field setter
     whose target field has been deleted, which is what `validate_pagetype_setter_descriptions`
