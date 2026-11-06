@@ -285,6 +285,19 @@ def test_next_actions_whole_workspace_has_no_guidance(store):
     assert not any(key.startswith("guidance") for key in actions)
 
 
+def test_next_actions_omit_stage_guidance_leaves_out_every_guidance_key(store):
+    """The flag removes both kinds of guidance key and nothing else."""
+    workspace = store.create_workspace("demo")
+    wid = workspace.id
+    pid = store.create_page(wid, "test-lifecycle", "F").page.id
+    store.set_workspace_guidance(wid, "buildTool", "use pytest")
+    store.set_page_status(wid, pid, "review")
+    full = store.next_actions(wid, pid)
+    assert "guidance" in full and "guidance_buildTool" in full
+    omitted = store.next_actions(wid, pid, omit_stage_guidance=True)
+    assert omitted == {key: value for key, value in full.items() if not key.startswith("guidance")}
+
+
 # --- server tool + response keys ---------------------------------------------
 def test_set_workspace_guidance_tool_and_response_keys(mcp):
     wid, pid = _building_lifecycle(mcp)

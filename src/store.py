@@ -430,7 +430,8 @@ class Store:
         return collected
 
     def next_actions(self, workspace_id: str, page_id: str | None = None, *,
-                     omit_populated_instructions: bool = False) -> dict[str, Any]:
+                     omit_populated_instructions: bool = False,
+                     omit_stage_guidance: bool = False) -> dict[str, Any]:
         """Partition the model-declared edges over a subtree (or the whole workspace) into
         `do` (agent edges to drive now), `blocked` (agent transitions with the unmet precondition to
         fix), `humanGates` (sign-off transitions - stop), and `attention` (items awaiting a human).
@@ -446,7 +447,8 @@ class Store:
         add carries the blocks its element is created holding.
 
         `omit_populated_instructions` drops the instruction from a field edge whose field already
-        holds content on that edge's page."""
+        holds content on that edge's page. `omit_stage_guidance` leaves out the focused page's
+        guidance keys, for a caller that has not just entered the status."""
         workspace = self.load_workspace(workspace_id)
         do: list[dict[str, Any]] = []
         blocked: list[dict[str, Any]] = []
@@ -509,7 +511,7 @@ class Store:
                                   "humanGates": human_gates, "attention": attention}
         # Guidance for the focused page: its stage guidance for the current status, and any
         # configured guidance texts for that status. A whole-workspace roll-up has no focused page.
-        if page_id is not None:
+        if page_id is not None and not omit_stage_guidance:
             focus = workspace.get_page(page_id)
             if focus is not None and not focus.archived:
                 focus_type = get_page_type(focus.type)
