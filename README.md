@@ -68,7 +68,7 @@ Workspaces are plain JSON files under `./.pasta-data` (override with `PASTA_DATA
 An MCP server the agent *can* use isn't one it *will* use. Copy the bundled skill so the workflow starts in pasta rather than in an unplanned code edit:
 
 ```text
-mkdir -p .claude/skills && cp -t .claude/skills -R path/to/pasta/.claude/skills/cook
+mkdir -p .claude/skills && cp -R path/to/pasta/.claude/skills/cook .claude/skills/
 ```
 
 The skill is three lines. All it does is tell the agent to call the servers instructions tool.
