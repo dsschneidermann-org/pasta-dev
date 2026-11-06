@@ -10,7 +10,18 @@ everything around it, while an edit to this file still takes effect at once.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+
+
+def _enabled() -> bool:
+    """False when PASTA_EVENT_CACHE=0; any other value enables it. Unset, it is on everywhere but
+    test mode, so a test opts in rather than inheriting echoes that depend on timing."""
+    # Imported on call: a name read while this module executes would tie it to that module's reloads.
+    from .pagetypes._registry import is_test_mode
+
+    setting = os.environ.get("PASTA_EVENT_CACHE")
+    return not is_test_mode() if setting is None else setting != "0"
 
 
 @dataclass(frozen=True)
@@ -28,14 +39,20 @@ class EventCache:
 
     def record(self, workspace_id: str, page_id: str, event: str, now: float,
                ttl_seconds: float) -> None:
-        """Note that `event` happened on a page at `now`, dropping every expired entry."""
+        """Note that `event` happened on a page at `now`, dropping every expired entry. Stores
+        nothing while the cache is off."""
+        if not _enabled():
+            return
         self._entries = {key: entry for key, entry in self._entries.items()
                          if entry.is_live(now)}
         self._entries[(workspace_id, page_id, event)] = _Entry(now, ttl_seconds)
 
     def is_due(self, workspace_id: str, page_id: str, event: str, now: float, *,
                force: bool = False) -> bool:
-        """Whether `event` should happen on a page: `force`, or no live record of it."""
+        """Whether `event` should happen on a page: `force`, or no live record of it. Never while
+        the cache is off, because an empty cache would otherwise read as everything being due."""
+        if not _enabled():
+            return False
         entry = self._entries.get((workspace_id, page_id, event))
         return force or entry is None or not entry.is_live(now)
 

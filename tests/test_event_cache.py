@@ -3,8 +3,16 @@
 import ast
 from pathlib import Path
 
+import pytest
+
 from src import event_cache
 from src.event_cache import EventCache
+
+
+@pytest.fixture(autouse=True)
+def cache_on(monkeypatch):
+    """The cache is off in test mode, which only the switch tests below want."""
+    monkeypatch.setenv("PASTA_EVENT_CACHE", "1")
 
 
 def _cache_with_event(now=100.0, ttl_seconds=300.0):
@@ -63,3 +71,23 @@ def test_no_module_level_import_from_its_package():
             assert node.level == 0 and not (node.module or "").startswith("src")
         elif isinstance(node, ast.Import):
             assert not any(alias.name.startswith("src") for alias in node.names)
+
+
+def _assert_switch(monkeypatch, setting, on):
+    monkeypatch.delenv("PASTA_EVENT_CACHE", raising=False)
+    if setting is not None:
+        monkeypatch.setenv("PASTA_EVENT_CACHE", setting)
+    cache = _cache_with_event()
+    assert bool(cache._entries) is on
+    assert cache.is_due("ws:1", "other", "event", 100.0) is on          # a miss
+    assert cache.is_due("ws:1", "page", "event", 100.0, force=True) is on
+
+
+@pytest.mark.parametrize("setting, on", [(None, False), ("0", False), ("1", True)])
+def test_the_cache_is_off_in_test_mode_unless_asked_for(monkeypatch, setting, on):
+    _assert_switch(monkeypatch, setting, on)
+
+
+@pytest.mark.parametrize("setting, on", [(None, True), ("0", False), ("1", True)])
+def test_the_cache_is_on_outside_test_mode_unless_turned_off(monkeypatch, production_mode, setting, on):
+    _assert_switch(monkeypatch, setting, on)
