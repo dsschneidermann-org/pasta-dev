@@ -516,15 +516,20 @@ async def mutatePageBatch(
     most one transition is legal per batch and only as the final command: a command after a transition
     carries a now-stale token. All-or-nothing: any rejection aborts the whole batch and nothing commits
     - the error names the failing index and command. Echoes the new status, the current
-    `statusRevisionToken`, and next actions, where a field edge whose field is already
-    populated on its page comes without its instruction and stage guidance comes only with a
-    transition - nextActions carries them all."""
+    `statusRevisionToken`, and next actions. A transition, or a write more than five minutes
+    after they were last sent, carries stage guidance and every field instruction; any other
+    write leaves out stage guidance and the instruction of a field already populated on its
+    page - nextActions carries them all."""
     with _guard_tool():
         result = STORE.mutate_page_batch(workspaceId, pageId, commands)
         page = result.page
+        emit_in_full = page_events.is_due(workspaceId, pageId, GUIDANCE_EMITTED, time.monotonic(),
+                                          force=result.transitioned)
         next_actions = STORE.next_actions(
-            workspaceId, pageId, omit_populated_instructions=True,
-            omit_stage_guidance=not result.transitioned)
+            workspaceId, pageId, omit_populated_instructions=not emit_in_full,
+            omit_stage_guidance=not (emit_in_full or result.transitioned))
+        if emit_in_full:
+            _record_guidance_emitted(workspaceId, pageId)
         await ws_reloader.refresh()
         return {
             "pageId": page.id,
