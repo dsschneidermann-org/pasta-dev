@@ -504,15 +504,16 @@ async def mutatePageBatch(
     `statusRevisionToken`, and next actions, where a field edge whose field is already
     populated on its page comes without its instruction - nextActions carries them all."""
     with _guard_tool():
-        page, created = STORE.mutate_page_batch(workspaceId, pageId, commands)
+        result = STORE.mutate_page_batch(workspaceId, pageId, commands)
+        page = result.page
         next_actions = STORE.next_actions(workspaceId, pageId, omit_populated_instructions=True)
         await ws_reloader.refresh()
         return {
             "pageId": page.id,
             "status": page.status,
             "statusRevisionToken": page.status_revision_token,
-            "count": len(created),
-            "createdIds": created,
+            "count": len(result.created_ids),
+            "createdIds": result.created_ids,
             "next": next_actions,
         }
 

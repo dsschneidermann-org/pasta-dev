@@ -38,7 +38,7 @@ def store(tmp_path):
     return Store(tmp_path)
 
 
-def _mutate(store, workspace_id, page_id, commands):
+def _write(store, workspace_id, page_id, commands):
     """Run a batch presenting the page's current status_revision_token on each command - the ordinary
     single-batch caller pattern (read the token, then write against it). A batch that transitions
     mid-sequence is deliberately not expressible this way: the transition regenerates the token, so
@@ -47,6 +47,12 @@ def _mutate(store, workspace_id, page_id, commands):
     stamped = [{**command, "args": {"statusRevisionToken": token, **(command.get("args") or {})}}
                for command in commands]
     return store.mutate_page_batch(workspace_id, page_id, stamped)
+
+
+def _mutate(store, workspace_id, page_id, commands):
+    """`_write`, reduced to the (page, created ids) pair most tests read."""
+    result = _write(store, workspace_id, page_id, commands)
+    return result.page, result.created_ids
 
 
 def test_create_and_list_workspace(store):
@@ -690,6 +696,28 @@ def test_next_actions_omits_populated_instructions_against_each_edges_own_page(s
     _mutate(store, workspace.id, child.id, [{"command": "addStep", "args": {"text": "build"}}])
     assert "instruction" not in field_edges(omit_populated_instructions=True)["addStep"]
     assert field_edges()["addStep"]["instruction"]
+
+
+def test_mutate_page_batch_reports_whether_the_status_moved(store):
+    """Content alone leaves `transitioned` False; a batch ending in a transition or a compound sets it."""
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-flow", "C").page
+    assert _write(store, workspace.id, page.id, [
+        {"command": "setSummary", "args": {"text": "s"}}]).transitioned is False
+    assert _write(store, workspace.id, page.id, [
+        {"command": "setSummary", "args": {"text": "t"}}, {"command": "open"}]).transitioned is True
+    assert _write(store, workspace.id, page.id, [
+        {"command": "close", "args": {"sha": "abc", "message": "done"}}]).transitioned is True
+
+
+def test_mutate_page_batch_does_not_count_an_element_status_change_as_a_transition(store):
+    """A step changing status is progress inside a stage, not a new stage."""
+    workspace = store.create_workspace("demo")
+    child = _child(store.create_page(workspace.id, "test-lifecycle", "F"), "test-child")
+    _, step_created = _mutate(store, workspace.id, child.id, [
+        {"command": "addStep", "args": {"text": "build"}}])
+    assert _write(store, workspace.id, child.id, [
+        {"command": "markStepDone", "args": {"stepId": step_created[0]}}]).transitioned is False
 
 
 def test_next_actions_withholds_child_field_setters_until_parent_unlocks(store):
@@ -1906,8 +1934,8 @@ def test_token_is_read_from_args_and_stripped_before_the_command(revstore):
     token = page.status_revision_token
     # The token rides inside args and is consumed by the store, so the command applies cleanly
     # rather than the pure core rejecting an unknown argument.
-    after, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "addItem", "args": {"statusRevisionToken": token, "text": "x"}}])
+    after = revstore.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItem", "args": {"statusRevisionToken": token, "text": "x"}}]).page
     assert [item["text"] for item in after.sections["items"]["items"]] == ["x"]
     # A token left in the old sibling position is no longer read, so it reads as a missing token.
     with pytest.raises(ConflictError, match="does not match"):
@@ -1927,12 +1955,12 @@ def test_content_keeps_the_token_and_a_transition_regenerates_it(revstore):
     page = revstore.create_page(workspace.id, "test-flow", "C").page        # token "000001"
     token = page.status_revision_token
     # a content command does not move the status, so it leaves the token unchanged
-    after, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}}])
+    after = revstore.mutate_page_batch(workspace.id, page.id, [
+        {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}}]).page
     assert after.status_revision_token == token
     # a status transition regenerates the token to a fresh value
-    opened, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "open", "args": {"statusRevisionToken": token}}])
+    opened = revstore.mutate_page_batch(workspace.id, page.id, [
+        {"command": "open", "args": {"statusRevisionToken": token}}]).page
     assert opened.status == "open"
     assert opened.status_revision_token != token and opened.status_revision_token.isdigit()
 
@@ -2000,7 +2028,7 @@ def test_legacy_page_without_a_token_bootstraps_on_first_transition(store):
     store.mutate_page_batch(workspace.id, page.id, [{"command": "setSummary", "args": {"text": "s"}}])
     assert store.get_page(workspace.id, page.id).status_revision_token is None
     # The first status transition assigns the first real token.
-    opened, _ = store.mutate_page_batch(workspace.id, page.id, [{"command": "open"}])
+    opened = store.mutate_page_batch(workspace.id, page.id, [{"command": "open"}]).page
     assert opened.status == "open"
     assert opened.status_revision_token is not None and opened.status_revision_token.isdigit()
 

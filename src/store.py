@@ -97,6 +97,13 @@ class CreatePageResult:
     children: list[Page] = field(default_factory=list)   # auto-created pinned children, if any
 
 
+@dataclass
+class MutatePageResult:
+    page: Page
+    created_ids: list[str | None]
+    transitioned: bool                                   # whether the batch moved the page to a new status
+
+
 @final
 class Store:
     def __init__(self, root: str | os.PathLike[str], id_factory: IdFactory = default_id_factory,
@@ -553,7 +560,7 @@ class Store:
 
     def mutate_page_batch(
         self, workspace_id: str, page_id: str, batch: list[dict[str, Any]]
-    ) -> tuple[Page, list[str | None]]:
+    ) -> MutatePageResult:
         """Apply an ordered batch of commands to a page as a single atomic commit.
 
         Each command is decided against the state left by the previous one; if any is rejected the
@@ -562,6 +569,7 @@ class Store:
         regenerates it, so a command after a transition carries a stale token and the batch aborts.
         A token regenerated mid-batch dies with the abort, so a rejection reports the revision the
         page is left holding rather than the one the discarded working copy had reached.
+        The result's `transitioned` says whether the batch moved the page to a new status.
         """
         if not batch:
             raise ValidationError("mutatePageBatch requires at least one command.")
@@ -623,7 +631,8 @@ class Store:
 
             workspace.pages[page_id] = working
             self._touch_and_save(workspace)
-            return working, created_ids
+            return MutatePageResult(page=working, created_ids=created_ids,
+                                    transitioned=working.status != page.status)
 
     @staticmethod
     def _revision_conflict(presented: object, reached: str | None, stored: str | None) -> str:
