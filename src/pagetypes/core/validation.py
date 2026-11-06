@@ -114,9 +114,10 @@ def validate_inline_content(content: str, value: JSONValue) -> None:
                 )
 
 
-# A code span typed as Markdown: a single backtick either side, on one line. A backtick that pairs
-# with nothing, or a doubled one, is not a span and stays literal text.
-_CODE_SPAN = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
+# A code span typed as Markdown: a single backtick either side, on one line, opening and closing
+# against its text. That keeps a stray backtick beside a space from pairing with the next span's
+# opening one. Any other backtick, doubled ones included, stays literal text.
+_CODE_SPAN = re.compile(r"(?<!`)`(?!\s)([^`\n]+)(?<!\s)`(?!`)")
 
 
 def _normalize_run(run: JSONValue) -> list[JSONValue]:

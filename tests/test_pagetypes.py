@@ -533,6 +533,13 @@ _SPAN, _CODE = ["`x`"], [{"code": "x"}]
     (["a stray ` here"], ["a stray ` here"]),
     (["``doubled``"], ["``doubled``"]),
     (["`across\nlines`"], ["`across\nlines`"]),
+    # A backtick beside a space neither opens nor closes a span, so a stray one cannot take the
+    # next span's opening backtick.
+    (["see `foo` and a stray ` and `**kwargs`"],
+     ["see ", {"code": "foo"}, " and a stray ` and ", {"code": "**kwargs"}]),
+    (["`foo and `bar`"], ["`foo and ", {"code": "bar"}]),
+    (["the ` key and the ` key"], ["the ` key and the ` key"]),
+    (["` padded `"], ["` padded `"]),
     # A code run carries no marks, so a marked run keeps its text.
     ([{"text": "`foo`", "bold": True}], [{"text": "`foo`", "bold": True}]),
     # A run holding no span is stored as sent, its shape included.

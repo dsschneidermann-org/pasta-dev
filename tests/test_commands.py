@@ -988,6 +988,10 @@ def test_a_stray_backtick_is_stored_as_literal_text():
     assert _added_paragraph("a stray ` here") == ["a stray ` here"]
 
 
+def test_a_stray_backtick_does_not_disturb_the_span_after_it():
+    assert _added_paragraph("a stray ` and `**kwargs`") == ["a stray ` and ", {"code": "**kwargs"}]
+
+
 def test_markdown_inside_a_code_span_passes_and_outside_it_is_rejected():
     assert _added_paragraph("pass `**kwargs` on") == ["pass ", {"code": "**kwargs"}, " on"]
     with pytest.raises(ValidationError, match="Markdown syntax"):
