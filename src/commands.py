@@ -178,22 +178,26 @@ def _is_legal(page: Page, page_type: PageType, command: CommandSpec,
 
 
 def _field_setter_edge(page: Page, page_type: PageType, section: str, field: str,
-                       command_name: str) -> dict[str, Any]:
+                       command_name: str, with_instruction: bool = True) -> dict[str, Any]:
     """One self-instructing `do` field edge: kind='field' with the (section, field), the field's
     instruction (its FieldSpec.description) and the single `command` that writes it, all inline -
-    so a `next` consumer needs no describePageType round-trip to know what to author."""
-    field_spec = get_pagetype_field(page_type, section, field)
-    return {
+    so a `next` consumer needs no describePageType round-trip to know what to author.
+    `with_instruction=False` leaves the instruction out, for a field that is already written."""
+    edge: dict[str, Any] = {
         "pageId": page.id, "pageType": page.type, "kind": "field",
         "section": section, "field": field,
-        "instruction": field_spec.description.strip() if field_spec is not None else "",
-        "command": command_name,
-        "statusRevisionToken": page.status_revision_token,
     }
+    if with_instruction:
+        field_spec = get_pagetype_field(page_type, section, field)
+        edge["instruction"] = field_spec.description.strip() if field_spec is not None else ""
+    edge["command"] = command_name
+    edge["statusRevisionToken"] = page.status_revision_token
+    return edge
 
 
 def field_setter_edges(page: Page, page_type: PageType,
-                       blocked_events: Collection[str] = ()) -> list[dict[str, Any]]:
+                       blocked_events: Collection[str] = (), *,
+                       omit_populated_instructions: bool = False) -> list[dict[str, Any]]:
     """The stage-relevant field-setter `do` edges for `page` in its current status (pure).
 
     A field's setter belongs in `do` only when authoring that field is what advances the current
@@ -218,6 +222,9 @@ def field_setter_edges(page: Page, page_type: PageType,
     field takes its blocks as an array, and a list field's add carries the blocks its element is
     created holding. remove, reorder and the element-scoped block adds are never surfaced here;
     describeMutations reports them.
+
+    `omit_populated_instructions` drops the instruction from the edge of a field that already holds
+    content, so a caller that has just written it is not handed the same guidance again.
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status) - set(blocked_events)
     required = {
@@ -240,7 +247,10 @@ def field_setter_edges(page: Page, page_type: PageType,
             continue
         if is_field_setter(command):
             _ = setters.setdefault(target, command.name)
-    return [_field_setter_edge(page, page_type, section, field, command_name)
+    return [_field_setter_edge(
+                page, page_type, section, field, command_name,
+                with_instruction=not (omit_populated_instructions and _is_populated(
+                    page.sections.get(section, {}).get(field))))
             for (section, field), command_name in setters.items()]
 
 

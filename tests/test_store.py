@@ -667,6 +667,31 @@ def test_next_actions_do_lists_stage_field_setters_with_shape(store):
     })
 
 
+def test_next_actions_omits_populated_instructions_against_each_edges_own_page(store):
+    """With omit_populated_instructions, each field edge is judged against the page it belongs to: the
+    parent's written parts drop their instruction while the pinned child's empty steps keep theirs,
+    until the child is written too. Without the flag every edge keeps its instruction."""
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "F")
+    parent, child = result.page, _child(result, "test-child")
+    _mutate(store, workspace.id, parent.id, [
+        {"command": "setSummary", "args": {"text": "S"}}, {"command": "beginPlanning"}])
+    _mutate(store, workspace.id, parent.id, [{"command": "addPart", "args": {"name": "P"}}])
+
+    def field_edges(**flags):
+        do = store.next_actions(workspace.id, parent.id, **flags)["do"]
+        return {edge["command"]: edge for edge in do if edge["kind"] == "field"}
+
+    trimmed = field_edges(omit_populated_instructions=True)
+    assert "instruction" not in trimmed["addPart"]
+    assert trimmed["addStep"]["instruction"]
+    assert field_edges()["addPart"]["instruction"]
+
+    _mutate(store, workspace.id, child.id, [{"command": "addStep", "args": {"text": "build"}}])
+    assert "instruction" not in field_edges(omit_populated_instructions=True)["addStep"]
+    assert field_edges()["addStep"]["instruction"]
+
+
 def test_next_actions_withholds_child_field_setters_until_parent_unlocks(store):
     """A pinned child stays silent in the subtree rollup until its parent unlocks its stage.
 

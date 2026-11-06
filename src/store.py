@@ -422,7 +422,8 @@ class Store:
         walk(root)
         return collected
 
-    def next_actions(self, workspace_id: str, page_id: str | None = None) -> dict[str, Any]:
+    def next_actions(self, workspace_id: str, page_id: str | None = None, *,
+                     omit_populated_instructions: bool = False) -> dict[str, Any]:
         """Partition the model-declared edges over a subtree (or the whole workspace) into
         `do` (agent edges to drive now), `blocked` (agent transitions with the unmet precondition to
         fix), `humanGates` (sign-off transitions - stop), and `attention` (items awaiting a human).
@@ -435,7 +436,10 @@ class Store:
 
         A field is one edge naming one command, because a field's whole authoring content is
         reachable in a single command: a blocks field takes an array of kinded blocks, and a list
-        add carries the blocks its element is created holding."""
+        add carries the blocks its element is created holding.
+
+        `omit_populated_instructions` drops the instruction from a field edge whose field already
+        holds content on that edge's page."""
         workspace = self.load_workspace(workspace_id)
         do: list[dict[str, Any]] = []
         blocked: list[dict[str, Any]] = []
@@ -489,7 +493,9 @@ class Store:
                                     "command": command.name, "reason": reason,
                                     "statusRevisionToken": page.status_revision_token})
             # Field setters whose field must be authored to advance this stage also enter `do`.
-            do.extend(commands.field_setter_edges(page, page_type, parent_blocked))
+            do.extend(commands.field_setter_edges(
+                page, page_type, parent_blocked,
+                omit_populated_instructions=omit_populated_instructions))
             attention.extend(self._page_attention(page, page_type))
 
         result: dict[str, Any] = {"do": do, "blocked": blocked,
