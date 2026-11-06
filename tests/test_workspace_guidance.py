@@ -14,7 +14,6 @@ from fastmcp.exceptions import ToolError
 
 import src.server as server
 from src.errors import ValidationError
-from src.event_cache import EventCache
 from src.model import Workspace
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.pagetypes._workspace_guidance import (
@@ -450,10 +449,8 @@ def test_a_transition_with_the_cache_off_carries_populated_instructions(mcp):
     assert _setter(_reopen_planning(mcp, wid, pid), "addPart")["instruction"]
 
 
-def test_the_cache_stays_empty_in_test_mode(mcp, monkeypatch):
-    cache = EventCache()
-    monkeypatch.setattr(server, "page_events", cache)
+def test_the_cache_stays_empty_in_test_mode(mcp):
     wid, pid = _open_flow_page(mcp)
     _write_summary(mcp, wid, pid)
     call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
-    assert cache._entries == {}
+    assert server.page_events._entries == {}

@@ -10,18 +10,24 @@ everything around it, while an edit to this file still takes effect at once.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
+# Whether the cache is in use. None follows the mode: on everywhere but test mode, so a test opts
+# in rather than inheriting echoes that depend on timing.
+_enabled: bool | None = None
 
-def _enabled() -> bool:
-    """False when PASTA_EVENT_CACHE=0; any other value enables it. Unset, it is on everywhere but
-    test mode, so a test opts in rather than inheriting echoes that depend on timing."""
+
+def set_enabled(on: bool | None) -> None:
+    """Turn the cache on or off outright, or pass None to follow the mode again."""
+    global _enabled
+    _enabled = on
+
+
+def _is_enabled() -> bool:
     # Imported on call: a name read while this module executes would tie it to that module's reloads.
     from .pagetypes._registry import is_test_mode
 
-    setting = os.environ.get("PASTA_EVENT_CACHE")
-    return not is_test_mode() if setting is None else setting != "0"
+    return not is_test_mode() if _enabled is None else _enabled
 
 
 @dataclass(frozen=True)
@@ -41,7 +47,7 @@ class EventCache:
                ttl_seconds: float) -> None:
         """Note that `event` happened on a page at `now`, dropping every expired entry. Stores
         nothing while the cache is off."""
-        if not _enabled():
+        if not _is_enabled():
             return
         self._entries = {key: entry for key, entry in self._entries.items()
                          if entry.is_live(now)}
@@ -50,7 +56,7 @@ class EventCache:
     def is_due(self, workspace_id: str, page_id: str, event: str, now: float) -> bool:
         """Whether `event` should happen on a page: no live record of it. Never while the cache is
         off, because an empty cache would otherwise read as everything being due."""
-        if not _enabled():
+        if not _is_enabled():
             return False
         entry = self._entries.get((workspace_id, page_id, event))
         return entry is None or not entry.is_live(now)

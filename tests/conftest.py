@@ -33,13 +33,15 @@ def production_mode():
 @pytest.fixture
 def event_cache(monkeypatch):
     """Turn the event cache on for one test, which is off by default in test mode, on a fresh
-    cache so its entries cannot reach another test. Returns that cache."""
+    cache so its entries cannot reach another test. Returns that cache, and the switch follows
+    the mode again afterwards."""
     from src import server
-    from src.event_cache import EventCache
+    from src.event_cache import EventCache, set_enabled
 
-    monkeypatch.setenv("PASTA_EVENT_CACHE", "1")
     monkeypatch.setattr(server, "page_events", EventCache())
-    return server.page_events
+    set_enabled(True)
+    yield server.page_events
+    set_enabled(None)
 
 
 @pytest.fixture
