@@ -71,7 +71,7 @@ An MCP server the agent *can* use isn't one it *will* use. Copy the bundled skil
 mkdir -p .claude/skills && cp -t .claude/skills -R path/to/pasta/.claude/skills/cook
 ```
 
-The skill is four lines. All it does is tell the agent to call the servers instructions tool.
+The skill is three lines. All it does is tell the agent to call the servers instructions tool.
 
 **Now ask your agent to `/cook` a feature, a simple change, a bug report or some documentation.**
 
