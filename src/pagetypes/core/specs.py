@@ -58,10 +58,11 @@ TABLE_ALIGN = "table_align"            # value: ["left"|"center"|"right"|None, .
 BLOCK_ARRAY = "block_array"            # value: [{"kind": <kind>, ...that kind's body args}, ...]
 
 _ALIGN_VALUES = ("left", "center", "right", None)
-# Markdown emphasis/code/link tokens rejected inside a plain-text run. Kept deliberately narrow
-# (bold/code/link markers) so ordinary prose containing a lone `*` or `_` or even a file with
-# double '__' is not falsely rejected.
-_MARKDOWN_TOKENS = ("**", "`", "](")
+# Markdown emphasis/link tokens rejected inside a plain-text run. Kept deliberately narrow
+# (bold/link markers) so ordinary prose containing a lone `*` or `_` or even a file with
+# double '__' is not falsely rejected. A backtick is judged by count instead, since balanced
+# ones are literal text.
+_MARKDOWN_TOKENS = ("**", "](")
 
 
 # --- Spec dataclasses --------------------------------------------------------

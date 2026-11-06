@@ -45,6 +45,11 @@ def _reject_markdown(text: str) -> None:
                 f"Markdown syntax ('{token}') is not allowed in a text run - express emphasis " +
                 f"or a link with a structured run (e.g. {{'text': '…', 'bold': true}}) instead."
             )
+    if text.count("`") % 2:
+        raise ValidationError(
+            "Unbalanced backticks in a text run - backticks are literal text only in pairs; " +
+            "close the pair, or write inline code with a structured run ({'code': '…'})."
+        )
 
 
 def _validate_run(run: JSONValue) -> None:

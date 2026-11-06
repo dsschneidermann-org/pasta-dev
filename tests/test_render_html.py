@@ -251,6 +251,14 @@ def test_blocks_field_keeps_the_markdown_to_html_pipeline():
     assert "<code" in out and "x = 1" in out
 
 
+def test_backticks_in_a_text_run_show_verbatim_in_the_page_html():
+    factory = _counter()
+    page = create_page(BLOCKS_TYPE, "Doc", None, factory)
+    page = apply_command(page, BLOCKS_TYPE, "addBody", {"blocks": [
+        {"kind": "paragraph", "inlines": ["say `now` please"]}]}, factory).page
+    assert "<p>say `now` please</p>" in render_page_html(page, BLOCKS_TYPE, _context())
+
+
 def test_empty_blocks_field_renders_the_none_fallback():
     spec = _spec(BLOCKS_TYPE, "body", "body")
     assert '<p class="empty">None.</p>' in _field_html(spec, [], None)
