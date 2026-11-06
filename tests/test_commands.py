@@ -973,6 +973,43 @@ def test_a_page_level_add_enforces_the_inline_grammar():
             {"kind": "paragraph", "inlines": ["a **bold** word"]}]}, factory)
 
 
+def _added_paragraph(*runs):
+    factory = make_counter()
+    page = _unified_page(factory)
+    return _body(apply_command(page, UNIFIED, "addBody", {"blocks": [
+        {"kind": "paragraph", "inlines": list(runs)}]}, factory).page)[0]["inlines"]
+
+
+def test_a_code_span_in_a_block_is_stored_as_a_code_run():
+    assert _added_paragraph("call `foo` now") == ["call ", {"code": "foo"}, " now"]
+
+
+def test_a_stray_backtick_is_stored_as_literal_text():
+    assert _added_paragraph("a stray ` here") == ["a stray ` here"]
+
+
+def test_markdown_inside_a_code_span_passes_and_outside_it_is_rejected():
+    assert _added_paragraph("pass `**kwargs` on") == ["pass ", {"code": "**kwargs"}, " on"]
+    with pytest.raises(ValidationError, match="Markdown syntax"):
+        _ = _added_paragraph("`x` and **y**")
+
+
+def test_an_element_scoped_add_normalises_too():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    page = apply_command(page, ELEMENT_BLOCKS, "addItemDetail", {
+        "itemId": item_id,
+        "blocks": [{"kind": "paragraph", "inlines": ["`x`"]}]}, factory).page
+    assert items_of(page)[0]["detail"][0]["inlines"] == [{"code": "x"}]
+
+
+def test_normalising_leaves_the_callers_args_as_sent():
+    factory = make_counter()
+    args = {"blocks": [{"kind": "paragraph", "inlines": ["`x`"]}]}
+    _ = apply_command(_unified_page(factory), UNIFIED, "addBody", args, factory)
+    assert args == {"blocks": [{"kind": "paragraph", "inlines": ["`x`"]}]}
+
+
 def _table_blocks_page_type() -> PageType:
     """An ad-hoc type whose element field accepts a table, so a table can be reached through an
     array argument. The shared fixtures deliberately declare narrower vocabularies."""
@@ -1029,6 +1066,16 @@ def test_an_add_creates_an_element_with_its_blocks():
     # Every block carries its own created id, distinct from the element's and from each other's.
     ids = [block["id"] for block in element["detail"] + element["snippet"]]
     assert len(set(ids)) == 3 and element["id"] not in ids
+
+
+def test_an_add_that_creates_an_element_normalises_its_blocks():
+    factory = make_counter()
+    page = create_page(ELEMENT_BLOCKS, "A fixture", None, factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItem", {
+        "text": "one",
+        "detail": [{"kind": "paragraph", "inlines": ["`x`"]}],
+    }, factory)
+    assert items_of(added.page)[0]["detail"][0]["inlines"] == [{"code": "x"}]
 
 
 def test_a_block_created_with_its_element_matches_one_added_after():
@@ -1312,7 +1359,7 @@ def test_every_declared_content_shape_is_checked_through_the_array_path():
             {"kind": "list", "ordered": True, "items": [["a **bold** item"]]}]}, factory)
     with pytest.raises(ValidationError, match="Markdown syntax"):
         _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
-            {"kind": "table", "header": [["A"]], "rows": [[["a `code` cell"]]]}]}, factory)
+            {"kind": "table", "header": [["A"]], "rows": [[["a [link](x) cell"]]]}]}, factory)
     # The same rules on an element-scoped add, since every block path runs one validator.
     element_page, item_id = new_item(factory)
     with pytest.raises(ValidationError, match="Markdown syntax"):

@@ -43,7 +43,7 @@ from .pagetypes.core.commands import (
     is_field_setter,
 )
 from .pagetypes.core.fields import FieldSpec
-from .pagetypes.core.validation import validate_arg_value
+from .pagetypes.core.validation import normalize_arg_value, validate_arg_value
 from .pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
 from .pagetypes._registry import guard_production_type
 
@@ -291,6 +291,11 @@ def apply_command(
 
 
 # --- validation --------------------------------------------------------------
+def _normalize_args(command: CommandSpec, args: dict[str, Any]) -> dict[str, Any]:
+    return {**args, **{arg.name: normalize_arg_value(arg, args[arg.name])
+                       for arg in command.args if arg.name in args}}
+
+
 def _validate_args(command: CommandSpec, args: dict[str, Any]) -> None:
     known = {arg.name for arg in command.args}
     for key in args:
@@ -341,12 +346,14 @@ def _apply(
     id_factory: IdFactory,
     batch_context: BatchContext | None = None,
 ) -> tuple[str | None, list[str]]:
-    """Validate one command's args and legality, then apply it, returning (the id reported
-    positionally, every id it created). A compound applies each of its steps through this same path.
+    """Normalise and validate one command's args, check its legality, then apply it, returning (the
+    id reported positionally, every id it created). A compound applies each of its steps through this
+    same path.
 
     The two differ only for a block add, which creates a whole run while `createdIds` stays one
     id per command; every other command creates at most one and reports it as both.
     """
+    args = _normalize_args(command, args)
     _validate_args(command, args)
     _check_legal(page, page_type, command)
     match command:

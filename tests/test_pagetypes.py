@@ -500,7 +500,7 @@ def test_validate_inline_runs_rejects_markdown_in_a_text_run():
     with pytest.raises(ValidationError):
         validate_inline_content(INLINE_RUNS, ["**bold**"])            # bare string
     with pytest.raises(ValidationError):
-        validate_inline_content(INLINE_RUNS, [{"text": "a `code` b"}])  # inside a text run
+        validate_inline_content(INLINE_RUNS, [{"text": "a [link](x) b"}])  # inside a text run
 
 
 def test_validate_inline_runs_rejects_malformed_runs():

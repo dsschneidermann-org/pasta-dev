@@ -600,6 +600,16 @@ def test_render_page_web_escapes_inline_run_text_keeps_decoration():
     assert "**a*b**" in md_mcp and "`x_y`" in md_mcp
 
 
+def test_a_normalised_span_and_a_stray_backtick_render_on_both_paths():
+    factory = make_counter()
+    page = create_page(BLOCKS, "Doc", None, factory)
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [
+        {"kind": "paragraph", "inlines": ["`x_y` and a stray ` here"]}]}, factory).page
+    html = _MD2HTML.render(render_page(page, BLOCKS, ref_context=_web_ctx()))
+    assert "<code>x_y</code> and a stray ` here" in html
+    assert "`x_y` and a stray ` here" in render_page(page, BLOCKS)
+
+
 def test_render_page_web_leaves_code_block_source_verbatim():
     factory = make_counter()
     page = create_page(BLOCKS, "Doc", None, factory)
