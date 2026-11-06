@@ -1205,6 +1205,14 @@ def test_unbalanced_backticks_abort_the_write():
             {"kind": "table", "header": [["A"]], "rows": [[["a stray ` cell"]]]}]}, factory)
 
 
+def test_a_fence_in_a_text_run_aborts_the_write():
+    factory = make_counter()
+    page = _unified_page(factory)
+    with pytest.raises(ValidationError, match="Adjacent backticks"):
+        _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
+            {"kind": "paragraph", "inlines": ["```\nx = 1\n```"]}]}, factory)
+
+
 def test_element_scoped_blocks_follow_the_backtick_rule():
     factory = make_counter()
     page, item_id = new_item(factory)

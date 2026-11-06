@@ -60,7 +60,7 @@ BLOCK_ARRAY = "block_array"            # value: [{"kind": <kind>, ...that kind's
 _ALIGN_VALUES = ("left", "center", "right", None)
 # Markdown emphasis/link tokens rejected inside a plain-text run. Kept deliberately narrow
 # (bold/link markers) so ordinary prose containing a lone `*` or `_` or even a file with
-# double '__' is not falsely rejected. A backtick is judged by count instead, since balanced
+# double '__' is not falsely rejected. Backticks are judged separately, since single balanced
 # ones are literal text.
 _MARKDOWN_TOKENS = ("**", "](")
 
