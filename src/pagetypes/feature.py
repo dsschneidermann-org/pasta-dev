@@ -354,8 +354,7 @@ _FEATURE_SPEC = PageType(
                 on the pure side, and the effectful side should be thin enough to hold none of them.
                 Use a heading per area and a code block for anything with a precise shape. No TBDs
                 and no 'handle edge cases' placeholders, nothing that contradicts another part of the
-                spec, and nothing that was not asked for. Emphasis and links are structured inline
-                runs, not markdown syntax.
+                spec, and nothing that was not asked for.
                 """),
         )),
         SectionSpec("decisions", "Decisions", (
