@@ -97,6 +97,13 @@ class CreatePageResult:
     children: list[Page] = field(default_factory=list)   # auto-created pinned children, if any
 
 
+@dataclass
+class MutatePageResult:
+    page: Page
+    created_ids: list[str | None]
+    transitioned: bool                                   # whether the batch moved the page to a new status
+
+
 @final
 class Store:
     def __init__(self, root: str | os.PathLike[str], id_factory: IdFactory = default_id_factory,
@@ -423,7 +430,8 @@ class Store:
         return collected
 
     def next_actions(self, workspace_id: str, page_id: str | None = None, *,
-                     omit_populated_instructions: bool = False) -> dict[str, Any]:
+                     omit_populated_instructions: bool = False,
+                     omit_stage_guidance: bool = False) -> dict[str, Any]:
         """Partition the model-declared edges over a subtree (or the whole workspace) into
         `do` (agent edges to drive now), `blocked` (agent transitions with the unmet precondition to
         fix), `humanGates` (sign-off transitions - stop), and `attention` (items awaiting a human).
@@ -439,7 +447,8 @@ class Store:
         add carries the blocks its element is created holding.
 
         `omit_populated_instructions` drops the instruction from a field edge whose field already
-        holds content on that edge's page."""
+        holds content on that edge's page. `omit_stage_guidance` leaves out the focused page's
+        guidance keys, for a caller that has not just entered the status."""
         workspace = self.load_workspace(workspace_id)
         do: list[dict[str, Any]] = []
         blocked: list[dict[str, Any]] = []
@@ -502,7 +511,7 @@ class Store:
                                   "humanGates": human_gates, "attention": attention}
         # Guidance for the focused page: its stage guidance for the current status, and any
         # configured guidance texts for that status. A whole-workspace roll-up has no focused page.
-        if page_id is not None:
+        if page_id is not None and not omit_stage_guidance:
             focus = workspace.get_page(page_id)
             if focus is not None and not focus.archived:
                 focus_type = get_page_type(focus.type)
@@ -553,7 +562,7 @@ class Store:
 
     def mutate_page_batch(
         self, workspace_id: str, page_id: str, batch: list[dict[str, Any]]
-    ) -> tuple[Page, list[str | None]]:
+    ) -> MutatePageResult:
         """Apply an ordered batch of commands to a page as a single atomic commit.
 
         Each command is decided against the state left by the previous one; if any is rejected the
@@ -562,6 +571,7 @@ class Store:
         regenerates it, so a command after a transition carries a stale token and the batch aborts.
         A token regenerated mid-batch dies with the abort, so a rejection reports the revision the
         page is left holding rather than the one the discarded working copy had reached.
+        The result's `transitioned` says whether the batch moved the page to a new status.
         """
         if not batch:
             raise ValidationError("mutatePageBatch requires at least one command.")
@@ -623,7 +633,8 @@ class Store:
 
             workspace.pages[page_id] = working
             self._touch_and_save(workspace)
-            return working, created_ids
+            return MutatePageResult(page=working, created_ids=created_ids,
+                                    transitioned=working.status != page.status)
 
     @staticmethod
     def _revision_conflict(presented: object, reached: str | None, stored: str | None) -> str:

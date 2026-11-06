@@ -145,12 +145,12 @@ def test_add_decision_ref_integrity(store):
             {"command": "addDecisions", "args": {"blocks": [{"kind": "decision", "questionId": "nope", "text": "x"}]}}
         ])
     # Mint the question on the parent, then the same decision resolves.
-    asked, asked_created = _mutate(store, workspace.id, parent.id, [
+    asked_created = _mutate(store, workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "contrast?"}}
-    ])
-    result, result_created = _mutate(store, workspace.id, child.id, [
+    ]).created_ids
+    result = _mutate(store, workspace.id, child.id, [
         {"command": "addDecisions", "args": {"blocks": [{"kind": "decision", "questionId": asked_created[0], "text": "WCAG AA"}]}}
-    ])
+    ]).page
     assert result.sections["decisions"]["body"][0]["questionId"] == asked_created[0]
 
 
@@ -161,9 +161,9 @@ def test_a_block_text_arg_of_the_wrong_type_is_rejected_not_stored(store, text):
     workspace = store.create_workspace("demo")
     result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
     parent, child = result.page, _child(result, "test-child")
-    _, asked = _mutate(store, workspace.id, parent.id, [
+    asked = _mutate(store, workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "contrast?"}}
-    ])
+    ]).created_ids
     with pytest.raises(ValidationError, match="must be of type 'string'"):
         _mutate(store, workspace.id, child.id, [
             {"command": "addDecisions", "args": {"blocks": [
@@ -185,12 +185,12 @@ def test_list_add_ref_check_rejects_a_dangling_parent_reference(store):
     # All-or-nothing: the rejected batch wrote nothing.
     assert store.get_page(workspace.id, child.id).sections["notes"]["items"] == []
     # Mint the question on the parent, then the same note resolves.
-    _asked, asked_created = _mutate(store, workspace.id, parent.id, [
+    asked_created = _mutate(store, workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "contrast?"}}
-    ])
-    noted, _noted_created = _mutate(store, workspace.id, child.id, [
+    ]).created_ids
+    noted = _mutate(store, workspace.id, child.id, [
         {"command": "addNote", "args": {"questionId": asked_created[0], "text": "checked at AA"}}
-    ])
+    ]).page
     assert len(noted.sections["notes"]["items"]) == 1
     assert noted.sections["notes"]["items"][0]["questionId"] == asked_created[0]
 
@@ -287,12 +287,12 @@ def test_ship_guard_blocks_until_child_complete(store):
         {"command": "setSummary", "args": {"text": "A dark theme."}},
         {"command": "beginPlanning"},
     ])
-    _, step_created = _mutate(store, workspace.id, child.id, [
+    step_created = _mutate(store, workspace.id, child.id, [
         {"command": "addStep", "args": {"text": "build"}}
-    ])
-    _, check_created = _mutate(store, workspace.id, child.id, [
+    ]).created_ids
+    check_created = _mutate(store, workspace.id, child.id, [
         {"command": "addCheck", "args": {"text": "renders"}}
-    ])
+    ]).created_ids
     _mutate(store, workspace.id, child.id, [{"command": "markReady"}])
 
     # Reach building. The review gate now refuses to advance while the step is todo and the check
@@ -313,7 +313,7 @@ def test_ship_guard_blocks_until_child_complete(store):
         {"command": "markCheckPassed", "args": {"checkId": check_created[0]}}
     ])
     _mutate(store, workspace.id, parent.id, [{"command": "submitForReview"}])
-    shipped, _ = _mutate(store, workspace.id, parent.id, [{"command": "ship"}])
+    shipped = _mutate(store, workspace.id, parent.id, [{"command": "ship"}]).page
     assert shipped.status == "done"
 
 
@@ -327,12 +327,12 @@ def test_skip_counts_as_addressed_for_review_and_ship(store):
         {"command": "setSummary", "args": {"text": "A dark theme."}},
         {"command": "beginPlanning"},
     ])
-    _, step_created = _mutate(store, workspace.id, child.id, [
+    step_created = _mutate(store, workspace.id, child.id, [
         {"command": "addStep", "args": {"text": "build"}}
-    ])
-    _, check_created = _mutate(store, workspace.id, child.id, [
+    ]).created_ids
+    check_created = _mutate(store, workspace.id, child.id, [
         {"command": "addCheck", "args": {"text": "renders"}}
-    ])
+    ]).created_ids
     _mutate(store, workspace.id, child.id, [{"command": "markReady"}])
     _mutate(store, workspace.id, parent.id, [
         {"command": "addPart", "args": {"name": "Renderer"}},
@@ -348,7 +348,7 @@ def test_skip_counts_as_addressed_for_review_and_ship(store):
         {"command": "markCheckSkipped", "args": {"checkId": check_created[0]}}
     ])
     _mutate(store, workspace.id, parent.id, [{"command": "submitForReview"}])
-    shipped, _ = _mutate(store, workspace.id, parent.id, [{"command": "ship"}])
+    shipped = _mutate(store, workspace.id, parent.id, [{"command": "ship"}]).page
     assert shipped.status == "done"
 
 
@@ -362,9 +362,9 @@ def test_reopen_unskips_a_step(store):
         {"command": "setSummary", "args": {"text": "x"}},
         {"command": "beginPlanning"},
     ])
-    _, step_created = _mutate(store, workspace.id, child.id, [
+    step_created = _mutate(store, workspace.id, child.id, [
         {"command": "addStep", "args": {"text": "build"}}
-    ])
+    ]).created_ids
     _mutate(store, workspace.id, child.id, [{"command": "markReady"}])
     _mutate(store, workspace.id, parent.id, [
         {"command": "addPart", "args": {"name": "R"}},
@@ -412,7 +412,7 @@ def test_begin_implementation_blocked_until_children_ready(store):
         {"command": "addStep", "args": {"text": "build"}},
         {"command": "markReady"},
     ])
-    advanced, _ = _mutate(store, workspace.id, parent.id, [{"command": "beginImplementation"}])
+    advanced = _mutate(store, workspace.id, parent.id, [{"command": "beginImplementation"}]).page
     assert advanced.status == "building"
 
 
@@ -614,9 +614,9 @@ def test_next_actions_ship_is_a_gated_human_gate(store):
         {"command": "setSummary", "args": {"text": "x"}},
         {"command": "beginPlanning"},                       # unlocks the child's parent-gated markReady
     ])
-    _, step_created = _mutate(store, workspace.id, child.id, [
+    step_created = _mutate(store, workspace.id, child.id, [
         {"command": "addStep", "args": {"text": "build"}}
-    ])
+    ]).created_ids
     _mutate(store, workspace.id, child.id, [
         {"command": "markReady"}                            # ready so beginImplementation is unblocked
     ])
@@ -692,6 +692,28 @@ def test_next_actions_omits_populated_instructions_against_each_edges_own_page(s
     assert field_edges()["addStep"]["instruction"]
 
 
+def test_mutate_page_batch_reports_whether_the_status_moved(store):
+    """Content alone leaves `transitioned` False; a batch ending in a transition or a compound sets it."""
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-flow", "C").page
+    assert _mutate(store, workspace.id, page.id, [
+        {"command": "setSummary", "args": {"text": "s"}}]).transitioned is False
+    assert _mutate(store, workspace.id, page.id, [
+        {"command": "setSummary", "args": {"text": "t"}}, {"command": "open"}]).transitioned is True
+    assert _mutate(store, workspace.id, page.id, [
+        {"command": "close", "args": {"sha": "abc", "message": "done"}}]).transitioned is True
+
+
+def test_mutate_page_batch_does_not_count_an_element_status_change_as_a_transition(store):
+    """A step changing status is progress inside a stage, not a new stage."""
+    workspace = store.create_workspace("demo")
+    child = _child(store.create_page(workspace.id, "test-lifecycle", "F"), "test-child")
+    step_created = _mutate(store, workspace.id, child.id, [
+        {"command": "addStep", "args": {"text": "build"}}]).created_ids
+    assert _mutate(store, workspace.id, child.id, [
+        {"command": "markStepDone", "args": {"stepId": step_created[0]}}]).transitioned is False
+
+
 def test_next_actions_withholds_child_field_setters_until_parent_unlocks(store):
     """A pinned child stays silent in the subtree rollup until its parent unlocks its stage.
 
@@ -761,9 +783,9 @@ def test_next_actions_terminal_state_has_no_field_setters(store):
 def test_attention_lists_escalated_open_questions(store):
     workspace = store.create_workspace("demo")
     parent = store.create_page(workspace.id, "test-lifecycle", "F").page
-    result, created = _mutate(store, workspace.id, parent.id, [
+    created = _mutate(store, workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "?"}}
-    ])
+    ]).created_ids
     assert store.attention(workspace.id)["attention"] == []                  # not escalated yet
     _mutate(store, workspace.id, parent.id, [
         {"command": "escalateQuestion", "args": {"questionId": created[0]}}
@@ -781,15 +803,15 @@ def test_mutate_page_batch_atomic_commit(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-lifecycle", "A").page
     # setSummary populates the field beginPlanning requires; each command is decided against the prior.
-    result, created = _mutate(store, workspace.id, page.id, [
+    result = _mutate(store, workspace.id, page.id, [
         {"command": "setSummary", "args": {"text": "S"}},
         {"command": "addPart", "args": {"name": "P"}},
         {"command": "beginPlanning"},
     ])
-    assert result.status == "planning"
-    assert result.sections["summary"]["body"] == "S"
-    assert len(result.sections["parts"]["items"]) == 1
-    assert created[1] is not None                                            # addPart's id
+    assert result.page.status == "planning"
+    assert result.page.sections["summary"]["body"] == "S"
+    assert len(result.page.sections["parts"]["items"]) == 1
+    assert result.created_ids[1] is not None                                 # addPart's id
 
 
 def test_mutate_page_batch_aborts_and_writes_nothing(store):
@@ -824,9 +846,9 @@ def _seed_items(store, *texts):
     """A fresh test-fields page with `texts` appended; returns (workspace_id, page_id, [item ids])."""
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "P").page
-    _, created = _mutate(store,
+    created = _mutate(store,
         workspace.id, page.id, [{"command": "addItem", "args": {"text": t}} for t in texts]
-    )
+    ).created_ids
     return workspace.id, page.id, created
 
 
@@ -834,44 +856,45 @@ def test_batch_chained_add_reuses_committed_preceding_id(store):
     # The exact case that used to abort: two positioned adds anchored on the SAME committed id. The
     # second reuses id0 because the first insert's id is unknowable when the batch is composed.
     ws, page_id, (id0,) = _seed_items(store, "0")
-    result, created = _mutate(store, ws, page_id, [
+    result = _mutate(store, ws, page_id, [
         {"command": "addItem", "args": {"text": "1", "index": 1, "precedingId": id0}},
         {"command": "addItem", "args": {"text": "2", "index": 2, "precedingId": id0}},
     ])
-    assert [it["text"] for it in result.sections["items"]["items"]] == ["0", "1", "2"]
-    assert all(cid is not None for cid in created)                       # both ids created
-    assert [it["id"] for it in result.sections["items"]["items"]] == [id0, created[0], created[1]]
+    assert [it["text"] for it in result.page.sections["items"]["items"]] == ["0", "1", "2"]
+    assert all(cid is not None for cid in result.created_ids)            # both ids created
+    assert [it["id"] for it in result.page.sections["items"]["items"]] == [
+        id0, result.created_ids[0], result.created_ids[1]]
 
 
 def test_batch_chained_add_longer_run(store):
     # The skip walks past a run of >1 batch-created ids: three adds, all anchored on id0.
     ws, page_id, (id0,) = _seed_items(store, "0")
-    result, _ = _mutate(store, ws, page_id, [
+    result = _mutate(store, ws, page_id, [
         {"command": "addItem", "args": {"text": "1", "index": 1, "precedingId": id0}},
         {"command": "addItem", "args": {"text": "2", "index": 2, "precedingId": id0}},
         {"command": "addItem", "args": {"text": "3", "index": 3, "precedingId": id0}},
-    ])
+    ]).page
     assert [it["text"] for it in result.sections["items"]["items"]] == ["0", "1", "2", "3"]
 
 
 def test_batch_insert_between_two_just_added(store):
     # Q12: index stays strict, so the in-between slot is reachable with the committed anchor.
     ws, page_id, (id0,) = _seed_items(store, "0")
-    result, _ = _mutate(store, ws, page_id, [
+    result = _mutate(store, ws, page_id, [
         {"command": "addItem", "args": {"text": "1", "index": 1, "precedingId": id0}},   # [0, 1]
         {"command": "addItem", "args": {"text": "2", "index": 2, "precedingId": id0}},   # [0, 1, 2]
         {"command": "addItem", "args": {"text": "3", "index": 2, "precedingId": id0}},   # between 1 and 2
-    ])
+    ]).page
     assert [it["text"] for it in result.sections["items"]["items"]] == ["0", "1", "3", "2"]
 
 
 def test_batch_reorder_skips_batch_created(store):
     # Q13: a committed entry reorders past a same-batch insert, anchored on a committed id.
     ws, page_id, (a_id, b_id) = _seed_items(store, "A", "B")
-    result, _ = _mutate(store, ws, page_id, [
+    result = _mutate(store, ws, page_id, [
         {"command": "addItem", "args": {"text": "n1", "index": 2, "precedingId": b_id}},          # [A, B, n1]
         {"command": "reorderItem", "args": {"itemId": a_id, "toIndex": 2, "precedingId": b_id}},  # skip n1 -> anchor B
-    ])
+    ]).page
     assert [it["text"] for it in result.sections["items"]["items"]] == ["B", "n1", "A"]
 
 
@@ -1180,9 +1203,9 @@ def test_set_title_command_renames_via_batch(store):
     # persists, and rejects a blank title (aborting the whole batch, so nothing is written).
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "Old").page
-    renamed, _ = _mutate(store, workspace.id, page.id, [
+    renamed = _mutate(store, workspace.id, page.id, [
         {"command": "setTitle", "args": {"title": "New"}}
-    ])
+    ]).page
     assert renamed.title == "New"
     assert store.get_page(workspace.id, page.id).title == "New"   # persisted
     with pytest.raises(ValidationError):
@@ -1640,9 +1663,9 @@ def test_render_html_rejects_an_unknown_page(store):
 def _page_with_one_item(store, workspace_id):
     """A test-element-blocks page holding one item, and that item's id."""
     page = store.create_page(workspace_id, "test-element-blocks", "Plan").page
-    _, created = _mutate(store, workspace_id, page.id, [
+    created = _mutate(store, workspace_id, page.id, [
         {"command": "addItem", "args": {"text": "one"}},
-    ])
+    ]).created_ids
     return page, created[0]
 
 
@@ -1654,13 +1677,13 @@ def test_one_batch_authors_two_complete_elements(store):
     """The shape the do edge advertises, run as one batch with no read-back in the middle."""
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-element-blocks", "Plan").page
-    _, created = _mutate(store, workspace.id, page.id, [
+    created = _mutate(store, workspace.id, page.id, [
         {"command": "addItem", "args": {"text": "one", "detail": [
             {"kind": "paragraph", "inlines": ["first"]},
             {"kind": "code", "language": "python", "source": "x = 1"}]}},
         {"command": "addItem", "args": {"text": "two", "detail": [
             {"kind": "paragraph", "inlines": ["second"]}]}},
-    ])
+    ]).created_ids
     items = store.get_page(workspace.id, page.id).sections["items"]["items"]
     assert created == [item["id"] for item in items]         # the two ELEMENT ids, in order
     assert [block["kind"] for block in items[0]["detail"]] == ["paragraph", "code"]
@@ -1708,16 +1731,16 @@ def test_element_block_inserts_compose_within_one_batch(store):
     batch guard walks left past the id the batch itself just created."""
     workspace = store.create_workspace("demo")
     page, item_id = _page_with_one_item(store, workspace.id)
-    _, first = _mutate(store, workspace.id, page.id, [
+    first = _mutate(store, workspace.id, page.id, [
         {"command": "addItemDetail", "args": {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["anchor"]}]}},
-    ])
+    ]).created_ids
     anchor = first[0]
-    _, created = _mutate(store, workspace.id, page.id, [
+    created = _mutate(store, workspace.id, page.id, [
         {"command": "addItemDetail",
          "args": {"itemId": item_id, "blocks": [{"kind": "code", "language": "python", "source": "x = 1"}], "index": 1, "precedingId": anchor}},
         {"command": "addItemDetail",
          "args": {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["second"]}], "index": 1, "precedingId": anchor}},
-    ])
+    ]).created_ids
     code_id, paragraph_id = created
     assert [block["id"] for block in _detail(store, workspace.id, page.id)] == [
         anchor, paragraph_id, code_id
@@ -1733,13 +1756,13 @@ def test_a_multi_block_add_composes_within_one_batch(store):
     """
     workspace = store.create_workspace("demo")
     doc = store.create_page(workspace.id, "test-blocks", "Doc").page
-    page, _ = _mutate(store, workspace.id, doc.id, [
+    page = _mutate(store, workspace.id, doc.id, [
         {"command": "addBody", "args": {"blocks": [{"kind": "paragraph", "inlines": ["anchor"]}]}}
-    ])
+    ]).page
     anchor = page.sections["body"]["body"][0]["id"]
     # One batch: a run of three blocks, then an insert anchored on the committed block. The three
     # ids the first command created are not nameable by the caller, so the guard must skip them.
-    page, _ = _mutate(store, workspace.id, doc.id, [
+    page = _mutate(store, workspace.id, doc.id, [
         {"command": "addBody", "args": {"blocks": [
             {"kind": "paragraph", "inlines": ["a"]},
             {"kind": "paragraph", "inlines": ["b"]},
@@ -1748,7 +1771,7 @@ def test_a_multi_block_add_composes_within_one_batch(store):
         {"command": "addBody", "args": {
             "blocks": [{"kind": "paragraph", "inlines": ["d"]}],
             "index": 1, "precedingId": anchor}},
-    ])
+    ]).page
     body = page.sections["body"]["body"]
     assert [block["inlines"][0] for block in body] == ["anchor", "d", "a", "b", "c"]
 
@@ -1758,17 +1781,17 @@ def test_createdids_stays_one_id_per_command(store):
     creates a run reports the first, exactly as an element add reports the element."""
     workspace = store.create_workspace("demo")
     doc = store.create_page(workspace.id, "test-blocks", "Doc").page
-    page, created = _mutate(store, workspace.id, doc.id, [
+    result = _mutate(store, workspace.id, doc.id, [
         {"command": "addBody", "args": {"blocks": [
             {"kind": "paragraph", "inlines": ["a"]},
             {"kind": "paragraph", "inlines": ["b"]},
         ]}},
         {"command": "addBody", "args": {"blocks": [{"kind": "divider"}]}},
     ])
-    assert len(created) == 2
-    body = page.sections["body"]["body"]
-    assert created[0] == body[0]["id"]      # the first of the run
-    assert created[1] == body[2]["id"]
+    assert len(result.created_ids) == 2
+    body = result.page.sections["body"]["body"]
+    assert result.created_ids[0] == body[0]["id"]      # the first of the run
+    assert result.created_ids[1] == body[2]["id"]
 
 
 def test_a_ref_checked_block_is_checked_when_created_with_its_element(store):
@@ -1789,13 +1812,13 @@ def test_a_ref_checked_block_is_checked_when_created_with_its_element(store):
         ])
     assert store.get_page(workspace.id, child.id).sections["decisions"]["body"] == []
     # The same block resolves once the parent has the question.
-    _, asked = _mutate(store, workspace.id, parent.id, [
+    asked = _mutate(store, workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "contrast?"}}
-    ])
-    page, _ = _mutate(store, workspace.id, child.id, [
+    ]).created_ids
+    page = _mutate(store, workspace.id, child.id, [
         {"command": "addDecisions", "args": {"blocks": [
             {"kind": "decision", "questionId": asked[0], "text": "WCAG AA"}]}}
-    ])
+    ]).page
     assert page.sections["decisions"]["body"][0]["questionId"] == asked[0]
 
 
@@ -1805,9 +1828,9 @@ def test_a_dangling_ref_in_a_later_add_aborts_the_whole_batch(store):
     workspace = store.create_workspace("demo")
     result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
     parent, child = result.page, _child(result, "test-child")
-    _, asked = _mutate(store, workspace.id, parent.id, [
+    asked = _mutate(store, workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "contrast?"}}
-    ])
+    ]).created_ids
     with pytest.raises(ValidationError, match="does not reference an existing element"):
         _mutate(store, workspace.id, child.id, [
             {"command": "addDecisions", "args": {"blocks": [
@@ -1836,13 +1859,13 @@ def test_a_ref_checked_block_created_with_its_element_is_checked(store):
         ])
     assert store.get_page(workspace.id, child.id).sections["steps"]["items"] == []
     # The same element commits once the parent carries the question.
-    _, asked = _mutate(store, workspace.id, parent.id, [
+    asked = _mutate(store, workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "contrast?"}}
-    ])
-    page, _ = _mutate(store, workspace.id, child.id, [
+    ]).created_ids
+    page = _mutate(store, workspace.id, child.id, [
         {"command": "addStep", "args": {"text": "one", "note": [
             {"kind": "decision", "questionId": asked[0], "text": "WCAG AA"}]}}
-    ])
+    ]).page
     step = page.sections["steps"]["items"][0]
     assert step["note"][0]["questionId"] == asked[0]
     # And the element-scoped add gets the same check.
@@ -1906,8 +1929,8 @@ def test_token_is_read_from_args_and_stripped_before_the_command(revstore):
     token = page.status_revision_token
     # The token rides inside args and is consumed by the store, so the command applies cleanly
     # rather than the pure core rejecting an unknown argument.
-    after, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "addItem", "args": {"statusRevisionToken": token, "text": "x"}}])
+    after = revstore.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItem", "args": {"statusRevisionToken": token, "text": "x"}}]).page
     assert [item["text"] for item in after.sections["items"]["items"]] == ["x"]
     # A token left in the old sibling position is no longer read, so it reads as a missing token.
     with pytest.raises(ConflictError, match="does not match"):
@@ -1927,12 +1950,12 @@ def test_content_keeps_the_token_and_a_transition_regenerates_it(revstore):
     page = revstore.create_page(workspace.id, "test-flow", "C").page        # token "000001"
     token = page.status_revision_token
     # a content command does not move the status, so it leaves the token unchanged
-    after, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}}])
+    after = revstore.mutate_page_batch(workspace.id, page.id, [
+        {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}}]).page
     assert after.status_revision_token == token
     # a status transition regenerates the token to a fresh value
-    opened, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "open", "args": {"statusRevisionToken": token}}])
+    opened = revstore.mutate_page_batch(workspace.id, page.id, [
+        {"command": "open", "args": {"statusRevisionToken": token}}]).page
     assert opened.status == "open"
     assert opened.status_revision_token != token and opened.status_revision_token.isdigit()
 
@@ -2000,7 +2023,7 @@ def test_legacy_page_without_a_token_bootstraps_on_first_transition(store):
     store.mutate_page_batch(workspace.id, page.id, [{"command": "setSummary", "args": {"text": "s"}}])
     assert store.get_page(workspace.id, page.id).status_revision_token is None
     # The first status transition assigns the first real token.
-    opened, _ = store.mutate_page_batch(workspace.id, page.id, [{"command": "open"}])
+    opened = store.mutate_page_batch(workspace.id, page.id, [{"command": "open"}]).page
     assert opened.status == "open"
     assert opened.status_revision_token is not None and opened.status_revision_token.isdigit()
 
