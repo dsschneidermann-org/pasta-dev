@@ -86,6 +86,7 @@ from src.pagetypes.core.pagetype import (
 )
 from src.pagetypes.core.validation import (
     collect_ref_ids,
+    normalize_arg_value,
     validate_block,
     validate_blocks,
     validate_inline_content,
@@ -517,6 +518,61 @@ def test_validate_run_lists_and_grid_and_align():
     validate_inline_content(TABLE_ALIGN, ["left", "center", "right", None])
     with pytest.raises(ValidationError):
         validate_inline_content(TABLE_ALIGN, ["middle"])
+
+
+_RUNS_ARG = _array("inlines", content=INLINE_RUNS)
+_SPAN, _CODE = ["`x`"], [{"code": "x"}]
+
+
+@pytest.mark.parametrize("sent, stored", [
+    (["call `foo` now"], ["call ", {"code": "foo"}, " now"]),
+    ([{"text": "`foo`"}], [{"code": "foo"}]),
+    (["`a` and `b`"], [{"code": "a"}, " and ", {"code": "b"}]),
+    (["pass `**kwargs` on"], ["pass ", {"code": "**kwargs"}, " on"]),
+    # A stray backtick, a doubled pair and a pair across lines are not spans.
+    (["a stray ` here"], ["a stray ` here"]),
+    (["``doubled``"], ["``doubled``"]),
+    (["`across\nlines`"], ["`across\nlines`"]),
+    # A code run carries no marks, so a marked run keeps its text.
+    ([{"text": "`foo`", "bold": True}], [{"text": "`foo`", "bold": True}]),
+    # A run holding no span is stored as sent, its shape included.
+    (["plain", {"text": "plain"}, {"code": "`x`"}, {"ref": "page:1"}],
+     ["plain", {"text": "plain"}, {"code": "`x`"}, {"ref": "page:1"}]),
+])
+def test_a_code_span_is_normalised_into_a_code_run(sent, stored):
+    assert normalize_arg_value(_RUNS_ARG, sent) == stored
+    assert normalize_arg_value(_RUNS_ARG, stored) == stored      # idempotent
+
+
+def test_normalising_reaches_every_run_shape():
+    assert normalize_arg_value(_array("items", content=INLINE_RUN_LISTS), [_SPAN]) == [_CODE]
+    assert normalize_arg_value(_array("rows", content=INLINE_RUN_GRID), [[_SPAN]]) == [[_CODE]]
+    blocks = _array("blocks", content=BLOCK_ARRAY, block_kinds=standard_blocks())
+    assert normalize_arg_value(blocks, [
+        {"kind": "paragraph", "inlines": _SPAN},
+        {"kind": "table", "header": [_SPAN], "rows": [[_SPAN]], "align": None},
+    ]) == [
+        {"kind": "paragraph", "inlines": _CODE},
+        {"kind": "table", "header": [_CODE], "rows": [[_CODE]], "align": None},
+    ]
+
+
+def test_normalising_leaves_an_arg_holding_no_runs_alone():
+    blocks = _array("blocks", content=BLOCK_ARRAY, block_kinds=(_code_block(), _paragraph_text()))
+    sent = [{"kind": "code", "language": "md", "source": "`x`"},
+            {"kind": "paragraph", "text": "`x`"}]
+    assert normalize_arg_value(blocks, sent) == sent
+    assert normalize_arg_value(_text(), "`x`") == "`x`"
+
+
+def test_normalising_returns_a_malformed_value_for_the_grammar_to_reject():
+    lists = _array("items", content=INLINE_RUN_LISTS)
+    grid = _array("rows", content=INLINE_RUN_GRID)
+    blocks = _array("blocks", content=BLOCK_ARRAY, block_kinds=standard_blocks())
+    for arg, malformed in ((_RUNS_ARG, "`x`"), (_RUNS_ARG, None), (_RUNS_ARG, [1]),
+                           (lists, "`x`"), (lists, ["`x`"]), (grid, ["`x`"]), (grid, [["`x`"]]),
+                           (blocks, ["`x`"]), (blocks, [{"kind": "nope", "inlines": ["`x`"]}])):
+        assert normalize_arg_value(arg, malformed) == malformed
 
 
 def test_validate_table_width_consistency():

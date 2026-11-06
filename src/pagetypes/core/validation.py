@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -111,6 +112,57 @@ def validate_inline_content(content: str, value: JSONValue) -> None:
                 raise ValidationError(
                     f"Table alignment must be one of left/center/right/null, got {entry!r}."
                 )
+
+
+# A code span typed as Markdown: a single backtick either side, on one line. A backtick that pairs
+# with nothing, or a doubled one, is not a span and stays literal text.
+_CODE_SPAN = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
+
+
+def _normalize_run(run: JSONValue) -> list[JSONValue]:
+    """The runs one run stands for. Only unmarked text can become a code run: a code run carries no
+    marks, so a marked run is left as sent rather than losing its emphasis or link."""
+    text = run.get("text") if isinstance(run, dict) and set(run) == {"text"} else run
+    if not isinstance(text, str) or _CODE_SPAN.search(text) is None:
+        return [run]
+    return [{"code": piece} if index % 2 else piece
+            for index, piece in enumerate(_CODE_SPAN.split(text)) if piece]
+
+
+def _normalize_runs(runs: JSONValue) -> JSONValue:
+    if not isinstance(runs, list):
+        return runs
+    return [normalized for run in runs for normalized in _normalize_run(run)]
+
+
+def _normalize_block(entry: JSONValue, block_kinds: tuple[BlockKindSpec, ...]) -> JSONValue:
+    if not isinstance(entry, dict):
+        return entry
+    block = next((block for block in block_kinds if block.kind == entry.get("kind")), None)
+    if block is None:
+        return entry
+    return {**entry, **{arg.name: normalize_arg_value(arg, entry[arg.name])
+                        for arg in block.body_args if arg.name in entry}}
+
+
+def normalize_arg_value(arg: ArgSpec, value: JSONValue) -> JSONValue:
+    """`value` with each code span in its text runs rewritten as a code run.
+
+    Runs ahead of the grammar, so the grammar checks what will be stored and the text inside a span
+    is code rather than markdown. It therefore sees unchecked input: a value of the wrong shape is
+    returned untouched for the grammar to reject.
+    """
+    if arg.content == INLINE_RUNS:
+        return _normalize_runs(value)
+    if isinstance(value, list):
+        if arg.content == INLINE_RUN_LISTS:
+            return [_normalize_runs(entry) for entry in value]
+        if arg.content == INLINE_RUN_GRID:
+            return [[_normalize_runs(cell) for cell in row] if isinstance(row, list) else row
+                    for row in value]
+        if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
+            return [_normalize_block(entry, arg.block_kinds) for entry in value]
+    return value
 
 
 _PYTHON_TYPE = {
