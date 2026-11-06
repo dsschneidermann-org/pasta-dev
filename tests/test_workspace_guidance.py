@@ -305,13 +305,17 @@ def test_set_workspace_guidance_tool_and_response_keys(mcp):
                   {"workspaceId": wid, "field": "buildTool", "text": "use pytest"})
     assert result == {"workspaceId": wid, "field": "buildTool",
                       "guidanceConfig": {"buildTool": "use pytest"}}
-    # A subsequent write response carries guidance_buildTool (page is at `building`), inside `next`.
+    # A content-only write leaves it out, while nextActions for the page carries it.
     written = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
                                    "commands": [{"command": "setSummary", "args": {"text": "S2"}}]})
-    assert written["next"]["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
-    # `next` is the payload nextActions returns for the page, so the two agree by construction.
+    assert "guidance_buildTool" not in written["next"]
     actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
     assert actions["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
+    # Entering `building` again carries it, inside `next`.
+    _mutate_server(mcp, {"workspaceId": wid, "pageId": pid, "commands": [{"command": "reopenPlanning"}]})
+    entered = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
+                                   "commands": [{"command": "beginImplementation"}]})
+    assert entered["next"]["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
 
 
 def test_create_page_response_carries_workspace_guidance(mcp):

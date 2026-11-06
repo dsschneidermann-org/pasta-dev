@@ -502,11 +502,14 @@ async def mutatePageBatch(
     carries a now-stale token. All-or-nothing: any rejection aborts the whole batch and nothing commits
     - the error names the failing index and command. Echoes the new status, the current
     `statusRevisionToken`, and next actions, where a field edge whose field is already
-    populated on its page comes without its instruction - nextActions carries them all."""
+    populated on its page comes without its instruction and stage guidance comes only with a
+    transition - nextActions carries them all."""
     with _guard_tool():
         result = STORE.mutate_page_batch(workspaceId, pageId, commands)
         page = result.page
-        next_actions = STORE.next_actions(workspaceId, pageId, omit_populated_instructions=True)
+        next_actions = STORE.next_actions(
+            workspaceId, pageId, omit_populated_instructions=True,
+            omit_stage_guidance=not result.transitioned)
         await ws_reloader.refresh()
         return {
             "pageId": page.id,
