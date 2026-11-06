@@ -2,7 +2,7 @@
 
 **A structured wiki over MCP that tells your coding agent what to do next, and won't let it skip ahead.**
 
-Pasta is an MCP server. Your project's features, bug reports, decision records and architecture notes live in it as **typed pages**, and every page carries a **status state machine**. On each write the server answers with the moves that are legal right now, the instruction for the exact stage the work is in, and the gates only a human is allowed to cross.
+Pasta is an MCP server. Your project's features, bug reports, decision records and architecture notes live in it as **typed pages**, and every page carries a **status state machine**. On each write the server answers with the moves that are legal right now and the gates only a human is allowed to cross, and when the work enters a new stage, with the instruction for that stage.
 
 So a process you write down once (TDD, reproduce-before-you-fix, spec-then-plan) stops being something the agent read 40,000 tokens ago and starts being something it is handed at the moment it applies.
 
