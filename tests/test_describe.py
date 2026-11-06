@@ -13,6 +13,7 @@ from src.pagetypes._registry import get_page_type
 # churns these introspection assertions.
 FIELDS = get_page_type("test-fields")     # arg schema (enum / required / optional) + type shape
 FLOW = get_page_type("test-flow")         # transition availability
+BLOCKS = get_page_type("test-blocks")     # every block kind, for the run-shape schema
 
 
 def _counter():
@@ -235,3 +236,31 @@ def test_describe_reports_the_skipped_element_state():
     skipped."""
     checks = _fields_of("test-child")[("checks", "items")]
     assert checks["elementStates"] == ["pending", "passed", "failed", "skipped"]
+
+
+def _body_args(kind):
+    schema = command_arg_schema(get_pagetype_command(BLOCKS, "addBody"))
+    branches = schema["properties"]["blocks"]["items"]["oneOf"]
+    return next(branch for branch in branches
+                if branch["properties"]["kind"]["const"] == kind)["properties"]
+
+
+def test_a_run_bearing_block_arg_advertises_the_run_shapes():
+    inlines = _body_args("paragraph")["inlines"]
+    assert inlines["type"] == "array"
+    branches = inlines["items"]["oneOf"]
+    assert {"type": "string"} in branches
+    assert [set(branch.get("properties", ())) for branch in branches] == [
+        set(), {"text", "bold", "italic", "href"}, {"code"}, {"ref"}]
+
+
+def test_the_run_schema_nests_with_the_value_shape():
+    assert "oneOf" in _body_args("list")["items"]["items"]["items"]
+    assert "oneOf" in _body_args("quote")["paragraphs"]["items"]["items"]
+    assert "oneOf" in _body_args("table")["header"]["items"]["items"]
+    assert "oneOf" in _body_args("table")["rows"]["items"]["items"]["items"]
+
+
+def test_a_block_arg_holding_no_runs_keeps_its_plain_type():
+    assert _body_args("code")["source"] == {"type": "string"}
+    assert _body_args("table")["align"] == {"type": "array"}

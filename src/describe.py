@@ -11,7 +11,7 @@ from typing import Any
 
 from .commands import legal_commands
 from .model import Page
-from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY
+from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY, INLINE_RUNS, INLINE_RUN_GRID, INLINE_RUN_LISTS
 from .pagetypes.core.args import BlockKindSpec
 from .pagetypes.core.commands import (
     CommandSpec,
@@ -20,6 +20,31 @@ from .pagetypes.core.commands import (
     StatusTransitionCommand,
 )
 from .pagetypes.core.pagetype import PageType
+
+
+# One inline run, in the shapes the grammar accepts.
+_RUN_SCHEMA: dict[str, Any] = {"oneOf": [
+    {"type": "string"},
+    {"type": "object",
+     "properties": {"text": {"type": "string"}, "bold": {"type": "boolean"},
+                    "italic": {"type": "boolean"}, "href": {"type": "string"}},
+     "required": ["text"], "additionalProperties": False},
+    {"type": "object", "properties": {"code": {"type": "string"}},
+     "required": ["code"], "additionalProperties": False},
+    {"type": "object", "properties": {"ref": {"type": "string"}},
+     "required": ["ref"], "additionalProperties": False},
+]}
+
+
+def _array_of(items: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "array", "items": items}
+
+
+_RUN_SHAPE_SCHEMAS = {
+    INLINE_RUNS: _array_of(_RUN_SCHEMA),
+    INLINE_RUN_LISTS: _array_of(_array_of(_RUN_SCHEMA)),
+    INLINE_RUN_GRID: _array_of(_array_of(_array_of(_RUN_SCHEMA))),
+}
 
 
 def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
@@ -32,7 +57,8 @@ def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
         properties: dict[str, Any] = {"kind": {"const": block.kind}}
         required = ["kind"]
         for arg in block.body_args:
-            properties[arg.name] = {"type": arg.type}
+            properties[arg.name] = (_RUN_SHAPE_SCHEMAS[arg.content]
+                                    if arg.content in _RUN_SHAPE_SCHEMAS else {"type": arg.type})
             if arg.required:
                 required.append(arg.name)
         branches.append({"type": "object", "properties": properties,
