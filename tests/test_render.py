@@ -600,7 +600,7 @@ def test_render_page_web_escapes_inline_run_text_keeps_decoration():
     assert "**a*b**" in md_mcp and "`x_y`" in md_mcp
 
 
-def test_a_normalised_span_and_a_stray_backtick_render_on_both_paths():
+def test_a_normalized_span_and_a_stray_backtick_render_on_both_paths():
     factory = make_counter()
     page = create_page(BLOCKS, "Doc", None, factory)
     page = apply_command(page, BLOCKS, "addBody", {"blocks": [

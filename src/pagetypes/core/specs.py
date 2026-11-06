@@ -49,7 +49,7 @@ TITLE_ELEMENT_FIELDS = ("title", "name")
 #   - {"code": str}                                     - an inline code span;
 #   - {"ref": "<pageId>"}                               - a page reference (label render-derived).
 # Markdown syntax inside a text run is rejected - emphasis is expressed with a structured run. A
-# backtick code span is the exception: it is normalised into a code run before the grammar runs.
+# backtick code span is the exception: it is normalized into a code run before the grammar runs.
 INLINE_RUNS = "inline_runs"            # value: [run, ...]                       (a paragraph/heading body)
 INLINE_RUN_LISTS = "inline_run_lists"  # value: [[run, ...], ...]                (list items / quote paragraphs / table header cells)
 INLINE_RUN_GRID = "inline_run_grid"    # value: [[[run, ...], ...], ...]         (table rows of cells)
@@ -61,7 +61,7 @@ BLOCK_ARRAY = "block_array"            # value: [{"kind": <kind>, ...that kind's
 _ALIGN_VALUES = ("left", "center", "right", None)
 # Markdown emphasis/link tokens rejected inside a plain-text run. Kept deliberately narrow (bold/link
 # markers) so ordinary prose containing a lone `*` or `_` or even a file with double '__' is not
-# falsely rejected. A backtick is absent on purpose: a code span is normalised into a code run
+# falsely rejected. A backtick is absent on purpose: a code span is normalized into a code run
 # before this check, and a backtick that forms no span is literal text.
 _MARKDOWN_TOKENS = ("**", "](")
 

@@ -998,7 +998,7 @@ def test_markdown_inside_a_code_span_passes_and_outside_it_is_rejected():
         _ = _added_paragraph("`x` and **y**")
 
 
-def test_an_element_scoped_add_normalises_too():
+def test_an_element_scoped_add_normalizes_too():
     factory = make_counter()
     page, item_id = new_item(factory)
     page = apply_command(page, ELEMENT_BLOCKS, "addItemDetail", {
@@ -1007,7 +1007,7 @@ def test_an_element_scoped_add_normalises_too():
     assert items_of(page)[0]["detail"][0]["inlines"] == [{"code": "x"}]
 
 
-def test_normalising_leaves_the_callers_args_as_sent():
+def test_normalizing_leaves_the_callers_args_as_sent():
     factory = make_counter()
     args = {"blocks": [{"kind": "paragraph", "inlines": ["`x`"]}]}
     _ = apply_command(_unified_page(factory), UNIFIED, "addBody", args, factory)
@@ -1072,7 +1072,7 @@ def test_an_add_creates_an_element_with_its_blocks():
     assert len(set(ids)) == 3 and element["id"] not in ids
 
 
-def test_an_add_that_creates_an_element_normalises_its_blocks():
+def test_an_add_that_creates_an_element_normalizes_its_blocks():
     factory = make_counter()
     page = create_page(ELEMENT_BLOCKS, "A fixture", None, factory)
     added = apply_command(page, ELEMENT_BLOCKS, "addItem", {

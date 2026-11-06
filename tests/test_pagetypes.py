@@ -546,12 +546,12 @@ _SPAN, _CODE = ["`x`"], [{"code": "x"}]
     (["plain", {"text": "plain"}, {"code": "`x`"}, {"ref": "page:1"}],
      ["plain", {"text": "plain"}, {"code": "`x`"}, {"ref": "page:1"}]),
 ])
-def test_a_code_span_is_normalised_into_a_code_run(sent, stored):
+def test_a_code_span_is_normalized_into_a_code_run(sent, stored):
     assert normalize_arg_value(_RUNS_ARG, sent) == stored
     assert normalize_arg_value(_RUNS_ARG, stored) == stored      # idempotent
 
 
-def test_normalising_reaches_every_run_shape():
+def test_normalizing_reaches_every_run_shape():
     assert normalize_arg_value(_array("items", content=INLINE_RUN_LISTS), [_SPAN]) == [_CODE]
     assert normalize_arg_value(_array("rows", content=INLINE_RUN_GRID), [[_SPAN]]) == [[_CODE]]
     blocks = _array("blocks", content=BLOCK_ARRAY, block_kinds=standard_blocks())
@@ -564,7 +564,7 @@ def test_normalising_reaches_every_run_shape():
     ]
 
 
-def test_normalising_leaves_an_arg_holding_no_runs_alone():
+def test_normalizing_leaves_an_arg_holding_no_runs_alone():
     blocks = _array("blocks", content=BLOCK_ARRAY, block_kinds=(_code_block(), _paragraph_text()))
     sent = [{"kind": "code", "language": "md", "source": "`x`"},
             {"kind": "paragraph", "text": "`x`"}]
@@ -572,7 +572,7 @@ def test_normalising_leaves_an_arg_holding_no_runs_alone():
     assert normalize_arg_value(_text(), "`x`") == "`x`"
 
 
-def test_normalising_returns_a_malformed_value_for_the_grammar_to_reject():
+def test_normalizing_returns_a_malformed_value_for_the_grammar_to_reject():
     lists = _array("items", content=INLINE_RUN_LISTS)
     grid = _array("rows", content=INLINE_RUN_GRID)
     blocks = _array("blocks", content=BLOCK_ARRAY, block_kinds=standard_blocks())

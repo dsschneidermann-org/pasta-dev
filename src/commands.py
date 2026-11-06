@@ -346,7 +346,7 @@ def _apply(
     id_factory: IdFactory,
     batch_context: BatchContext | None = None,
 ) -> tuple[str | None, list[str]]:
-    """Normalise and validate one command's args, check its legality, then apply it, returning (the
+    """Normalize and validate one command's args, check its legality, then apply it, returning (the
     id reported positionally, every id it created). A compound applies each of its steps through this
     same path.
 
