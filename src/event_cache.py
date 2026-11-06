@@ -47,14 +47,13 @@ class EventCache:
                          if entry.is_live(now)}
         self._entries[(workspace_id, page_id, event)] = _Entry(now, ttl_seconds)
 
-    def is_due(self, workspace_id: str, page_id: str, event: str, now: float, *,
-               force: bool = False) -> bool:
-        """Whether `event` should happen on a page: `force`, or no live record of it. Never while
-        the cache is off, because an empty cache would otherwise read as everything being due."""
+    def is_due(self, workspace_id: str, page_id: str, event: str, now: float) -> bool:
+        """Whether `event` should happen on a page: no live record of it. Never while the cache is
+        off, because an empty cache would otherwise read as everything being due."""
         if not _enabled():
             return False
         entry = self._entries.get((workspace_id, page_id, event))
-        return force or entry is None or not entry.is_live(now)
+        return entry is None or not entry.is_live(now)
 
 
 page_events = EventCache()

@@ -523,11 +523,11 @@ async def mutatePageBatch(
     with _guard_tool():
         result = STORE.mutate_page_batch(workspaceId, pageId, commands)
         page = result.page
-        emit_in_full = page_events.is_due(workspaceId, pageId, GUIDANCE_EMITTED, time.monotonic(),
-                                          force=result.transitioned)
+        emit_in_full = page_events.is_due(workspaceId, pageId, GUIDANCE_EMITTED,
+                                          time.monotonic()) or result.transitioned
         next_actions = STORE.next_actions(
             workspaceId, pageId, omit_populated_instructions=not emit_in_full,
-            omit_stage_guidance=not (emit_in_full or result.transitioned))
+            omit_stage_guidance=not emit_in_full)
         if emit_in_full:
             _record_guidance_emitted(workspaceId, pageId)
         await ws_reloader.refresh()

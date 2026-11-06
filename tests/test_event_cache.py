@@ -33,10 +33,6 @@ def test_an_event_past_its_ttl_is_due():
     assert _cache_with_event().is_due("ws:1", "page", "event", 400.1)
 
 
-def test_force_makes_a_live_event_due():
-    assert _cache_with_event().is_due("ws:1", "page", "event", 100.0, force=True)
-
-
 def test_recording_again_restarts_the_ttl():
     cache = _cache_with_event()
     cache.record("ws:1", "page", "event", 350.0, 300.0)
@@ -80,7 +76,6 @@ def _assert_switch(monkeypatch, setting, on):
     cache = _cache_with_event()
     assert bool(cache._entries) is on
     assert cache.is_due("ws:1", "other", "event", 100.0) is on          # a miss
-    assert cache.is_due("ws:1", "page", "event", 100.0, force=True) is on
 
 
 @pytest.mark.parametrize("setting, on", [(None, False), ("0", False), ("1", True)])

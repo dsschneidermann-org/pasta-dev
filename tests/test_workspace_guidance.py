@@ -445,9 +445,9 @@ def test_a_rejected_batch_records_nothing(mcp, event_cache):
     assert _guidance_is_due(event_cache, wid, pid)
 
 
-def test_a_transition_with_the_cache_off_still_drops_populated_instructions(mcp):
+def test_a_transition_with_the_cache_off_carries_populated_instructions(mcp):
     wid, pid = _building_lifecycle(mcp)
-    assert "instruction" not in _setter(_reopen_planning(mcp, wid, pid), "addPart")
+    assert _setter(_reopen_planning(mcp, wid, pid), "addPart")["instruction"]
 
 
 def test_the_cache_stays_empty_in_test_mode(mcp, monkeypatch):
