@@ -499,7 +499,46 @@ def test_validate_inline_runs_rejects_markdown_in_a_text_run():
     with pytest.raises(ValidationError):
         validate_inline_content(INLINE_RUNS, ["**bold**"])            # bare string
     with pytest.raises(ValidationError):
-        validate_inline_content(INLINE_RUNS, [{"text": "a `code` b"}])  # inside a text run
+        validate_inline_content(INLINE_RUNS, [{"text": "a **bold** b"}])  # inside a text run
+
+
+@pytest.mark.parametrize("text", ["say `now` please", "`a` and `b`"])
+def test_balanced_backticks_are_allowed_in_a_text_run(text):
+    validate_inline_content(INLINE_RUNS, [
+        text,
+        {"text": text},
+        {"text": text, "bold": True},
+        {"text": text, "href": "https://x"},
+    ])
+
+
+@pytest.mark.parametrize("text", ["a stray ` here", "`a` and ` b"])
+def test_unbalanced_backticks_are_rejected_in_a_text_run(text):
+    for run in (text, {"text": text}, {"text": text, "bold": True}):
+        with pytest.raises(ValidationError, match="Unbalanced backticks"):
+            validate_inline_content(INLINE_RUNS, [run])
+
+
+@pytest.mark.parametrize("text", ["``doubled``", "```", "```\nfence\n```", "``````"])
+def test_adjacent_backticks_are_rejected_in_a_text_run(text):
+    for run in (text, {"text": text}, {"text": text, "bold": True}):
+        with pytest.raises(ValidationError, match="Adjacent backticks"):
+            validate_inline_content(INLINE_RUNS, [run])
+
+
+def test_backticks_balance_within_a_run_not_across_runs():
+    with pytest.raises(ValidationError, match="Unbalanced backticks"):
+        validate_inline_content(INLINE_RUNS, ["say `", {"text": "now`", "bold": True}])
+
+
+@pytest.mark.parametrize("text", ["`**kwargs`", "`[a](b)`"])
+def test_markdown_tokens_stay_rejected_between_backticks(text):
+    with pytest.raises(ValidationError, match="Markdown syntax"):
+        validate_inline_content(INLINE_RUNS, [text])
+
+
+def test_a_code_run_is_not_checked_for_balance():
+    validate_inline_content(INLINE_RUNS, [{"code": "x`y"}, {"code": "```"}])
 
 
 def test_validate_inline_runs_rejects_malformed_runs():

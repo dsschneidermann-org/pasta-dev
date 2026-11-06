@@ -1177,6 +1177,55 @@ def test_element_scoped_blocks_still_enforce_the_inline_grammar():
                           {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["a **bold** word"]}]}, factory)
 
 
+def test_balanced_backticks_are_stored_as_sent_at_every_block_depth():
+    factory = make_counter()
+    page = _unified_page(factory)
+    text = "say `now` please"
+    marked = {"text": text, "bold": True}
+    added = apply_command(page, UNIFIED, "addBody", {"blocks": [
+        {"kind": "paragraph", "inlines": [text]},
+        {"kind": "heading", "level": 2, "inlines": [marked]},
+        {"kind": "list", "ordered": False, "items": [[text]]},
+        {"kind": "quote", "paragraphs": [[text]]},
+        {"kind": "table", "header": [[text]], "rows": [[[text]]]},
+    ]}, factory)
+    paragraph, heading, bullets, quote, table = _body(added.page)
+    assert paragraph["inlines"] == [text]
+    assert heading["inlines"] == [marked]
+    assert bullets["items"] == [[text]]
+    assert quote["paragraphs"] == [[text]]
+    assert table["header"] == [[text]] and table["rows"] == [[[text]]]
+
+
+def test_unbalanced_backticks_abort_the_write():
+    factory = make_counter()
+    page = _unified_page(factory)
+    with pytest.raises(ValidationError, match="Unbalanced backticks"):
+        _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
+            {"kind": "table", "header": [["A"]], "rows": [[["a stray ` cell"]]]}]}, factory)
+
+
+def test_a_fence_in_a_text_run_aborts_the_write():
+    factory = make_counter()
+    page = _unified_page(factory)
+    with pytest.raises(ValidationError, match="Adjacent backticks"):
+        _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
+            {"kind": "paragraph", "inlines": ["```\nx = 1\n```"]}]}, factory)
+
+
+def test_element_scoped_blocks_follow_the_backtick_rule():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItemDetail", {
+        "itemId": item_id,
+        "blocks": [{"kind": "paragraph", "inlines": ["say `now` please"]}]}, factory)
+    assert items_of(added.page)[0]["detail"][0]["inlines"] == ["say `now` please"]
+    with pytest.raises(ValidationError, match="Unbalanced backticks"):
+        _ = apply_command(page, ELEMENT_BLOCKS, "addItemDetail", {
+            "itemId": item_id,
+            "blocks": [{"kind": "paragraph", "inlines": ["a stray ` here"]}]}, factory)
+
+
 def test_element_block_commands_are_locked_once_ready():
     factory = make_counter()
     page, item_id = new_item(factory)
@@ -1312,7 +1361,7 @@ def test_every_declared_content_shape_is_checked_through_the_array_path():
             {"kind": "list", "ordered": True, "items": [["a **bold** item"]]}]}, factory)
     with pytest.raises(ValidationError, match="Markdown syntax"):
         _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
-            {"kind": "table", "header": [["A"]], "rows": [[["a `code` cell"]]]}]}, factory)
+            {"kind": "table", "header": [["A"]], "rows": [[["a **bold** cell"]]]}]}, factory)
     # The same rules on an element-scoped add, since every block path runs one validator.
     element_page, item_id = new_item(factory)
     with pytest.raises(ValidationError, match="Markdown syntax"):
