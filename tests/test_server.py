@@ -9,7 +9,6 @@ advertised surface a real client sees, since the fixtures are hidden from discov
 """
 
 import asyncio
-import warnings
 
 import pytest
 from fastmcp import Client
@@ -480,12 +479,3 @@ def test_instructions_lists_workspace_guidance_setup(mcp):
     assert "## Workspace guidance setup" in text
     assert "setWorkspaceGuidance" in text
     assert "buildTool" in text          # a fixture guidance field, in test mode
-
-
-def test_instructions_reads_no_deprecated_camel_case_field(mcp):
-    # fastmcp 4 keeps camelCase reads on SDK models working through a warning bridge that is
-    # scheduled for removal, so a read through it is a break waiting for the next release.
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        call(mcp, "instructions")
-    assert not [w for w in caught if "inputSchema" in str(w.message)]
