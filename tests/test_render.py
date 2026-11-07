@@ -496,7 +496,7 @@ def test_render_non_fsm_list_has_no_checkbox():
 # ============================================================================
 # plain-text markdown escaping on the web render path (escape_plain_text)
 # ============================================================================
-_MD2HTML = Wenmode(github)   # same preset the web routes use
+_MD2HTML = Wenmode(github())   # same preset the web routes use
 
 
 def _web_ctx(titles=None):

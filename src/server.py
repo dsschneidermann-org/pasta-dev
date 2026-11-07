@@ -355,7 +355,7 @@ def _guard_tool() -> Generator[None]:
 @mcp.tool
 async def instructions() -> str:
     """Retrieve instructions for pasta MCP."""
-    tools = [(tool.name, tool.to_mcp_tool().inputSchema) for tool in await mcp.list_tools()]
+    tools = [(tool.name, tool.to_mcp_tool().input_schema) for tool in await mcp.list_tools()]
     return render_instructions(tools, sorted(workspace_guidance_fields()))
 
 

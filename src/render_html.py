@@ -24,7 +24,7 @@ from .pagetypes._registry import is_auto_child_type
 from .render import RefContext, checkbox_state, render_blocks
 
 # The one Markdown-to-HTML engine, defined here because this is where HTML is produced.
-md2html = Wenmode(github)
+md2html = Wenmode(github())
 
 
 # Shown for an empty field, so a page's shape is visible before it is filled.
