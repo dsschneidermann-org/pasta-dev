@@ -1,8 +1,8 @@
 """Sphinx configuration for the pasta MCP server documentation site.
 
 Builds an HTML site. The page-type pages render each status finite-state machine as
-a Mermaid diagram via ``sphinxcontrib.mermaid``, driven by python-statemachine's
-``statemachine-diagram`` directive (``:format: mermaid``).
+a Mermaid diagram via `sphinxcontrib.mermaid`, driven by python-statemachine's
+`statemachine-diagram` directive (`:format: mermaid`).
 """
 
 import builtins
