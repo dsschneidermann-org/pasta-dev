@@ -21,9 +21,9 @@ finder so ``src.server`` and its submodules load as reactive modules that
 re-execute in place when their files change, propagating along the dependency graph.
 
 Two brittleness notes (dev-only tool):
-* It reaches into a few private fastmcp internals (``base_app.providers`` /
-  ``FastMCPProvider`` for mount/unmount, ``base_app._mcp_server.run`` for session
-  capture). These changed across fastmcp versions; revisit on a fastmcp upgrade.
+* It reaches into a few private fastmcp/mcp internals (``base_app.providers`` /
+  ``FastMCPProvider`` for mount/unmount, ``mcp.server.connection.Connection.__init__``
+  for connection capture). These changed across fastmcp versions; revisit on a fastmcp upgrade.
 * ``src.server`` and ``src.cleanup`` must be imported ONLY through the
   reloader's finder (never at module top level), or the hot reload silently becomes
   a no-op.
@@ -35,6 +35,7 @@ import asyncio
 import logging
 import traceback
 from asyncio import Event, Lock, TaskGroup
+from collections.abc import Callable
 from contextlib import asynccontextmanager, suppress
 from importlib import import_module
 from pathlib import Path
@@ -45,7 +46,7 @@ from weakref import WeakSet
 import uvicorn
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
-from mcp.server.session import ServerSession
+from mcp.server.connection import Connection
 from reactivity import async_effect, derived  # pyright: ignore[reportMissingTypeStubs]
 from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter  # pyright: ignore[reportMissingTypeStubs]
 from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks  # pyright: ignore[reportMissingTypeStubs]
@@ -95,33 +96,53 @@ class _LoggingErrorFilter(ErrorFilter):
         return super().__exit__(exc_type, exc_value, traceback_)  # pyright: ignore[reportArgumentType]
 
 
-# --- MCP session capture ---------------------------------------------------------------
-# So we can push tools/list_changed to live sessions on reload, we briefly wrap
-# ServerSession.__init__ to record each newly created session. Adapted from mcp-hmr.
-_active_sessions: WeakSet[ServerSession] = WeakSet()
-_pending_session_patches = 0
+# --- MCP connection capture ------------------------------------------------------------
+# So we can push tools/list_changed to live clients on reload, every Connection the SDK builds is
+# recorded. A Connection is the per-client object that outlives its requests; one with no
+# standalone stream has nowhere to deliver a notification, and the SDK drops it there.
+_live_connections: WeakSet[Connection] = WeakSet()
 
 
-def _patch_session_init():
-    """Wrap ServerSession.__init__ to capture the next new session, then self-restore."""
-    global _pending_session_patches
-    _pending_session_patches += 1
-    original_init = ServerSession.__init__
+def _capture_connections() -> Callable[[], None]:
+    """Record every Connection the SDK builds from now on; return the function that stops it."""
+    original_init = Connection.__init__
 
-    def capture_init(self: ServerSession, *args: Any, **kwargs: Any):
+    def capture_init(self: Connection, *args: Any, **kwargs: Any) -> None:
         original_init(self, *args, **kwargs)
-        _active_sessions.add(self)
-        global _pending_session_patches
-        _pending_session_patches -= 1
-        _unpatch()
+        _live_connections.add(self)
 
-    ServerSession.__init__ = capture_init
+    Connection.__init__ = capture_init
 
-    def _unpatch():
-        if _pending_session_patches < 1:
-            ServerSession.__init__ = original_init
+    def restore() -> None:
+        Connection.__init__ = original_init
 
-    return _unpatch
+    return restore
+
+
+async def _notify_list_changed() -> None:
+    """Tell every live client connection its tool, resource and prompt lists may have changed."""
+    for connection in list(_live_connections):
+        for send in (
+            connection.send_tool_list_changed,
+            connection.send_resource_list_changed,
+            connection.send_prompt_list_changed,
+        ):
+            with suppress(Exception):
+                await send()
+
+
+# Mounting forwards live calls to `mcp`; each mount appends one FastMCPProvider to
+# base_app.providers, an internal we pop to unmount on the next reload.
+def _mount(base_app: FastMCP, mcp: FastMCP) -> Callable[[], None]:
+    """Mount `mcp` under the proxy; return the function that unmounts it again."""
+    base_app.mount(mcp)
+    mounted_provider = base_app.providers[-1]
+
+    def unmount() -> None:
+        if mounted_provider in base_app.providers:
+            base_app.providers.remove(mounted_provider)
+
+    return unmount
 
 
 def build_dev_app() -> Starlette:
@@ -129,18 +150,6 @@ def build_dev_app() -> Starlette:
 
     # The proxy is built ONCE and never rebuilt; only what is mounted under it swaps.
     base_app: FastMCP = FastMCP(name="pasta-hmr-proxy")
-
-    # Capture each new client session created while the proxy's low-level server runs.
-    _original_run = base_app._mcp_server.run
-
-    async def _run_with_session_capture(*args: Any, **kwargs: Any):
-        unpatch = _patch_session_init()
-        try:
-            await _original_run(*args, **kwargs)
-        finally:
-            unpatch()
-
-    base_app._mcp_server.run = _run_with_session_capture
 
     # Reactive handles on the reloaded module's two entrypoints. Reading either inside a
     # reactive computation subscribes it to reloads of src.server (and its deps).
@@ -152,28 +161,6 @@ def build_dev_app() -> Starlette:
     def current_fastapi():
         return import_module(TARGET_MODULE).app
 
-    # Mounting forwards live calls to `mcp`; each mount appends one FastMCPProvider to
-    # base_app.providers (a fastmcp 3.4.x internal we pop to unmount on the next reload).
-    def mount_mcp(mcp: FastMCP):
-        base_app.mount(mcp)
-        mounted_provider = base_app.providers[-1]
-
-        def unmount():
-            if mounted_provider in base_app.providers:
-                base_app.providers.remove(mounted_provider)
-
-        return unmount
-
-    async def notify_sessions():
-        for session in list(_active_sessions):
-            for send in (
-                session.send_tool_list_changed,
-                session.send_resource_list_changed,
-                session.send_prompt_list_changed,
-            ):
-                with suppress(Exception):
-                    await send()
-
     # Only one mount is live at a time; a reload tears the old one down before mounting new.
     mount_lock = Lock()
     task_group: TaskGroup | None = None
@@ -182,9 +169,9 @@ def build_dev_app() -> Starlette:
 
     async def serve_mcp(mcp: FastMCP, stop: Event, finish: Event):
         async with mount_lock:
-            unmount = mount_mcp(mcp)
+            unmount = _mount(base_app, mcp)
             try:
-                await notify_sessions()  # tell live sessions the tool set may have changed
+                await _notify_list_changed()  # tell live clients the tool set may have changed
                 _ = await stop.wait()
             finally:
                 unmount()
@@ -243,6 +230,7 @@ def build_dev_app() -> Starlette:
     @asynccontextmanager
     async def reloader_lifespan(_app: Starlette):
         nonlocal task_group
+        restore_connection_init = _capture_connections()
         call_pre_reload_hooks()
         async with TaskGroup() as tg:
             task_group = tg
@@ -261,6 +249,7 @@ def build_dev_app() -> Starlette:
                 if stop_event is not None:
                     stop_event.set()
                 _ = watch_task.cancel()
+                restore_connection_init()
 
     # The FastAPI app object last served; a reload swaps in a new one (see below).
     last_fastapi_app: object = None

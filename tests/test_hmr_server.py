@@ -1,16 +1,22 @@
-"""Unit tests for the dev server's reload-failure reporting (src.hmr_server).
+"""Unit tests for the dev server (src.hmr_server): reload-failure reporting, and the framework
+internals the reload swap relies on.
 
-Only the reporting is covered here. The reload machinery itself needs a live uvicorn process, a
-file watcher and a real edit, so it is exercised by hand against the running dev server rather
-than in this suite; what is pinned here is the part that regressed silently - a failed re-exec
-that left no usable trace in the console.
+The reload machinery as a whole needs a live uvicorn process, a file watcher and a real edit, so it
+is exercised by hand against the running dev server rather than in this suite. What is pinned here
+is what regressed silently: a failed re-exec that left no usable trace in the console, and the
+fastmcp/mcp internals behind the mount swap and the list_changed notification, which a framework
+upgrade can move without any error.
 """
 
+import asyncio
 import logging
 
 import pytest
+from fastmcp import FastMCP
+from mcp.server.connection import Connection
 
-from src.hmr_server import _LoggingErrorFilter
+import src.hmr_server as hmr_server
+from src.hmr_server import _LoggingErrorFilter, _mount
 
 
 @pytest.fixture
@@ -58,3 +64,82 @@ def test_a_clean_reload_reports_nothing(caplog):
         with _LoggingErrorFilter():
             pass
     assert caplog.text == ""
+
+
+def test_a_mounted_server_is_served_through_the_proxy_until_unmounted():
+    # The reload swap leans on a fastmcp internal: mount() appends one provider to the proxy's
+    # `providers`, and removing that provider unmounts it. An upgrade that moves this fails here
+    # rather than leaving the dev server serving a stale or doubled tool set.
+    proxy, child = FastMCP("proxy"), FastMCP("child")
+
+    @child.tool
+    def ping() -> str:
+        return "pong"
+
+    async def tool_names() -> set[str]:
+        return {tool.name for tool in await proxy.list_tools()}
+
+    unmount = _mount(proxy, child)
+    assert "ping" in asyncio.run(tool_names())
+    unmount()
+    assert "ping" not in asyncio.run(tool_names())
+
+
+class _RecordingOutbound:
+    """Stands in for a client's standalone stream, recording each notification sent down it."""
+
+    def __init__(self):
+        self.sent: list[str] = []
+
+    async def notify(self, method, params, opts=None):
+        self.sent.append(method)
+
+    async def send_raw_request(self, method, params, opts=None):
+        raise AssertionError("a reload sends notifications, never requests")
+
+
+class _BrokenOutbound(_RecordingOutbound):
+    async def notify(self, method, params, opts=None):
+        raise RuntimeError("stream gone")
+
+
+@pytest.fixture
+def capturing():
+    restore = hmr_server._capture_connections()
+    try:
+        yield
+    finally:
+        restore()
+        hmr_server._live_connections.clear()
+
+
+def test_a_connection_built_while_capturing_is_recorded(capturing):
+    connection = Connection.for_loop(_RecordingOutbound())
+    assert connection in hmr_server._live_connections
+
+
+def test_a_connection_built_after_capture_stops_is_not_recorded():
+    hmr_server._capture_connections()()
+    connection = Connection.for_loop(_RecordingOutbound())
+    assert connection not in hmr_server._live_connections
+
+
+def test_a_reload_tells_each_live_connection_every_list_may_have_changed(capturing):
+    outbound = _RecordingOutbound()
+    connection = Connection.for_loop(outbound)  # held, so the weak set keeps it
+    asyncio.run(hmr_server._notify_list_changed())
+    assert connection in hmr_server._live_connections
+    assert outbound.sent == ["notifications/tools/list_changed",
+                             "notifications/resources/list_changed",
+                             "notifications/prompts/list_changed"]
+
+
+def test_one_broken_connection_does_not_stop_the_others_hearing_of_a_reload(capturing):
+    # A client that vanished mid-reload must not cost every other client its refresh.
+    broken, healthy = _BrokenOutbound(), _RecordingOutbound()
+    connections = [Connection.for_loop(broken), Connection.for_loop(healthy)]
+    asyncio.run(hmr_server._notify_list_changed())
+    assert len(connections) == 2
+    assert healthy.sent == ["notifications/tools/list_changed",
+                            "notifications/resources/list_changed",
+                            "notifications/prompts/list_changed"]
