@@ -243,6 +243,7 @@ def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
 
     parent_strip, child_strip = strip(parent.id), strip(child.id)
     assert parent_strip.endswith('<a href="#section-children">Child pages</a>' +
+                                 '<a href="#footer">Bottom</a>' +
                                  f'<a href="/{workspace.id}/page/{child.id}">Child fixture{link_mark}</a>')
     assert f"Parent{link_mark}" not in parent_strip
     assert child_strip.startswith('<nav class="page-contents" aria-label="Sections">' +

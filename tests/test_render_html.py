@@ -358,6 +358,7 @@ def test_contents_strip_links_pinned_children_after_the_child_pages_anchor():
     nav = _nav(render_page_html(page, LIFECYCLE, _tree_context()))
     assert nav.endswith('<a href="#section-references">References</a>' +
                         '<a href="#section-children">Child pages</a>' +
+                        '<a href="#footer">Bottom</a>' +
                         f'<a href="/ws:demo/page/c:1">Plan &lt;one&gt;{_LINK_MARK}</a>' +
                         f'<a href="/ws:demo/page/c:2">Spec{_LINK_MARK}</a></nav>')
 
@@ -367,6 +368,7 @@ def test_contents_strip_names_only_the_pinned_children():
                 child_ids=["c:1", "f:1"])
     nav = _nav(render_page_html(page, LIFECYCLE, _tree_context()))
     assert nav.endswith('<a href="#section-children">Child pages</a>' +
+                        '<a href="#footer">Bottom</a>' +
                         f'<a href="/ws:demo/page/c:1">Plan &lt;one&gt;{_LINK_MARK}</a></nav>')
     assert "page/f:1" not in nav                                       # unpinned: not named
 
@@ -379,6 +381,13 @@ def test_contents_strip_keeps_the_child_pages_anchor_without_pinned_children():
     childless = Page(id="p:2", type="test-lifecycle", title="Empty", status="draft")
     assert '<a href="#section-children">Child pages</a>' in _nav(
         render_page_html(childless, LIFECYCLE, _tree_context()))
+
+
+def test_contents_strip_ends_its_anchors_with_bottom_when_nothing_is_pinned():
+    page = Page(id="x:1", type="test-fields", title="Plain", status="active", child_ids=["f:1"])
+    nav = _nav(render_page_html(page, FIELDS, _tree_context()))
+    assert nav.endswith('<a href="#section-children">Child pages</a>' +
+                        '<a href="#footer">Bottom</a></nav>')
 
 
 def test_contents_strip_pinned_child_links_keep_the_archived_view():
@@ -424,7 +433,8 @@ def test_contents_strip_without_a_context_keeps_todays_links():
     nav = _nav(render_page_html(page, LIFECYCLE, None))
     assert f"Parent{_LINK_MARK}" not in nav
     assert nav.endswith('<a href="#section-references">References</a>' +
-                        '<a href="#section-children">Child pages</a></nav>')
+                        '<a href="#section-children">Child pages</a>' +
+                        '<a href="#footer">Bottom</a></nav>')
 
 
 def test_render_page_html_escapes_the_page_title():
@@ -484,6 +494,7 @@ def test_render_page_html_toc_is_its_child_list_alone():
     assert "section-references" not in out
     assert "section-children" not in out
     assert "page-contents" not in out
+    assert 'href="#footer"' not in out
 
 
 # --- block-bearing element fields --------------------------------------------
