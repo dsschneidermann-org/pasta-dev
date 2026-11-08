@@ -8,6 +8,8 @@ type (architecture): the toggle points at that page type's generated Sphinx doc,
 production types are documentable - a fixture has no doc to link to.
 """
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -248,6 +250,36 @@ def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
     assert f"Parent{link_mark}" not in parent_strip
     assert child_strip.startswith('<nav class="page-contents" aria-label="Sections">' +
                                   f'<a href="/{workspace.id}/page/{parent.id}">Parent{link_mark}</a>')
+
+
+_TOP_LINK = '<a id="to-top" href="#top">'
+
+
+def test_every_view_carries_the_floating_top_link(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    for path in ("/", f"/{workspace.id}", f"/{workspace.id}/page/{page.id}"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert _TOP_LINK in response.text
+
+
+def test_the_refusal_page_carries_the_floating_top_link(client, invalid_declarations):
+    response = client.get("/")
+    assert response.status_code == 503
+    assert _TOP_LINK in response.text
+
+
+def test_top_link_style_takes_every_colour_from_both_water_css_sheets(client):
+    # Literal colours read correctly in one theme only; both sheets must define each variable.
+    rules = "".join(re.findall(r"#to-top(?::hover)?\s*\{([^}]*)\}", client.get("/static/styles.css").text))
+    assert "position: fixed" in rules
+    colours = re.findall(r"(?:^|[;\s])(?:color|background|border)\s*:\s*([^;]+);", rules)
+    assert colours and all("var(--" in value for value in colours)
+    names = {name for value in colours for name in re.findall(r"var\((--[a-z-]+)\)", value)}
+    for theme in ("light", "dark"):
+        sheet = client.get(f"/static/water.css/{theme}.min.css").text
+        assert all(f"{name}:" in sheet for name in names)
 
 
 # --- Declaration quarantine --------------------------------------------------
