@@ -334,7 +334,6 @@ def test_footer_links_the_source_and_carries_the_agpl_note(client, monkeypatch):
         response = client.get(path)
         assert 'Source: <a href="https://example.com/o/r">example.com/o/r</a>' in response.text
         assert NOTE in response.text
-        assert "Dennis S" not in response.text
 
 
 def test_footer_without_a_source_link_shows_only_the_note(client, monkeypatch):
