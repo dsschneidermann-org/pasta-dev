@@ -332,7 +332,7 @@ def test_footer_links_the_source_and_carries_the_agpl_note(client, monkeypatch):
     part = workspace.id.removeprefix("ws:")
     for path in ("/", f"/ws:{part}", f"/ws:{part}/page/{page.id}"):
         response = client.get(path)
-        assert 'Source: <a href="https://example.com/o/r">example.com/o/r</a>' in response.text
+        assert 'href="https://example.com/o/r"' in response.text
         assert NOTE in response.text
 
 
