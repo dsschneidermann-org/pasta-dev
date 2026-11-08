@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 import asyncio
 from contextlib import contextmanager, asynccontextmanager
-from typing import Any
+from typing import Annotated, Any, override
 from collections.abc import Generator
+import time
 import traceback
 
 from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
@@ -15,11 +16,16 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
-from fastmcp.server.middleware import Middleware, MiddlewareContext
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
+from fastmcp.tools import ToolResult
+import mcp.types as mt
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
+from .event_cache import page_events
 from .hmr_live_refresh import ws_reloader
 from .instructions import render_instructions
 from .pagetypes._registry import (
@@ -41,6 +47,15 @@ validate_registry()
 
 DATA_DIR = os.environ.get("PASTA_DATA_DIR", ".pasta-data")
 STORE = Store(DATA_DIR)
+
+# The event behind a write's full `next`, and how long one full delivery stays fresh.
+GUIDANCE_EMITTED = "guidanceEmitted"
+GUIDANCE_TTL_SECONDS = 300.0
+
+
+def _record_guidance_emitted(workspace_id: str, page_id: str) -> None:
+    page_events.record(workspace_id, page_id, GUIDANCE_EMITTED, time.monotonic(),
+                       GUIDANCE_TTL_SECONDS)
 
 
 @asynccontextmanager
@@ -75,7 +90,7 @@ templates = Jinja2Templates(directory="src/templates")
 # Registered ahead of `add_no_cache_headers` so that one stays the outer middleware and stamps this
 # response too, since a cached refusal would outlive the fix.
 @app.middleware("http")
-async def refuse_invalid_declarations(request: Request, call_next):
+async def refuse_invalid_declarations(request: Request, call_next: RequestResponseEndpoint) -> Response:
     errors = declaration_errors()
     # The refusal page renders with the stylesheet and theme assets served from /static.
     if errors is None or request.url.path.startswith("/static"):
@@ -101,7 +116,7 @@ async def refuse_invalid_declarations(request: Request, call_next):
 # per-route responses alone wouldn't cover those. CSS stylesheet is excepted.
 # BaseHTTPMiddleware only sees HTTP scopes, the /ws/reloader websocket passes through.
 @app.middleware("http")
-async def add_no_cache_headers(request: Request, call_next):
+async def add_no_cache_headers(request: Request, call_next: RequestResponseEndpoint) -> Response:
     response = await call_next(request)
     if not request.url.path.endswith(".css"):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -157,7 +172,7 @@ async def route_index(request: Request, archived: str | None = None):
 
 
 @app.get("/ws:{workspaceIdPart}", response_class=HTMLResponse)
-async def route_tree(request: Request, workspaceIdPart: str, archived: str | None = None, markdown: str | None = None):
+async def route_tree(request: Request, workspaceIdPart: str, archived: str | None = None):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
@@ -220,7 +235,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
 async def route_archive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.archive_page(workspace_id, pageId)
+        _ = STORE.archive_page(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -229,7 +244,7 @@ async def route_archive_page(workspaceIdPart: str, pageId: str):
 async def route_unarchive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.unarchive_page(workspace_id, pageId)
+        _ = STORE.unarchive_page(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -242,7 +257,7 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
 async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.schedule_page_deletion(workspace_id, pageId)
+        _ = STORE.schedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -251,7 +266,7 @@ async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
 async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.unschedule_page_deletion(workspace_id, pageId)
+        _ = STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -261,10 +276,10 @@ async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
 # can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
 # routes it fires the live-reload refresh and 202s (no MCP equivalent - a browser can't call MCP).
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
-async def route_set_page_status(workspaceIdPart: str, pageId: str, status: str = Form(...)):
+async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annotated[str, Form()]):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
-        STORE.set_page_status(workspace_id, pageId, status)
+        _ = STORE.set_page_status(workspace_id, pageId, status)
         await ws_reloader.refresh()
         return PlainTextResponse(status_code=202)
 
@@ -304,7 +319,12 @@ class _RefuseInvalidDeclarations(Middleware):
     nowhere else to learn why the server stopped answering.
     """
 
-    async def on_call_tool(self, context: MiddlewareContext, call_next):
+    @override
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
         errors = declaration_errors()
         if errors is None:
             return await call_next(context)
@@ -313,9 +333,9 @@ class _RefuseInvalidDeclarations(Middleware):
         # traceback behind these errors, which the aggregated message deliberately does not carry.
         from ._hmr_debug import LOG_PATH
         raise ToolError(
-            "The page-type declarations are invalid, so this server is refusing to serve rather "
-            f"than answer out of them:\n{errors}\n"
-            f"The full reload traceback is at {LOG_PATH}.\n"
+            "The page-type declarations are invalid, so this server is refusing to serve rather " +
+            f"than answer out of them:\n{errors}\n" +
+            f"The full reload traceback is at {LOG_PATH}.\n" +
             "Fix the declaration and save; the reload restores the tools.")
 
 
@@ -335,7 +355,7 @@ def _guard_tool() -> Generator[None]:
 @mcp.tool
 async def instructions() -> str:
     """Retrieve instructions for pasta MCP."""
-    tools = [(tool.name, tool.to_mcp_tool().inputSchema) for tool in await mcp.list_tools()]
+    tools = [(tool.name, tool.to_mcp_tool().input_schema) for tool in await mcp.list_tools()]
     return render_instructions(tools, sorted(workspace_guidance_fields()))
 
 
@@ -433,7 +453,10 @@ async def nextActions(workspaceId: str, pageId: str | None = None) -> dict[str, 
     legal now), `blocked` (agent edges with the unmet precondition to fix), `humanGates`
     (sign-off edges - stop), and `attention` (items awaiting a human)."""
     with _guard_tool():
-        return STORE.next_actions(workspaceId, pageId)
+        result = STORE.next_actions(workspaceId, pageId)
+        if pageId is not None:
+            _record_guidance_emitted(workspaceId, pageId)
+        return result
 
 
 @mcp.tool
@@ -464,6 +487,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         result = STORE.create_page(workspaceId, type, title, parentId)
         page = result.page
         next_actions = STORE.next_actions(workspaceId, page.id)
+        _record_guidance_emitted(workspaceId, page.id)
         await ws_reloader.refresh()
         return {
             "id": page.id,
@@ -492,17 +516,27 @@ async def mutatePageBatch(
     most one transition is legal per batch and only as the final command: a command after a transition
     carries a now-stale token. All-or-nothing: any rejection aborts the whole batch and nothing commits
     - the error names the failing index and command. Echoes the new status, the current
-    `statusRevisionToken`, and next actions."""
+    `statusRevisionToken`, and next actions. A transition, or a write more than five minutes
+    after they were last sent, carries stage guidance and every field instruction; any other
+    write leaves out stage guidance and the instruction of a field already populated on its
+    page - nextActions carries them all."""
     with _guard_tool():
-        page, created = STORE.mutate_page_batch(workspaceId, pageId, commands)
-        next_actions = STORE.next_actions(workspaceId, pageId)
+        result = STORE.mutate_page_batch(workspaceId, pageId, commands)
+        page = result.page
+        emit_in_full = result.transitioned or page_events.is_due(
+            workspaceId, pageId, GUIDANCE_EMITTED, time.monotonic())
+        next_actions = STORE.next_actions(
+            workspaceId, pageId, omit_populated_instructions=not emit_in_full,
+            omit_stage_guidance=not emit_in_full)
+        if emit_in_full:
+            _record_guidance_emitted(workspaceId, pageId)
         await ws_reloader.refresh()
         return {
             "pageId": page.id,
             "status": page.status,
             "statusRevisionToken": page.status_revision_token,
-            "count": len(created),
-            "createdIds": created,
+            "count": len(result.created_ids),
+            "createdIds": result.created_ids,
             "next": next_actions,
         }
 
@@ -623,4 +657,4 @@ async def unlink(workspaceId: str, fromId: str, toId: str, role: str) -> dict[st
 
 
 # --- capture HMR reload errors to hmr_debug.log (see src/_hmr_debug.py) -------
-from . import _hmr_debug  # noqa: E402, F401
+from . import _hmr_debug  # pyright: ignore[reportUnusedImport]

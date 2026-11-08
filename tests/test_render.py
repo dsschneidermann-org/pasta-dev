@@ -496,7 +496,7 @@ def test_render_non_fsm_list_has_no_checkbox():
 # ============================================================================
 # plain-text markdown escaping on the web render path (escape_plain_text)
 # ============================================================================
-_MD2HTML = Wenmode(github)   # same preset the web routes use
+_MD2HTML = Wenmode(github())   # same preset the web routes use
 
 
 def _web_ctx(titles=None):
@@ -598,6 +598,16 @@ def test_render_page_web_escapes_inline_run_text_keeps_decoration():
     assert "<strong>a*b</strong>" in html and "<code>x_y</code>" in html
     md_mcp = render_page(page, BLOCKS)                  # MCP path leaves the run text raw
     assert "**a*b**" in md_mcp and "`x_y`" in md_mcp
+
+
+def test_backticks_in_a_text_run_render_verbatim_on_both_paths():
+    factory = make_counter()
+    page = create_page(BLOCKS, "Doc", None, factory)
+    page = apply_command(page, BLOCKS, "addBody", {"blocks": [{"kind": "paragraph", "inlines": [
+        "say `now` and ", {"text": "`later`", "bold": True}]}]}, factory).page
+    assert "say `now` and **`later`**" in render_page(page, BLOCKS)     # MCP path leaves the run text raw
+    html = _MD2HTML.render(render_page(page, BLOCKS, ref_context=_web_ctx()))
+    assert "say `now` and <strong>`later`</strong>" in html             # literal, not a code element
 
 
 def test_render_page_web_leaves_code_block_source_verbatim():

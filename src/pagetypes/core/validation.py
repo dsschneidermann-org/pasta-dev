@@ -6,17 +6,22 @@ from collections.abc import Mapping
 from typing import Any
 
 from ...errors import ValidationError
+from ...model import JSONValue
 
 from .pagetype import PageType, element_fsm_sites, get_pagetype_field
-from .args import BlockKindSpec
-from .commands import CommandSpec, is_field_setter
+from .args import ArgSpec, BlockKindSpec
+from .commands import (
+    AddElementCommand,
+    BlockCommand,
+    FieldCommand,
+    SetProseCommand,
+    SetScalarCommand,
+    is_field_setter,
+)
 from .fields import ElementBlocksSpec, FieldSpec, get_element_blocks
 from .specs import (
-    ADD_ELEMENT,
     BLOCKS,
     LIST,
-    SET_PROSE,
-    SET_SCALAR,
     ElementFSMSpec,
     FSMSpec,
     BLOCK_ARRAY,
@@ -40,9 +45,19 @@ def _reject_markdown(text: str) -> None:
                 f"Markdown syntax ('{token}') is not allowed in a text run - express emphasis " +
                 f"or a link with a structured run (e.g. {{'text': '…', 'bold': true}}) instead."
             )
+    if "``" in text:
+        raise ValidationError(
+            "Adjacent backticks are not allowed in a text run - write a code fence as a code " +
+            "block, or inline code with a structured run ({'code': '…'})."
+        )
+    if text.count("`") % 2:
+        raise ValidationError(
+            "Unbalanced backticks in a text run - backticks are literal text only in pairs; " +
+            "close the pair, or write inline code with a structured run ({'code': '…'})."
+        )
 
 
-def _validate_run(run: Any) -> None:
+def _validate_run(run: JSONValue) -> None:
     """Validate one inline run against the run grammar."""
     if isinstance(run, str):
         _reject_markdown(run)
@@ -74,14 +89,14 @@ def _validate_run(run: Any) -> None:
     raise ValidationError("An inline run object must be a text run, {'code': …}, or {'ref': …}.")
 
 
-def _validate_runs(runs: Any) -> None:
+def _validate_runs(runs: JSONValue) -> None:
     if not isinstance(runs, list):
         raise ValidationError("An inline-run value must be an array of runs.")
     for run in runs:
         _validate_run(run)
 
 
-def validate_inline_content(content: str, value: Any) -> None:
+def validate_inline_content(content: str, value: JSONValue) -> None:
     """Validate `value` against the declared inline-content `content` shape (raises ValidationError)."""
     if content == INLINE_RUNS:
         _validate_runs(value)
@@ -108,7 +123,39 @@ def validate_inline_content(content: str, value: Any) -> None:
                 )
 
 
-def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
+_PYTHON_TYPE = {
+    "string": str,
+    "boolean": bool,
+    "integer": int,
+    "number": (int, float),
+    "array": list,
+    "object": dict,
+}
+
+
+def validate_arg_value(arg: ArgSpec, value: JSONValue) -> None:
+    """Validate one present argument value against its spec - its JSON type, its choices, and the
+    inline-run or block shape it declares (raises ValidationError). A command's args and a block's
+    body args are both checked through it."""
+    expected = _PYTHON_TYPE.get(arg.type, str)
+    # bool is a subclass of int - guard against int slipping through as bool and vice versa
+    if arg.type == "integer" and isinstance(value, bool):
+        raise ValidationError(f"Argument '{arg.name}' must be an integer, got a boolean.")
+    if not isinstance(value, expected):
+        raise ValidationError(
+            f"Argument '{arg.name}' must be of type '{arg.type}', got {type(value).__name__}."
+        )
+    if arg.choices is not None and value not in arg.choices:
+        raise ValidationError(
+            f"Argument '{arg.name}' must be one of {list(arg.choices)}, got {value!r}."
+        )
+    if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
+        validate_blocks(value, arg.block_kinds)
+    elif arg.content is not None:
+        validate_inline_content(arg.content, value)
+
+
+def validate_block(entry: JSONValue, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """Validate one block against the block kinds its field declares.
 
     A block is an object carrying a `kind` the field declares plus exactly that kind's body args,
@@ -134,13 +181,13 @@ def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
         present = arg.name in entry and entry[arg.name] is not None
         if arg.required and not present:
             raise ValidationError(f"A '{kind}' block requires '{arg.name}'.")
-        if present and arg.content is not None:
-            validate_inline_content(arg.content, entry[arg.name])
+        if present:
+            validate_arg_value(arg, entry[arg.name])
     if kind == "table":
         validate_table(entry.get("header", []), entry.get("rows", []), entry.get("align"))
 
 
-def validate_blocks(value: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
+def validate_blocks(value: JSONValue, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """Validate an array of blocks against the block kinds its field declares."""
     if not isinstance(value, list):
         raise ValidationError("A blocks value must be an array of blocks.")
@@ -148,7 +195,7 @@ def validate_blocks(value: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
         validate_block(entry, block_kinds)
 
 
-def collect_ref_ids(content: str, value: Any,
+def collect_ref_ids(content: str, value: JSONValue,
                     block_kinds: tuple[BlockKindSpec, ...] | None = None) -> list[str]:
     """Every `{ref: pageId}` page id carried by an arg `value` of the given `content` shape.
 
@@ -164,10 +211,10 @@ def collect_ref_ids(content: str, value: Any,
     """
     ids: list[str] = []
 
-    def from_runs(runs: Any) -> None:
+    def from_runs(runs: JSONValue) -> None:
         if isinstance(runs, list):
-            ids.extend(run["ref"] for run in runs
-                       if isinstance(run, dict) and isinstance(run.get("ref"), str))
+            ids.extend(ref for run in runs
+                       if isinstance(run, dict) and isinstance(ref := run.get("ref"), str))
 
     if content == INLINE_RUNS:
         from_runs(value)
@@ -186,7 +233,7 @@ def collect_ref_ids(content: str, value: Any,
     return ids
 
 
-def _block_ref_ids(entry: Any, block_kinds: tuple[BlockKindSpec, ...] | None) -> list[str]:
+def _block_ref_ids(entry: JSONValue, block_kinds: tuple[BlockKindSpec, ...] | None) -> list[str]:
     """Every inline page ref one block carries, read through the body args its kind declares.
 
     Stays defensive like its caller: this runs before the grammar validation, so a malformed
@@ -229,14 +276,14 @@ def validate_pagetype_field_setters(page_type: PageType) -> list[str]:
     errors: list[str] = []
     seen: dict[tuple[str, str], str] = {}
     for command in page_type.commands:
-        if command.section is None or command.field is None:
+        if not isinstance(command, FieldCommand):
             continue
         if not is_field_setter(command):
             continue
         target = (command.section, command.field)
         if target in seen:
             errors.append(
-                f"{target[0]}.{target[1]} has two field setters "
+                f"{target[0]}.{target[1]} has two field setters " +
                 f"('{seen[target]}' and '{command.name}') - a `do` edge names one command."
             )
             continue
@@ -253,11 +300,9 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
     """
     errors: list[str] = []
     for command in page_type.commands:
-        if command.kind not in (SET_SCALAR, SET_PROSE, ADD_ELEMENT):
+        if not isinstance(command, (SetScalarCommand, SetProseCommand, AddElementCommand)):
             continue
-        section, field = command.section, command.field
-        field_spec = (get_pagetype_field(page_type, section, field)
-                      if section is not None and field is not None else None)
+        field_spec = get_pagetype_field(page_type, command.section, command.field)
         if field_spec is None:
             errors.append(
                 f"field setter '{command.name}' targets unknown field " +
@@ -293,27 +338,27 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
         for arg in command.args:
             if arg.content != BLOCK_ARRAY:
                 continue
-            if command.section is None or command.field is None:
+            if not isinstance(command, FieldCommand):
                 errors.append(f"command '{command.name}' carries blocks but targets no field.")
                 continue
             field_spec = get_pagetype_field(page_type, command.section, command.field)
             if field_spec is None:
                 errors.append(
-                    f"command '{command.name}' carries blocks for "
+                    f"command '{command.name}' carries blocks for " +
                     f"{command.section}.{command.field}, which is not a declared field.")
                 continue
-            element_field = command.element_field or (
-                arg.name if command.kind == ADD_ELEMENT else None)
+            element_field = (command.element_field if isinstance(command, BlockCommand)
+                             else arg.name if isinstance(command, AddElementCommand) else None)
             if element_field is None:
                 if field_spec.kind != BLOCKS:
                     errors.append(
-                        f"command '{command.name}' carries blocks for "
+                        f"command '{command.name}' carries blocks for " +
                         f"{command.section}.{command.field}, which is not a blocks field.")
                 continue
             if get_element_blocks(field_spec, element_field) is None:
                 errors.append(
-                    f"command '{command.name}' carries blocks for "
-                    f"{command.section}.{command.field}.{element_field}, which is not declared "
+                    f"command '{command.name}' carries blocks for " +
+                    f"{command.section}.{command.field}.{element_field}, which is not declared " +
                     f"as a block-bearing element field.")
     return errors
 

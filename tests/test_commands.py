@@ -4,6 +4,7 @@ import pytest
 
 from src.commands import (
     apply_command,
+    batch_args,
     BatchContext,
     create_page,
     field_setter_edges,
@@ -15,7 +16,7 @@ from src.errors import ConflictError, IllegalCommandError, NotFoundError, Valida
 from src.model import Page
 from src.pagetypes.core.specs import FSMSpec
 from src.pagetypes.core.args import _table_block, _text, standard_blocks
-from src.pagetypes.core.commands import add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
+from src.pagetypes.core.commands import AddElementCommand, CompoundCommand, add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
 from src.pagetypes.core.fields import ElementBlocksSpec, SectionSpec, _blocks, _list, _prose
 from src.pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
 from src.pagetypes._registry import get_page_type
@@ -343,6 +344,26 @@ def test_compound_close_illegal_from_draft():
     page = new_flow(factory)
     with pytest.raises(IllegalCommandError):
         _ = apply_command(page, FLOW, "close", {"sha": "a", "message": "m"}, factory)  # not open yet
+
+
+def test_a_compound_step_is_checked_for_legality_like_a_command():
+    # The step's legal_in excludes the page's status, so the step - not the compound - is illegal.
+    step = AddElementCommand(name="_closeAdd", section="resolution", field="commits",
+                             args=(_text("sha"),), element_map=(("sha", "sha"),), legal_in=("closed",))
+    page_type = PageType(
+        tag="xtest-compound-step", name="Compound step", description="ad-hoc compound fixture",
+        sections=(SectionSpec("resolution", "Resolution", (_list("commits", ("sha",)),)),),
+        commands=(CompoundCommand(name="close", description="record a commit AND close (open -> closed)",
+                                  event="close", dest="closed", legal_in=("open",), args=step.args,
+                                  steps=(step,)),
+                  add_link_cmd(), set_title_cmd()),
+        fsm=FSMSpec(name="XTestCompoundStep", initial="open", states=("open", "closed")),
+    )
+    page = Page(id="xtest-compound-step:1", type="xtest-compound-step", title="X", status="open",
+                sections=initial_sections(page_type))
+    with pytest.raises(IllegalCommandError, match="_closeAdd"):
+        _ = apply_command(page, page_type, "close", {"sha": "abc"}, make_counter())
+    assert page.sections["resolution"]["commits"] == [] and page.status == "open"
 
 
 def test_legal_commands_content_always_transitions_gated():
@@ -756,6 +777,53 @@ def test_field_setter_edges_drop_blocked_events():
     assert "addStep" in {e["command"] for e in field_setter_edges(child, CHILD, {"reopen"})}
 
 
+def test_field_setter_edges_omit_the_instruction_of_a_populated_field_when_asked():
+    """With omit_populated_instructions, a field that already holds content keeps its edge - it may
+    still be edited - but without its instruction; a field still empty keeps its instruction."""
+    seal = _field_setter_page_type()
+    page = _field_setter_page(seal, "draft")
+    page.sections["overview"]["body"] = "written"
+    by_field = {(e["section"], e["field"]): e
+                for e in field_setter_edges(page, seal, omit_populated_instructions=True)}
+    assert list(by_field[("overview", "body")]) == [
+        "pageId", "pageType", "kind", "section", "field", "command", "statusRevisionToken"]
+    assert by_field[("overview", "body")]["command"] == "setOverview"
+    assert by_field[("design", "body")]["instruction"] == "the design instruction"
+
+
+def test_field_setter_edges_omit_a_populated_blocks_field_instruction():
+    seal = _field_setter_page_type()
+    page = _field_setter_page(seal, "draft")
+    page.sections["design"]["body"] = [{"id": "b1", "kind": "paragraph", "inlines": ["x"]}]
+    design = next(e for e in field_setter_edges(page, seal, omit_populated_instructions=True)
+                  if e["section"] == "design")
+    assert design["command"] == "addDesign" and "instruction" not in design
+
+
+def test_field_setter_edges_keep_every_instruction_by_default():
+    """Without the flag the edges are unchanged: a populated field still carries its instruction."""
+    seal = _field_setter_page_type()
+    page = _field_setter_page(seal, "draft")
+    page.sections["overview"]["body"] = "written"
+    overview = next(e for e in field_setter_edges(page, seal) if e["section"] == "overview")
+    assert overview["instruction"] == "the overview instruction"
+
+
+def test_field_setter_edges_keep_the_instruction_of_blank_or_missing_content():
+    """Blank prose, an empty blocks field and a section the page predates count as unpopulated, so
+    clearing a field brings its instruction back."""
+    seal = _field_setter_page_type()
+    page = _field_setter_page(seal, "draft")
+    page.sections["overview"]["body"] = "   "
+    page.sections["design"]["body"] = []
+    edges = field_setter_edges(page, seal, omit_populated_instructions=True)
+    assert len(edges) == 2 and all(e["instruction"] for e in edges)
+    del page.sections["overview"]
+    overview = next(e for e in field_setter_edges(page, seal, omit_populated_instructions=True)
+                    if e["section"] == "overview")
+    assert overview["instruction"] == "the overview instruction"
+
+
 # --- block-bearing element fields --------------------------------------------
 ELEMENT_BLOCKS = get_page_type("test-element-blocks")
 
@@ -1109,6 +1177,55 @@ def test_element_scoped_blocks_still_enforce_the_inline_grammar():
                           {"itemId": item_id, "blocks": [{"kind": "paragraph", "inlines": ["a **bold** word"]}]}, factory)
 
 
+def test_balanced_backticks_are_stored_as_sent_at_every_block_depth():
+    factory = make_counter()
+    page = _unified_page(factory)
+    text = "say `now` please"
+    marked = {"text": text, "bold": True}
+    added = apply_command(page, UNIFIED, "addBody", {"blocks": [
+        {"kind": "paragraph", "inlines": [text]},
+        {"kind": "heading", "level": 2, "inlines": [marked]},
+        {"kind": "list", "ordered": False, "items": [[text]]},
+        {"kind": "quote", "paragraphs": [[text]]},
+        {"kind": "table", "header": [[text]], "rows": [[[text]]]},
+    ]}, factory)
+    paragraph, heading, bullets, quote, table = _body(added.page)
+    assert paragraph["inlines"] == [text]
+    assert heading["inlines"] == [marked]
+    assert bullets["items"] == [[text]]
+    assert quote["paragraphs"] == [[text]]
+    assert table["header"] == [[text]] and table["rows"] == [[[text]]]
+
+
+def test_unbalanced_backticks_abort_the_write():
+    factory = make_counter()
+    page = _unified_page(factory)
+    with pytest.raises(ValidationError, match="Unbalanced backticks"):
+        _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
+            {"kind": "table", "header": [["A"]], "rows": [[["a stray ` cell"]]]}]}, factory)
+
+
+def test_a_fence_in_a_text_run_aborts_the_write():
+    factory = make_counter()
+    page = _unified_page(factory)
+    with pytest.raises(ValidationError, match="Adjacent backticks"):
+        _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
+            {"kind": "paragraph", "inlines": ["```\nx = 1\n```"]}]}, factory)
+
+
+def test_element_scoped_blocks_follow_the_backtick_rule():
+    factory = make_counter()
+    page, item_id = new_item(factory)
+    added = apply_command(page, ELEMENT_BLOCKS, "addItemDetail", {
+        "itemId": item_id,
+        "blocks": [{"kind": "paragraph", "inlines": ["say `now` please"]}]}, factory)
+    assert items_of(added.page)[0]["detail"][0]["inlines"] == ["say `now` please"]
+    with pytest.raises(ValidationError, match="Unbalanced backticks"):
+        _ = apply_command(page, ELEMENT_BLOCKS, "addItemDetail", {
+            "itemId": item_id,
+            "blocks": [{"kind": "paragraph", "inlines": ["a stray ` here"]}]}, factory)
+
+
 def test_element_block_commands_are_locked_once_ready():
     factory = make_counter()
     page, item_id = new_item(factory)
@@ -1244,7 +1361,7 @@ def test_every_declared_content_shape_is_checked_through_the_array_path():
             {"kind": "list", "ordered": True, "items": [["a **bold** item"]]}]}, factory)
     with pytest.raises(ValidationError, match="Markdown syntax"):
         _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
-            {"kind": "table", "header": [["A"]], "rows": [[["a `code` cell"]]]}]}, factory)
+            {"kind": "table", "header": [["A"]], "rows": [[["a **bold** cell"]]]}]}, factory)
     # The same rules on an element-scoped add, since every block path runs one validator.
     element_page, item_id = new_item(factory)
     with pytest.raises(ValidationError, match="Markdown syntax"):
@@ -1252,3 +1369,17 @@ def test_every_declared_content_shape_is_checked_through_the_array_path():
             "itemId": item_id,
             "blocks": [{"kind": "list", "ordered": False,
                         "items": [["a **bold** item"]]}]}, factory)
+
+
+def test_batch_args_copies_an_object_and_reads_absent_args_as_empty():
+    args = {"text": "x"}
+    assert batch_args({"command": "c", "args": args}) == args
+    assert batch_args({"command": "c", "args": args}) is not args
+    assert batch_args({"command": "c"}) == {}
+    assert batch_args({"command": "c", "args": None}) == {}
+
+
+@pytest.mark.parametrize("args", [["abc"], "abc", 5, True, [], "", 0, [["text", "x"]]])
+def test_batch_args_rejects_args_that_are_not_an_object(args):
+    with pytest.raises(ValidationError, match="A command's args must be an object"):
+        _ = batch_args({"command": "c", "args": args})

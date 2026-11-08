@@ -2,7 +2,7 @@
 
 **A structured wiki over MCP that tells your coding agent what to do next, and won't let it skip ahead.**
 
-Pasta is an MCP server. Your project's features, bug reports, decision records and architecture notes live in it as **typed pages**, and every page carries a **status state machine**. On each write the server answers with the moves that are legal right now, the instruction for the exact stage the work is in, and the gates only a human is allowed to cross.
+Pasta is an MCP server. Your project's features, bug reports, decision records and architecture notes live in it as **typed pages**, and every page carries a **status state machine**. On each write the server answers with the moves that are legal right now and the gates only a human is allowed to cross, and when the work enters a new stage, with the instruction for that stage.
 
 So a process you write down once (TDD, reproduce-before-you-fix, spec-then-plan) stops being something the agent read 40,000 tokens ago and starts being something it is handed at the moment it applies.
 
@@ -35,7 +35,7 @@ Every create and every write returns a `next` block. There is nothing else to co
 
 | bucket | what it means | who |
 | --- | --- | --- |
-| `do` | transitions that are legal, plus the field setters *this stage* needs, each carrying its own authoring instruction | agent |
+| `do` | transitions that are legal, plus the field setters *this stage* needs, each carrying its own authoring instruction (a write's `next` leaves it off a field that is already filled; `nextActions` always carries it) | agent |
 | `blocked` | an edge that isn't available yet; `reason` names the fix ("requires: steps.items", or the parent status that hasn't unlocked it) | agent |
 | `humanGates` | sign-offs such as shipping a feature or closing a bug, listed whether or not their preconditions are met, so the agent can never silently drive past one | you |
 | `attention` | a question the agent escalated instead of guessing | you |
@@ -65,13 +65,13 @@ Workspaces are plain JSON files under `./.pasta-data` (override with `PASTA_DATA
 
 ### Give your agent the habit
 
-An MCP server the agent *can* use isn't one it *will* use. Copy the bundled skills so the workflow starts in pasta rather than in an unplanned code edit:
+An MCP server the agent *can* use isn't one it *will* use. Copy the bundled skill so the workflow starts in pasta rather than in an unplanned code edit:
 
 ```text
-mkdir -p .claude/skills && cp -t .claude/skills -R path/to/pasta/.claude/skills/{pasta,cook}
+mkdir -p .claude/skills && cp -R path/to/pasta/.claude/skills/cook .claude/skills/
 ```
 
-Then start work with `/pasta` (or `/cook`, which is the same with a funnier name). The skill is four lines. All it does is tell the agent to call the servers instructions tool.
+The skill is three lines. All it does is tell the agent to call the servers instructions tool.
 
 **Now ask your agent to `/cook` a feature, a simple change, a bug report or some documentation.**
 
@@ -148,7 +148,7 @@ Tasks run through [just](https://github.com/casey/just):
 ```text
 just test        # full suite
 just testincr    # incremental (pytest --testmon)
-just types       # basedpyright
+just types       # basedpyright - passes only with 0 errors and 0 warnings
 just main        # run the server
 just docs        # generate page-type docs + Sphinx site
 just dev         # server and a live docs site, in parallel

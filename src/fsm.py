@@ -89,8 +89,8 @@ def machine_class(fsm: FSMSpec | ElementFSMSpec) -> Any:
     """
     if fsm.machine is None:
         raise LookupError(
-            f"No machine was built for FSM spec {fsm.name!r}. A spec is built by the page type "
-            f"that declares it; this one is declared by none, or its build failed and "
+            f"No machine was built for FSM spec {fsm.name!r}. A spec is built by the page type " +
+            f"that declares it; this one is declared by none, or its build failed and " +
             f"validate_page_types would have reported it.")
     return fsm.machine
 

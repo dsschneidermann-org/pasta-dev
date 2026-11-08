@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from reactivity.hmr.hooks import on_dispose
+from reactivity.hmr.hooks import on_dispose  # pyright: ignore[reportMissingTypeStubs]
 
 from .model import Workspace
 

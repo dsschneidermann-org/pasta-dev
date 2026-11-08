@@ -11,9 +11,14 @@ from typing import Any
 
 from .commands import legal_commands
 from .model import Page
-from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION
+from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY
 from .pagetypes.core.args import BlockKindSpec
-from .pagetypes.core.commands import CommandSpec
+from .pagetypes.core.commands import (
+    CommandSpec,
+    ElementTransitionCommand,
+    FieldCommand,
+    StatusTransitionCommand,
+)
 from .pagetypes.core.pagetype import PageType
 
 
@@ -73,17 +78,20 @@ def _command_summary(command: CommandSpec) -> dict[str, Any]:
         # a short line on what the command does; a field setter's instruction is not here, it lives
         # on the (section, field) FieldSpec reported in this type's `sections` listing
         "description": command.description,
-        "section": command.section,
-        "field": command.field,
-        "event": command.event,
+        "section": command.section if isinstance(command, FieldCommand) else None,
+        "field": command.field if isinstance(command, FieldCommand) else None,
+        "event": (command.event
+                  if isinstance(command, (StatusTransitionCommand, ElementTransitionCommand))
+                  else None),
         "agency": command.agency,
         # statuses a CONTENT command is allowed in. Suppressed for a transition/compound command:
         # there `legal_in` is the edge's SOURCE status, already reported in the FSM transition list,
         # so hiding it here keeps the describe output unclobbered.
         "legalIn": (list(command.legal_in) if command.legal_in
-                    and command.kind not in (TRANSITION, COMPOUND) else None),
+                    and not isinstance(command, StatusTransitionCommand) else None),
         # (section, field) content that must be present before this transition is legal.
-        "requires": [{"section": section, "field": field} for section, field in command.requires],
+        "requires": ([{"section": section, "field": field} for section, field in command.requires]
+                     if isinstance(command, StatusTransitionCommand) else []),
         "args": command_arg_schema(command),
     }
 

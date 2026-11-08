@@ -5,24 +5,24 @@ description = "pasta MCP server - a structured wiki over MCP (FastMCP + python-s
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi[standard]>=0.139.2",
-    "fastmcp>=3.4.4",
+    "fastapi[standard]>=0.162.0",
+    "fastmcp>=4.1.6",
     "hmr>=0.7.6.3",
     "jinja2>=3.1.6",
     "myst-parser>=5.1.0",
     "pydot>=4.0.1",
-    "python-statemachine>=3.2.0",
-    "sphinx>=9.1.0",
+    "python-statemachine>=3.2.2",
+    "sphinx>=9.2.0",
     "sphinx-autodoc2>=0.5.0",
-    "sphinxcontrib-mermaid>=2.1.0",
-    "wenmode>=0.12.1",
+    "sphinxcontrib-mermaid>=2.1.1",
+    "wenmode>=0.15.3",
 ]
 
 [dependency-groups]
 dev = [
-    "basedpyright>=1.39.9",
-    "pytest>=9.1.1",
-    "pytest-testmon>=2.2.0",
+    "basedpyright>=1.40.2",
+    "pytest>=9.2.0",
+    "pytest-testmon>=2.3.0",
     "sphinx-autobuild>=2025.8.25",
 ]
 docs = [
@@ -39,4 +39,5 @@ testpaths = ["tests"]
 typeCheckingMode = "recommended"
 reportAny = false
 reportExplicitAny = false
+reportPrivateUsage = false
 include = ["src/**/*"]

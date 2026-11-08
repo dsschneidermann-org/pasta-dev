@@ -6,6 +6,7 @@ mode, so the configurable-field set is the fixtures', not production's.
 """
 
 import asyncio
+import time
 
 import pytest
 from fastmcp import Client
@@ -285,6 +286,19 @@ def test_next_actions_whole_workspace_has_no_guidance(store):
     assert not any(key.startswith("guidance") for key in actions)
 
 
+def test_next_actions_omit_stage_guidance_leaves_out_every_guidance_key(store):
+    """The flag removes both kinds of guidance key and nothing else."""
+    workspace = store.create_workspace("demo")
+    wid = workspace.id
+    pid = store.create_page(wid, "test-lifecycle", "F").page.id
+    store.set_workspace_guidance(wid, "buildTool", "use pytest")
+    store.set_page_status(wid, pid, "review")
+    full = store.next_actions(wid, pid)
+    assert "guidance" in full and "guidance_buildTool" in full
+    omitted = store.next_actions(wid, pid, omit_stage_guidance=True)
+    assert omitted == {key: value for key, value in full.items() if not key.startswith("guidance")}
+
+
 # --- server tool + response keys ---------------------------------------------
 def test_set_workspace_guidance_tool_and_response_keys(mcp):
     wid, pid = _building_lifecycle(mcp)
@@ -292,13 +306,17 @@ def test_set_workspace_guidance_tool_and_response_keys(mcp):
                   {"workspaceId": wid, "field": "buildTool", "text": "use pytest"})
     assert result == {"workspaceId": wid, "field": "buildTool",
                       "guidanceConfig": {"buildTool": "use pytest"}}
-    # A subsequent write response carries guidance_buildTool (page is at `building`), inside `next`.
+    # A content-only write leaves it out, while nextActions for the page carries it.
     written = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
                                    "commands": [{"command": "setSummary", "args": {"text": "S2"}}]})
-    assert written["next"]["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
-    # `next` is the payload nextActions returns for the page, so the two agree by construction.
+    assert "guidance_buildTool" not in written["next"]
     actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
     assert actions["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
+    # Entering `building` again carries it, inside `next`.
+    _mutate_server(mcp, {"workspaceId": wid, "pageId": pid, "commands": [{"command": "reopenPlanning"}]})
+    entered = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
+                                   "commands": [{"command": "beginImplementation"}]})
+    assert entered["next"]["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
 
 
 def test_create_page_response_carries_workspace_guidance(mcp):
@@ -313,3 +331,126 @@ def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     with pytest.raises(ToolError, match="not a workspace guidance field"):
         call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "nope", "text": "x"})
+
+
+# --- the event cache behind a write's full next -------------------------------
+def _guidance_is_due(cache, wid, pid):
+    return cache.is_due(wid, pid, server.GUIDANCE_EMITTED, time.monotonic())
+
+
+def _lapse_guidance(cache, wid, pid):
+    """Backdate a page's last full delivery to just past its window."""
+    ttl = server.GUIDANCE_TTL_SECONDS
+    cache.record(wid, pid, server.GUIDANCE_EMITTED, time.monotonic() - ttl - 1, ttl)
+
+
+def _flow_page(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    return wid, call(mcp, "createPage", {"workspaceId": wid, "type": "test-flow", "title": "F"})["id"]
+
+
+def test_create_page_counts_as_a_delivery(mcp, event_cache):
+    wid, pid = _flow_page(mcp)
+    assert not _guidance_is_due(event_cache, wid, pid)
+
+
+def test_a_focused_next_actions_counts_as_a_delivery(mcp, event_cache):
+    wid, pid = _flow_page(mcp)
+    _lapse_guidance(event_cache, wid, pid)
+    call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
+    assert not _guidance_is_due(event_cache, wid, pid)
+
+
+def test_a_whole_workspace_next_actions_records_nothing(mcp, event_cache):
+    wid, pid = _flow_page(mcp)
+    _lapse_guidance(event_cache, wid, pid)
+    call(mcp, "nextActions", {"workspaceId": wid})
+    assert _guidance_is_due(event_cache, wid, pid)
+
+
+def _setter(result, command):
+    return next(edge for edge in result["next"]["do"] if edge["command"] == command)
+
+
+def _open_flow_page(mcp):
+    wid, pid = _flow_page(mcp)
+    _mutate_server(mcp, {"workspaceId": wid, "pageId": pid, "commands": [{"command": "open"}]})
+    return wid, pid
+
+
+def _write_summary(mcp, wid, pid):
+    return _mutate_server(mcp, {"workspaceId": wid, "pageId": pid, "commands": [
+        {"command": "setSummary", "args": {"text": "S"}}]})
+
+
+def _lifecycle_page(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    return wid, call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
+
+
+def _reopen_planning(mcp, wid, pid):
+    """A transition back to planning, where the populated parts field is in `do` again."""
+    return _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
+                                "commands": [{"command": "reopenPlanning"}]})
+
+
+def test_a_write_inside_the_window_stays_trimmed(mcp, event_cache):
+    wid, pid = _open_flow_page(mcp)
+    assert not any(key.startswith("guidance") for key in _write_summary(mcp, wid, pid)["next"])
+
+
+def test_a_lapsed_write_carries_stage_guidance_once(mcp, event_cache):
+    wid, pid = _open_flow_page(mcp)
+    _lapse_guidance(event_cache, wid, pid)
+    assert _write_summary(mcp, wid, pid)["next"]["guidance"].startswith(PAGE_STATUS_GUIDANCE)
+    assert "guidance" not in _write_summary(mcp, wid, pid)["next"]
+
+
+def test_a_lapsed_write_carries_populated_instructions_once(mcp, event_cache):
+    wid, page = _lifecycle_page(mcp)
+    pid = page["id"]
+    assert "instruction" not in _setter(_write_summary(mcp, wid, pid), "setSummary")
+    _lapse_guidance(event_cache, wid, pid)
+    assert _setter(_write_summary(mcp, wid, pid), "setSummary")["instruction"]
+    assert "instruction" not in _setter(_write_summary(mcp, wid, pid), "setSummary")
+
+
+def test_a_lapsed_write_carries_the_workspace_guidance_keys(mcp, event_cache):
+    wid, pid = _building_lifecycle(mcp)
+    call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "buildTool", "text": "use pytest"})
+    _lapse_guidance(event_cache, wid, pid)
+    assert _write_summary(mcp, wid, pid)["next"]["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
+
+
+def test_a_transition_inside_the_window_carries_populated_instructions(mcp, event_cache):
+    wid, pid = _building_lifecycle(mcp)
+    assert _setter(_reopen_planning(mcp, wid, pid), "addPart")["instruction"]
+
+
+def test_the_first_write_on_a_pinned_child_is_full(mcp, event_cache):
+    wid, page = _lifecycle_page(mcp)
+    child_id = page["children"][0]["id"]
+    result = _mutate_server(mcp, {"workspaceId": wid, "pageId": child_id, "commands": [
+        {"command": "addStep", "args": {"text": "build"}}]})
+    assert result["next"]["guidance"].startswith(PAGE_STATUS_GUIDANCE)
+
+
+def test_a_rejected_batch_records_nothing(mcp, event_cache):
+    wid, pid = _open_flow_page(mcp)
+    _lapse_guidance(event_cache, wid, pid)
+    with pytest.raises(ToolError):
+        _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
+                             "commands": [{"command": "noSuchCommand"}]})
+    assert _guidance_is_due(event_cache, wid, pid)
+
+
+def test_a_transition_with_the_cache_off_carries_populated_instructions(mcp):
+    wid, pid = _building_lifecycle(mcp)
+    assert _setter(_reopen_planning(mcp, wid, pid), "addPart")["instruction"]
+
+
+def test_the_cache_stays_empty_in_test_mode(mcp):
+    wid, pid = _open_flow_page(mcp)
+    _write_summary(mcp, wid, pid)
+    call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
+    assert server.page_events._entries == {}

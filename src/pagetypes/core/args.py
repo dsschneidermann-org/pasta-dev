@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ...errors import ValidationError
 from .specs import (
     INLINE_RUNS,
     INLINE_RUN_GRID,
@@ -17,6 +16,14 @@ from .specs import (
     TABLE_ALIGN,
     RefCheck,
 )
+
+# The module's interface, underscore-named declaration helpers included: page-type modules use them.
+__all__ = [
+    "ArgSpec", "BlockKindSpec",
+    "_text", "_integer", "_boolean", "_array", "_same_named", "_INDEX", "_PRECEDING",
+    "_paragraph_runs", "_heading_runs", "_code_block", "_list_block", "_quote_block",
+    "_table_block", "_divider_block", "_paragraph_text", "_heading_text", "standard_blocks",
+]
 
 
 @dataclass(frozen=True)
@@ -71,12 +78,6 @@ def _boolean(name: str, *, required: bool = True, description: str = "") -> ArgS
 def _array(name: str, *, content: str | None = None, required: bool = True, description: str = "",
            block_kinds: tuple[BlockKindSpec, ...] | None = None) -> ArgSpec:
     return ArgSpec(name, type="array", required=required, content=content, description=description,
-                   block_kinds=block_kinds)
-
-
-def _object(name: str, *, content: str | None = None, required: bool = True, description: str = "",
-            block_kinds: tuple[BlockKindSpec, ...] | None = None) -> ArgSpec:
-    return ArgSpec(name, type="object", required=required, content=content, description=description,
                    block_kinds=block_kinds)
 
 

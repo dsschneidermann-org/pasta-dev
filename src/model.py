@@ -11,6 +11,11 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any
 
+# Any JSON value as parsed: what a command argument holds before a page type's grammar has
+# checked its shape. Code that inspects one narrows it with isinstance, and pyright then
+# checks every case the narrowed value can take.
+type JSONValue = None | bool | int | float | str | list[JSONValue] | dict[str, JSONValue]
+
 
 @dataclass
 class Page:

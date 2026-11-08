@@ -170,6 +170,20 @@ def test_echoed_next_carries_stage_field_setters(mcp):
     assert "addPart" in planning_do and "setSummary" not in planning_do
 
 
+def test_mutate_echo_omits_populated_instructions_but_next_actions_keeps_them(mcp):
+    """mutatePageBatch's echo drops the instruction of a field already written on its page, while
+    nextActions - used to resume work - and createPage keep every instruction."""
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
+    assert next(e for e in created["next"]["do"] if e["command"] == "setSummary")["instruction"]
+    result = _mutate(mcp, {"workspaceId": wid, "pageId": created["id"], "commands": [
+        {"command": "setSummary", "args": {"text": "S"}}]})
+    echoed = next(e for e in result["next"]["do"] if e["command"] == "setSummary")
+    assert echoed["kind"] == "field" and "instruction" not in echoed
+    actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": created["id"]})
+    assert next(e for e in actions["do"] if e["command"] == "setSummary")["instruction"]
+
+
 def test_archive_page_via_server(mcp):
     workspace = call(mcp, "createWorkspace", {"name": "demo"})
     wid = workspace["id"]
@@ -295,16 +309,34 @@ def test_mutate_page_batch_carries_guidance_inside_next_on_a_transition(mcp):
     assert result["next"]["guidance"] == PAGE_STATUS_GUIDANCE + FLOW_OPEN_GUIDANCE
 
 
-def test_mutate_page_batch_carries_guidance_on_a_content_only_write(mcp):
-    """The stage text instructs the status the page currently sits at, so it rides every write - a
-    stage is worked through many content-only writes and at most one transition."""
+def test_mutate_page_batch_omits_guidance_on_a_content_only_write(mcp):
+    """A write carries the stage text only when it moved the page to a new status, and nextActions
+    always does, for an agent resuming work."""
     workspace_id, page_id = _flow_page(mcp)
     _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id,
                   "commands": [{"command": "open"}]})
     result = _mutate(mcp,
                   {"workspaceId": workspace_id, "pageId": page_id,
                    "commands": [{"command": "setSummary", "args": {"text": "x"}}]})
+    assert "guidance" not in result["next"]
+    actions = call(mcp, "nextActions", {"workspaceId": workspace_id, "pageId": page_id})
+    assert actions["guidance"] == PAGE_STATUS_GUIDANCE + FLOW_OPEN_GUIDANCE
+
+
+def test_mutate_page_batch_carries_guidance_when_content_precedes_the_transition(mcp):
+    workspace_id, page_id = _flow_page(mcp)
+    result = _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id, "commands": [
+        {"command": "setSummary", "args": {"text": "x"}}, {"command": "open"}]})
     assert result["next"]["guidance"] == PAGE_STATUS_GUIDANCE + FLOW_OPEN_GUIDANCE
+
+
+def test_mutate_page_batch_transition_into_an_unguided_status_has_no_guidance(mcp):
+    workspace_id, page_id = _flow_page(mcp)
+    _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id,
+                  "commands": [{"command": "open"}]})
+    result = _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id, "commands": [
+        {"command": "close", "args": {"sha": "abc", "message": "done"}}]})
+    assert result["status"] == "closed" and "guidance" not in result["next"]
 
 
 def test_two_transitions_in_one_batch_are_rejected(mcp):
