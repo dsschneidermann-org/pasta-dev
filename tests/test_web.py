@@ -346,3 +346,9 @@ def test_footer_without_a_source_link_shows_only_the_note(client, monkeypatch):
 def test_server_publishes_the_checkouts_source_link():
     src_dir = Path(server.__file__).resolve().parent
     assert server.templates.env.globals["source_link"] == to_source_link(read_remote_url(src_dir))
+
+
+def test_footer_link_is_muted_without_an_underline(client):
+    css = client.get("/static/styles.css").text
+    assert "#footer a { color: var(--text-muted); text-decoration: none; }" in css
+    assert "#footer a:hover { color: var(--links); }" in css

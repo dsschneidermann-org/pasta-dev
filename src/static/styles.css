@@ -12,6 +12,10 @@ li:has(> button), li:has(> input), li:has(> select), li:has(> textarea) {
     list-style-type: none;
 }
 
+/* The footer is a licence notice, not navigation: its link stays as quiet as an annotation. */
+#footer a { color: var(--text-muted); text-decoration: none; }
+#footer a:hover { color: var(--links); }
+
 /* Theme color additions. */
 body.light {
   --text-error: #b00020;
