@@ -31,7 +31,10 @@
         <div id="footer">
             {% block footer %}
             <hr />
-            &copy; Copyright 2026 by <a href="http://dennis-s.dk">Dennis S</a>.
+            {% if source_link %}
+            Source: <a href="{{ source_link.href }}">{{ source_link.text }}</a> &middot;
+            {% endif %}
+            AGPL software must be offered to its users as source code.
             {% endblock %}
         </div>
         <a id="to-top" href="#top"><span aria-hidden="true">↑</span> Top</a>

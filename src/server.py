@@ -5,6 +5,7 @@ import asyncio
 from contextlib import contextmanager, asynccontextmanager
 from typing import Annotated, Any, override
 from collections.abc import Generator
+from pathlib import Path
 import time
 import traceback
 
@@ -38,6 +39,7 @@ from .pagetypes._registry import (
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
 from .serialize import page_to_dict
+from .source_link import read_remote_url, source_link
 from .store import Store
 
 # Fail fast: validate every page type once at load. This runs on a cold start and re-runs on
@@ -76,6 +78,10 @@ app.mount("/static", StaticFiles(directory="src/static"), name="static")
 app.mount("/sphinx", StaticFiles(directory="docsite/_build/html"), name="sphinx")
 
 templates = Jinja2Templates(directory="src/templates")
+# Read once per execution of this module, so a reload picks up a changed remote. git runs in the
+# directory of the code being served, not the process cwd.
+templates.env.globals["source_link"] = source_link(  # pyright: ignore[reportArgumentType]
+    read_remote_url(Path(__file__).resolve().parent))
 
 
 # --- Declaration quarantine --------------------------------------------------
