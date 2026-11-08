@@ -41,3 +41,9 @@ sphinx:
 
 [parallel]
 dev: main sphinx
+
+sync-wiki:
+    gitnexus analyze --index-only --force
+    uv run python scripts/reset_stale_wiki.py
+    gitnexus wiki
+    cp -f .gitnexus/wiki/index.html ../pasta.dennis-s.dk/index.html
