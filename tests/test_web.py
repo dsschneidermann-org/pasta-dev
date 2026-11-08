@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 import src.server as server
 from src.errors import ValidationError
-from src.source_link import SourceLink, read_remote_url, source_link
+from src.source_link import SourceLink, read_remote_url, to_source_link
 from src.store import Store
 
 
@@ -346,4 +346,4 @@ def test_footer_without_a_source_link_shows_only_the_note(client, monkeypatch):
 
 def test_server_publishes_the_checkouts_source_link():
     src_dir = Path(server.__file__).resolve().parent
-    assert server.templates.env.globals["source_link"] == source_link(read_remote_url(src_dir))
+    assert server.templates.env.globals["source_link"] == to_source_link(read_remote_url(src_dir))

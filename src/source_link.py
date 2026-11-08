@@ -19,7 +19,7 @@ class SourceLink:
     text: str
 
 
-def source_link(remote_url: str | None) -> SourceLink | None:
+def to_source_link(remote_url: str | None) -> SourceLink | None:
     """The web page a git remote URL names, or None when it names none. Credentials never survive."""
     remote = (remote_url or "").strip()
     if remote.startswith(("http://", "https://", "ssh://")):

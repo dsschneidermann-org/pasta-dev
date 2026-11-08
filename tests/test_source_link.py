@@ -5,32 +5,32 @@ import subprocess
 
 import pytest
 
-from src.source_link import SourceLink, read_remote_url, source_link
+from src.source_link import SourceLink, read_remote_url, to_source_link
 
 
 def test_source_link_maps_an_scp_like_remote_to_https():
-    assert source_link("git@github.com:dsschneidermann-org/pasta-dev.git") == SourceLink(
+    assert to_source_link("git@github.com:dsschneidermann-org/pasta-dev.git") == SourceLink(
         href="https://github.com/dsschneidermann-org/pasta-dev",
         text="github.com/dsschneidermann-org/pasta-dev")
 
 
 def test_source_link_keeps_an_https_remote():
-    assert source_link("https://github.com/dsschneidermann/pasta\n") == SourceLink(
+    assert to_source_link("https://github.com/dsschneidermann/pasta\n") == SourceLink(
         href="https://github.com/dsschneidermann/pasta", text="github.com/dsschneidermann/pasta")
 
 
 def test_source_link_strips_credentials():
-    link = source_link("https://user:secret@example.com/a/b.git")
+    link = to_source_link("https://user:secret@example.com/a/b.git")
     assert link == SourceLink(href="https://example.com/a/b", text="example.com/a/b")
 
 
 def test_source_link_maps_an_ssh_url_to_https_without_its_port():
-    assert source_link("ssh://git@example.com:2222/a/b.git") == SourceLink(
+    assert to_source_link("ssh://git@example.com:2222/a/b.git") == SourceLink(
         href="https://example.com/a/b", text="example.com/a/b")
 
 
 def test_source_link_keeps_an_http_port():
-    assert source_link("http://example.com:8080/a/b/") == SourceLink(
+    assert to_source_link("http://example.com:8080/a/b/") == SourceLink(
         href="http://example.com:8080/a/b", text="example.com:8080/a/b")
 
 
@@ -40,7 +40,7 @@ def test_source_link_keeps_an_http_port():
     "https://example.com/", "https://example.com:notaport/a/b", "https://[::1]/a/b",
 ])
 def test_source_link_is_none_without_a_web_page(remote_url):
-    assert source_link(remote_url) is None
+    assert to_source_link(remote_url) is None
 
 
 def _git(*args):
