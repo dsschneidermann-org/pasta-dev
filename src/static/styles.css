@@ -22,6 +22,15 @@ body.dark {
   --text-on-error: #000;
 }
 
+/* Floating back-to-top link in the page shell, on every view. */
+#to-top {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 10;
+  padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.9rem; text-decoration: none;
+  color: var(--text-main); background: var(--button-base);
+}
+#to-top:hover { background: var(--button-hover); text-decoration: none; }
+
 /* Structured page render (src/render_html.py). Scoped under .pasta-page so it cannot reach the
    sidebar, the workspace index or the tree view. Every colour is a water.css custom property,
    which both its light and dark sheets define, so the whole block follows the theme. */
