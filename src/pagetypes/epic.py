@@ -6,6 +6,7 @@ on their own, and reading one without the other would hide the coupling.
 
 from __future__ import annotations
 
+from ._stage_guidance import DECOMPOSITION
 from .core.specs import (
     ChildStateGuard,
     ElementFSMSpec,
@@ -227,6 +228,7 @@ _EPIC = PageType(
         states=("draft", "grounding", "decomposition", "planReview",
                 "executing", "review", "shipped", "abandoned"),
         terminal_states=("shipped", "abandoned"),
+        status_guidance=(("decomposition", DECOMPOSITION),),
     ),
 )
 

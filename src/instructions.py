@@ -47,8 +47,6 @@ If calling `tree` reveals an empty workspace, no project overview doc or the `to
 - Project Overview + `architecture` and `document` pages go under the Documentation `toc` page.
 - `decision-record` pages go under the ADRs `toc` page.
 - `feature-brief`, `simple-change` and `epic` pages go under the Features `toc` page.
-- An `epic`'s `feature-brief` children are created under the epic itself, NOT under the Features `toc` page - the epic's ship gate only sees briefs that are its own children.
-- An `epic`'s `agent-plan` pages are created under the epic itself too, one per dispatched agent - the epic's plan and review gates only see agent-plan pages that are its own children.
 - `bug-report` pages go under the Bug Reports `toc` page.
 
 ## Response shapes

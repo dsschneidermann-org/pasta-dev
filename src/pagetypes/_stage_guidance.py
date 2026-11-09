@@ -192,6 +192,17 @@ Shipping is a human gate: drive up to it and stop. If anything turns up outstand
 use requestChanges to go back to building rather than leave a known gap at the gate.
 """
 
+# --- epic --------------------------------------------------------------------
+DECOMPOSITION = """
+decomposition - the grounded base is recorded, and the epic is now split into the pages
+its agents work from. Create each of them as a child of this epic:
+
+- Each feature-brief is created under the epic itself, not under the Features toc page -
+  the epic's ship gate only sees briefs that are its own children.
+- Each agent-plan page is created under the epic itself too, one per dispatched agent -
+  the epic's plan and review gates only see agent-plan pages that are its own children.
+"""
+
 # --- simple-change and bug-report, shared ------------------------------------
 REVIEW = """
 review - the work is written, and this is the last stop before it is marked done and
