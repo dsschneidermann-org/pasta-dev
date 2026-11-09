@@ -154,6 +154,50 @@ def test_set_element_field_sets_a_flag_in_place():
     assert flagged.created_id is None      # a set, not an add
 
 
+def _two_items(factory):
+    page = create_page(FIELDS, "P", None, factory)
+    page = apply_command(page, FIELDS, "addItem", {"text": "one", "note": "n1"}, factory).page
+    return apply_command(page, FIELDS, "addItem", {"text": "two"}, factory).page
+
+
+def test_edit_item_writes_only_the_fields_sent_and_keeps_id_and_position():
+    factory = make_counter()
+    page = _two_items(factory)
+    before = page.sections["items"]["items"]
+    edited = apply_command(page, FIELDS, "editItem",
+                           {"itemId": before[0]["id"], "text": "uno"}, factory).page
+    after = edited.sections["items"]["items"]
+    assert [item["id"] for item in after] == [item["id"] for item in before]
+    assert after[0] == {**before[0], "text": "uno"}       # note untouched
+    assert after[1] == before[1]
+
+
+def test_edit_item_treats_null_as_not_sent():
+    factory = make_counter()
+    page = _two_items(factory)
+    item_id = page.sections["items"]["items"][0]["id"]
+    edited = apply_command(page, FIELDS, "editItem",
+                           {"itemId": item_id, "text": None, "note": "n2"}, factory).page
+    assert edited.sections["items"]["items"][0]["text"] == "one"
+    assert edited.sections["items"]["items"][0]["note"] == "n2"
+
+
+@pytest.mark.parametrize("args", [{}, {"text": None}, {"text": None, "note": None}])
+def test_an_edit_that_writes_nothing_is_rejected(args):
+    factory = make_counter()
+    page = _two_items(factory)
+    item_id = page.sections["items"]["items"][0]["id"]
+    with pytest.raises(ValidationError, match="names no field to change"):
+        _ = apply_command(page, FIELDS, "editItem", {"itemId": item_id, **args}, factory)
+
+
+def test_edit_item_with_an_unknown_id_is_not_found():
+    factory = make_counter()
+    with pytest.raises(NotFoundError):
+        _ = apply_command(_two_items(factory), FIELDS, "editItem",
+                          {"itemId": "nope", "text": "x"}, factory)
+
+
 # --- argument validation -----------------------------------------------------
 def test_unknown_command_raises():
     with pytest.raises(ValidationError):

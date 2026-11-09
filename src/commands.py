@@ -460,9 +460,11 @@ def _add_element(page: Page, page_type: PageType, command: AddElementCommand,
 
 def _apply_element_writes(element: dict[str, Any], command: ElementWriteCommand,
                           args: dict[str, Any]) -> None:
-    """Set an element's mapped-arg fields and any literal `element_const` fields in place."""
+    """Set an element's mapped-arg fields and any literal `element_const` fields in place. A mapped
+    arg sent as null counts as not sent - the same rule the arg validator applies - so a write
+    never blanks a field."""
     for element_field, arg_name in command.element_map:
-        if arg_name in args:
+        if args.get(arg_name) is not None:
             element[element_field] = args[arg_name]
     for element_field, value in command.element_const:
         element[element_field] = value
@@ -525,7 +527,13 @@ def _find_element(page: Page, command: ElementWriteCommand, args: dict[str, Any]
 
 
 def _set_element_field(page: Page, command: ElementWriteCommand, args: dict[str, Any]) -> None:
-    """Set fields on an existing list element (args[0] identifies it by id), id preserved."""
+    """Set fields on an existing list element (args[0] identifies it by id), id preserved. An edit -
+    mapped args and no constant - must write at least one field, or it would silently do nothing."""
+    if (command.element_map and not command.element_const
+            and all(args.get(arg_name) is None for _, arg_name in command.element_map)):
+        raise ValidationError(
+            f"Command '{command.name}' names no field to change: send at least one of " +
+            ", ".join(arg_name for _, arg_name in command.element_map) + ".")
     _apply_element_writes(_find_element(page, command, args), command, args)
 
 
