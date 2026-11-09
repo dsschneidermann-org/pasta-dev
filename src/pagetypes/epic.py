@@ -191,7 +191,7 @@ _EPIC = PageType(
         *list_cmds("review", field="findings", label="finding",
                    add_args=(_text("issue"), _text("severity", choices=_SEVERITIES),
                              _text("action", required=False, choices=_EPIC_FINDING_ACTIONS,
-                                   description="how the finding was applied")),
+                                   description="how the finding was applied to the plan")),
                    legal_in=("planReview", "executing", "review"), editable=True),
         # draft -> grounding needs only the intent: grounding reads the real repo from that one line.
         transition_cmd("beginGrounding", "draft -> grounding", requires=(("summary", "body"),)),
