@@ -71,10 +71,7 @@ _EPIC = PageType(
     ),
     sections=(
         SectionSpec("notice", "Controller notice", (
-            _prose("body", fixed=_CONTROLLER_NOTICE, description="""
-                Who may edit this epic, fixed by the page type: it is seeded when the epic is
-                created and refreshed on every write, and no command writes it.
-                """),
+            _prose("body", description="Controller notice fixed text.", fixed=_CONTROLLER_NOTICE),
         )),
         SectionSpec("summary", "Summary", (
             _prose("body", description="""
@@ -138,8 +135,7 @@ _EPIC = PageType(
                 here before either starts. Record the real signature rather than a description of
                 one: 'returns the parsed config' is not a contract, a written-out function signature
                 with its argument and return types is. Correct a contract in place with
-                editContract, never by removing and re-adding it: its id is what handoffs and
-                briefs point at.
+                editContract: its id is what handoffs and briefs point at.
                 """),
         )),
         SectionSpec("questions", "Questions", (
@@ -175,8 +171,7 @@ _EPIC = PageType(
                 means an agent would build the wrong thing or two agents would collide; should-fix
                 is real but survivable; nit is polish. Record the finding here AND make the edit its
                 action names, so the plan and this record agree, and correct a finding in place
-                with editFinding rather than removing and re-adding it. Say which workstream or
-                agent it applies to.
+                with editFinding. Say which workstream or agent it applies to.
                 """),
         )),
     ),

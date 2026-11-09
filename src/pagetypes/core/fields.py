@@ -88,7 +88,7 @@ def _scalar(key: str, *, choices: tuple[str, ...] | None = None, description: st
     return FieldSpec(key=key, kind=SCALAR, choices=choices, description=description)
 
 
-def _prose(key: str, *, fixed: str | None = None, description: str = "") -> FieldSpec:
+def _prose(key: str, *, description: str = "", fixed: str | None = None) -> FieldSpec:
     return FieldSpec(key=key, kind=PROSE, description=description, fixed=fixed)
 
 
