@@ -1,4 +1,4 @@
-"""The `epic` page type, and the `agent` pages created under it.
+"""The `epic` page type, and the `agent-plan` pages created under it.
 
 The two are declared together because they are designed against each other rather than
 on their own, and reading one without the other would hide the coupling.
@@ -44,12 +44,12 @@ _AGENT_PLANNED = ("ready", "working", "finished", "blocked", "accepted")
 # Seeded into every epic as its first section and written by no command: who may edit this page.
 _CONTROLLER_NOTICE = """
     This epic is the controller's page. Only the controlling agent - the session that created this
-    epic and dispatches its agents - runs commands on it. Each dispatched agent is handed one agent
-    page, a child of this epic whose page id is the agent's id; it works from that page, reports back
-    onto it, and writes only that page and the feature-briefs it links to, with their child pages.
-    It never edits this epic or another agent's page. The controller records here what an agent
-    raises: addFinding or editFinding for a problem, and editContract for a shared contract it
-    corrected.
+    epic and dispatches its agents - runs commands on it. Each dispatched agent is handed one
+    agent-plan page, a child of this epic whose page id is the agent's id; it works from that page,
+    reports back onto it, and writes only that page and the feature-briefs it links to, with their
+    child pages. It never edits this epic or another agent's page. The controller records here what
+    an agent raises: addFinding or editFinding for a problem, and editContract for a shared contract
+    it corrected.
     """
 
 
@@ -58,8 +58,8 @@ _EPIC = PageType(
     name="Epic (major feature)",
     description=(
         "The root of a major feature too large for one feature-brief: it decomposes into several "
-        "child feature-briefs and is built by subagents, each dispatched from an agent page of its "
-        "own under the epic. Use it when the work splits into parts that each ship on their own; "
+        "child feature-briefs and is built by subagents, each dispatched from an agent-plan page of "
+        "its own under the epic. Use it when the work splits into parts that each ship on their own; "
         "for one feature use a feature-brief, and for a small self-contained change use a "
         "simple-change."
     ),
@@ -114,9 +114,9 @@ _EPIC = PageType(
             _list("items", element_fields=("name", "owner", "shape"), description="""
                 Each one interface that crosses an agent boundary: its name, the page id of the agent
                 that defines it in owner, and its exact signature or data shape in shape. A dispatched
-                agent sees only its own agent page and the briefs it links, so anything two agents
-                must agree on is written here before either starts. Record the real signature rather
-                than a description of one: 'returns the parsed config' is not a contract, a
+                agent sees only its own agent-plan page and the briefs it links, so anything two
+                agents must agree on is written here before either starts. Record the real signature
+                rather than a description of one: 'returns the parsed config' is not a contract, a
                 written-out function signature with its argument and return types is. Correct a
                 contract in place with editContract: its id is what agent tasks and briefs point at.
                 """),
@@ -132,19 +132,20 @@ _EPIC = PageType(
                 it.
                 """),
         )),
-        # The plan review's outcome, populated in `planReview`: the decomposition and its agent pages
-        # are reviewed together, before any agent is dispatched. The verdict stays planReview-only;
-        # findings are also recorded in `executing` and `review`, from what dispatched agents report.
+        # The plan review's outcome, populated in `planReview`: the decomposition and its agent-plan
+        # pages are reviewed together, before any agent is dispatched. The verdict stays
+        # planReview-only; findings are also recorded in `executing` and `review`, from what
+        # dispatched agents report.
         SectionSpec("review", "Plan review", (
             _scalar("verdict", choices=_VERDICTS, description="""
-                The review outcome for the decomposition and its agent pages together. build-ready:
-                the agents cover the epic with no gaps and no overlaps, and each could be dispatched
-                from its page alone without getting stuck. needs-changes: at least one blocking
-                finding must be applied before dispatching. needs-human-decision: the work cannot
-                proceed until a person settles a question. Approve unless there are serious gaps,
-                meaning a component no agent owns, two agents owning the same file, a contract two
-                agents need that nobody defines, or an agent task too vague to act on. Minor wording
-                preferences are never a reason to withhold build-ready.
+                The review outcome for the decomposition and its agent-plan pages together.
+                build-ready: the agents cover the epic with no gaps and no overlaps, and each could be
+                dispatched from its page alone without getting stuck. needs-changes: at least one
+                blocking finding must be applied before dispatching. needs-human-decision: the work
+                cannot proceed until a person settles a question. Approve unless there are serious
+                gaps, meaning a component no agent owns, two agents owning the same file, a contract
+                two agents need that nobody defines, or an agent task too vague to act on. Minor
+                wording preferences are never a reason to withhold build-ready.
                 """),
             _list("findings", element_fields=("issue", "severity", "action"), description="""
                 Each one finding against the plan or the work: what is wrong, why it matters, its
@@ -154,7 +155,7 @@ _EPIC = PageType(
                 means an agent would build the wrong thing or two agents would collide; should-fix
                 is real but survivable; nit is polish. Record the finding here AND make the edit its
                 action names, so the plan and this record agree, and correct a finding in place
-                with editFinding. Name the agent page it applies to.
+                with editFinding. Name the agent-plan page it applies to.
                 """),
         )),
     ),
@@ -184,28 +185,29 @@ _EPIC = PageType(
         # draft -> grounding needs only the intent: grounding reads the real repo from that one line.
         transition_cmd("beginGrounding", "draft -> grounding", requires=(("summary", "body"),)),
         # grounding -> decomposition is gated on the grounding having produced a base. From here the
-        # child feature-briefs and the agent pages are created.
+        # child feature-briefs and the agent-plan pages are created.
         transition_cmd("beginDecomposition", "grounding -> decomposition", requires=(
             ("components", "items"),
             ("constraints", "items"),
             ("conflicts", "items"),
             ("documentation", "items"),
         )),
-        # decomposition -> planReview reviews the split AND the agent pages together, before any agent
-        # is dispatched: no agent page may still be in draft (a page-status guard, store-checked).
+        # decomposition -> planReview reviews the split AND the agent-plan pages together, before
+        # any agent is dispatched: no agent-plan page may still be in draft (a page-status guard,
+        # store-checked).
         transition_cmd("submitPlan", "decomposition -> planReview",
                        requires=(("questions", "items"),),
-                       guards=(ChildStateGuard("agent", _AGENT_PLANNED,
-                                               "every agent page must be marked ready"),)),
+                       guards=(ChildStateGuard("agent-plan", _AGENT_PLANNED,
+                                               "every agent-plan page must be marked ready"),)),
         # planReview -> executing requires a verdict to have been recorded (the review happened).
         # `build-ready` is the signal to proceed; `needs-changes` should `reviseDecomposition`
         # instead. The verdict's VALUE is a soft guide (requires only checks presence).
         transition_cmd("approvePlan", "planReview -> executing", requires=(("review", "verdict"),)),
         transition_cmd("reviseDecomposition", "planReview -> decomposition (send the plan back)"),
-        # executing -> review is guarded on every agent page having been accepted (a page-status
-        # guard over the epic's agent children, checked in the store).
+        # executing -> review is guarded on every agent-plan page having been accepted (a
+        # page-status guard over the epic's agent-plan children, checked in the store).
         transition_cmd("submitForReview", "executing -> review", guards=(
-            ChildStateGuard("agent", ("accepted",), "every agent must be accepted"),)),
+            ChildStateGuard("agent-plan", ("accepted",), "every agent must be accepted"),)),
         transition_cmd("reopenDecomposition", "executing -> decomposition"),
         transition_cmd("requestChanges", "review -> executing", agency="either"),
         # `ship` is a human gate AND is guarded: every child feature-brief must itself be `shipped`
@@ -229,8 +231,8 @@ _EPIC = PageType(
 )
 
 
-# An agent page may only be marked ready once its epic has reached `decomposition` or later - not
-# while it is still in `draft` or `grounding` (the base is still being established), nor once
+# An agent-plan page may only be marked ready once its epic has reached `decomposition` or later -
+# not while it is still in `draft` or `grounding` (the base is still being established), nor once
 # `abandoned`. Enforced in the store.
 _EPIC_IN_DECOMPOSITION_OR_LATER = ParentStateGuard(
     parent_type="epic",
@@ -243,8 +245,9 @@ _EPIC_IN_DECOMPOSITION_OR_LATER = ParentStateGuard(
 _MODEL_TIERS = ("cheap", "standard", "capable")
 
 
-# Seeded into every agent page as its first section and written by no command: who writes this page.
-_AGENT_NOTICE = """
+# Seeded into every agent-plan page as its first section and written by no command: who writes
+# this page.
+_AGENT_PLAN_NOTICE = """
     This page is one dispatched agent's whole assignment, and its page id is the agent's id. The
     controller - the session that created the epic above it - writes the assignment, task and
     reporting contract, links the feature-briefs the agent works on, and is the only one to run
@@ -256,9 +259,9 @@ _AGENT_NOTICE = """
     """
 
 
-_AGENT = PageType(
-    tag="agent",
-    name="Agent",
+_AGENT_PLAN = PageType(
+    tag="agent-plan",
+    name="Agent plan",
     description=(
         "One subagent an epic dispatches: its role, capability, exact task and the worktree it "
         "creates, linked to the feature-briefs it works on. Its page id is the agent's id, and the "
@@ -267,13 +270,13 @@ _AGENT = PageType(
     ),
     sections=(
         SectionSpec("notice", "Agent notice", (
-            _prose("body", description="Agent notice fixed text.", fixed=_AGENT_NOTICE),
+            _prose("body", description="Agent notice fixed text.", fixed=_AGENT_PLAN_NOTICE),
         )),
         SectionSpec("assignment", "Assignment", (
             _scalar("role", description="""
                 What this agent is, named as a role a reader recognises - implementer, test writer,
-                integration reviewer. One agent page is one dispatch, so the role describes this run
-                rather than a definition shared with other agents.
+                integration reviewer. One agent-plan page is one dispatch, so the role describes this
+                run rather than a definition shared with other agents.
                 """),
             _scalar("capability", choices=_MODEL_TIERS, description="""
                 The model tier this agent is dispatched on. Name it on every agent: an omitted tier
@@ -293,8 +296,8 @@ _AGENT = PageType(
                 epic it owns and what done looks like, name the shared contracts it touches by their
                 id on the epic, and add only the decisions it needs that its feature-briefs cannot
                 tell it. Link each feature-brief it works on with addLink role works-on, and each
-                agent page that must be accepted before it starts with role depends-on. Point at
-                large artifacts by file path rather than pasting them.
+                agent-plan page that must be accepted before it starts with role depends-on. Point
+                at large artifacts by file path rather than pasting them.
                 """),
         )),
         SectionSpec("reporting", "Reporting contract", (
@@ -349,7 +352,7 @@ _AGENT = PageType(
         set_title_cmd(),
     ),
     fsm=FSMSpec(
-        name="Agent",
+        name="AgentPlan",
         initial="draft",
         states=("draft", "ready", "working", "finished", "blocked", "accepted"),
         terminal_states=("accepted",),
