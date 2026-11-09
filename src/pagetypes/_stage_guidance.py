@@ -195,12 +195,14 @@ use requestChanges to go back to building rather than leave a known gap at the g
 # --- epic --------------------------------------------------------------------
 DECOMPOSITION = """
 decomposition - the grounded base is recorded, and the epic is now split into the pages
-its agents work from. Create each of them as a child of this epic:
+its agents work from. Create each of them as a child of this epic, then schedule them:
 
 - Each feature-brief is created under the epic itself, not under the Features toc page -
   the epic's ship gate only sees briefs that are its own children.
 - Each agent-plan page is created under the epic itself too, one per dispatched agent -
   the epic's plan and review gates only see agent-plan pages that are its own children.
+- The Scheduling section groups the agent-plan pages into the waves the controller
+  dispatches them in, consistent with the depends-on links between them.
 """
 
 # --- simple-change and bug-report, shared ------------------------------------

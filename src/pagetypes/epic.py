@@ -122,6 +122,18 @@ _EPIC = PageType(
                 contract in place with editContract: its id is what agent tasks and briefs point at.
                 """),
         )),
+        SectionSpec("scheduling", "Scheduling", (
+            _prose("body", description="""
+                How the controller dispatches this epic's agent-plan pages, written as the
+                instructions it follows while executing. Group the agent-plan pages into waves and
+                name each page by id under its wave: the agents in one wave run at once, so none of
+                them may need another's work. Say what must be true before the next wave is
+                dispatched - normally that every agent in the earlier waves is accepted and its work
+                merged into main. Keep it consistent with the depends-on links between agent-plan
+                pages: the links are what each agent sees, this section is what the controller
+                dispatches from.
+                """),
+        )),
         SectionSpec("questions", "Questions", (
             _list("items", element_fields=("text", "answer", "needsHuman", "status"),
                   element_fsm=_QUESTION_FSM, description="""
@@ -168,6 +180,7 @@ _EPIC = PageType(
         *list_cmds("documentation", add_args=(_text(),)),
         *list_cmds("contracts", add_args=(_text("name"), _text("owner"), _text("shape")),
                    editable=True),
+        set_prose_cmd("scheduling"),
         # Questions carry the same surface as a feature-brief's: askQuestion (no remove), an answer
         # transition that also writes the answer, and an escalate that raises the needsHuman flag.
         *list_cmds("questions", add_name="askQuestion", label="question", remove=False,
