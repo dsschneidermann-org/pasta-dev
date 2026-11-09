@@ -188,7 +188,6 @@ _EPIC = PageType(
                               description="flag a question as awaiting a human", const=("needsHuman", True)),
         set_scalar_cmd("review", "verdict", name="setReviewVerdict", choices=_VERDICTS,
                        legal_in=("planReview",)),
-        # Findings are recorded at the plan review, while agents build, and in the integration review.
         *list_cmds("review", field="findings", label="finding",
                    add_args=(_text("issue"), _text("severity", choices=_SEVERITIES),
                              _text("action", required=False, choices=_EPIC_FINDING_ACTIONS,
