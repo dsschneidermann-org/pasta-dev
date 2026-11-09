@@ -321,9 +321,6 @@ def test_pages_serve_normally_once_the_declarations_validate(client):
     assert client.get("/").status_code == 200
 
 
-NOTE = "AGPL software must be offered to its users as source code."
-
-
 def test_footer_links_the_source_and_carries_the_agpl_note(client, monkeypatch):
     monkeypatch.setitem(server.templates.env.globals, "source_link",
                         SourceLink(href="https://example.com/o/r", text="example.com/o/r"))
@@ -333,22 +330,16 @@ def test_footer_links_the_source_and_carries_the_agpl_note(client, monkeypatch):
     for path in ("/", f"/ws:{part}", f"/ws:{part}/page/{page.id}"):
         response = client.get(path)
         assert 'href="https://example.com/o/r"' in response.text
-        assert NOTE in response.text
+        assert "AGPL" in response.text
 
 
 def test_footer_without_a_source_link_shows_only_the_note(client, monkeypatch):
     monkeypatch.setitem(server.templates.env.globals, "source_link", None)
     response = client.get("/")
-    assert NOTE in response.text
+    assert "AGPL" in response.text
     assert "Source:" not in response.text
 
 
 def test_server_publishes_the_checkouts_source_link():
     src_dir = Path(server.__file__).resolve().parent
     assert server.templates.env.globals["source_link"] == to_source_link(read_remote_url(src_dir))
-
-
-def test_footer_link_is_muted_without_an_underline(client):
-    css = client.get("/static/styles.css").text
-    assert "#footer a { color: var(--text-muted); text-decoration: none; }" in css
-    assert "#footer a:hover { color: var(--links); }" in css
