@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import ClassVar
 
 from .args import (
@@ -326,15 +326,34 @@ def set_element_field_cmd(section: str, *, name: str, const: tuple[str, bool], d
                                   args=(_text(id_arg),), element_const=(const,), legal_in=legal_in)
 
 
+def edit_element_cmd(section: str, *, args: tuple[ArgSpec, ...], field: str = "items",
+                     singular: str | None = None, label: str | None = None,
+                     name: str | None = None,
+                     legal_in: tuple[str, ...] | None = None) -> CommandSpec:
+    """A SET_ELEMENT_FIELD command that edits the id'd element in place - the edit shape beside the
+    flag shape above. Each of `args` becomes optional and is mapped onto its same-named element field,
+    keeping its choices, so only the fields sent are written and the element keeps its id, position
+    and status. Pass the list's add args to make every field editable. The noun is derived as in
+    list_cmds (edit<Noun>, <noun>Id)."""
+    noun = singular or _singular(field if field != "items" else section)
+    label = label or noun
+    editable = tuple(replace(arg, required=False) for arg in args)
+    return SetElementFieldCommand(name=name or f"edit{_cap(noun)}",
+                                  description=f"edit {_a(label)} {label} in place",
+                                  section=section, field=field,
+                                  args=(_text(f"{noun}Id"), *editable),
+                                  element_map=_same_named(editable), legal_in=legal_in)
+
+
 def is_field_setter(command: CommandSpec) -> bool:
     """Whether `command` writes typed field content into a (section, field).
 
     A SET_SCALAR, a SET_PROSE, an ADD_ELEMENT (including the element-FSM adds addStep / addCase /
     askQuestion), or a page-level ADD_BLOCK. Not setters: an element-scoped ADD_BLOCK (the element
     it fills must exist first, so it is not a stage's own work), REMOVE_* / REORDER_* (structure,
-    not content), SET_ELEMENT_FIELD (a flag on an existing element), ELEMENT_TRANSITION (fires an
-    element's own FSM), TRANSITION / COMPOUND (page-status edges), and the universal ADD_LINK /
-    SET_TITLE.
+    not content), SET_ELEMENT_FIELD (a write to an existing element - a flag or an in-place edit),
+    ELEMENT_TRANSITION (fires an element's own FSM), TRANSITION / COMPOUND (page-status edges), and
+    the universal ADD_LINK / SET_TITLE.
 
     The page-type-agnostic classifier behind the self-direction `do` list, where each field gets
     one entry naming the one command that authors it. It lives here rather than beside that

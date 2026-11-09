@@ -52,6 +52,7 @@ from src.pagetypes.core.commands import (
     RemoveElementCommand,
     ReorderBlockCommand,
     ReorderElementCommand,
+    SetElementFieldCommand,
     SetProseCommand,
     SetScalarCommand,
     SetTitleCommand,
@@ -59,6 +60,7 @@ from src.pagetypes.core.commands import (
     TransitionCommand,
     add_link_cmd,
     blocks_cmds,
+    edit_element_cmd,
     element_blocks_cmds,
     list_cmds,
     set_prose_cmd,
@@ -1253,3 +1255,16 @@ def test_is_field_setter_by_class():
     assert is_field_setter(page_add) and not is_field_setter(element_add)
     assert is_field_setter(set_prose_cmd("summary"))
     assert not is_field_setter(transition_cmd("go", "a -> b"))
+
+
+def test_edit_element_cmd_makes_every_field_optional_and_maps_it_same_named():
+    command = edit_element_cmd("items", args=(_text("text"), _text("kind", choices=("a", "b"))))
+    assert isinstance(command, SetElementFieldCommand)
+    assert command.name == "editItem"
+    assert command.description == "edit an item in place"
+    assert [(arg.name, arg.required) for arg in command.args] == [
+        ("itemId", True), ("text", False), ("kind", False)]
+    assert command.args[2].choices == ("a", "b")            # the add's choices survive
+    assert command.element_map == (("text", "text"), ("kind", "kind"))
+    assert command.element_const == ()
+    assert not is_field_setter(command)                      # never a do-list setter

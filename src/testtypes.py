@@ -46,7 +46,7 @@ fixture.
 
 Command DECLARATION flows through the SAME shared command-helper factories the production types use
 (`set_prose_cmd` / `set_scalar_cmd` / `list_cmds` / `element_cmds` / `set_element_field_cmd` /
-`blocks_cmds` / `element_blocks_cmds` / `transition_cmd` / `transition_on_add_cmd`,
+`edit_element_cmd` / `blocks_cmds` / `element_blocks_cmds` / `transition_cmd` / `transition_on_add_cmd`,
 imported from
 src.pagetypes) - so a fixture reads like a production type and doubles as coverage of those
 helpers, while its command surface (names, args, legality, FSM edges, guards, ref-checks) stays
@@ -71,6 +71,7 @@ from .pagetypes.core.commands import (
     add_link_cmd,
     set_title_cmd,
     blocks_cmds,
+    edit_element_cmd,
     element_blocks_cmds,
     element_cmds,
     list_cmds,
@@ -122,7 +123,7 @@ _QUESTION_FSM = ElementFSMSpec(
 # test-fields - every non-block field kind + the content-mutation patterns.
 # scalar (plain), scalar (enum), prose, and a plain list (multi element fields, one optional,
 # no element FSM). Commands cover set_scalar, set_prose, add_element (append + positioned insert),
-# remove_element, reorder_element, and set_element_field (a boolean const). Single `active` status:
+# remove_element, reorder_element, and set_element_field (a boolean const, and an in-place edit). Single `active` status:
 # this fixture has no lifecycle of its own - it is purely a content surface.
 # ============================================================================
 TEST_FIELDS = PageType(
@@ -146,6 +147,7 @@ TEST_FIELDS = PageType(
         set_prose_cmd("basics", name="setBody", label="body"),
         *list_cmds("items", add_args=(_text("text"), _text("note", required=False))),
         set_element_field_cmd("items", name="flagItem", const=("flagged", True), description="set an item's flag"),
+        edit_element_cmd("items", args=(_text("text"), _text("note", required=False))),
         add_link_cmd(),
         set_title_cmd(),
     ),
