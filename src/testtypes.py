@@ -273,7 +273,7 @@ TEST_FLOW = PageType(
 # a `beginImplementation` guarded on that child's page status (a page-status ChildStateGuard),
 # and `submitForReview` + `ship` guarded on that child's element states (element-status
 # ChildStateGuards whose allowed set accepts done/passed or skipped). ship is also guarded on the
-# page status of its NON-pinned test-flow children, the one guard here over children that can be
+# page status of its non-pinned test-flow children, the one guard here over children that can be
 # absent or archived.
 # ============================================================================
 TEST_LIFECYCLE = PageType(

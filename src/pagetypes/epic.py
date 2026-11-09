@@ -38,7 +38,7 @@ _VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
 _SEVERITIES = ("blocking", "should-fix", "nit")
 _EPIC_FINDING_ACTIONS = ("addAgent", "editAgent", "addContract", "addConstraint", "askQuestion",
                          "editContract", "edit")
-# every agent status but draft: a reopened decomposition must not be refused by agents already at work
+# Every agent status but draft: a reopened decomposition must not be refused by agents already at work
 _AGENT_PLANNED = ("ready", "working", "finished", "blocked", "accepted")
 
 # Seeded into every epic as its first section and written by no command: who may edit this page.
@@ -318,8 +318,8 @@ _AGENT = PageType(
         )),
     ),
     commands=(
-        # The controller's fields are draft-only, so a dispatched agent's own nextActions never
-        # offers them; reopen unlocks them again.
+        # The controller's fields are draft-only, so the dispatched agent is never offered them;
+        # reopen unlocks them again.
         set_scalar_cmd("assignment", "role", legal_in=("draft",)),
         set_scalar_cmd("assignment", "capability", choices=_MODEL_TIERS, legal_in=("draft",)),
         set_scalar_cmd("assignment", "worktree", legal_in=("draft",)),
