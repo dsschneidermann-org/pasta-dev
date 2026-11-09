@@ -27,6 +27,7 @@ from src.pagetypes.core.specs import (
     REORDER_ELEMENT,
     REMOVE_BLOCK,
     REMOVE_ELEMENT,
+    SCALAR,
     SET_ELEMENT_FIELD,
     SET_PROSE,
     SET_SCALAR,
@@ -98,6 +99,7 @@ from src.pagetypes.core.validation import (
     validate_page_type,
     validate_page_types,
     validate_pagetype_block_args,
+    validate_pagetype_fixed_fields,
     validate_pagetype_setter_descriptions,
 )
 from src.pagetypes._registry import get_page_type
@@ -1287,3 +1289,23 @@ def test_a_fixed_prose_field_is_normalized_seeded_and_reseeded():
     assert initial_sections(page_type, stale) == {
         "notice": {"body": "line one\n  indented"}, "summary": {"body": "kept"}}
     assert _prose("body").fixed is None
+
+
+@pytest.mark.parametrize("kind", [SCALAR, LIST, BLOCKS])
+def test_fixed_on_a_non_prose_field_is_reported(kind: str):
+    field = FieldSpec(key="f", kind=kind, fixed="x",
+                      element_fields=("text",) if kind == LIST else None,
+                      block_kinds=_kinds("paragraph") if kind == BLOCKS else ())
+    assert "f: fixed is only valid on a prose field." in validate_field_spec(field)
+
+
+def test_a_command_writing_a_fixed_field_is_reported():
+    page_type = PageType(
+        tag="xtest-fixed-written", name="Fixed", description="ad-hoc",
+        sections=(SectionSpec("notice", "Notice", (_prose("body", fixed="x", description="d"),)),),
+        commands=(set_prose_cmd("notice"),),
+        fsm=FSMSpec(name="XTestFixedWritten", initial="active", states=("active",)))
+    assert validate_pagetype_fixed_fields(page_type) == [
+        "notice.body is fixed - command 'setNotice' may not write it."]
+    assert "xtest-fixed-written: notice.body is fixed - command 'setNotice' may not write it." in (
+        validate_page_type(page_type))
