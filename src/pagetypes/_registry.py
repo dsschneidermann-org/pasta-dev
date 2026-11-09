@@ -24,7 +24,7 @@ from .feature import (
     _IMPLEMENTATION_PLAN,
     _TESTING_PLAN,
 )
-from .epic import _AGENT_PLAN, _EPIC
+from .epic import _AGENT, _EPIC
 from .document import _DOCUMENT
 from .toc import _TOC
 
@@ -45,7 +45,7 @@ REGISTRY: dict[str, PageType] = {
     _IMPLEMENTATION_PLAN.tag: _IMPLEMENTATION_PLAN,
     _TESTING_PLAN.tag: _TESTING_PLAN,
     _EPIC.tag: _EPIC,
-    _AGENT_PLAN.tag: _AGENT_PLAN,
+    _AGENT.tag: _AGENT,
     _DOCUMENT.tag: _DOCUMENT,
     _TOC.tag: _TOC,
 }
