@@ -120,10 +120,11 @@ _QUESTION_FSM = ElementFSMSpec(
 
 # ============================================================================
 # test-fields - every non-block field kind + the content-mutation patterns.
-# scalar (plain), scalar (enum), prose, and a plain list (multi element fields, one optional,
-# no element FSM). Commands cover set_scalar, set_prose, add_element (append + positioned insert),
-# remove_element, reorder_element, and set_element_field (a boolean const). Single `active` status:
-# this fixture has no lifecycle of its own - it is purely a content surface.
+# scalar (plain), scalar (enum), prose, a fixed prose body, and a plain list (multi element fields,
+# one optional, no element FSM). Commands cover set_scalar, set_prose, add_element (append +
+# positioned insert), remove_element, reorder_element, and set_element_field (a boolean const, and
+# an in-place edit). Single `active` status: this fixture has no lifecycle of its own - it is
+# purely a content surface.
 # ============================================================================
 TEST_FIELDS = PageType(
     tag="test-fields",
@@ -139,12 +140,16 @@ TEST_FIELDS = PageType(
             _list("items", element_fields=("text", "note", "flagged"),
                   description="a plain list: a required field, an optional field, and a set-able flag"),
         )),
+        SectionSpec("notice", "Notice", (
+            _prose("body", fixed="Fixture notice: seeded from the declaration and never written.",
+                   description="a fixed prose body - seeded from the page type, no command writes it"),
+        )),
     ),
     commands=(
         set_scalar_cmd("basics", "label"),
         set_scalar_cmd("basics", "kind", choices=("alpha", "beta", "gamma")),
         set_prose_cmd("basics", name="setBody", label="body"),
-        *list_cmds("items", add_args=(_text("text"), _text("note", required=False))),
+        *list_cmds("items", add_args=(_text("text"), _text("note", required=False)), editable=True),
         set_element_field_cmd("items", name="flagItem", const=("flagged", True), description="set an item's flag"),
         add_link_cmd(),
         set_title_cmd(),

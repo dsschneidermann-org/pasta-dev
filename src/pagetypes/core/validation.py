@@ -22,6 +22,7 @@ from .fields import ElementBlocksSpec, FieldSpec, get_element_blocks
 from .specs import (
     BLOCKS,
     LIST,
+    PROSE,
     ElementFSMSpec,
     FSMSpec,
     BLOCK_ARRAY,
@@ -291,6 +292,23 @@ def validate_pagetype_field_setters(page_type: PageType) -> list[str]:
     return errors
 
 
+def validate_pagetype_fixed_fields(page_type: PageType) -> list[str]:
+    """No command writes a fixed field.
+
+    A fixed field's value is its declaration, re-seeded on every backfill, so a command writing it
+    would be overwritten on the next write - and a field a command can write is not fixed.
+    """
+    errors: list[str] = []
+    for command in page_type.commands:
+        if not isinstance(command, FieldCommand):
+            continue
+        field_spec = get_pagetype_field(page_type, command.section, command.field)
+        if field_spec is not None and field_spec.fixed is not None:
+            errors.append(f"{command.section}.{command.field} is fixed - " +
+                          f"command '{command.name}' may not write it.")
+    return errors
+
+
 def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
     """A field setter (SET_SCALAR / SET_PROSE / ADD_ELEMENT) carries a short description of what it
     does ('set the summary', 'add a constraint'), never its field's authoring instruction: that
@@ -378,6 +396,7 @@ def validate_page_type(page_type: PageType) -> list[str]:
     errors.extend(validate_page_machine(page_type))
     errors.extend(validate_pagetype_field_setters(page_type))
     errors.extend(validate_pagetype_setter_descriptions(page_type))
+    errors.extend(validate_pagetype_fixed_fields(page_type))
     errors.extend(validate_pagetype_block_args(page_type))
     return [f"{page_type.tag}: {error}" for error in errors]
 
@@ -513,6 +532,8 @@ def validate_field_spec(field: FieldSpec) -> list[str]:
     fields exactly once. Recurses into every declared kind and element-blocks spec.
     """
     errors: list[str] = []
+    if field.fixed is not None and field.kind != PROSE:
+        errors.append(f"{field.key}: fixed is only valid on a prose field.")
     if field.block_kinds and field.kind != BLOCKS:
         errors.append(f"{field.key}: block_kinds is only valid on a blocks field.")
     if field.kind == BLOCKS and not field.block_kinds:

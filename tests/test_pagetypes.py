@@ -27,6 +27,7 @@ from src.pagetypes.core.specs import (
     REORDER_ELEMENT,
     REMOVE_BLOCK,
     REMOVE_ELEMENT,
+    SCALAR,
     SET_ELEMENT_FIELD,
     SET_PROSE,
     SET_SCALAR,
@@ -39,6 +40,7 @@ from src.pagetypes.core.specs import (
     PROSE,
     ElementFSMSpec,
     FSMSpec,
+    RefCheck,
     status_guidance,
 )
 from src.pagetypes.core.args import BlockKindSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
@@ -52,6 +54,7 @@ from src.pagetypes.core.commands import (
     RemoveElementCommand,
     ReorderBlockCommand,
     ReorderElementCommand,
+    SetElementFieldCommand,
     SetProseCommand,
     SetScalarCommand,
     SetTitleCommand,
@@ -96,6 +99,7 @@ from src.pagetypes.core.validation import (
     validate_page_type,
     validate_page_types,
     validate_pagetype_block_args,
+    validate_pagetype_fixed_fields,
     validate_pagetype_setter_descriptions,
 )
 from src.pagetypes._registry import get_page_type
@@ -1253,3 +1257,69 @@ def test_is_field_setter_by_class():
     assert is_field_setter(page_add) and not is_field_setter(element_add)
     assert is_field_setter(set_prose_cmd("summary"))
     assert not is_field_setter(transition_cmd("go", "a -> b"))
+
+
+def test_an_editable_list_gains_an_in_place_edit_over_its_add_args():
+    *_, edit = list_cmds("items", add_args=(_text("text"), _text("kind", choices=("a", "b"))),
+                         legal_in=("draft",), editable=True)
+    assert isinstance(edit, SetElementFieldCommand)
+    assert edit.name == "editItem"
+    assert edit.description == "edit an item in place"
+    assert [(arg.name, arg.required) for arg in edit.args] == [
+        ("itemId", True), ("text", False), ("kind", False)]
+    assert edit.args[2].choices == ("a", "b")               # the add's choices survive
+    assert edit.element_map == (("text", "text"), ("kind", "kind"))
+    assert edit.element_const == ()
+    assert edit.legal_in == ("draft",)                      # inherited from the list
+    assert not is_field_setter(edit)                         # never a do-list setter
+
+
+def test_a_list_is_not_editable_unless_asked():
+    commands = list_cmds("items", add_args=(_text(),))
+    assert not any(isinstance(command, SetElementFieldCommand) for command in commands)
+
+
+def test_an_editable_list_cannot_carry_a_ref_check():
+    with pytest.raises(ValueError, match="ref_check"):
+        _ = list_cmds("notes", add_args=(_text("questionId"), _text()), editable=True,
+                      ref_check=RefCheck(arg="questionId", scope="parent",
+                                         section="questions", field="items"))
+
+
+def test_a_fixed_prose_field_is_normalized_seeded_and_reseeded():
+    notice = _prose("body", fixed="""
+        line one
+          indented
+        """, description="a fixed notice")
+    assert notice.fixed == "line one\n  indented"
+    page_type = PageType(
+        tag="xtest-fixed", name="Fixed", description="ad-hoc",
+        sections=(SectionSpec("notice", "Notice", (notice,)),
+                  SectionSpec("summary", "Summary", (_prose("body", description="x"),))),
+        commands=(set_prose_cmd("summary"),),
+        fsm=FSMSpec(name="XTestFixedSeed", initial="active", states=("active",)))
+    assert initial_sections(page_type)["notice"]["body"] == "line one\n  indented"
+    stale = {"notice": {"body": "old text"}, "summary": {"body": "kept"}}
+    assert initial_sections(page_type, stale) == {
+        "notice": {"body": "line one\n  indented"}, "summary": {"body": "kept"}}
+    assert _prose("body").fixed is None
+
+
+@pytest.mark.parametrize("kind", [SCALAR, LIST, BLOCKS])
+def test_fixed_on_a_non_prose_field_is_reported(kind: str):
+    field = FieldSpec(key="f", kind=kind, fixed="x",
+                      element_fields=("text",) if kind == LIST else None,
+                      block_kinds=_kinds("paragraph") if kind == BLOCKS else ())
+    assert "f: fixed is only valid on a prose field." in validate_field_spec(field)
+
+
+def test_a_command_writing_a_fixed_field_is_reported():
+    page_type = PageType(
+        tag="xtest-fixed-written", name="Fixed", description="ad-hoc",
+        sections=(SectionSpec("notice", "Notice", (_prose("body", fixed="x", description="d"),)),),
+        commands=(set_prose_cmd("notice"),),
+        fsm=FSMSpec(name="XTestFixedWritten", initial="active", states=("active",)))
+    assert validate_pagetype_fixed_fields(page_type) == [
+        "notice.body is fixed - command 'setNotice' may not write it."]
+    assert "xtest-fixed-written: notice.body is fixed - command 'setNotice' may not write it." in (
+        validate_page_type(page_type))

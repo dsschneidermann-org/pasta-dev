@@ -38,7 +38,18 @@ _QUESTION_FSM = ElementFSMSpec(
 _VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
 _SEVERITIES = ("blocking", "should-fix", "nit")
 _EPIC_FINDING_ACTIONS = ("addWorkstream", "addAgent", "addDispatch", "addContract",
-                         "addConstraint", "askQuestion", "edit")
+                         "addConstraint", "askQuestion", "editContract", "editDispatch", "edit")
+
+# Seeded into every epic as its first section and written by no command: who may edit this page.
+_CONTROLLER_NOTICE = """
+    This epic is the controller's page. Only the controlling agent - the session that created
+    this epic and dispatches its agent plan - runs commands on it or on its agent plan. A
+    dispatched agent works only on its own feature-brief (its workstream's briefId) and that
+    brief's child pages; it never edits this epic, the agent plan, or another workstream's brief.
+    An agent reports by driving its own brief and handing its outcome back to the controller,
+    which records what came back: reportDispatch on the agent plan, addFinding or editFinding
+    here for a problem it raised, and editContract here for a shared contract it corrected.
+    """
 
 
 _EPIC = PageType(
@@ -51,6 +62,9 @@ _EPIC = PageType(
         "feature-brief, and for a small self-contained change use a simple-change."
     ),
     sections=(
+        SectionSpec("notice", "Controller notice", (
+            _prose("body", description="Controller notice fixed text.", fixed=_CONTROLLER_NOTICE),
+        )),
         SectionSpec("summary", "Summary", (
             _prose("body", description="""
                 The intent in a sentence or two: what you want to build and why it is worth building.
@@ -112,7 +126,8 @@ _EPIC = PageType(
                 agent sees only its own brief, so anything two workstreams must agree on is written
                 here before either starts. Record the real signature rather than a description of
                 one: 'returns the parsed config' is not a contract, a written-out function signature
-                with its argument and return types is.
+                with its argument and return types is. Correct a contract in place with
+                editContract: its id is what handoffs and briefs point at.
                 """),
         )),
         SectionSpec("questions", "Questions", (
@@ -127,7 +142,8 @@ _EPIC = PageType(
                 """),
         )),
         # The plan review's outcome, populated in `planReview`: the decomposition and the agent plan
-        # are reviewed together, before any agent is dispatched.
+        # are reviewed together, before any agent is dispatched. The verdict stays planReview-only;
+        # findings are also recorded in `executing` and `review`, from what dispatched agents report.
         SectionSpec("review", "Plan review", (
             _scalar("verdict", choices=_VERDICTS, description="""
                 The review outcome for the decomposition and the agent plan together. build-ready:
@@ -140,11 +156,14 @@ _EPIC = PageType(
                 act on. Minor wording preferences are never a reason to withhold build-ready.
                 """),
             _list("findings", element_fields=("issue", "severity", "action"), description="""
-                Each one plan-review finding: what is wrong, why it matters before any agent is
-                dispatched, its severity, and the action taken to apply it. blocking means an agent
-                would build the wrong thing or two agents would collide; should-fix is real but
-                survivable; nit is polish. Record the finding here AND make the edit its action
-                names, so the plan and this record agree. Say which workstream or agent it applies to.
+                Each one finding against the plan or the work: what is wrong, why it matters, its
+                severity, and the action taken to apply it. Recorded at the plan review before any
+                agent is dispatched, and again while executing and in review, where the controller
+                records what a dispatched agent reported or what integration turned up. blocking
+                means an agent would build the wrong thing or two agents would collide; should-fix
+                is real but survivable; nit is polish. Record the finding here AND make the edit its
+                action names, so the plan and this record agree, and correct a finding in place
+                with editFinding. Say which workstream or agent it applies to.
                 """),
         )),
     ),
@@ -157,7 +176,8 @@ _EPIC = PageType(
         *list_cmds("workstreams", add_args=(
             _text("name"), _text("briefId", required=False), _text("scope"),
             _text("dependsOn", required=False))),
-        *list_cmds("contracts", add_args=(_text("name"), _text("owner"), _text("shape"))),
+        *list_cmds("contracts", add_args=(_text("name"), _text("owner"), _text("shape")),
+                   editable=True),
         # Questions carry the same surface as a feature-brief's: askQuestion (no remove), an answer
         # transition that also writes the answer, and an escalate that raises the needsHuman flag.
         *list_cmds("questions", add_name="askQuestion", label="question", remove=False,
@@ -172,7 +192,7 @@ _EPIC = PageType(
                    add_args=(_text("issue"), _text("severity", choices=_SEVERITIES),
                              _text("action", required=False, choices=_EPIC_FINDING_ACTIONS,
                                    description="how the finding was applied to the plan")),
-                   legal_in=("planReview",)),
+                   legal_in=("planReview", "executing", "review"), editable=True),
         # draft -> grounding needs only the intent: grounding reads the real repo from that one line.
         transition_cmd("beginGrounding", "draft -> grounding", requires=(("summary", "body"),)),
         # grounding -> decomposition is gated on the grounding having produced a base. From here the
@@ -274,7 +294,9 @@ _AGENT_PLAN = PageType(
                 mechanical single-file work whose content is already written down, standard for
                 multi-file integration and judgement, and capable for architecture and final review.
                 Define a role once and dispatch it many times rather than writing a near-identical
-                agent per workstream.
+                agent per workstream. Confine every mission to the agent's own feature-brief and
+                that brief's child pages: a dispatched agent never runs a command on the epic, this
+                agent plan, or another workstream's brief, because those are the controller's pages.
                 """),
         )),
         SectionSpec("dispatches", "Dispatches", (
@@ -307,7 +329,9 @@ _AGENT_PLAN = PageType(
                 and where the agent's full written report lives. An agent reports by driving its own
                 brief, not by handing prose back, so name the page status you expect rather than the
                 summary you want to read. Accepting a dispatch without this check is how a
-                workstream comes to be believed done while its brief still says otherwise.
+                workstream comes to be believed done while its brief still says otherwise. The
+                agent writes only its own brief; the controller, never the agent, records the
+                result here (reportDispatch) and on the epic (addFinding, editFinding, editContract).
                 """),
         )),
     ),

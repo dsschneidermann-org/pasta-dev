@@ -28,9 +28,14 @@ class FieldSpec:
     element_blocks: tuple[ElementBlocksSpec, ...] = ()
     block_kinds: tuple[BlockKindSpec, ...] = ()
     description: str = ""
+    # Prose fields only: the field's whole value, seeded from this declaration on create and on
+    # every backfill. No command may write a fixed field.
+    fixed: str | None = None
 
     def __post_init__(self):
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
+        if self.fixed is not None:
+            object.__setattr__(self, "fixed", dedent(self.fixed.strip("\n")).rstrip())
 
 
 @dataclass(frozen=True)
@@ -83,8 +88,8 @@ def _scalar(key: str, *, choices: tuple[str, ...] | None = None, description: st
     return FieldSpec(key=key, kind=SCALAR, choices=choices, description=description)
 
 
-def _prose(key: str, *, description: str = "") -> FieldSpec:
-    return FieldSpec(key=key, kind=PROSE, description=description)
+def _prose(key: str, *, description: str = "", fixed: str | None = None) -> FieldSpec:
+    return FieldSpec(key=key, kind=PROSE, description=description, fixed=fixed)
 
 
 def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec | None = None,

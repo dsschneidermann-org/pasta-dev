@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import ClassVar
 
 from .args import (
@@ -251,6 +251,7 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
               element_blocks: tuple[str, ...] = (),
               legal_in: tuple[str, ...] | None = None, ref_check: RefCheck | None = None,
               add: bool = True, remove: bool = True, reorder: bool = True,
+              editable: bool = False,
               add_name: str | None = None, remove_name: str | None = None,
               reorder_name: str | None = None) -> tuple[CommandSpec, ...]:
     """The add/remove/reorder commands for a list field; select a subset with add=/remove=/reorder=
@@ -263,6 +264,11 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
     add supports positioned insert' invariants hold by construction. An add that references
     another page carries a `ref_check`; the remove and reorder name an element already on this
     page, so they do not.
+
+    `editable` adds edit<Noun>(<noun>Id, ...), a SET_ELEMENT_FIELD over the add's args made
+    optional, so an element is corrected in place: only the fields sent are written, and it keeps
+    its id, position and status. A ref-checked list cannot be editable, because references are
+    checked on adds only.
 
     `element_blocks` names the element fields whose blocks the add can carry. Each gives the
     add one optional array arg named after that element field, holding the blocks the element is
@@ -296,6 +302,15 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
             description=f"move {_a(label)} {label} to an anchored position (precedingId guards a stale read)",
             section=section, field=field,
             args=(_text(id_arg), _integer("toIndex"), _PRECEDING), legal_in=legal_in))
+    if editable:
+        if ref_check is not None:
+            raise ValueError(f"list_cmds({section!r}): an editable list cannot carry a ref_check - " +
+                             "references are checked on adds only, so an edit would bypass it")
+        edit_args = tuple(replace(arg, required=False) for arg in add_args or ())
+        out.append(SetElementFieldCommand(
+            name=f"edit{cap}", description=f"edit {_a(label)} {label} in place",
+            section=section, field=field, args=(_text(id_arg), *edit_args),
+            element_map=_same_named(edit_args), legal_in=legal_in))
     return tuple(out)
 
 
@@ -332,9 +347,9 @@ def is_field_setter(command: CommandSpec) -> bool:
     A SET_SCALAR, a SET_PROSE, an ADD_ELEMENT (including the element-FSM adds addStep / addCase /
     askQuestion), or a page-level ADD_BLOCK. Not setters: an element-scoped ADD_BLOCK (the element
     it fills must exist first, so it is not a stage's own work), REMOVE_* / REORDER_* (structure,
-    not content), SET_ELEMENT_FIELD (a flag on an existing element), ELEMENT_TRANSITION (fires an
-    element's own FSM), TRANSITION / COMPOUND (page-status edges), and the universal ADD_LINK /
-    SET_TITLE.
+    not content), SET_ELEMENT_FIELD (a write to an existing element - a flag or an in-place edit),
+    ELEMENT_TRANSITION (fires an element's own FSM), TRANSITION / COMPOUND (page-status edges), and
+    the universal ADD_LINK / SET_TITLE.
 
     The page-type-agnostic classifier behind the self-direction `do` list, where each field gets
     one entry naming the one command that authors it. It lives here rather than beside that

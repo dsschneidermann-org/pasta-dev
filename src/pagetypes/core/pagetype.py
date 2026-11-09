@@ -160,12 +160,16 @@ def initial_sections(
     Idempotent: a section or field already present in `existing` is carried over untouched: only
     a section or field the page type declares but `existing` lacks gets its empty default. This
     lets the same function seed a freshly created page (no `existing`) and backfill an older page
-    against a page type that has since gained a section or field.
+    against a page type that has since gained a section or field. A fixed field is always written
+    from its declaration, so a backfill also refreshes it.
     """
     sections: dict[str, dict[str, Any]] = {}
     for section in page_type.sections:
         field_values: dict[str, Any] = dict((existing or {}).get(section.key, {}))
         for field_spec in section.fields:
+            if field_spec.fixed is not None:
+                field_values[field_spec.key] = field_spec.fixed
+                continue
             if field_spec.key in field_values:
                 continue
             if field_spec.kind == PROSE:
