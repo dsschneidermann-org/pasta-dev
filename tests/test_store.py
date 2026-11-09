@@ -49,6 +49,16 @@ def _mutate(store, workspace_id, page_id, commands):
     return store.mutate_page_batch(workspace_id, page_id, stamped)
 
 
+def _closed_flow_child(store, workspace_id, parent_id):
+    """A non-pinned test-flow child of `parent_id`, taken to `closed` - what the test-lifecycle
+    ship guard over its test-flow children accepts."""
+    flow = store.create_page(workspace_id, "test-flow", "Change", parent_id=parent_id).page
+    _mutate(store, workspace_id, flow.id, [{"command": "open"}])
+    _mutate(store, workspace_id, flow.id, [
+        {"command": "close", "args": {"sha": "abc123", "message": "Ship it"}}])
+    return flow
+
+
 def test_create_and_list_workspace(store):
     workspace = store.create_workspace("demo")
     assert workspace.id.startswith("ws:")
@@ -313,6 +323,7 @@ def test_ship_guard_blocks_until_child_complete(store):
         {"command": "markCheckPassed", "args": {"checkId": check_created[0]}}
     ])
     _mutate(store, workspace.id, parent.id, [{"command": "submitForReview"}])
+    _closed_flow_child(store, workspace.id, parent.id)
     shipped = _mutate(store, workspace.id, parent.id, [{"command": "ship"}]).page
     assert shipped.status == "done"
 
@@ -348,6 +359,7 @@ def test_skip_counts_as_addressed_for_review_and_ship(store):
         {"command": "markCheckSkipped", "args": {"checkId": check_created[0]}}
     ])
     _mutate(store, workspace.id, parent.id, [{"command": "submitForReview"}])
+    _closed_flow_child(store, workspace.id, parent.id)
     shipped = _mutate(store, workspace.id, parent.id, [{"command": "ship"}]).page
     assert shipped.status == "done"
 
