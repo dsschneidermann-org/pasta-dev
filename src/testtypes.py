@@ -121,8 +121,8 @@ _QUESTION_FSM = ElementFSMSpec(
 
 # ============================================================================
 # test-fields - every non-block field kind + the content-mutation patterns.
-# scalar (plain), scalar (enum), prose, and a plain list (multi element fields, one optional,
-# no element FSM). Commands cover set_scalar, set_prose, add_element (append + positioned insert),
+# scalar (plain), scalar (enum), prose, a fixed prose body, and a plain list (multi element fields,
+# one optional, no element FSM). Commands cover set_scalar, set_prose, add_element (append + positioned insert),
 # remove_element, reorder_element, and set_element_field (a boolean const, and an in-place edit). Single `active` status:
 # this fixture has no lifecycle of its own - it is purely a content surface.
 # ============================================================================
@@ -139,6 +139,10 @@ TEST_FIELDS = PageType(
         SectionSpec("items", "Items", (
             _list("items", element_fields=("text", "note", "flagged"),
                   description="a plain list: a required field, an optional field, and a set-able flag"),
+        )),
+        SectionSpec("notice", "Notice", (
+            _prose("body", fixed="Fixture notice: seeded from the declaration and never written.",
+                   description="a fixed prose body - seeded from the page type, no command writes it"),
         )),
     ),
     commands=(

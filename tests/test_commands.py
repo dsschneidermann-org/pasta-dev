@@ -52,6 +52,17 @@ def test_create_page_initial_state():
     assert page.sections["items"]["items"] == []
 
 
+def test_create_seeds_a_fixed_field_and_every_write_restores_it():
+    notice = get_pagetype_field(FIELDS, "notice", "body")
+    assert notice is not None and notice.fixed is not None
+    factory = make_counter()
+    page = create_page(FIELDS, "P", None, factory)
+    assert page.sections["notice"]["body"] == notice.fixed
+    page.sections["notice"]["body"] = "tampered"
+    after = apply_command(page, FIELDS, "setLabel", {"label": "x"}, factory).page
+    assert after.sections["notice"]["body"] == notice.fixed
+
+
 def test_create_page_rejects_blank_title():
     with pytest.raises(ValidationError):
         _ = create_page(FIELDS, "   ", None, make_counter())

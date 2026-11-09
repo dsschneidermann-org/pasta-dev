@@ -280,7 +280,7 @@ def test_blocks_page_text_includes_inline_content():
 # ============================================================================
 # full page shape on render - every section shown, empty -> *None.*, + Child pages
 # ============================================================================
-FIELDS_SECTION_NAMES = ["Basics", "Items"]
+FIELDS_SECTION_NAMES = ["Basics", "Items", "Notice"]
 
 
 def _page_with_children(child_ids):
@@ -313,6 +313,12 @@ def test_render_filled_fields_are_not_none():
     assert "The body." in md
     assert "*None.*" in md                        # but still-empty fields (label, items) show it
     assert "*test-fields* · `active`" in md      # page-header meta: type italic, status in code
+
+
+def test_render_shows_a_fixed_field():
+    md = render_page(create_page(FIELDS, "Blank", None, make_counter()), FIELDS)
+    assert "## Notice" in md
+    assert "Fixture notice: seeded from the declaration and never written." in md
 
 
 def test_render_child_pages_direct_titled_links_only():
