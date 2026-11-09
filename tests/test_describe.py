@@ -89,6 +89,12 @@ def test_describe_mutations_ignore_requirements_surfaces_gated_transition():
     assert skipped["beginPlanning"] is True
 
 
+def test_describe_page_type_reports_a_fixed_field():
+    sections = {section["key"]: section for section in describe_page_type(FIELDS)["sections"]}
+    assert sections["notice"]["fields"][0]["fixed"] is True
+    assert sections["basics"]["fields"][2]["fixed"] is False      # the ordinary prose body
+
+
 def test_describe_page_type_keeps_the_instruction_on_the_field_not_the_setter():
     """A field's authoring instruction is reported once, on the field; its setter carries a short
     description instead."""

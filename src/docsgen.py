@@ -185,6 +185,8 @@ def _field_line(field: dict[str, Any]) -> str:
             f"`{spec['field']}` ({', '.join(spec['kinds'])})" for spec in field["elementBlocks"]))
     if field.get("blockKinds"):
         notes.append("block kinds: " + ", ".join(f"`{kind}`" for kind in field["blockKinds"]))
+    if field.get("fixed"):
+        notes.append("fixed - seeded from the page type, no command writes it")
     return _bullet(f"  - `{field['key']}` *({field['kind']})*", field["description"], notes)
 
 
