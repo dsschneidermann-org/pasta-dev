@@ -135,7 +135,6 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         # read a page-level field's vocabulary, now that no command name carries it.
                         "blockKinds": ([block.kind for block in field_spec.block_kinds]
                                        if field_spec.kind == BLOCKS else None),
-                        # a field whose value is its declaration: seeded on create, no command writes it
                         "fixed": field_spec.fixed is not None,
                         "description": field_spec.description,
                     }

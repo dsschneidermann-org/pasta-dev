@@ -38,7 +38,7 @@ _QUESTION_FSM = ElementFSMSpec(
 _VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
 _SEVERITIES = ("blocking", "should-fix", "nit")
 _EPIC_FINDING_ACTIONS = ("addWorkstream", "addAgent", "addDispatch", "addContract",
-                         "addConstraint", "askQuestion", "editContract", "redispatch", "edit")
+                         "addConstraint", "askQuestion", "editContract", "editDispatch", "edit")
 
 # Seeded into every epic as its first section and written by no command: who may edit this page.
 _CONTROLLER_NOTICE = """
