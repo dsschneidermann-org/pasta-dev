@@ -18,7 +18,6 @@ from .core.args import _boolean, _integer, _text
 from .core.commands import (
     add_link_cmd,
     set_title_cmd,
-    edit_element_cmd,
     element_cmds,
     list_cmds,
     set_element_field_cmd,
@@ -40,13 +39,6 @@ _VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
 _SEVERITIES = ("blocking", "should-fix", "nit")
 _EPIC_FINDING_ACTIONS = ("addWorkstream", "addAgent", "addDispatch", "addContract",
                          "addConstraint", "askQuestion", "editContract", "redispatch", "edit")
-# Findings are recorded at the plan review, while agents build, and in the integration review.
-_FINDING_STATUSES = ("planReview", "executing", "review")
-# The add args of the two in-place-editable lists, shared by their add and their edit.
-_FINDING_ARGS = (_text("issue"), _text("severity", choices=_SEVERITIES),
-                 _text("action", required=False, choices=_EPIC_FINDING_ACTIONS,
-                       description="how the finding was applied"))
-_CONTRACT_ARGS = (_text("name"), _text("owner"), _text("shape"))
 
 # Seeded into every epic as its first section and written by no command: who may edit this page.
 _CONTROLLER_NOTICE = """
@@ -184,8 +176,8 @@ _EPIC = PageType(
         *list_cmds("workstreams", add_args=(
             _text("name"), _text("briefId", required=False), _text("scope"),
             _text("dependsOn", required=False))),
-        *list_cmds("contracts", add_args=_CONTRACT_ARGS),
-        edit_element_cmd("contracts", args=_CONTRACT_ARGS),
+        *list_cmds("contracts", add_args=(_text("name"), _text("owner"), _text("shape")),
+                   editable=True),
         # Questions carry the same surface as a feature-brief's: askQuestion (no remove), an answer
         # transition that also writes the answer, and an escalate that raises the needsHuman flag.
         *list_cmds("questions", add_name="askQuestion", label="question", remove=False,
@@ -196,10 +188,12 @@ _EPIC = PageType(
                               description="flag a question as awaiting a human", const=("needsHuman", True)),
         set_scalar_cmd("review", "verdict", name="setReviewVerdict", choices=_VERDICTS,
                        legal_in=("planReview",)),
-        *list_cmds("review", field="findings", label="finding", add_args=_FINDING_ARGS,
-                   legal_in=_FINDING_STATUSES),
-        edit_element_cmd("review", field="findings", label="finding", args=_FINDING_ARGS,
-                         legal_in=_FINDING_STATUSES),
+        # Findings are recorded at the plan review, while agents build, and in the integration review.
+        *list_cmds("review", field="findings", label="finding",
+                   add_args=(_text("issue"), _text("severity", choices=_SEVERITIES),
+                             _text("action", required=False, choices=_EPIC_FINDING_ACTIONS,
+                                   description="how the finding was applied")),
+                   legal_in=("planReview", "executing", "review"), editable=True),
         # draft -> grounding needs only the intent: grounding reads the real repo from that one line.
         transition_cmd("beginGrounding", "draft -> grounding", requires=(("summary", "body"),)),
         # grounding -> decomposition is gated on the grounding having produced a base. From here the

@@ -46,8 +46,8 @@ fixture.
 
 Command DECLARATION flows through the SAME shared command-helper factories the production types use
 (`set_prose_cmd` / `set_scalar_cmd` / `list_cmds` / `element_cmds` / `set_element_field_cmd` /
-`edit_element_cmd` / `blocks_cmds` / `element_blocks_cmds` / `transition_cmd` /
-`transition_on_add_cmd`, imported from
+`blocks_cmds` / `element_blocks_cmds` / `transition_cmd` / `transition_on_add_cmd`,
+imported from
 src.pagetypes) - so a fixture reads like a production type and doubles as coverage of those
 helpers, while its command surface (names, args, legality, FSM edges, guards, ref-checks) stays
 exactly what it was when hand-written. The field-spec and command helpers are shared with
@@ -71,7 +71,6 @@ from .pagetypes.core.commands import (
     add_link_cmd,
     set_title_cmd,
     blocks_cmds,
-    edit_element_cmd,
     element_blocks_cmds,
     element_cmds,
     list_cmds,
@@ -150,9 +149,8 @@ TEST_FIELDS = PageType(
         set_scalar_cmd("basics", "label"),
         set_scalar_cmd("basics", "kind", choices=("alpha", "beta", "gamma")),
         set_prose_cmd("basics", name="setBody", label="body"),
-        *list_cmds("items", add_args=(_text("text"), _text("note", required=False))),
+        *list_cmds("items", add_args=(_text("text"), _text("note", required=False)), editable=True),
         set_element_field_cmd("items", name="flagItem", const=("flagged", True), description="set an item's flag"),
-        edit_element_cmd("items", args=(_text("text"), _text("note", required=False))),
         add_link_cmd(),
         set_title_cmd(),
     ),

@@ -251,6 +251,7 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
               element_blocks: tuple[str, ...] = (),
               legal_in: tuple[str, ...] | None = None, ref_check: RefCheck | None = None,
               add: bool = True, remove: bool = True, reorder: bool = True,
+              editable: bool = False,
               add_name: str | None = None, remove_name: str | None = None,
               reorder_name: str | None = None) -> tuple[CommandSpec, ...]:
     """The add/remove/reorder commands for a list field; select a subset with add=/remove=/reorder=
@@ -263,6 +264,11 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
     add supports positioned insert' invariants hold by construction. An add that references
     another page carries a `ref_check`; the remove and reorder name an element already on this
     page, so they do not.
+
+    `editable` adds edit<Noun>(<noun>Id, ...), a SET_ELEMENT_FIELD over the add's args made
+    optional, so an element is corrected in place: only the fields sent are written, and it keeps
+    its id, position and status. A ref-checked list cannot be editable, because references are
+    checked on adds only.
 
     `element_blocks` names the element fields whose blocks the add can carry. Each gives the
     add one optional array arg named after that element field, holding the blocks the element is
@@ -296,6 +302,15 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
             description=f"move {_a(label)} {label} to an anchored position (precedingId guards a stale read)",
             section=section, field=field,
             args=(_text(id_arg), _integer("toIndex"), _PRECEDING), legal_in=legal_in))
+    if editable:
+        if ref_check is not None:
+            raise ValueError(f"list_cmds({section!r}): an editable list cannot carry a ref_check - " +
+                             "references are checked on adds only, so an edit would bypass it")
+        edit_args = tuple(replace(arg, required=False) for arg in add_args or ())
+        out.append(SetElementFieldCommand(
+            name=f"edit{cap}", description=f"edit {_a(label)} {label} in place",
+            section=section, field=field, args=(_text(id_arg), *edit_args),
+            element_map=_same_named(edit_args), legal_in=legal_in))
     return tuple(out)
 
 
@@ -324,25 +339,6 @@ def set_element_field_cmd(section: str, *, name: str, const: tuple[str, bool], d
     id_arg = f"{singular or _singular(section)}Id"
     return SetElementFieldCommand(name=name, description=description, section=section, field=field,
                                   args=(_text(id_arg),), element_const=(const,), legal_in=legal_in)
-
-
-def edit_element_cmd(section: str, *, args: tuple[ArgSpec, ...], field: str = "items",
-                     singular: str | None = None, label: str | None = None,
-                     name: str | None = None,
-                     legal_in: tuple[str, ...] | None = None) -> CommandSpec:
-    """A SET_ELEMENT_FIELD command that edits the id'd element in place - the edit shape beside the
-    flag shape above. Each of `args` becomes optional and is mapped onto its same-named element field,
-    keeping its choices, so only the fields sent are written and the element keeps its id, position
-    and status. Pass the list's add args to make every field editable. The noun is derived as in
-    list_cmds (edit<Noun>, <noun>Id)."""
-    noun = singular or _singular(field if field != "items" else section)
-    label = label or noun
-    editable = tuple(replace(arg, required=False) for arg in args)
-    return SetElementFieldCommand(name=name or f"edit{_cap(noun)}",
-                                  description=f"edit {_a(label)} {label} in place",
-                                  section=section, field=field,
-                                  args=(_text(f"{noun}Id"), *editable),
-                                  element_map=_same_named(editable), legal_in=legal_in)
 
 
 def is_field_setter(command: CommandSpec) -> bool:

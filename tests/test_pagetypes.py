@@ -40,6 +40,7 @@ from src.pagetypes.core.specs import (
     PROSE,
     ElementFSMSpec,
     FSMSpec,
+    RefCheck,
     status_guidance,
 )
 from src.pagetypes.core.args import BlockKindSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
@@ -61,7 +62,6 @@ from src.pagetypes.core.commands import (
     TransitionCommand,
     add_link_cmd,
     blocks_cmds,
-    edit_element_cmd,
     element_blocks_cmds,
     list_cmds,
     set_prose_cmd,
@@ -1259,17 +1259,31 @@ def test_is_field_setter_by_class():
     assert not is_field_setter(transition_cmd("go", "a -> b"))
 
 
-def test_edit_element_cmd_makes_every_field_optional_and_maps_it_same_named():
-    command = edit_element_cmd("items", args=(_text("text"), _text("kind", choices=("a", "b"))))
-    assert isinstance(command, SetElementFieldCommand)
-    assert command.name == "editItem"
-    assert command.description == "edit an item in place"
-    assert [(arg.name, arg.required) for arg in command.args] == [
+def test_an_editable_list_gains_an_in_place_edit_over_its_add_args():
+    *_, edit = list_cmds("items", add_args=(_text("text"), _text("kind", choices=("a", "b"))),
+                         legal_in=("draft",), editable=True)
+    assert isinstance(edit, SetElementFieldCommand)
+    assert edit.name == "editItem"
+    assert edit.description == "edit an item in place"
+    assert [(arg.name, arg.required) for arg in edit.args] == [
         ("itemId", True), ("text", False), ("kind", False)]
-    assert command.args[2].choices == ("a", "b")            # the add's choices survive
-    assert command.element_map == (("text", "text"), ("kind", "kind"))
-    assert command.element_const == ()
-    assert not is_field_setter(command)                      # never a do-list setter
+    assert edit.args[2].choices == ("a", "b")               # the add's choices survive
+    assert edit.element_map == (("text", "text"), ("kind", "kind"))
+    assert edit.element_const == ()
+    assert edit.legal_in == ("draft",)                      # inherited from the list
+    assert not is_field_setter(edit)                         # never a do-list setter
+
+
+def test_a_list_is_not_editable_unless_asked():
+    commands = list_cmds("items", add_args=(_text(),))
+    assert not any(isinstance(command, SetElementFieldCommand) for command in commands)
+
+
+def test_an_editable_list_cannot_carry_a_ref_check():
+    with pytest.raises(ValueError, match="ref_check"):
+        _ = list_cmds("notes", add_args=(_text("questionId"), _text()), editable=True,
+                      ref_check=RefCheck(arg="questionId", scope="parent",
+                                         section="questions", field="items"))
 
 
 def test_a_fixed_prose_field_is_normalized_seeded_and_reseeded():
