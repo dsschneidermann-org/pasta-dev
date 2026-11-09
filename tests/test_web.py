@@ -9,12 +9,14 @@ production types are documentable - a fixture has no doc to link to.
 """
 
 import re
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 import src.server as server
 from src.errors import ValidationError
+from src.source_link import SourceLink, read_remote_url, to_source_link
 from src.store import Store
 
 
@@ -317,3 +319,27 @@ def test_pages_serve_normally_once_the_declarations_validate(client):
     # No lingering quarantine on the HTTP side either.
     server.STORE.create_workspace("demo")
     assert client.get("/").status_code == 200
+
+
+def test_footer_links_the_source_and_carries_the_agpl_note(client, monkeypatch):
+    monkeypatch.setitem(server.templates.env.globals, "source_link",
+                        SourceLink(href="https://example.com/o/r", text="example.com/o/r"))
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    part = workspace.id.removeprefix("ws:")
+    for path in ("/", f"/ws:{part}", f"/ws:{part}/page/{page.id}"):
+        response = client.get(path)
+        assert 'href="https://example.com/o/r"' in response.text
+        assert "AGPL" in response.text
+
+
+def test_footer_without_a_source_link_shows_only_the_note(client, monkeypatch):
+    monkeypatch.setitem(server.templates.env.globals, "source_link", None)
+    response = client.get("/")
+    assert "AGPL" in response.text
+    assert "Source:" not in response.text
+
+
+def test_server_publishes_the_checkouts_source_link():
+    src_dir = Path(server.__file__).resolve().parent
+    assert server.templates.env.globals["source_link"] == to_source_link(read_remote_url(src_dir))
