@@ -1268,3 +1268,22 @@ def test_edit_element_cmd_makes_every_field_optional_and_maps_it_same_named():
     assert command.element_map == (("text", "text"), ("kind", "kind"))
     assert command.element_const == ()
     assert not is_field_setter(command)                      # never a do-list setter
+
+
+def test_a_fixed_prose_field_is_normalized_seeded_and_reseeded():
+    notice = _prose("body", fixed="""
+        line one
+          indented
+        """, description="a fixed notice")
+    assert notice.fixed == "line one\n  indented"
+    page_type = PageType(
+        tag="xtest-fixed", name="Fixed", description="ad-hoc",
+        sections=(SectionSpec("notice", "Notice", (notice,)),
+                  SectionSpec("summary", "Summary", (_prose("body", description="x"),))),
+        commands=(set_prose_cmd("summary"),),
+        fsm=FSMSpec(name="XTestFixedSeed", initial="active", states=("active",)))
+    assert initial_sections(page_type)["notice"]["body"] == "line one\n  indented"
+    stale = {"notice": {"body": "old text"}, "summary": {"body": "kept"}}
+    assert initial_sections(page_type, stale) == {
+        "notice": {"body": "line one\n  indented"}, "summary": {"body": "kept"}}
+    assert _prose("body").fixed is None
