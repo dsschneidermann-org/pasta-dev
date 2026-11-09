@@ -1,4 +1,4 @@
-"""The `epic` page type, and the `agent-plan` pinned under it.
+"""The `epic` page type, and the `agent` pages created under it.
 
 The two are declared together because they are designed against each other rather than
 on their own, and reading one without the other would hide the coupling.
@@ -36,20 +36,20 @@ _QUESTION_FSM = ElementFSMSpec(
 
 _VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
 _SEVERITIES = ("blocking", "should-fix", "nit")
-_EPIC_FINDING_ACTIONS = ("addWorkstream", "addAgent", "addDispatch", "addContract",
-                         "addConstraint", "askQuestion", "editContract", "editDispatch", "edit")
+_EPIC_FINDING_ACTIONS = ("addAgent", "editAgent", "addContract", "addConstraint", "askQuestion",
+                         "editContract", "edit")
 # every agent status but draft: a reopened decomposition must not be refused by agents already at work
 _AGENT_PLANNED = ("ready", "working", "finished", "blocked", "accepted")
 
 # Seeded into every epic as its first section and written by no command: who may edit this page.
 _CONTROLLER_NOTICE = """
-    This epic is the controller's page. Only the controlling agent - the session that created
-    this epic and dispatches its agent plan - runs commands on it or on its agent plan. A
-    dispatched agent works only on its own feature-brief (its workstream's briefId) and that
-    brief's child pages; it never edits this epic, the agent plan, or another workstream's brief.
-    An agent reports by driving its own brief and handing its outcome back to the controller,
-    which records what came back: reportDispatch on the agent plan, addFinding or editFinding
-    here for a problem it raised, and editContract here for a shared contract it corrected.
+    This epic is the controller's page. Only the controlling agent - the session that created this
+    epic and dispatches its agents - runs commands on it. Each dispatched agent is handed one agent
+    page, a child of this epic whose page id is the agent's id; it works from that page, reports back
+    onto it, and writes only that page and the feature-briefs it links to, with their child pages.
+    It never edits this epic or another agent's page. The controller records here what an agent
+    raises: addFinding or editFinding for a problem, and editContract for a shared contract it
+    corrected.
     """
 
 
@@ -58,9 +58,10 @@ _EPIC = PageType(
     name="Epic (major feature)",
     description=(
         "The root of a major feature too large for one feature-brief: it decomposes into several "
-        "child feature-briefs and is built by subagents dispatched from its pinned agent plan. Use "
-        "it when the work splits into parts that each ship on their own; for one feature use a "
-        "feature-brief, and for a small self-contained change use a simple-change."
+        "child feature-briefs and is built by subagents, each dispatched from an agent page of its "
+        "own under the epic. Use it when the work splits into parts that each ship on their own; "
+        "for one feature use a feature-brief, and for a small self-contained change use a "
+        "simple-change."
     ),
     sections=(
         SectionSpec("notice", "Controller notice", (
@@ -79,14 +80,14 @@ _EPIC = PageType(
             _list("items", element_fields=("name",), description="""
                 Each one part of the system this epic touches, named as a real file, module, or
                 subsystem path you CONFIRMED exists while grounding. One per element. This is the
-                epic's whole surface area: a component missed here becomes a workstream nobody owns,
-                and a component two workstreams both touch is a collision found only when the second
-                agent's edits land on the first agent's file.
+                epic's whole surface area: a component missed here is one no agent owns, and a
+                component two agents both touch is a collision found only when the second agent's
+                edits land on the first agent's file.
                 """),
         )),
         SectionSpec("constraints", "Constraints", (
             _list("items", element_fields=("text",), description="""
-                Each one project-wide requirement every workstream must respect, with its exact
+                Each one project-wide requirement every agent must respect, with its exact
                 values copied verbatim: version floors, dependency limits, naming and copy rules,
                 platform and performance targets. Every dispatched agent inherits these and none of
                 them can see the others' work, so a constraint recorded vaguely here is one that
@@ -98,8 +99,8 @@ _EPIC = PageType(
                 Each one collision with what already exists, found while grounding: prior art that
                 already solves part of this, an interface this epic would break, or a competing
                 in-flight change. Name the file or page it collides with and say what has to give.
-                Record collisions BETWEEN the intended workstreams here too, because two agents
-                editing one file is the failure this list exists to catch before either is dispatched.
+                Record collisions BETWEEN the intended agents here too, because two agents editing
+                one file is the failure this list exists to catch before either is dispatched.
                 """),
         )),
         SectionSpec("documentation", "Documentation", (
@@ -109,26 +110,15 @@ _EPIC = PageType(
                 so reconciling it when the work lands is mechanical rather than a fresh investigation.
                 """),
         )),
-        SectionSpec("workstreams", "Workstreams", (
-            _list("items", element_fields=("name", "briefId", "scope", "dependsOn"), description="""
-                Each one child feature-brief of this epic: its name, the page id of that brief in
-                briefId, the slice of the epic it owns in scope, and the workstreams that must finish
-                before it in dependsOn. CREATE the feature-brief as a child of this epic and record
-                its id here. The ship gate can only check briefs that exist, so a workstream listed
-                without a brief page lets an epic ship having built nothing. Split along seams where
-                one agent can work without reading another's code, and keep each slice something that
-                could ship on its own.
-                """),
-        )),
         SectionSpec("contracts", "Shared contracts", (
             _list("items", element_fields=("name", "owner", "shape"), description="""
-                Each one interface that crosses a workstream boundary: its name, the workstream that
-                defines it in owner, and its exact signature or data shape in shape. A dispatched
-                agent sees only its own brief, so anything two workstreams must agree on is written
-                here before either starts. Record the real signature rather than a description of
-                one: 'returns the parsed config' is not a contract, a written-out function signature
-                with its argument and return types is. Correct a contract in place with
-                editContract: its id is what handoffs and briefs point at.
+                Each one interface that crosses an agent boundary: its name, the page id of the agent
+                that defines it in owner, and its exact signature or data shape in shape. A dispatched
+                agent sees only its own agent page and the briefs it links, so anything two agents
+                must agree on is written here before either starts. Record the real signature rather
+                than a description of one: 'returns the parsed config' is not a contract, a
+                written-out function signature with its argument and return types is. Correct a
+                contract in place with editContract: its id is what agent tasks and briefs point at.
                 """),
         )),
         SectionSpec("questions", "Questions", (
@@ -138,23 +128,23 @@ _EPIC = PageType(
                 decidable question rather than a topic. Set needsHuman when only a person can settle
                 it: a product call, a trade-off with no technically correct answer, or anything
                 carrying cost or policy consequences. Answer it here once decided, because a question
-                still open when the dispatches begin is answered differently by every agent that
-                reaches it.
+                still open when the agents start is answered differently by every agent that reaches
+                it.
                 """),
         )),
-        # The plan review's outcome, populated in `planReview`: the decomposition and the agent plan
+        # The plan review's outcome, populated in `planReview`: the decomposition and its agent pages
         # are reviewed together, before any agent is dispatched. The verdict stays planReview-only;
         # findings are also recorded in `executing` and `review`, from what dispatched agents report.
         SectionSpec("review", "Plan review", (
             _scalar("verdict", choices=_VERDICTS, description="""
-                The review outcome for the decomposition and the agent plan together. build-ready:
-                the workstreams cover the epic with no gaps and no overlaps, and an agent could be
-                dispatched against any one of them without getting stuck. needs-changes: at least one
-                blocking finding must be applied before dispatching. needs-human-decision: the work
-                cannot proceed until a person settles a question. Approve unless there are serious
-                gaps, meaning a component no workstream owns, two workstreams owning the same file, a
-                contract two workstreams need that nobody defines, or an agent mission too vague to
-                act on. Minor wording preferences are never a reason to withhold build-ready.
+                The review outcome for the decomposition and its agent pages together. build-ready:
+                the agents cover the epic with no gaps and no overlaps, and each could be dispatched
+                from its page alone without getting stuck. needs-changes: at least one blocking
+                finding must be applied before dispatching. needs-human-decision: the work cannot
+                proceed until a person settles a question. Approve unless there are serious gaps,
+                meaning a component no agent owns, two agents owning the same file, a contract two
+                agents need that nobody defines, or an agent task too vague to act on. Minor wording
+                preferences are never a reason to withhold build-ready.
                 """),
             _list("findings", element_fields=("issue", "severity", "action"), description="""
                 Each one finding against the plan or the work: what is wrong, why it matters, its
@@ -164,7 +154,7 @@ _EPIC = PageType(
                 means an agent would build the wrong thing or two agents would collide; should-fix
                 is real but survivable; nit is polish. Record the finding here AND make the edit its
                 action names, so the plan and this record agree, and correct a finding in place
-                with editFinding. Say which workstream or agent it applies to.
+                with editFinding. Name the agent page it applies to.
                 """),
         )),
     ),
@@ -174,9 +164,6 @@ _EPIC = PageType(
         *list_cmds("constraints", add_args=(_text(),)),
         *list_cmds("conflicts", add_args=(_text(),)),
         *list_cmds("documentation", add_args=(_text(),)),
-        *list_cmds("workstreams", add_args=(
-            _text("name"), _text("briefId", required=False), _text("scope"),
-            _text("dependsOn", required=False))),
         *list_cmds("contracts", add_args=(_text("name"), _text("owner"), _text("shape")),
                    editable=True),
         # Questions carry the same surface as a feature-brief's: askQuestion (no remove), an answer
@@ -197,17 +184,17 @@ _EPIC = PageType(
         # draft -> grounding needs only the intent: grounding reads the real repo from that one line.
         transition_cmd("beginGrounding", "draft -> grounding", requires=(("summary", "body"),)),
         # grounding -> decomposition is gated on the grounding having produced a base. From here the
-        # child feature-briefs and the agent plan are authored.
+        # child feature-briefs and the agent pages are created.
         transition_cmd("beginDecomposition", "grounding -> decomposition", requires=(
             ("components", "items"),
             ("constraints", "items"),
             ("conflicts", "items"),
             ("documentation", "items"),
         )),
-        # decomposition -> planReview reviews the split AND the agent plan together, before any agent
-        # is dispatched: the agent-plan child must be `ready` (a page-status guard, store-checked).
+        # decomposition -> planReview reviews the split AND the agent pages together, before any agent
+        # is dispatched: no agent page may still be in draft (a page-status guard, store-checked).
         transition_cmd("submitPlan", "decomposition -> planReview",
-                       requires=(("workstreams", "items"), ("questions", "items")),
+                       requires=(("questions", "items"),),
                        guards=(ChildStateGuard("agent", _AGENT_PLANNED,
                                                "every agent page must be marked ready"),)),
         # planReview -> executing requires a verdict to have been recorded (the review happened).
@@ -215,8 +202,8 @@ _EPIC = PageType(
         # instead. The verdict's VALUE is a soft guide (requires only checks presence).
         transition_cmd("approvePlan", "planReview -> executing", requires=(("review", "verdict"),)),
         transition_cmd("reviseDecomposition", "planReview -> decomposition (send the plan back)"),
-        # executing -> review is guarded on every dispatch having been accepted (an element-status
-        # guard across the pinned agent plan, checked in the store).
+        # executing -> review is guarded on every agent page having been accepted (a page-status
+        # guard over the epic's agent children, checked in the store).
         transition_cmd("submitForReview", "executing -> review", guards=(
             ChildStateGuard("agent", ("accepted",), "every agent must be accepted"),)),
         transition_cmd("reopenDecomposition", "executing -> decomposition"),
