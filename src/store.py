@@ -1081,15 +1081,18 @@ class Store:
         """The message of the first CHILD-state guard `command` fails on `page`, or None.
 
         Looks DOWN at `page`'s children. A failure says other pages' work is unfinished; it does not
-        make authoring on THIS page premature, so it never suppresses a field setter.
+        make authoring on THIS page premature, so it never suppresses a field setter. Only live
+        children count, and a page with no live child of the guarded type fails the guard.
         """
         if not isinstance(command, StatusTransitionCommand):
             return None
         for guard in command.guards:
-            for child_id in page.child_ids:
-                child = workspace.pages.get(child_id)
-                if child is None or child.type != guard.child_type:
-                    continue
+            children = [child for child_id in page.child_ids
+                        if (child := workspace.pages.get(child_id)) is not None
+                        and child.type == guard.child_type and not child.archived]
+            if not children:
+                return f"{guard.message} (there is no '{guard.child_type}' child page)"
+            for child in children:
                 if guard.section is None or guard.field is None:
                     # page-status form: the child page's own status must be allowed
                     if child.status not in guard.allowed:

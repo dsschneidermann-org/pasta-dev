@@ -164,13 +164,15 @@ class RefCheck:
 class ChildStateGuard:
     """A cross-page transition guard over the status of a page's children, evaluated in the store.
 
-    For every child page of type `child_type`, in one of two forms:
+    It holds when the page has at least one non-archived child of type `child_type` and every such
+    child passes, in one of two forms:
     - element form (`section`/`field` given): every element in that list field must have a status
       in `allowed`;
     - page form (`section`/`field` omitted): the child page's own status must be in `allowed`.
-    `allowed` is the set of statuses that satisfy the guard - usually one, but more than one lets a
-    guard treat several as equivalent (e.g. a step counts as addressed when done or skipped).
-    Otherwise the transition is rejected with `message`.
+    An archived child is history and is not counted, and with no live child of the type the guard
+    fails rather than passing over nothing. `allowed` is the set of statuses that satisfy the guard
+    - usually one, but more than one lets a guard treat several as equivalent (e.g. a step counts as
+    addressed when done or skipped). Otherwise the transition is rejected with `message`.
     """
     child_type: str
     allowed: tuple[str, ...]
