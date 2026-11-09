@@ -129,9 +129,10 @@ _EPIC = PageType(
                 name each page by id under its wave: the agents in one wave run at once, so none of
                 them may need another's work. Say what must be true before the next wave is
                 dispatched - normally that every agent in the earlier waves is accepted and its work
-                merged into main. Keep it consistent with the depends-on links between agent-plan
-                pages: the links are what each agent sees, this section is what the controller
-                dispatches from.
+                integrated into the branch the next wave starts from, which may be main or a
+                worktree branch of the epic's own. Keep it consistent with the depends-on links
+                between agent-plan pages: the links are what each agent sees, this section is what
+                the controller dispatches from.
                 """),
         )),
         SectionSpec("questions", "Questions", (
