@@ -461,8 +461,7 @@ def _add_element(page: Page, page_type: PageType, command: AddElementCommand,
 def _apply_element_writes(element: dict[str, Any], command: ElementWriteCommand,
                           args: dict[str, Any]) -> None:
     """Set an element's mapped-arg fields and any literal `element_const` fields in place. A mapped
-    arg sent as null counts as not sent - the same rule the arg validator applies - so a write
-    never blanks a field."""
+    arg sent as null counts as not sent, so a write never blanks a field."""
     for element_field, arg_name in command.element_map:
         if args.get(arg_name) is not None:
             element[element_field] = args[arg_name]

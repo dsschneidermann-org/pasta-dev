@@ -168,7 +168,7 @@ def initial_sections(
         field_values: dict[str, Any] = dict((existing or {}).get(section.key, {}))
         for field_spec in section.fields:
             if field_spec.fixed is not None:
-                field_values[field_spec.key] = field_spec.fixed   # the declaration is its only source
+                field_values[field_spec.key] = field_spec.fixed
                 continue
             if field_spec.key in field_values:
                 continue

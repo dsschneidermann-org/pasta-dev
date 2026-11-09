@@ -46,8 +46,8 @@ fixture.
 
 Command DECLARATION flows through the SAME shared command-helper factories the production types use
 (`set_prose_cmd` / `set_scalar_cmd` / `list_cmds` / `element_cmds` / `set_element_field_cmd` /
-`edit_element_cmd` / `blocks_cmds` / `element_blocks_cmds` / `transition_cmd` / `transition_on_add_cmd`,
-imported from
+`edit_element_cmd` / `blocks_cmds` / `element_blocks_cmds` / `transition_cmd` /
+`transition_on_add_cmd`, imported from
 src.pagetypes) - so a fixture reads like a production type and doubles as coverage of those
 helpers, while its command surface (names, args, legality, FSM edges, guards, ref-checks) stays
 exactly what it was when hand-written. The field-spec and command helpers are shared with
@@ -122,9 +122,10 @@ _QUESTION_FSM = ElementFSMSpec(
 # ============================================================================
 # test-fields - every non-block field kind + the content-mutation patterns.
 # scalar (plain), scalar (enum), prose, a fixed prose body, and a plain list (multi element fields,
-# one optional, no element FSM). Commands cover set_scalar, set_prose, add_element (append + positioned insert),
-# remove_element, reorder_element, and set_element_field (a boolean const, and an in-place edit). Single `active` status:
-# this fixture has no lifecycle of its own - it is purely a content surface.
+# one optional, no element FSM). Commands cover set_scalar, set_prose, add_element (append +
+# positioned insert), remove_element, reorder_element, and set_element_field (a boolean const, and
+# an in-place edit). Single `active` status: this fixture has no lifecycle of its own - it is
+# purely a content surface.
 # ============================================================================
 TEST_FIELDS = PageType(
     tag="test-fields",

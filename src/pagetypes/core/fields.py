@@ -28,8 +28,8 @@ class FieldSpec:
     element_blocks: tuple[ElementBlocksSpec, ...] = ()
     block_kinds: tuple[BlockKindSpec, ...] = ()
     description: str = ""
-    # PROSE only: the field's whole value, seeded from this declaration on create and on every
-    # backfill. No command may write a fixed field (validate_pagetype_fixed_fields).
+    # Prose fields only: the field's whole value, seeded from this declaration on create and on
+    # every backfill. No command may write a fixed field.
     fixed: str | None = None
 
     def __post_init__(self):
