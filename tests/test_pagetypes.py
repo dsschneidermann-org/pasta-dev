@@ -108,7 +108,7 @@ from src.pagetypes.architecture import _ARCHITECTURE
 from src.pagetypes.bug_report import _BUG_REPORT
 from src.pagetypes.decision_record import _DECISION_RECORD
 from src.pagetypes.document import _DOCUMENT
-from src.pagetypes.epic import _AGENT_PLAN, _EPIC
+from src.pagetypes.epic import _AGENT_PLAN, _EPIC, _SOLUTION_DESIGN, _SOLUTION_RESEARCH
 from src.pagetypes.feature import (
     _FEATURE_BRIEF,
     _FEATURE_SPEC,
@@ -134,7 +134,8 @@ def _kinds(*names: str) -> tuple[BlockKindSpec, ...]:
 # mode empties that map, and these invariants must keep covering production all the same.
 PRODUCTION_TYPES = {page_type.tag: page_type for page_type in (
     _ARCHITECTURE, _DECISION_RECORD, _BUG_REPORT, _SIMPLE_CHANGE, _FEATURE_BRIEF, _FEATURE_SPEC,
-    _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _DOCUMENT, _TOC,
+    _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _SOLUTION_RESEARCH, _SOLUTION_DESIGN,
+    _DOCUMENT, _TOC,
 )}
 
 # Structural invariants must hold for EVERY page type - production and hand-authored fixture alike.
@@ -958,14 +959,14 @@ def test_validate_block_and_validate_blocks_are_one_grammar():
 def test_the_block_surface_is_three_commands_per_field():
     """The headline outcome, and the only place it is pinned.
 
-    One add per blocks field - seven page-level fields plus one block-bearing element field - and
+    One add per blocks field - nine page-level fields plus one block-bearing element field - and
     no in-place edit at all: a block is replaced by removing it and adding at its slot.
     """
     adds = [command.name
             for page_type in PRODUCTION_TYPES.values()
             for command in page_type.commands
             if command.kind == ADD_BLOCK]
-    assert len(adds) == 8
+    assert len(adds) == 10
     document = {command.name for command in PRODUCTION_TYPES["document"].commands}
     assert document == {"addBody", "removeBlock", "reorderBlock", "addLink", "setTitle"}
 
