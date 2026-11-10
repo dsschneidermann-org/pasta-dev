@@ -400,6 +400,25 @@ def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
         call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "nope", "text": "x"})
 
 
+def test_get_workspace_guidance_tool_reads_back_what_was_set(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "draftHint", "text": "drafting"})
+    assert call(mcp, "getWorkspaceGuidance", {"workspaceId": wid}) == {
+        "workspaceId": wid,
+        "fields": [
+            {"field": "buildTool", "description": "the build tool this workspace uses", "text": None},
+            {"field": "draftHint", "description": "a hint shown while drafting", "text": "drafting"},
+            {"field": "reviewHint", "description": "a hint shown while reviewing", "text": None},
+        ],
+        "undeclared": {},
+    }
+
+
+def test_get_workspace_guidance_unknown_workspace_is_tool_error(mcp):
+    with pytest.raises(ToolError, match="not found"):
+        call(mcp, "getWorkspaceGuidance", {"workspaceId": "ws:missing"})
+
+
 # --- the event cache behind a write's full next -------------------------------
 def _guidance_is_due(cache, wid, pid):
     return cache.is_due(wid, pid, server.GUIDANCE_EMITTED, time.monotonic())
