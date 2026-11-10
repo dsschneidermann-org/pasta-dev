@@ -137,7 +137,7 @@ Pages are not free-form text either. A field is a scalar, a prose body, a list o
 
 ## Write your own process
 
-The lifecycles above are data, not framework internals. Each page type is one module under `src/pagetypes/`, holding its sections, fields, commands, guards and state machine, so adding a status or an edge is a declaration rather than a code path. The stage prose lives together in `src/pagetypes/_stage_guidance.py`, which means you can read and revise your whole process as prose, in one file. And `setWorkspaceGuidance` sets per-field house rules at runtime, without touching either, while `getWorkspaceGuidance` reads them all back.
+The lifecycles above are data, not framework internals. Each page type is one module under `src/pagetypes/`, holding its sections, fields, commands, guards and state machine, so adding a status or an edge is a declaration rather than a code path. The stage prose lives together in `src/pagetypes/_stage_guidance.py`, which means you can read and revise your whole process as prose, in one file. And `setWorkspaceGuidance` sets per-field house rules at runtime, without touching either.
 
 Want your agent to always run the linter before review, or always write the ADR before the code? Add it to the status that owns that moment, and it will be there when the moment arrives.
 
