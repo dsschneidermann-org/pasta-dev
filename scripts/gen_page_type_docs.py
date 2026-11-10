@@ -2,13 +2,13 @@
 
 The content is produced purely by `src.docsgen` (unit-tested); this driver only does the
 I/O: it splits the emitted docs into one `docsite/page-types/<tag>-<state>.md` file each, plus a
-generated `docsite/page-types/states.md` toctree index, then prints what it wrote.
+generated `docsite/page-types/states.md` toctree index, then prints what it wrote and removed.
 
     uv run python scripts/gen_page_type_docs.py
 
-It does NOT touch the hand-authored per-type overview docs (`page-types/<tag>.md`), and it does
-not delete previously generated files - remove a stale `<tag>-<state>.md` by hand if a state is
-ever dropped from a page type. Re-run after changing the page-type registry or the doc templates.
+Every `.md` in that directory is generated, so it deletes any the registry no longer produces,
+such as the page of a state dropped from a page type. Re-run after changing the page-type registry
+or the doc templates.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))   # make `src` importable when run as a bare script
 
-from src.docsgen import STATES_INDEX_STEM, all_state_docs, render_states_index
+from src.docsgen import STATES_INDEX_STEM, all_state_docs, render_states_index, stale_stems
 
 PAGE_TYPES_DIR = _REPO_ROOT / "docsite" / "page-types"
 
@@ -43,7 +43,13 @@ def main() -> None:
         print(f"wrote {path.relative_to(PAGE_TYPES_DIR.parent.parent)}")
         written += 1
 
-    print(f"\n{written} files written to {PAGE_TYPES_DIR} ({skipped} unchanged)")
+    stale = stale_stems((path.stem for path in PAGE_TYPES_DIR.glob("*.md")), docs)
+    for stem in stale:
+        path = PAGE_TYPES_DIR / f"{stem}.md"
+        path.unlink()
+        print(f"removed {path.relative_to(PAGE_TYPES_DIR.parent.parent)}")
+
+    print(f"\n{written} files written to {PAGE_TYPES_DIR} ({skipped} unchanged, {len(stale)} removed)")
 
 
 if __name__ == "__main__":

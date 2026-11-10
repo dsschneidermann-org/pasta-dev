@@ -24,6 +24,7 @@ points make the FSM walk trivial:
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterable, Mapping
 from types import ModuleType
 from typing import Any
 
@@ -307,3 +308,8 @@ def render_states_index(registry: dict[str, PageType] | None = None) -> str:
                 lines.append(_stem(page_type.tag, state) + ".md")
     lines.append("```")
     return "\n".join(lines) + "\n"
+
+
+def stale_stems(existing: Iterable[str], docs: Mapping[str, str]) -> list[str]:
+    """The stems among `existing` that `docs` no longer generates, such as a dropped state's page."""
+    return sorted(set(existing) - set(docs))
