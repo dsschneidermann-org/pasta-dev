@@ -32,3 +32,25 @@ GROUNDING_TOOL_DESC = (
     "grounding - for example, a knowledge-graph MCP server queried instead of grepping and "
     "loading whole files."
 )
+
+RESEARCH_SOURCES_FIELD = "researchSources"
+RESEARCH_SOURCES_LABEL = "RESEARCH SOURCES GUIDANCE: "
+RESEARCH_SOURCES_DESC = (
+    "The outside sources a research agent may read for prior art - for example, named "
+    "documentation MCP servers or URLs - and whether web search is allowed."
+)
+
+HUMAN_REACH_FIELD = "humanReach"
+HUMAN_REACH_LABEL = "HUMAN REACH GUIDANCE: "
+HUMAN_REACH_DESC = (
+    "How to reach the human when the work stops at a human gate or a question waits on them - "
+    "for example, a push notification, then one question at a time in the terminal."
+)
+
+SUBAGENT_DISPATCH_FIELD = "subagentDispatch"
+SUBAGENT_DISPATCH_LABEL = "SUBAGENT DISPATCH GUIDANCE: "
+SUBAGENT_DISPATCH_DESC = (
+    "How this workspace defines and launches subagents - for example, which model each "
+    "capability tier maps to, the agent type or tool that launches them, whether they run in "
+    "parallel or in the background, and how a run is handed its agent-plan page id."
+)

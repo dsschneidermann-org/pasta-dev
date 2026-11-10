@@ -193,16 +193,210 @@ use requestChanges to go back to building rather than leave a known gap at the g
 """
 
 # --- epic --------------------------------------------------------------------
-DECOMPOSITION = """
-decomposition - the grounded base is recorded, and the epic is now split into the pages
-its agents work from. Create each of them as a child of this epic, then schedule them:
+EPIC_DRAFT = """
+draft - the epic exists and nothing has been looked at. This status is for capturing
+what the user wants and why, in their words, before anyone researches it. The work
+of it:
 
-- Each feature-brief is created under the epic itself, not under the Features toc page -
-  the epic's ship gate only sees briefs that are its own children.
-- Each agent-plan page is created under the epic itself too, one per dispatched agent -
-  the epic's plan and review gates only see agent-plan pages that are its own children.
+- Write the summary as the outcome they want, not a solution.
+- If they have not said why, ask one open question in their terms with nothing to
+  pick from. Do not offer approaches yet: options offered now steer what they tell
+  you.
+- Record the why as they said it.
+- Draw out the goals, non-goals and anti-goals and record them as outcomes, marking
+  what you filled in as your proposal. They are what the approaches are judged
+  against, so they are written before any approach exists and cannot be fitted to
+  one.
+
+No code is read here. Recon belongs to the research agent, so this page's context
+stays small. Begin research once the summary, the why and the outcomes are written.
+"""
+
+RESEARCHING = """
+researching - the intent is captured, and a research agent is finding out what is true
+and what could be built, on the epic's solution-research page. This status is for
+dispatching that agent and waiting, not for researching. The work of it:
+
+- Create a researcher agent-plan page under the epic at standard capability, linked
+  works-on to the research page, with worktree none: the run reads code, it never
+  edits it. Its task carries the summary, the why and any answered questions.
+- When the research is submitted for judging, create a fresh judge agent-plan page at
+  the same capability against the same page. The judge sets the verdict and fires
+  report or revise; on revise, redispatch the researcher with the findings.
+- Accept a run only from its page. A run that answers with a long reply instead of a
+  filled page has failed and is redispatched. Accept each finished agent-plan page,
+  because the epic's later gates count every agent-plan page under it.
+- Allow one extra round for minor findings; a pass that again turns up only minor
+  findings is a pass.
+
+Do not open the research page beyond its digest and its questions. Present the
+findings once the research page is reported.
+"""
+
+DECIDING = """
+deciding - research is in, and this is the conversation that turns it into the
+user's choice. It is the one stage where the controller talks the work through with
+them. The work of it:
+
+- Read the research digest and questions. Ask each open one here, flagged needsHuman,
+  and put them to the user one at a time, building each on their last answer or on
+  a research fact and saying what the answer changes. A proposal with your reason
+  often beats a question.
+- Play back your understanding in short chunks, marking what they said as theirs and
+  what you filled in as your proposal, and ask what is wrong or missing. Refine the
+  outcomes as the conversation settles them, turning a confirmed proposal into what
+  the user said.
+- Then, in a message of its own, lay out the approaches with their trade-offs and the
+  recommendation and ask which way to go. Record the pick as the chosen approach, and
+  the pick itself as an answered question.
+- If an answer rules out every approach or changes the ask, reopen research with that
+  answer in the researcher's task rather than design on a stale set.
+
+Nothing is designed here. Choosing the approach is a human gate: drive up to it
+and stop.
+"""
+
+DESIGNING = """
+designing - the user has picked an approach, and a design agent is writing it up on
+the epic's solution-design page. This status is for running the design and its check,
+not for designing. The work of it:
+
+- Create a designer agent-plan page at capable capability - the one stage making open
+  decisions every agent after it inherits - linked works-on to the design page, with
+  worktree none. Its task carries the chosen approach ids, the outcomes, the answered
+  questions and the research page id.
+- When the design is submitted for check, create a fresh reviewer agent-plan page at
+  the same capability, handed only the design page. It reads the page cold as the
+  builder who must plan from it, records its questions and findings, sets the outcome
+  and verdict, and fires markReady or revise.
+- On revise, redispatch the designer to sort the builder questions and apply the
+  findings. Bring every question it escalates to the human in one message, most
+  important first; answer them in this epic's questions, then redispatch the designer
+  to fold the answers in and resubmit.
+- The check yields one round of questions for the human. A second pass only
+  verifies, raising blocking findings at most.
+
+Submit the design for sign-off once the design page is ready.
+"""
+
+DESIGN_REVIEW = """
+designReview - the design page is ready and frozen, and this is the human's sign-off.
+Nothing is decomposed or built until they give it. The work of it:
+
+- Put the design digest in front of them with a link to the design page and the
+  decisions marked proposal, so they can check your calls while reading.
+- Answer their questions from the page. A change they want goes back through
+  requestDesignChanges with their words in the designer's task; a change of approach
+  goes back through reconsiderApproach.
+
+"Sounds good" to a digest is not approval of a page they have not opened. Approval is
+a human firing approveDesign: drive up to it and stop.
+"""
+
+DECOMPOSITION = """
+decomposition - the design is signed off. This status is for sealing it and splitting
+it into the pages the build agents work from. The work of it:
+
+- Seal the design page first; a design that can still move is not one to split.
+- Split along the design's expected changes into feature-briefs, each created under
+  the epic itself, not under the Features toc page - the epic's ship gate only sees
+  briefs that are its own children. Every expected change is owned by exactly one
+  brief and every acceptance criterion is delivered by at least one.
+- Turn every interface that crosses between two briefs into a shared contract with an
+  owner, its shape copied from the design.
+- Create one agent-plan page per build agent under the epic itself too - the epic's
+  plan and review gates only see agent-plan pages that are its own children. Give each
+  a capability: cheap for mechanical single-file work, standard for ordinary
+  multi-file work, capable only for breadth, a critical domain or open design. Its
+  task names the design decisions and contracts it touches by id, never the
+  session's history.
 - The Scheduling section groups the agent-plan pages into the waves the controller
-  dispatches them in, consistent with the depends-on links between them.
+  dispatches them in, consistent with the depends-on links between them: each wave
+  leaves a working, verifiable state, and runs at most five agents at once.
+
+If the split shows the design cannot be built as written, reopen the design rather
+than patch it in a brief: a human signs the changed design off again.
+"""
+
+
+# --- solution-research and solution-design -----------------------------------
+INVESTIGATING = """
+investigating - you are the research agent, handed the epic's intent and nothing else.
+This page is your whole output: the controller reads its digest, and nobody reads your
+reply. The work of it:
+
+- Restate the ask, then read the codebase from where it lands, following callers and
+  imports until the blast radius stops growing. Give every recon entry its basis:
+  observed when you opened it, inferred when it follows from something you opened,
+  assumed when neither.
+- Read the outside sources this workspace allows for prior art: libraries, upstream
+  documentation, comparable designs.
+- Generate several real ways of building it, cull those that work against the why or
+  that the code rules out, and keep two or three grounded in the recon. Give each a
+  prediction that should hold if it is right and a falsifier that would show it wrong,
+  and judge each against the epic's outcomes. Recommend one.
+- Turn what only the user can settle into questions; never ask what the code or the
+  epic already answers.
+- Write the digest last.
+
+Do not design the solution, write code, or run a command on the epic or on any
+agent-plan page. Submit for judging once a stranger could choose between the
+approaches from this page alone.
+"""
+
+JUDGING = """
+judging - the research is written, and a fresh judge who did not write it checks it
+before anyone relies on it. The work of it:
+
+- Open a sample of the entries marked observed and confirm they say what the page
+  claims; one that does not check out is a blocking finding, and so is an inference
+  passed off as observed.
+- Check the approaches genuinely differ, each grounded in the recon, and that the
+  dropped approaches explain the culling. An approach whose falsifier could never be
+  observed is a blocking finding.
+- Check the digest says nothing the page does not.
+
+Record each problem as a finding, set the verdict afresh, and fire report on pass or
+revise otherwise. Minor findings alone are a pass.
+"""
+
+DRAFTING = """
+drafting - you are the design agent, handed the chosen approach, the epic's outcomes
+and answered questions, and the research page to read. This page is what a human
+will sign off. The work of it:
+
+- Copy the intent from the epic, then grow the chosen approach into a strategy a
+  builder could plan from: the parts, what each is responsible for, how data moves,
+  and where pure logic ends and effects begin.
+- Record every shaping decision with its alternatives and reason, marking your own
+  calls as proposals.
+- Write each interface's exact shape, every expected change by path, and acceptance
+  criteria a reviewer can verify.
+- Design the smallest thing that meets the outcomes: no configurability, extension
+  points or generality nobody asked for.
+- After a check, resolve each builder question the page, the epic or the research
+  already answers, settle each minor one as a proposal decision, and escalate the
+  ones only the user can answer; then stop and report which ones wait on them.
+  Once their answers are on the epic, resolve those and fold the answers in.
+
+Do not decompose the work or write code. Submit for check once every builder question
+is resolved and the digest matches the page.
+"""
+
+CHECKING = """
+checking - the design is written, and a fresh reviewer reads it as the builder who must
+plan from it, without the conversation that produced it. The work of it:
+
+- Read this page, opening the research page only to check the expected changes
+  against its recon. Add the questions you would need answered before planning, where
+  a wrong guess would change the build, most important first; skip what the page
+  leaves to the builder and what you could decide yourself.
+- Check the design against the verdict's rubric and record each problem as a finding.
+- Set the builder-check outcome and the verdict afresh on every pass.
+
+Fire markReady when the verdict is pass and nothing important is left; otherwise fire
+revise. On a second pass, raise only blocking findings and no new questions for the
+human.
 """
 
 # --- simple-change and bug-report, shared ------------------------------------

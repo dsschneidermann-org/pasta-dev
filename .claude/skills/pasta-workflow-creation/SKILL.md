@@ -95,7 +95,8 @@ optionally the statuses it is allowed in. Names follow the field they write:
 ### Relationships across pages
 
 - **Pinned children** are declared on the parent and created in the same step as the
-  parent (a feature brief creates its spec, implementation plan and testing plan).
+  parent (a feature brief creates its spec, implementation plan and testing plan; an
+  epic creates its research and design pages).
 - **Ordinary children** are created later, as the work needs them (an epic's feature
   briefs, and one agent-plan page per agent it dispatches).
 - A **child guard** holds a parent's transition until its direct children of a given type
