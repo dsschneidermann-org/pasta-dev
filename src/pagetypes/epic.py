@@ -30,6 +30,9 @@ from ._workspace_guidance import (
     RESEARCH_SOURCES_DESC,
     RESEARCH_SOURCES_FIELD,
     RESEARCH_SOURCES_LABEL,
+    SUBAGENT_DISPATCH_DESC,
+    SUBAGENT_DISPATCH_FIELD,
+    SUBAGENT_DISPATCH_LABEL,
 )
 from .core.specs import (
     AutoChildSpec,
@@ -302,6 +305,11 @@ _EPIC = PageType(
     workspace_guidance=(
         WorkspaceGuidanceSpec(HUMAN_REACH_FIELD, ("deciding", "designReview", "review"),
                               HUMAN_REACH_DESC, HUMAN_REACH_LABEL),
+        # The stages in which the controller creates agent-plan pages, labels their capability, or
+        # launches and relaunches the agents.
+        WorkspaceGuidanceSpec(SUBAGENT_DISPATCH_FIELD,
+                              ("researching", "designing", "decomposition", "executing"),
+                              SUBAGENT_DISPATCH_DESC, SUBAGENT_DISPATCH_LABEL),
     ),
     auto_children=(AutoChildSpec("solution-research"), AutoChildSpec("solution-design")),
 )
@@ -439,6 +447,12 @@ _AGENT_PLAN = PageType(
         initial="draft",
         states=("draft", "ready", "working", "finished", "blocked", "accepted"),
         terminal_states=("accepted",),
+    ),
+    # draft is where the controller defines the agent and its capability; ready is where it
+    # launches it.
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(SUBAGENT_DISPATCH_FIELD, ("draft", "ready"), SUBAGENT_DISPATCH_DESC,
+                              SUBAGENT_DISPATCH_LABEL),
     ),
 )
 
