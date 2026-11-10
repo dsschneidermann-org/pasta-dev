@@ -13,7 +13,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 import src.server as server
-from src.errors import ValidationError
+from src.errors import NotFoundError, ValidationError
 from src.model import Workspace
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.pagetypes._workspace_guidance import (
@@ -27,7 +27,7 @@ from src.pagetypes.core.pagetype import PageType
 from src.pagetypes.core.validation import validate_page_types, validate_workspace_guidance
 from src.pagetypes._registry import get_page_type, workspace_guidance_fields
 from src.serialize import workspace_from_dict, workspace_to_dict
-from src.store import Store, workspace_guidance
+from src.store import Store, workspace_guidance, workspace_guidance_overview
 from src.describe import describe_page_type
 
 LIFECYCLE = get_page_type("test-lifecycle")
@@ -210,6 +210,35 @@ def test_workspace_guidance_skips_out_of_set_absent_and_empty():
     assert workspace_guidance(LIFECYCLE, "building", {"buildTool": ""}) == {}     # empty clears
 
 
+# --- workspace_guidance_overview (pure projection) ------------------------------
+def test_workspace_guidance_overview_lists_declared_fields_sorted_with_text():
+    declared = {"b": WorkspaceGuidanceSpec("b", ("draft",), "bee", "B: "),
+                "a": WorkspaceGuidanceSpec("a", ("draft",), "ay", "A: ")}
+    assert workspace_guidance_overview(declared, {"a": "x"}) == {
+        "fields": [{"field": "a", "description": "ay", "text": "x"},
+                   {"field": "b", "description": "bee", "text": None}],
+        "undeclared": {}}
+
+
+def test_workspace_guidance_overview_reads_a_cleared_field_as_unset():
+    declared = {"a": WorkspaceGuidanceSpec("a", ("draft",), "ay", "A: ")}
+    assert workspace_guidance_overview(declared, {"a": ""})["fields"] == [
+        {"field": "a", "description": "ay", "text": None}]
+
+
+def test_workspace_guidance_overview_splits_out_undeclared_stored_text():
+    declared = {"a": WorkspaceGuidanceSpec("a", ("draft",), "ay", "A: ")}
+    overview = workspace_guidance_overview(declared, {"z": "old", "y": "", "a": "x", "m": "mid"})
+    assert [entry["field"] for entry in overview["fields"]] == ["a"]
+    assert overview["undeclared"] == {"m": "mid", "z": "old"}
+    assert list(overview["undeclared"]) == ["m", "z"]
+
+
+def test_workspace_guidance_overview_of_nothing_is_empty():
+    assert workspace_guidance_overview({}, {}) == {"fields": [], "undeclared": {}}
+    assert workspace_guidance_overview({}, {"a": "x"}) == {"fields": [], "undeclared": {"a": "x"}}
+
+
 # --- serialization round-trip ------------------------------------------------
 def test_guidance_config_round_trips():
     workspace = Workspace(id="ws:1", name="n", guidance_config={"mergeProcess": "rebase"})
@@ -253,6 +282,44 @@ def test_set_workspace_guidance_persists_and_validates(store):
     # An undeclared field is rejected, naming the declared ones.
     with pytest.raises(ValidationError, match="not a workspace guidance field"):
         store.set_workspace_guidance(wid, "nope", "x")
+
+
+# --- store.get_workspace_guidance --------------------------------------------
+def test_get_workspace_guidance_reads_every_declared_field(store):
+    wid = store.create_workspace("demo").id
+    store.set_workspace_guidance(wid, "buildTool", "use pytest")
+    store.set_workspace_guidance(wid, "reviewHint", "")
+    assert store.get_workspace_guidance(wid) == {
+        "workspaceId": wid,
+        "fields": [
+            {"field": "buildTool", "description": "the build tool this workspace uses",
+             "text": "use pytest"},
+            {"field": "draftHint", "description": "a hint shown while drafting", "text": None},
+            {"field": "reviewHint", "description": "a hint shown while reviewing", "text": None},
+        ],
+        "undeclared": {},
+    }
+
+
+def test_get_workspace_guidance_surfaces_stored_text_for_an_undeclared_field(store):
+    wid = store.create_workspace("demo").id
+    workspace = store.load_workspace(wid)
+    workspace.guidance_config["retiredField"] = "old rule"   # left by a server declaring more fields
+    store._touch_and_save(workspace)
+    assert store.get_workspace_guidance(wid)["undeclared"] == {"retiredField": "old rule"}
+
+
+def test_get_workspace_guidance_does_not_write(store):
+    wid = store.create_workspace("demo").id
+    store.set_workspace_guidance(wid, "buildTool", "use pytest")
+    before = workspace_to_dict(store.load_workspace(wid))
+    _ = store.get_workspace_guidance(wid)
+    assert workspace_to_dict(store.load_workspace(wid)) == before   # updated_at included
+
+
+def test_get_workspace_guidance_unknown_workspace_is_not_found(store):
+    with pytest.raises(NotFoundError, match="not found"):
+        _ = store.get_workspace_guidance("ws:missing")
 
 
 # --- store.next_actions guidance injection -----------------------------------
@@ -331,6 +398,25 @@ def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     with pytest.raises(ToolError, match="not a workspace guidance field"):
         call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "nope", "text": "x"})
+
+
+def test_get_workspace_guidance_tool_reads_back_what_was_set(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "draftHint", "text": "drafting"})
+    assert call(mcp, "getWorkspaceGuidance", {"workspaceId": wid}) == {
+        "workspaceId": wid,
+        "fields": [
+            {"field": "buildTool", "description": "the build tool this workspace uses", "text": None},
+            {"field": "draftHint", "description": "a hint shown while drafting", "text": "drafting"},
+            {"field": "reviewHint", "description": "a hint shown while reviewing", "text": None},
+        ],
+        "undeclared": {},
+    }
+
+
+def test_get_workspace_guidance_unknown_workspace_is_tool_error(mcp):
+    with pytest.raises(ToolError, match="not found"):
+        call(mcp, "getWorkspaceGuidance", {"workspaceId": "ws:missing"})
 
 
 # --- the event cache behind a write's full next -------------------------------

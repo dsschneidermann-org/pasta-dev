@@ -113,14 +113,15 @@ def render_tool_schemas(tools: list[tuple[str, dict[str, Any]]], named_text: str
 
 
 def render_guidance_fields(fields: list[str]) -> str:
-    """The '## Workspace guidance setup' section: names setWorkspaceGuidance and lists the settable
-    field names only, with no per-field descriptions."""
+    """The '## Workspace guidance setup' section: names setWorkspaceGuidance and getWorkspaceGuidance
+    and lists the settable field names only, with no per-field descriptions."""
     names = ", ".join(f"`{field}`" for field in fields) if fields else "(none)"
     return (
         "## Workspace guidance setup\n\n"
         "A workspace can carry per-status house rules, set with "
         "`setWorkspaceGuidance(workspaceId, field, text)` and surfaced on a page while it sits at "
-        f"the relevant status. Settable fields: {names}."
+        "the relevant status. `getWorkspaceGuidance(workspaceId)` reads every field back with its "
+        f"description and stored text. Settable fields: {names}."
     )
 
 

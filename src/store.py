@@ -31,7 +31,7 @@ from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import JSONValue, Page, Workspace
-from .pagetypes.core.specs import BLOCK_ARRAY, LIST, RefCheck, status_guidance
+from .pagetypes.core.specs import BLOCK_ARRAY, LIST, RefCheck, WorkspaceGuidanceSpec, status_guidance
 from .pagetypes.core.commands import (
     AddElementCommand,
     AddLinkCommand,
@@ -89,6 +89,21 @@ def workspace_guidance(page_type: PageType, status: str,
             if text:
                 out[f"guidance_{spec.field}"] = spec.label + text
     return out
+
+
+def workspace_guidance_overview(declared: dict[str, WorkspaceGuidanceSpec],
+                                config: dict[str, str]) -> dict[str, Any]:
+    """Every declared guidance field with its description and stored text (None when unset or
+    cleared), sorted by field, plus the stored text of any field no page type declares."""
+    return {
+        "fields": [
+            {"field": name, "description": declared[name].description,
+             "text": config.get(name) or None}
+            for name in sorted(declared)
+        ],
+        "undeclared": {name: text for name, text in sorted(config.items())
+                       if name not in declared and text},
+    }
 
 
 @dataclass
@@ -959,6 +974,12 @@ class Store:
         return self._set_workspace_status(workspace_id, "active")
 
     # --- workspace guidance configuration -----------------------------------
+    def get_workspace_guidance(self, workspace_id: str) -> dict[str, Any]:
+        """Every workspace guidance field with its stored text, read without taking the write lock."""
+        workspace = self.load_workspace(workspace_id)
+        return {"workspaceId": workspace.id,
+                **workspace_guidance_overview(workspace_guidance_fields(), workspace.guidance_config)}
+
     def set_workspace_guidance(self, workspace_id: str, field: str, text: str) -> Workspace:
         """Store `text` under `field` on the workspace's guidance config. Rejects a field no page
         type declares; an empty string clears the field. Returns the updated workspace."""

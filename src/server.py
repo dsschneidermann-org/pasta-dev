@@ -549,6 +549,15 @@ async def mutatePageBatch(
 
 # --- Workspace guidance configuration ----------------------------------------
 @mcp.tool
+async def getWorkspaceGuidance(workspaceId: str) -> dict[str, Any]:
+    """Read every workspace guidance field: each declared field with its description and stored
+    text (null when unset or cleared), sorted by field, plus under `undeclared` the stored text of
+    any field no page type declares any longer."""
+    with _guard_tool():
+        return STORE.get_workspace_guidance(workspaceId)
+
+
+@mcp.tool
 async def setWorkspaceGuidance(workspaceId: str, field: str, text: str) -> dict[str, Any]:
     """Set the workspace's stored guidance text for a configurable guidance field.
 

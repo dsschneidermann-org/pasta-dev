@@ -479,3 +479,4 @@ def test_instructions_lists_workspace_guidance_setup(mcp):
     assert "## Workspace guidance setup" in text
     assert "setWorkspaceGuidance" in text
     assert "buildTool" in text          # a fixture guidance field, in test mode
+    assert '"name": "getWorkspaceGuidance"' in text   # named in the guidance section, so its schema is listed

@@ -74,6 +74,11 @@ def test_render_guidance_fields_handles_empty():
     assert "setWorkspaceGuidance" in out
 
 
+def test_render_guidance_fields_names_the_read_tool():
+    out = render_guidance_fields(["mergeProcess"])
+    assert "`getWorkspaceGuidance(workspaceId)`" in out
+
+
 # --- render_instructions -----------------------------------------------------
 def test_render_instructions_composes_all_sections_in_order():
     out = render_instructions(_tools(), ["mergeProcess"])
@@ -90,3 +95,11 @@ def test_render_instructions_schema_section_follows_the_prose_names():
     assert '"name": "search"' in out
     assert '"name": "setWorkspaceGuidance"' in out
     assert '"name": "getPage"' not in out
+
+
+def test_render_instructions_lists_the_read_tool_schema():
+    tools = _tools() + [("getWorkspaceGuidance", {"type": "object",
+                                                   "properties": {"workspaceId": {"type": "string"}},
+                                                   "required": ["workspaceId"]})]
+    out = render_instructions(tools, ["mergeProcess"])
+    assert '"name": "getWorkspaceGuidance"' in out
