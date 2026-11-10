@@ -8,7 +8,7 @@ __pycache__/
 
 # test / tooling caches
 .pytest_cache/
-.testmondata
+.testmondata*
 
 # Claude worktrees and settings
 .claude/worktrees

@@ -272,7 +272,9 @@ TEST_FLOW = PageType(
 # terminal statuses, a questions element-FSM + escalate (feeds `attention`), a pinned auto-child,
 # a `beginImplementation` guarded on that child's page status (a page-status ChildStateGuard),
 # and `submitForReview` + `ship` guarded on that child's element states (element-status
-# ChildStateGuards whose allowed set accepts done/passed or skipped).
+# ChildStateGuards whose allowed set accepts done/passed or skipped). ship is also guarded on the
+# page status of its non-pinned test-flow children, the one guard here over children that can be
+# absent or archived.
 # ============================================================================
 TEST_LIFECYCLE = PageType(
     tag="test-lifecycle",
@@ -326,6 +328,7 @@ TEST_LIFECYCLE = PageType(
                             section="steps", field="items"),
             ChildStateGuard("test-child", ("passed", "skipped"), "every test-child check must be passed",
                             section="checks", field="items"),
+            ChildStateGuard("test-flow", ("closed",), "every test-flow child must be closed"),
         )),
         transition_cmd("abandon", "drop the work -> abandoned", agency="either",
                        legal_in=("draft", "planning", "building", "review")),

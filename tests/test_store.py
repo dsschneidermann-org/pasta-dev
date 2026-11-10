@@ -49,6 +49,16 @@ def _mutate(store, workspace_id, page_id, commands):
     return store.mutate_page_batch(workspace_id, page_id, stamped)
 
 
+def _closed_flow_child(store, workspace_id, parent_id):
+    """A non-pinned test-flow child of `parent_id`, taken to `closed` - what the test-lifecycle
+    ship guard over its test-flow children accepts."""
+    flow = store.create_page(workspace_id, "test-flow", "Change", parent_id=parent_id).page
+    _mutate(store, workspace_id, flow.id, [{"command": "open"}])
+    _mutate(store, workspace_id, flow.id, [
+        {"command": "close", "args": {"sha": "abc123", "message": "Ship it"}}])
+    return flow
+
+
 def test_create_and_list_workspace(store):
     workspace = store.create_workspace("demo")
     assert workspace.id.startswith("ws:")
@@ -313,6 +323,7 @@ def test_ship_guard_blocks_until_child_complete(store):
         {"command": "markCheckPassed", "args": {"checkId": check_created[0]}}
     ])
     _mutate(store, workspace.id, parent.id, [{"command": "submitForReview"}])
+    _closed_flow_child(store, workspace.id, parent.id)
     shipped = _mutate(store, workspace.id, parent.id, [{"command": "ship"}]).page
     assert shipped.status == "done"
 
@@ -348,8 +359,62 @@ def test_skip_counts_as_addressed_for_review_and_ship(store):
         {"command": "markCheckSkipped", "args": {"checkId": check_created[0]}}
     ])
     _mutate(store, workspace.id, parent.id, [{"command": "submitForReview"}])
+    _closed_flow_child(store, workspace.id, parent.id)
     shipped = _mutate(store, workspace.id, parent.id, [{"command": "ship"}]).page
     assert shipped.status == "done"
+
+
+def _lifecycle_in_review(store):
+    """A test-lifecycle page in `review` whose pinned test-child step is done and check passed, so
+    only ship's guard over its test-flow children is left to decide ship."""
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
+    parent, child = result.page, _child(result, "test-child")
+    _mutate(store, workspace.id, parent.id, [
+        {"command": "setSummary", "args": {"text": "A dark theme."}},
+        {"command": "beginPlanning"},
+    ])
+    step_id = _mutate(store, workspace.id, child.id, [
+        {"command": "addStep", "args": {"text": "build"}}]).created_ids[0]
+    check_id = _mutate(store, workspace.id, child.id, [
+        {"command": "addCheck", "args": {"text": "renders"}}]).created_ids[0]
+    _mutate(store, workspace.id, child.id, [{"command": "markReady"}])
+    _mutate(store, workspace.id, child.id, [
+        {"command": "markStepDone", "args": {"stepId": step_id}},
+        {"command": "markCheckPassed", "args": {"checkId": check_id}},
+    ])
+    _mutate(store, workspace.id, parent.id, [
+        {"command": "addPart", "args": {"name": "Renderer"}},
+        {"command": "beginImplementation"},
+    ])
+    _mutate(store, workspace.id, parent.id, [{"command": "submitForReview"}])
+    return workspace, parent
+
+
+def test_child_guard_refuses_a_page_with_no_child_of_its_type(store):
+    workspace, parent = _lifecycle_in_review(store)
+    with pytest.raises(IllegalCommandError, match="there is no 'test-flow' child page"):
+        _mutate(store, workspace.id, parent.id, [{"command": "ship"}])
+
+
+def test_child_guard_ignores_an_archived_child(store):
+    workspace, parent = _lifecycle_in_review(store)
+    stalled = store.create_page(workspace.id, "test-flow", "Stalled", parent_id=parent.id).page
+    _mutate(store, workspace.id, stalled.id, [{"command": "open"}])
+    _closed_flow_child(store, workspace.id, parent.id)
+    with pytest.raises(IllegalCommandError, match="is 'open'"):
+        _mutate(store, workspace.id, parent.id, [{"command": "ship"}])
+    store.archive_page(workspace.id, stalled.id)
+    shipped = _mutate(store, workspace.id, parent.id, [{"command": "ship"}]).page
+    assert shipped.status == "done"
+
+
+def test_child_guard_refuses_when_its_only_child_is_archived(store):
+    workspace, parent = _lifecycle_in_review(store)
+    flow = _closed_flow_child(store, workspace.id, parent.id)
+    store.archive_page(workspace.id, flow.id)
+    with pytest.raises(IllegalCommandError, match="there is no 'test-flow' child page"):
+        _mutate(store, workspace.id, parent.id, [{"command": "ship"}])
 
 
 def test_reopen_unskips_a_step(store):

@@ -47,7 +47,6 @@ If calling `tree` reveals an empty workspace, no project overview doc or the `to
 - Project Overview + `architecture` and `document` pages go under the Documentation `toc` page.
 - `decision-record` pages go under the ADRs `toc` page.
 - `feature-brief`, `simple-change` and `epic` pages go under the Features `toc` page.
-- An `epic`'s `feature-brief` children are created under the epic itself, NOT under the Features `toc` page - the epic's ship gate only sees briefs that are its own children.
 - `bug-report` pages go under the Bug Reports `toc` page.
 
 ## Response shapes
@@ -87,9 +86,9 @@ testing-plan: The verification cases for a feature. Auto-created as a child of a
 
 feature-spec: The detailed product/UX specification for a feature, authored during planning on top of the grounded base and sealed before the plan review. Auto-created as a child of a feature-brief.
 
-epic: The root of a major feature too large for one feature-brief - it decomposes into several child feature-briefs and is built by subagents dispatched from its pinned agent plan. Use it when the work splits into parts that each ship on their own; when it does not, use a feature-brief.
+epic: The root of a major feature too large for one feature-brief - it decomposes into several child feature-briefs and is built by subagents, each dispatched from an agent-plan page of its own. Use it when the work splits into parts that each ship on their own; when it does not, use a feature-brief.
 
-agent-plan: Which subagents an epic creates, the order they are dispatched in, and how their results are reported back onto the feature-briefs. Auto-created as a child of an epic.
+agent-plan: One subagent an epic dispatches - its role, capability, exact task and worktree, linked to the feature-briefs it works on. Its page id is the agent's id and the page it reports back into as it starts and works. Created as a child of an epic.
 """
 
 

@@ -96,16 +96,21 @@ optionally the statuses it is allowed in. Names follow the field they write:
 
 - **Pinned children** are declared on the parent and created in the same step as the
   parent (a feature brief creates its spec, implementation plan and testing plan).
+- **Ordinary children** are created later, as the work needs them (an epic's feature
+  briefs, and one agent-plan page per agent it dispatches).
 - A **child guard** holds a parent's transition until its direct children of a given type
   are in an accepted set of states (ship waits until every plan step is done or skipped
-  and every test case has passed or been skipped).
+  and every test case has passed or been skipped). It ignores archived children and
+  fails while no live child of its type exists, so a parent can't pass a gate over
+  children it never created. Archiving a child is how it is dropped.
 - A **parent guard** keeps a child locked until its parent reaches a given status (no plan
   steps can be written until the brief is in planning).
 - There is no gate on the states of elements on the same page. To require "every step
-  is done", put the steps on a pinned child page and give the parent a child guard.
+  is done", put the steps on a child page and give the parent a child guard.
 - To make one sibling child wait for another, add a status to the parent. Never order
   them by nesting one child under another: guards only see direct children, so a
-  moved child makes its guard pass with nothing checked.
+  moved child leaves its parent's guard with none of its type, and that transition is
+  held shut.
 
 ## 2. How the workflow drives an agent
 
@@ -178,7 +183,7 @@ If your workflow needs something this model can't express, write it on its own l
 **Field instruction**: say what one entry is, how specific it has to be, and what goes
 wrong if it is vague.
 > Each one part of the system this epic touches, named as a real path you confirmed
-> exists. A component missed here becomes a workstream nobody owns.
+> exists. A component missed here is one no agent owns.
 
 **Status guidance** follows one shape:
 ```
@@ -287,6 +292,8 @@ Two limits this example exposes:
 - Every review stage has a send-back edge.
 - Every field instruction is specific enough for a stranger to act on.
 - Locks are deliberate: verdicts only in review, records only once the work has started.
-- Any "all items done" gate uses a pinned child and a child guard; siblings are ordered
+- Any "all items done" gate uses a child page and a child guard; siblings are ordered
   through a parent status.
+- Every child guard names children that will exist when it is checked: it fails while
+  none of its type is live.
 - Anything the model can't express is marked `EXTENSION:`.
