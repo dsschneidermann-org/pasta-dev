@@ -70,7 +70,7 @@ _SEVERITIES = ("blocking", "should-fix", "nit")
 _EPIC_FINDING_ACTIONS = ("addAgent", "editAgent", "addContract", "askQuestion", "editContract",
                          "reopenDesign", "edit")
 _OUTCOME_KINDS = ("goal", "non-goal", "anti-goal")
-_SAID_BY = ("person", "proposal")
+_SAID_BY = ("user", "proposal")
 # Every agent status but draft: a reopened decomposition must not be refused by agents already at work
 _AGENT_PLANNED = ("ready", "working", "finished", "blocked", "accepted")
 
@@ -94,7 +94,7 @@ _EPIC = PageType(
     description=(
         "The root of a major feature too large for one feature-brief. A research agent and a "
         "design agent work out the solution on its pinned solution-research and solution-design "
-        "pages, a person picks the approach and signs off the design, and it then decomposes into "
+        "pages, a human picks the approach and signs off the design, and it then decomposes into "
         "several child feature-briefs built by subagents, each dispatched from an agent-plan page "
         "of its own under the epic. Use it when the work splits into parts that each ship on their "
         "own; for one feature use a feature-brief, and for a small self-contained change use a "
@@ -115,14 +115,14 @@ _EPIC = PageType(
         )),
         SectionSpec("framing", "Framing", (
             _prose("why", description="""
-                Why the person wants this, in their words: the problem it removes or what it makes
+                Why the user wants this, in their words: the problem it removes or what it makes
                 possible, and why now. If they have not said, ask one open question with nothing to
                 pick from; never infer it from the summary. Research ranks approaches against this
                 paragraph, so a guessed why yields approaches that solve the wrong problem well.
                 """),
             _list("outcomes", element_fields=("text", "kind", "said"), description="""
                 Each one goal, non-goal or anti-goal (kind), where an anti-goal is something that
-                would make this a failure even if it technically works. said is person when they
+                would make this a failure even if it technically works. said is user when they
                 stated it and proposal when you filled it in, and you present every proposal to them
                 as yours. Write them before research begins: the approaches are judged against them,
                 and outcomes written after the approaches get fitted to them. Write each so a
@@ -132,9 +132,9 @@ _EPIC = PageType(
         )),
         SectionSpec("decision", "Approach decision", (
             _list("chosen", element_fields=("approachId", "takes"), description="""
-                The approach the person picked, by the element id of that approach on this epic's
+                The approach the user picked, by the element id of that approach on this epic's
                 solution-research page. Usually one element; a hybrid gets one per approach it draws
-                from, with what it takes from each in takes. Record only a pick the person made, or,
+                from, with what it takes from each in takes. Record only a pick the user made, or,
                 when they handed you the how, your recommendation with takes saying it was your
                 call. The design agent is dispatched against exactly this.
                 """),
@@ -169,10 +169,10 @@ _EPIC = PageType(
         SectionSpec("questions", "Questions", (
             _list("items", element_fields=("text", "answer", "needsHuman", "status"),
                   element_fsm=_QUESTION_FSM, description="""
-                Each one question only the person can settle, asked as a single decidable question in
+                Each one question only the user can settle, asked as a single decidable question in
                 their terms rather than a topic: the research page's questions, the design check's
                 escalations and the decomposition's questions all land here, so this list is the one
-                record of what the person decided, and the approach pick is always one of them. Set
+                record of what the user decided, and the approach pick is always one of them. Set
                 needsHuman while it waits on them, and answer it here with their words once decided,
                 because a question still open when the agents start is answered differently by
                 every agent that reaches it.
@@ -188,7 +188,7 @@ _EPIC = PageType(
                 build-ready: the agents cover the signed-off design with no gaps and no overlaps, and
                 each could be dispatched from its page alone without getting stuck. needs-changes: at
                 least one blocking finding must be applied before dispatching. needs-human-decision:
-                the work cannot proceed until a person settles a question. Approve unless there are
+                the work cannot proceed until a human settles a question. Approve unless there are
                 serious gaps, meaning an expected change in the design no agent owns, two agents
                 owning the same file, an acceptance criterion no brief delivers, a contract two
                 agents need that nobody defines, or an agent task too vague to act on. Minor wording
@@ -213,7 +213,7 @@ _EPIC = PageType(
                    add_args=(_text(), _text("kind", choices=_OUTCOME_KINDS),
                              _text("said", choices=_SAID_BY)),
                    editable=True),
-        # The pick is recorded while the person is choosing and frozen once they have chosen.
+        # The pick is recorded while the user is choosing and frozen once they have chosen.
         *list_cmds("decision", field="chosen", singular="chosenApproach",
                    add_args=(_text("approachId"), _text("takes", required=False)),
                    legal_in=("deciding",)),
@@ -243,12 +243,12 @@ _EPIC = PageType(
         transition_cmd("presentFindings", "researching -> deciding", guards=(
             ChildStateGuard("solution-research", ("reported",), "the research page must be reported"),)),
         transition_cmd("reopenResearch", "deciding -> researching", agency="either"),
-        # The person picks the approach; the agent records it, then stops here.
+        # A human picks the approach; the agent records it, then stops here.
         transition_cmd("chooseApproach", "deciding -> designing (human gate)", agency="human",
                        requires=(("decision", "chosen"), ("questions", "items"))),
         transition_cmd("submitDesign", "designing -> designReview", guards=(
             ChildStateGuard("solution-design", ("ready",), "the design page must be ready"),)),
-        # Nothing is decomposed or built until the person signs the design off.
+        # Nothing is decomposed or built until a human signs the design off.
         transition_cmd("approveDesign", "designReview -> decomposition (human gate)", agency="human"),
         transition_cmd("requestDesignChanges", "designReview -> designing", agency="either"),
         transition_cmd("reconsiderApproach", "designReview -> deciding", agency="either"),
@@ -317,7 +317,7 @@ _EPIC = PageType(
 
 # An agent-plan page may only be marked ready once its epic is dispatching agents: researching or
 # designing for the research and design agents, decomposition or later for the build agents - not
-# while the epic is still in `draft`, while the person is deciding or signing off, nor once
+# while the epic is still in `draft`, while a human is deciding or signing off, nor once
 # `abandoned`. Enforced in the store.
 _EPIC_DISPATCHING = ParentStateGuard(
     parent_type="epic",
@@ -459,7 +459,7 @@ _AGENT_PLAN = PageType(
 
 # The research and design pages are pinned children of the epic, created with it and each kept
 # waiting until the epic reaches the stage that is theirs: research while it is researching,
-# design while it is designing. Sealing the design waits for the person's sign-off. Enforced in
+# design while it is designing. Sealing the design waits for the human's sign-off. Enforced in
 # the store.
 _EPIC_RESEARCHING = ParentStateGuard(
     parent_type="epic",
@@ -474,7 +474,7 @@ _EPIC_DESIGNING = ParentStateGuard(
 _EPIC_IN_DECOMPOSITION = ParentStateGuard(
     parent_type="epic",
     required_statuses=("decomposition",),
-    message="the epic must be in decomposition, after the person approved the design",
+    message="the epic must be in decomposition, after a human approved the design",
 )
 
 # The judge's and reviewer's verdict: a page goes forward or goes back, nothing in between.
@@ -492,7 +492,7 @@ _SOLUTION_RESEARCH = PageType(
         "The delegated research and brainstorming step of an epic: a research agent reads the "
         "codebase and outside sources and returns grounded facts, two or three candidate "
         "approaches and a digest, so the controller reads the digest instead of doing the research "
-        "itself. A judge agent checks it before the person sees it. Auto-created as a child of an "
+        "itself. A judge agent checks it before the user sees it. Auto-created as a child of an "
         "epic; architecture documents how the system is shaped today instead."
     ),
     sections=(
@@ -500,7 +500,7 @@ _SOLUTION_RESEARCH = PageType(
             _prose("body", description="""
                 The epic's ask restated in your own words from its summary and framing: what is
                 wanted, for whom, and why. Where your restatement and the ask diverge, say so; that
-                gap is the first question for the person.
+                gap is the first question for the user.
                 """),
         )),
         SectionSpec("components", "Components", (
@@ -569,9 +569,9 @@ _SOLUTION_RESEARCH = PageType(
                 way, the others and why they do not fit go here.
                 """),
         )),
-        SectionSpec("questions", "Questions for the person", (
+        SectionSpec("questions", "Questions for the user", (
             _list("items", element_fields=("text", "why", "changes"), description="""
-                Each one question neither the epic nor the codebase answers and only the person can
+                Each one question neither the epic nor the codebase answers and only the user can
                 settle, asked as a single decidable question in their terms. why is what you hope to
                 learn; changes names the approach it rules in or out, or what it changes in what gets
                 built. Anything you could settle by reading further is not a question here.
@@ -668,7 +668,7 @@ _BUILDER_QUESTION_FSM = ElementFSMSpec(
     checkmark_done="resolved",
 )
 
-_DECIDED_BY = ("person", "proposal")
+_DECIDED_BY = ("user", "proposal")
 _CHANGE_KINDS = ("create", "modify", "delete")
 _CHECK_OUTCOMES = ("nothing-important-left", "questions-raised")
 _PILES = ("answered", "minor", "theirs")
@@ -678,9 +678,9 @@ _SOLUTION_DESIGN = PageType(
     tag="solution-design",
     name="Solution design",
     description=(
-        "The delegated design step of an epic: a design agent turns the approach the person chose "
+        "The delegated design step of an epic: a design agent turns the approach the user chose "
         "into a design a builder could plan from without asking anyone, a reviewer agent reads it "
-        "cold as that builder, and the person then signs it off on the epic. Auto-created as a "
+        "cold as that builder, and a human then signs it off on the epic. Auto-created as a "
         "child of an epic; a feature-spec designs one feature-brief instead."
     ),
     sections=(
@@ -694,13 +694,13 @@ _SOLUTION_DESIGN = PageType(
         )),
         SectionSpec("approach", "Approach", (
             _prose("chosen", description="""
-                The approach the person picked on the epic, restated in full from its research
+                The approach the user picked on the epic, restated in full from its research
                 sketch and grown into what will actually be built. For a hybrid, say what comes
                 from which approach.
                 """),
             _list("alternatives", element_fields=("name", "tradeoff", "whyNot"), description="""
                 Each other approach from the research page, what it would have traded, and in whyNot
-                why it lost, in the person's reason where they gave one. This is what keeps the
+                why it lost, in the user's reason where they gave one. This is what keeps the
                 choice from being reopened during the build.
                 """),
         )),
@@ -716,8 +716,8 @@ _SOLUTION_DESIGN = PageType(
         SectionSpec("decisions", "Decisions", (
             _list("items", element_fields=("decision", "alternatives", "reason", "by"), description="""
                 Each one choice that shapes what gets built, stated in the active voice, with the
-                alternatives weighed, the reason this one won, and by: person when they decided it,
-                proposal when you did. A default the person never heard is one they could not
+                alternatives weighed, the reason this one won, and by: user when they decided it,
+                proposal when you did. A default the user never heard is one they could not
                 reject, so every call of yours is here marked proposal.
                 """),
         )),
@@ -769,16 +769,16 @@ _SOLUTION_DESIGN = PageType(
                 wrong guess would change the build, with why. The designer resolves each into a pile:
                 answered when the page, the epic or the research already say (put the answer into the
                 design), minor when a sensible builder could settle it (settle it as a proposal
-                decision), or theirs when only the person can answer. Escalate a theirs question
+                decision), or theirs when only the user can answer. Escalate a theirs question
                 while it waits on them, and resolve it only once its answer is on the epic, naming
                 that epic question's id in resolution.
                 """),
         )),
         SectionSpec("digest", "Digest", (
             _prose("body", description="""
-                At most 200 words for the controller to put in front of the person: what will be
+                At most 200 words for the controller to put in front of the user: what will be
                 built in two sentences, the decisions marked proposal they should check, and what is
-                left to the builder. Write it last; it is what the person reads before opening the
+                left to the builder. Write it last; it is what the user reads before opening the
                 page to sign it off.
                 """),
         )),
@@ -847,7 +847,7 @@ _SOLUTION_DESIGN = PageType(
         # verdict should `revise`.
         transition_cmd("markReady", "checking -> ready", requires=(("check", "outcome"), ("review", "verdict"))),
         transition_cmd("revise", "checking -> drafting (send the design back)"),
-        # ready and sealed are both terminal, so what the person signs off and what is built from
+        # ready and sealed are both terminal, so what a human signs off and what is built from
         # cannot drift; either reopens only when the epic has gone back to designing.
         transition_cmd("reopen", "ready -> drafting", legal_in=("ready", "sealed"),
                        parent_guards=(_EPIC_DESIGNING,)),

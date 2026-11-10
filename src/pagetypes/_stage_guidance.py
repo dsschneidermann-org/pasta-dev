@@ -195,7 +195,7 @@ use requestChanges to go back to building rather than leave a known gap at the g
 # --- epic --------------------------------------------------------------------
 EPIC_DRAFT = """
 draft - the epic exists and nothing has been looked at. This status is for capturing
-what the person wants and why, in their words, before anyone researches it. The work
+what the user wants and why, in their words, before anyone researches it. The work
 of it:
 
 - Write the summary as the outcome they want, not a solution.
@@ -235,29 +235,29 @@ findings once the research page is reported.
 
 DECIDING = """
 deciding - research is in, and this is the conversation that turns it into the
-person's choice. It is the one stage where the controller talks the work through with
+user's choice. It is the one stage where the controller talks the work through with
 them. The work of it:
 
 - Read the research digest and questions. Ask each open one here, flagged needsHuman,
-  and put them to the person one at a time, building each on their last answer or on
+  and put them to the user one at a time, building each on their last answer or on
   a research fact and saying what the answer changes. A proposal with your reason
   often beats a question.
 - Play back your understanding in short chunks, marking what they said as theirs and
   what you filled in as your proposal, and ask what is wrong or missing. Refine the
   outcomes as the conversation settles them, turning a confirmed proposal into what
-  the person said.
+  the user said.
 - Then, in a message of its own, lay out the approaches with their trade-offs and the
   recommendation and ask which way to go. Record the pick as the chosen approach, and
   the pick itself as an answered question.
 - If an answer rules out every approach or changes the ask, reopen research with that
   answer in the researcher's task rather than design on a stale set.
 
-Nothing is designed here. Choosing the approach is the person's gate: drive up to it
+Nothing is designed here. Choosing the approach is a human gate: drive up to it
 and stop.
 """
 
 DESIGNING = """
-designing - the person has picked an approach, and a design agent is writing it up on
+designing - the user has picked an approach, and a design agent is writing it up on
 the epic's solution-design page. This status is for running the design and its check,
 not for designing. The work of it:
 
@@ -270,17 +270,17 @@ not for designing. The work of it:
   builder who must plan from it, records its questions and findings, sets the outcome
   and verdict, and fires markReady or revise.
 - On revise, redispatch the designer to sort the builder questions and apply the
-  findings. Bring every question it escalates to the person in one message, most
+  findings. Bring every question it escalates to the human in one message, most
   important first; answer them in this epic's questions, then redispatch the designer
   to fold the answers in and resubmit.
-- The check yields one round of questions for the person. A second pass only
+- The check yields one round of questions for the human. A second pass only
   verifies, raising blocking findings at most.
 
 Submit the design for sign-off once the design page is ready.
 """
 
 DESIGN_REVIEW = """
-designReview - the design page is ready and frozen, and this is the person's sign-off.
+designReview - the design page is ready and frozen, and this is the human's sign-off.
 Nothing is decomposed or built until they give it. The work of it:
 
 - Put the design digest in front of them with a link to the design page and the
@@ -290,7 +290,7 @@ Nothing is decomposed or built until they give it. The work of it:
   goes back through reconsiderApproach.
 
 "Sounds good" to a digest is not approval of a page they have not opened. Approval is
-the person firing approveDesign: drive up to it and stop.
+a human firing approveDesign: drive up to it and stop.
 """
 
 DECOMPOSITION = """
@@ -315,7 +315,7 @@ it into the pages the build agents work from. The work of it:
   leaves a working, verifiable state, and runs at most five agents at once.
 
 If the split shows the design cannot be built as written, reopen the design rather
-than patch it in a brief: the person signs the changed design off again.
+than patch it in a brief: a human signs the changed design off again.
 """
 
 
@@ -335,7 +335,7 @@ reply. The work of it:
   that the code rules out, and keep two or three grounded in the recon. Give each a
   prediction that should hold if it is right and a falsifier that would show it wrong,
   and judge each against the epic's outcomes. Recommend one.
-- Turn what only the person can settle into questions; never ask what the code or the
+- Turn what only the user can settle into questions; never ask what the code or the
   epic already answers.
 - Write the digest last.
 
@@ -362,7 +362,7 @@ revise otherwise. Minor findings alone are a pass.
 
 DRAFTING = """
 drafting - you are the design agent, handed the chosen approach, the epic's outcomes
-and answered questions, and the research page to read. This page is what the person
+and answered questions, and the research page to read. This page is what a human
 will sign off. The work of it:
 
 - Copy the intent from the epic, then grow the chosen approach into a strategy a
@@ -376,7 +376,7 @@ will sign off. The work of it:
   points or generality nobody asked for.
 - After a check, resolve each builder question the page, the epic or the research
   already answers, settle each minor one as a proposal decision, and escalate the
-  ones only the person can answer; then stop and report which ones wait on them.
+  ones only the user can answer; then stop and report which ones wait on them.
   Once their answers are on the epic, resolve those and fold the answers in.
 
 Do not decompose the work or write code. Submit for check once every builder question
@@ -396,7 +396,7 @@ plan from it, without the conversation that produced it. The work of it:
 
 Fire markReady when the verdict is pass and nothing important is left; otherwise fire
 revise. On a second pass, raise only blocking findings and no new questions for the
-person.
+human.
 """
 
 # --- simple-change and bug-report, shared ------------------------------------

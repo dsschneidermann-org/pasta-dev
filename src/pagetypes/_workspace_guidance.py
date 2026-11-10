@@ -43,7 +43,7 @@ RESEARCH_SOURCES_DESC = (
 HUMAN_REACH_FIELD = "humanReach"
 HUMAN_REACH_LABEL = "HUMAN REACH GUIDANCE: "
 HUMAN_REACH_DESC = (
-    "How to reach the person when the work stops at a human gate or a question waits on them - "
+    "How to reach the human when the work stops at a human gate or a question waits on them - "
     "for example, a push notification, then one question at a time in the terminal."
 )
 
