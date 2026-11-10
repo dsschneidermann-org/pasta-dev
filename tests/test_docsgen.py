@@ -15,6 +15,7 @@ import pytest
 from src import docsgen, testcharts
 from src.commands import create_page, legal_commands
 from src.docsgen import (
+    STATES_INDEX_STEM,
     _bullet,
     _field_line,
     _seed_page,
@@ -22,6 +23,7 @@ from src.docsgen import (
     page_machine_qualname,
     reachable_states,
     render_states_index,
+    stale_stems,
     state_docs,
 )
 from src.fsm import machine_class
@@ -144,6 +146,14 @@ def test_states_index_lists_every_generated_page():
 def test_all_state_docs_is_idempotent():
     # Doc generation is pure over the registry: regenerating yields byte-identical output.
     assert all_state_docs() == all_state_docs()
+
+
+def test_stale_stems_names_the_pages_the_registry_no_longer_generates():
+    docs = all_state_docs()
+    docs[STATES_INDEX_STEM] = render_states_index()
+    # A page left on disk from a state the page type has since dropped.
+    assert stale_stems([*docs, "test-flow-dropped"], docs) == ["test-flow-dropped"]
+    assert stale_stems(docs, docs) == []
 
 
 # --- a state page's own content ----------------------------------------------
