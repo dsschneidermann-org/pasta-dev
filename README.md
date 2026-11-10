@@ -141,6 +141,8 @@ The lifecycles above are data, not framework internals. Each page type is one mo
 
 Want your agent to always run the linter before review, or always write the ADR before the code? Add it to the status that owns that moment, and it will be there when the moment arrives.
 
+To sketch a whole new process before writing any of it, [Designing a page type](docs/designing-page-types.md) describes the model in pseudocode, with no Python, and the `pasta-workflow-creation` skill in `.claude/skills/` hands that brief to your agent so it can brainstorm one with you.
+
 ## Development
 
 Tasks run through [just](https://github.com/casey/just):
