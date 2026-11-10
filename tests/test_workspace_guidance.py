@@ -27,7 +27,7 @@ from src.pagetypes.core.pagetype import PageType
 from src.pagetypes.core.validation import validate_page_types, validate_workspace_guidance
 from src.pagetypes._registry import get_page_type, workspace_guidance_fields
 from src.serialize import workspace_from_dict, workspace_to_dict
-from src.store import Store, workspace_guidance
+from src.store import Store, workspace_guidance, workspace_guidance_overview
 from src.describe import describe_page_type
 
 LIFECYCLE = get_page_type("test-lifecycle")
@@ -208,6 +208,35 @@ def test_workspace_guidance_skips_out_of_set_absent_and_empty():
     assert workspace_guidance(LIFECYCLE, "planning", {"buildTool": "x"}) == {}   # out of set
     assert workspace_guidance(LIFECYCLE, "building", {}) == {}                    # absent
     assert workspace_guidance(LIFECYCLE, "building", {"buildTool": ""}) == {}     # empty clears
+
+
+# --- workspace_guidance_overview (pure projection) ------------------------------
+def test_workspace_guidance_overview_lists_declared_fields_sorted_with_text():
+    declared = {"b": WorkspaceGuidanceSpec("b", ("draft",), "bee", "B: "),
+                "a": WorkspaceGuidanceSpec("a", ("draft",), "ay", "A: ")}
+    assert workspace_guidance_overview(declared, {"a": "x"}) == {
+        "fields": [{"field": "a", "description": "ay", "text": "x"},
+                   {"field": "b", "description": "bee", "text": None}],
+        "undeclared": {}}
+
+
+def test_workspace_guidance_overview_reads_a_cleared_field_as_unset():
+    declared = {"a": WorkspaceGuidanceSpec("a", ("draft",), "ay", "A: ")}
+    assert workspace_guidance_overview(declared, {"a": ""})["fields"] == [
+        {"field": "a", "description": "ay", "text": None}]
+
+
+def test_workspace_guidance_overview_splits_out_undeclared_stored_text():
+    declared = {"a": WorkspaceGuidanceSpec("a", ("draft",), "ay", "A: ")}
+    overview = workspace_guidance_overview(declared, {"z": "old", "y": "", "a": "x", "m": "mid"})
+    assert [entry["field"] for entry in overview["fields"]] == ["a"]
+    assert overview["undeclared"] == {"m": "mid", "z": "old"}
+    assert list(overview["undeclared"]) == ["m", "z"]
+
+
+def test_workspace_guidance_overview_of_nothing_is_empty():
+    assert workspace_guidance_overview({}, {}) == {"fields": [], "undeclared": {}}
+    assert workspace_guidance_overview({}, {"a": "x"}) == {"fields": [], "undeclared": {"a": "x"}}
 
 
 # --- serialization round-trip ------------------------------------------------

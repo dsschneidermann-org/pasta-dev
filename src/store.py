@@ -31,7 +31,7 @@ from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import JSONValue, Page, Workspace
-from .pagetypes.core.specs import BLOCK_ARRAY, LIST, RefCheck, status_guidance
+from .pagetypes.core.specs import BLOCK_ARRAY, LIST, RefCheck, WorkspaceGuidanceSpec, status_guidance
 from .pagetypes.core.commands import (
     AddElementCommand,
     AddLinkCommand,
@@ -89,6 +89,21 @@ def workspace_guidance(page_type: PageType, status: str,
             if text:
                 out[f"guidance_{spec.field}"] = spec.label + text
     return out
+
+
+def workspace_guidance_overview(declared: dict[str, WorkspaceGuidanceSpec],
+                                config: dict[str, str]) -> dict[str, Any]:
+    """Every declared guidance field with its description and stored text (None when unset or
+    cleared), sorted by field, plus the stored text of any field no page type declares."""
+    return {
+        "fields": [
+            {"field": name, "description": declared[name].description,
+             "text": config.get(name) or None}
+            for name in sorted(declared)
+        ],
+        "undeclared": {name: text for name, text in sorted(config.items())
+                       if name not in declared and text},
+    }
 
 
 @dataclass
