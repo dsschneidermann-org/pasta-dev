@@ -121,8 +121,10 @@ _EPIC = PageType(
                 Each one goal, non-goal or anti-goal (kind), where an anti-goal is something that
                 would make this a failure even if it technically works. said is person when they
                 stated it and proposal when you filled it in, and you present every proposal to them
-                as yours. Write each so a reviewer could tell whether the built result meets it: the
-                design copies these verbatim, and a vague one becomes a criterion nobody can check.
+                as yours. Write them before research begins: the approaches are judged against them,
+                and outcomes written after the approaches get fitted to them. Write each so a
+                reviewer could tell whether the built result meets it: the design copies these
+                verbatim, and a vague one becomes a criterion nobody can check.
                 """),
         )),
         SectionSpec("decision", "Approach decision", (
@@ -230,16 +232,17 @@ _EPIC = PageType(
                              _text("action", required=False, choices=_EPIC_FINDING_ACTIONS,
                                    description="how the finding was applied to the plan")),
                    legal_in=("planReview", "executing", "review"), editable=True),
-        # draft -> researching needs the intent and the why: research reads the repo from the one
-        # and ranks approaches against the other.
+        # draft -> researching needs the intent, the why and the outcomes: research reads the repo
+        # from the first and judges approaches against the others, which are written before any
+        # approach exists so they cannot be fitted to one.
         transition_cmd("beginResearch", "draft -> researching",
-                       requires=(("summary", "body"), ("framing", "why"))),
+                       requires=(("summary", "body"), ("framing", "why"), ("framing", "outcomes"))),
         transition_cmd("presentFindings", "researching -> deciding", guards=(
             ChildStateGuard("solution-research", ("reported",), "the research page must be reported"),)),
         transition_cmd("reopenResearch", "deciding -> researching", agency="either"),
-        # The person picks the approach; the agent records it and the outcomes, then stops here.
+        # The person picks the approach; the agent records it, then stops here.
         transition_cmd("chooseApproach", "deciding -> designing (human gate)", agency="human",
-                       requires=(("framing", "outcomes"), ("decision", "chosen"), ("questions", "items"))),
+                       requires=(("decision", "chosen"), ("questions", "items"))),
         transition_cmd("submitDesign", "designing -> designReview", guards=(
             ChildStateGuard("solution-design", ("ready",), "the design page must be ready"),)),
         # Nothing is decomposed or built until the person signs the design off.
@@ -464,6 +467,8 @@ _EPIC_IN_DECOMPOSITION = ParentStateGuard(
 _JUDGE_VERDICTS = ("pass", "revise")
 _JUDGE_SEVERITIES = ("blocking", "minor")
 _SIDES = ("pure", "effectful")
+# How far a recon entry can be trusted: opened, followed from something opened, or neither.
+_BASES = ("observed", "inferred", "assumed")
 
 
 _SOLUTION_RESEARCH = PageType(
@@ -485,35 +490,37 @@ _SOLUTION_RESEARCH = PageType(
                 """),
         )),
         SectionSpec("components", "Components", (
-            _list("items", element_fields=("name", "role", "side"), description="""
+            _list("items", element_fields=("name", "role", "side", "basis"), description="""
                 Each one file, module or subsystem the work would read or change, named in name as a
-                real path you opened. role says what it does today and why it exists; side is pure
-                or effectful - I/O, storage, network, clock, randomness. Reach each by following
-                callers and imports, not by matching names: a guessed component sends every approach
-                down the wrong path, and a missed one is work no agent owns.
+                real path. role says what it does today and why it exists; side is pure or effectful
+                - I/O, storage, network, clock, randomness; basis is observed when you opened it,
+                inferred when it follows from something you opened, assumed when neither. Reach each
+                by following callers and imports, not by matching names: a guessed component sends
+                every approach down the wrong path, and a missed one is work no agent owns.
                 """),
         )),
         SectionSpec("constraints", "Constraints", (
-            _list("items", element_fields=("text",), description="""
+            _list("items", element_fields=("text", "basis"), description="""
                 Each one hard requirement any approach must respect, its exact value copied from the
                 file that declares it, which you name: version floors, dependency limits, naming and
-                copy rules, platform and performance targets. Mark one you inferred rather than read,
-                so a guess is not later spent as a fact.
+                copy rules, platform and performance targets. basis is observed when you read the
+                value there, inferred or assumed otherwise, so a guess is not later spent as a fact.
                 """),
         )),
         SectionSpec("conflicts", "Conflicts", (
-            _list("items", element_fields=("text",), description="""
+            _list("items", element_fields=("text", "basis"), description="""
                 Each one collision with what already exists: code here that already does part of
                 this, an interface an approach would break, or a competing in-flight change, named by
-                file or page with what has to give. If you searched and found none, add one element
-                saying where you looked.
+                file or page with what has to give, and its basis - observed, inferred or assumed.
+                If you searched and found none, add one element saying where you looked.
                 """),
         )),
         SectionSpec("documentation", "Documentation", (
-            _list("items", element_fields=("text",), description="""
+            _list("items", element_fields=("text", "basis"), description="""
                 Each one pasta doc, architecture page or decision record covering the area this
                 touches, and the part of it any approach would make stale, so reconciling it once the
-                work lands is mechanical. If there is none, say where you looked.
+                work lands is mechanical, with its basis - observed when you opened the page. If
+                there is none, say where you looked.
                 """),
         )),
         SectionSpec("priorArt", "Prior art", (
@@ -526,15 +533,18 @@ _SOLUTION_RESEARCH = PageType(
                 """),
         )),
         SectionSpec("approaches", "Approaches", (
-            _list("items", element_fields=("name", "sketch", "tradeoffs", "fit", "recommended"),
+            _list("items", element_fields=("name", "sketch", "tradeoffs", "fit", "predicts",
+                                           "falsifier", "recommended"),
                   description="""
                 Each one of the two or three ways of building this that survived your culling,
                 concrete enough to picture in sketch: which components change, what is new, how data
                 moves, citing the component paths above. tradeoffs is what it costs and what it buys;
-                fit is how it serves the why and avoids the anti-goals on the epic. Set recommended on
-                exactly one and say why in its fit. Two approaches that differ only in naming are one
-                approach. Correct an approach in place with editApproach: the epic's chosen approach
-                points at its id.
+                fit is how it serves the why and the outcomes on the epic and avoids its anti-goals.
+                predicts is an observation that should hold if the approach is right, and falsifier
+                the observation that would show it wrong; an approach nothing could falsify is a
+                preference, not an approach. Set recommended on exactly one and say why in its fit.
+                Two approaches that differ only in naming are one approach. Correct an approach in
+                place with editApproach: the epic's chosen approach points at its id.
                 """),
         )),
         SectionSpec("dropped", "Dropped approaches", (
@@ -564,9 +574,9 @@ _SOLUTION_RESEARCH = PageType(
         # Written by the judge, a fresh agent that did not write this page, in `judging` only.
         SectionSpec("review", "Judge review", (
             _scalar("verdict", choices=_JUDGE_VERDICTS, description="""
-                pass only when the sampled component paths, constraint values and sources checked out
-                on reading, the approaches are real alternatives grounded in the recon, and the
-                digest matches the page; revise otherwise. Set it afresh on every pass, as the judge -
+                pass only when the sampled entries marked observed checked out on reading, the
+                approaches are real alternatives grounded in the recon, each with a falsifier that
+                could actually be observed, and the digest matches the page; revise otherwise. Set it afresh on every pass, as the judge -
                 never as the agent that wrote the page.
                 """),
             _list("findings", element_fields=("issue", "severity"), description="""
@@ -578,15 +588,16 @@ _SOLUTION_RESEARCH = PageType(
     ),
     commands=(
         set_prose_cmd("understanding"),
-        *list_cmds("components", add_args=(_text("name"), _text("role"), _text("side", choices=_SIDES))),
-        *list_cmds("constraints", add_args=(_text(),)),
-        *list_cmds("conflicts", add_args=(_text(),)),
-        *list_cmds("documentation", add_args=(_text(),)),
+        *list_cmds("components", add_args=(_text("name"), _text("role"), _text("side", choices=_SIDES),
+                                          _text("basis", choices=_BASES))),
+        *list_cmds("constraints", add_args=(_text(), _text("basis", choices=_BASES))),
+        *list_cmds("conflicts", add_args=(_text(), _text("basis", choices=_BASES))),
+        *list_cmds("documentation", add_args=(_text(), _text("basis", choices=_BASES))),
         *list_cmds("priorArt", label="prior art", add_args=(_text("name"), _text("finding"), _text("bearing"))),
         # Editable so a revised approach keeps the id the epic's chosen approach points at.
         *list_cmds("approaches", singular="approach",
                    add_args=(_text("name"), _text("sketch"), _text("tradeoffs"), _text("fit"),
-                             _boolean("recommended", required=False)),
+                             _text("predicts"), _text("falsifier"), _boolean("recommended", required=False)),
                    editable=True),
         *list_cmds("dropped", singular="droppedApproach", label="dropped approach",
                    add_args=(_text("name"), _text("reason"))),

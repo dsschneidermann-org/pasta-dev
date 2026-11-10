@@ -203,9 +203,13 @@ of it:
   pick from. Do not offer approaches yet: options offered now steer what they tell
   you.
 - Record the why as they said it.
+- Draw out the goals, non-goals and anti-goals and record them as outcomes, marking
+  what you filled in as your proposal. They are what the approaches are judged
+  against, so they are written before any approach exists and cannot be fitted to
+  one.
 
 No code is read here. Recon belongs to the research agent, so this page's context
-stays small. Begin research once the summary and the why are written.
+stays small. Begin research once the summary, the why and the outcomes are written.
 """
 
 RESEARCHING = """
@@ -239,8 +243,9 @@ them. The work of it:
   a research fact and saying what the answer changes. A proposal with your reason
   often beats a question.
 - Play back your understanding in short chunks, marking what they said as theirs and
-  what you filled in as your proposal, and ask what is wrong or missing. Record the
-  goals, non-goals and anti-goals as outcomes as they settle.
+  what you filled in as your proposal, and ask what is wrong or missing. Refine the
+  outcomes as the conversation settles them, turning a confirmed proposal into what
+  the person said.
 - Then, in a message of its own, lay out the approaches with their trade-offs and the
   recommendation and ask which way to go. Record the pick as the chosen approach, and
   the pick itself as an answered question.
@@ -321,11 +326,15 @@ This page is your whole output: the controller reads its digest, and nobody read
 reply. The work of it:
 
 - Restate the ask, then read the codebase from where it lands, following callers and
-  imports until the blast radius stops growing. Record only what you opened.
+  imports until the blast radius stops growing. Give every recon entry its basis:
+  observed when you opened it, inferred when it follows from something you opened,
+  assumed when neither.
 - Read the outside sources this workspace allows for prior art: libraries, upstream
   documentation, comparable designs.
 - Generate several real ways of building it, cull those that work against the why or
-  that the code rules out, and keep two or three grounded in the recon. Recommend one.
+  that the code rules out, and keep two or three grounded in the recon. Give each a
+  prediction that should hold if it is right and a falsifier that would show it wrong,
+  and judge each against the epic's outcomes. Recommend one.
 - Turn what only the person can settle into questions; never ask what the code or the
   epic already answers.
 - Write the digest last.
@@ -339,10 +348,12 @@ JUDGING = """
 judging - the research is written, and a fresh judge who did not write it checks it
 before anyone relies on it. The work of it:
 
-- Open a sample of the recorded component paths and constraint sources and confirm
-  they say what the page claims.
+- Open a sample of the entries marked observed and confirm they say what the page
+  claims; one that does not check out is a blocking finding, and so is an inference
+  passed off as observed.
 - Check the approaches genuinely differ, each grounded in the recon, and that the
-  dropped approaches explain the culling.
+  dropped approaches explain the culling. An approach whose falsifier could never be
+  observed is a blocking finding.
 - Check the digest says nothing the page does not.
 
 Record each problem as a finding, set the verdict afresh, and fire report on pass or
