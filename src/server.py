@@ -428,7 +428,8 @@ async def describeMutations(workspaceId: str, pageId: str) -> dict[str, Any]:
 
 @mcp.tool
 async def outline(workspaceId: str, pageId: str) -> dict[str, Any]:
-    """A page's section tree (key, name, order, field kinds). Structure only, no body content."""
+    """A page's current status and section tree (key, name, order, field kinds). Structure only,
+    no body content - the cheap way to read one page's status."""
     with _guard_tool():
         return STORE.outline(workspaceId, pageId)
 

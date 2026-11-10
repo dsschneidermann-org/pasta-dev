@@ -278,7 +278,8 @@ class Store:
         }
 
     def outline(self, workspace_id: str, page_id: str) -> dict[str, Any]:
-        """A page's section tree (key, name, order, field kinds) - structure, no body."""
+        """A page's current status and section tree (key, name, order, field kinds) - structure,
+        no body."""
         page = self.get_page(workspace_id, page_id)
         page_type = get_page_type(page.type)
         if page_type is None:
@@ -287,6 +288,7 @@ class Store:
             "pageId": page.id,
             "type": page.type,
             "title": page.title,
+            "status": page.status,
             "sections": [
                 {
                     "key": section.key,

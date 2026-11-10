@@ -490,6 +490,16 @@ def test_outline_returns_section_tree(store):
     assert outline["sections"][0]["order"] == 0
 
 
+def test_outline_carries_the_current_status_and_no_content(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-flow", "A").page
+    outline = store.outline(workspace.id, page.id)
+    assert set(outline) == {"pageId", "type", "title", "status", "sections"}
+    assert outline["status"] == "draft"
+    _mutate(store, workspace.id, page.id, [{"command": "open"}])
+    assert store.outline(workspace.id, page.id)["status"] == "open"
+
+
 def test_render_markdown_page_and_tree(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "Page title").page
