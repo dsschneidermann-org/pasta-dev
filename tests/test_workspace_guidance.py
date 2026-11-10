@@ -13,7 +13,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 import src.server as server
-from src.errors import ValidationError
+from src.errors import NotFoundError, ValidationError
 from src.model import Workspace
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.pagetypes._workspace_guidance import (
@@ -282,6 +282,44 @@ def test_set_workspace_guidance_persists_and_validates(store):
     # An undeclared field is rejected, naming the declared ones.
     with pytest.raises(ValidationError, match="not a workspace guidance field"):
         store.set_workspace_guidance(wid, "nope", "x")
+
+
+# --- store.get_workspace_guidance --------------------------------------------
+def test_get_workspace_guidance_reads_every_declared_field(store):
+    wid = store.create_workspace("demo").id
+    store.set_workspace_guidance(wid, "buildTool", "use pytest")
+    store.set_workspace_guidance(wid, "reviewHint", "")
+    assert store.get_workspace_guidance(wid) == {
+        "workspaceId": wid,
+        "fields": [
+            {"field": "buildTool", "description": "the build tool this workspace uses",
+             "text": "use pytest"},
+            {"field": "draftHint", "description": "a hint shown while drafting", "text": None},
+            {"field": "reviewHint", "description": "a hint shown while reviewing", "text": None},
+        ],
+        "undeclared": {},
+    }
+
+
+def test_get_workspace_guidance_surfaces_stored_text_for_an_undeclared_field(store):
+    wid = store.create_workspace("demo").id
+    workspace = store.load_workspace(wid)
+    workspace.guidance_config["retiredField"] = "old rule"   # left by a server declaring more fields
+    store._touch_and_save(workspace)
+    assert store.get_workspace_guidance(wid)["undeclared"] == {"retiredField": "old rule"}
+
+
+def test_get_workspace_guidance_does_not_write(store):
+    wid = store.create_workspace("demo").id
+    store.set_workspace_guidance(wid, "buildTool", "use pytest")
+    before = workspace_to_dict(store.load_workspace(wid))
+    _ = store.get_workspace_guidance(wid)
+    assert workspace_to_dict(store.load_workspace(wid)) == before   # updated_at included
+
+
+def test_get_workspace_guidance_unknown_workspace_is_not_found(store):
+    with pytest.raises(NotFoundError, match="not found"):
+        _ = store.get_workspace_guidance("ws:missing")
 
 
 # --- store.next_actions guidance injection -----------------------------------

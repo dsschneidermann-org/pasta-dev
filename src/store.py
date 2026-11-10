@@ -974,6 +974,12 @@ class Store:
         return self._set_workspace_status(workspace_id, "active")
 
     # --- workspace guidance configuration -----------------------------------
+    def get_workspace_guidance(self, workspace_id: str) -> dict[str, Any]:
+        """Every workspace guidance field with its stored text, read without taking the write lock."""
+        workspace = self.load_workspace(workspace_id)
+        return {"workspaceId": workspace.id,
+                **workspace_guidance_overview(workspace_guidance_fields(), workspace.guidance_config)}
+
     def set_workspace_guidance(self, workspace_id: str, field: str, text: str) -> Workspace:
         """Store `text` under `field` on the workspace's guidance config. Rejects a field no page
         type declares; an empty string clears the field. Returns the updated workspace."""
