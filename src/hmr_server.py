@@ -160,6 +160,15 @@ def reimport(scope: ReloadScope, changed: Set[str]) -> Exception | None:
 
 
 # --- Reload failure reporting ----------------------------------------------------------
+def _report_reload_failure(error: BaseException) -> None:
+    """Say on the dev console what a failed reload cost, and hand its traceback to sys.excepthook,
+    which tees it to the reload log."""
+    logger.error(
+        "[HMR] reload FAILED - the edit did not take; the build loaded before it stays loaded " +
+        "and both surfaces refuse until a reload succeeds:\n%s", reload_failure_summary(error))
+    sys.excepthook(type(error), error, error.__traceback__)
+
+
 class _LoggingErrorFilter(ErrorFilter):
     """Restate a swallowed reload failure through the dev console's error logger.
 

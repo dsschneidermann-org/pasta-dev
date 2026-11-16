@@ -24,8 +24,8 @@ from mcp.server.connection import Connection
 
 import src.hmr_server as hmr_server
 from src.hmr_live_refresh import reload_failure, set_reload_failure
-from src.hmr_server import (ReloadScope, _LoggingErrorFilter, _mount, _normalise, modules_to_drop,
-                            needs_reimport, reimport, reload_failure_summary)
+from src.hmr_server import (ReloadScope, _LoggingErrorFilter, _mount, _normalise, _report_reload_failure,
+                            modules_to_drop, needs_reimport, reimport, reload_failure_summary)
 
 
 @pytest.fixture
@@ -208,6 +208,44 @@ def test_a_recorded_reload_failure_holds_until_cleared():
     finally:
         set_reload_failure(None)
     assert reload_failure() is None
+
+
+@pytest.fixture
+def report(caplog, monkeypatch):
+    """Report a reload failure, capturing the console text and what reached sys.excepthook."""
+    hooked: list[BaseException] = []
+    monkeypatch.setattr(sys, "excepthook", lambda _type, value, _tb: hooked.append(value))
+
+    def _run(error: BaseException):
+        with caplog.at_level(logging.ERROR, logger="uvicorn.error"):
+            _report_reload_failure(error)
+        return caplog.text, hooked
+    return _run
+
+
+def test_a_failed_reload_reaches_the_console_as_an_error(report):
+    text, _ = report(ImportError("cannot import name 'NEW'"))
+    assert "ERROR" in text
+    assert "[HMR]" in text
+
+
+def test_a_failed_reload_report_names_its_error(report):
+    text, _ = report(ValueError("Invalid page-type declarations:\n- bug-report: bad setter"))
+    assert "Invalid page-type declarations" in text
+    assert "bad setter" in text
+
+
+def test_a_failed_reload_report_states_what_it_cost(report):
+    # The error alone never said what it cost: the edit did not take, and both surfaces now refuse.
+    text, _ = report(ValueError("boom"))
+    assert "did not take" in text
+    assert "refuse" in text
+
+
+def test_the_traceback_is_handed_to_the_excepthook_that_tees_the_reload_log(report):
+    error = ValueError("boom")
+    _, hooked = report(error)
+    assert hooked == [error]
 
 
 # --- Re-importing a package, all or nothing ----------------------------------------------
