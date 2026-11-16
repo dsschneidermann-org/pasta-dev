@@ -67,6 +67,15 @@ _PACKAGE_DIR = str(Path(__file__).resolve().parent)
 # dropped: uvicorn configures only its own loggers, not the root logger.
 logger = logging.getLogger("uvicorn.error")
 
+# uvicorn hands websockets this same logger, and websockets logs every connection opening and
+# closing on it at INFO. uvicorn's own line for the accept already names the client and path.
+WEBSOCKET_LIFECYCLE_LINES = ("connection open", "connection closed")
+
+
+def shows_on_console(record: logging.LogRecord) -> bool:
+    """A filter for the dev console: False for websockets' per-connection lifecycle lines."""
+    return record.msg not in WEBSOCKET_LIFECYCLE_LINES
+
 
 # --- What a reload re-imports -----------------------------------------------------------
 QUIET_WINDOW_MS = 300  # watchfiles awatch step: the quiet time before a batch of changes is reloaded
@@ -331,4 +340,5 @@ def build_dev_app() -> Starlette:
 
 def run_dev_server(host: str = "0.0.0.0", port: int = 8000) -> None:
     """Serve the combined HMR dev app. Dev-only; blocks until interrupted."""
+    logger.addFilter(shows_on_console)
     uvicorn.run(build_dev_app(), host=host, port=port, timeout_graceful_shutdown=1)
