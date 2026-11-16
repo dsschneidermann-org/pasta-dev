@@ -110,8 +110,6 @@ _EPIC = PageType(
                 The intent in a sentence or two: what you want to build and why it is worth building.
                 Write it before any code is read, because each direction's investigator searches the
                 repo from this line. State the outcome you want, not the implementation you imagine.
-                If the outcome can be stated without joining two independent things with 'and', it
-                is probably one feature-brief rather than an epic.
                 """),
         )),
         SectionSpec("framing", "Framing", (
@@ -123,14 +121,14 @@ _EPIC = PageType(
                 problem well.
                 """),
             _list("outcomes", element_fields=("text", "kind", "said"), description="""
-                Each one goal, non-goal or anti-goal (kind), where an anti-goal is something that
-                would make this a failure even if it technically works. said is user when they
-                stated it and proposal when you filled it in, and you present every proposal to them
-                as yours. Write them before research begins: every investigation assesses its
-                direction against each one by id, and outcomes written after the directions get
-                fitted to them. Write each so a reviewer could tell whether the built result meets
-                it: the design copies these verbatim, and a vague one becomes a criterion nobody can
-                check.
+                Each one goal, non-goal or anti-goal, named in kind. An anti-goal is something that
+                would make this a failure even if it technically works. Set said to user for an
+                outcome the user stated and to proposal for one you filled in, and tell the user
+                which outcomes are your proposals. Write them before research begins: every
+                investigation assesses its direction against each one by id, and outcomes written
+                after the directions get fitted to them. Write each so a reviewer could tell whether
+                the built result meets it: the design copies these verbatim, and a vague one becomes
+                a criterion nobody can check.
                 """),
         )),
         SectionSpec("directions", "Solution directions", (
@@ -139,9 +137,10 @@ _EPIC = PageType(
                 saying what it would change or add and what it assumes, so the agent investigating
                 it knows what to look for. Write them with the user from the summary, the why and
                 the outcomes before any code is read. Two directions that would send an investigator
-                to the same code with the same question are one. said is user when they named it
-                and proposal when you did. Each gets one solution-investigation page, which records
-                this element's id; correct a direction in place with editDirection so the id holds.
+                to the same code with the same question are one. Set said to user for a direction the
+                user named and to proposal for one you added. Each gets one solution-investigation
+                page, which records this element's id; correct a direction in place with
+                editDirection so the id holds.
                 """),
         )),
         SectionSpec("decision", "Approach decision", (

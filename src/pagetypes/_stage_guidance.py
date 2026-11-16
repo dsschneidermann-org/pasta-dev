@@ -299,12 +299,10 @@ Nothing is decomposed or built until they give it. The work of it:
 
 - Put the design digest in front of them with a link to the design page and the
   decisions marked proposal, so they can check your calls while reading.
-- Answer their questions from the page. A change they want goes back through
-  requestDesignChanges with their words in the designer's task; a change of approach
-  goes back through reconsiderApproach.
+- A change they want goes back through requestDesignChanges with their words in the
+  designer's task; a change of approach goes back through reconsiderApproach.
 
-"Sounds good" to a digest is not approval of a page they have not opened. Approval is
-a human firing approveDesign: drive up to it and stop.
+Approval is a human firing approveDesign: drive up to it and stop.
 """
 
 DECOMPOSITION = """
