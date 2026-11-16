@@ -32,7 +32,10 @@ Two brittleness notes (dev-only tool):
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import logging
+import os
+import sys
 import traceback
 from asyncio import Event, Lock, TaskGroup
 from collections.abc import Callable, Mapping, Set
@@ -121,6 +124,39 @@ def needs_reimport(changed: Set[str]) -> bool:
 def reload_failure_summary(error: BaseException) -> str:
     """The exception's own lines without its traceback."""
     return "".join(traceback.format_exception_only(error)).strip()
+
+
+def _normalise(path: str) -> str:
+    """Make a watcher path and a module's __file__ comparable, case included on Windows."""
+    return os.path.normcase(str(Path(path).resolve()))
+
+
+def reimport(scope: ReloadScope, changed: Set[str]) -> Exception | None:
+    """Re-import the scope's entry from disk, all or nothing.
+
+    Every droppable module leaves sys.modules first, so the import runs each one again from what is
+    on disk now, in the order the imports themselves ask for. When it raises, the modules loaded
+    before are put back exactly as they were and the error is returned instead."""
+    snapshot = {name: module for name, module in sys.modules.items()
+                if _in_package(name, scope.package)}
+    loaded = {name: _normalise(file) if (file := getattr(module, "__file__", None)) else None
+              for name, module in snapshot.items()}
+    for name in modules_to_drop(scope, loaded, changed):
+        del sys.modules[name]
+    # Bytecode is checked against the source's mtime in whole seconds and its size, so a same-size
+    # rewrite within a second of the last compile would otherwise load the old code.
+    for path in changed:
+        if path.endswith(".py"):
+            Path(importlib.util.cache_from_source(path)).unlink(missing_ok=True)
+    importlib.invalidate_caches()
+    try:
+        _ = import_module(scope.entry)
+    except Exception as error:
+        for name in [name for name in sys.modules if _in_package(name, scope.package)]:
+            del sys.modules[name]
+        sys.modules.update(snapshot)
+        return error
+    return None
 
 
 # --- Reload failure reporting ----------------------------------------------------------

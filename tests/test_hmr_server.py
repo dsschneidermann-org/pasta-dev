@@ -10,6 +10,13 @@ upgrade can move without any error.
 
 import asyncio
 import logging
+import os
+import sys
+import uuid
+from importlib import import_module
+from importlib.util import cache_from_source
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastmcp import FastMCP
@@ -17,8 +24,8 @@ from mcp.server.connection import Connection
 
 import src.hmr_server as hmr_server
 from src.hmr_live_refresh import reload_failure, set_reload_failure
-from src.hmr_server import (ReloadScope, _LoggingErrorFilter, _mount, modules_to_drop, needs_reimport,
-                            reload_failure_summary)
+from src.hmr_server import (ReloadScope, _LoggingErrorFilter, _mount, _normalise, modules_to_drop,
+                            needs_reimport, reimport, reload_failure_summary)
 
 
 @pytest.fixture
@@ -201,3 +208,125 @@ def test_a_recorded_reload_failure_holds_until_cleared():
     finally:
         set_reload_failure(None)
     assert reload_failure() is None
+
+
+# --- Re-importing a package, all or nothing ----------------------------------------------
+# Driven against a throwaway package, never against src. The shapes are the ones the HMR bug
+# logged: an importer and the exporter of a new name changed together, and a class gaining a field
+# that an unchanged module instantiates and a changed module reads.
+@pytest.fixture
+def package(tmp_path, monkeypatch):
+    """A throwaway package on sys.path. write() rewrites one of its files and returns the path as a
+    reload batch names it."""
+    name = f"rpkg_{uuid.uuid4().hex[:8]}"
+    root = tmp_path / name
+    root.mkdir()
+    (root / "__init__.py").write_text("")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    def write(relative: str, source: str) -> str:
+        (root / relative).write_text(source)
+        return _normalise(str(root / relative))
+
+    def scope(always=(), unless_changed=()) -> ReloadScope:
+        return ReloadScope(name, f"{name}.entry", frozenset(f"{name}.{m}" for m in always),
+                           frozenset(f"{name}.{m}" for m in unless_changed))
+
+    def modules() -> dict:
+        return {n: m for n, m in sys.modules.items() if n == name or n.startswith(f"{name}.")}
+
+    yield SimpleNamespace(name=name, root=root, write=write, scope=scope, modules=modules)
+    for module_name in list(modules()):
+        del sys.modules[module_name]
+
+
+def test_an_importer_and_the_exporter_of_a_new_name_reload_together(package):
+    package.write("a.py", "OLD = 1\n")
+    package.write("entry.py", "from .a import OLD\n")
+    import_module(f"{package.name}.entry")
+    changed = {package.write("entry.py", "from .a import NEW\n"),
+               package.write("a.py", "OLD = 1\nNEW = 2\n")}
+    assert reimport(package.scope(), changed) is None
+    assert sys.modules[f"{package.name}.entry"].NEW == 2
+
+
+def test_a_new_field_read_through_an_unchanged_module_reloads_together(package):
+    # The FieldSpec.fixed shape: fields gains a field, unchanged kinds builds an instance of it,
+    # validation's new code reads the field, and unchanged entry runs validation on the instance.
+    package.write("fields.py", "class F:\n    def __init__(self):\n        self.kind = 'k'\n")
+    package.write("kinds.py", "from .fields import F\nINSTANCE = F()\n")
+    package.write("validation.py", "def check(f):\n    return f.kind\n")
+    package.write("entry.py",
+                  "from .kinds import INSTANCE\nfrom .validation import check\nRESULT = check(INSTANCE)\n")
+    import_module(f"{package.name}.entry")
+    changed = {package.write("validation.py", "def check(f):\n    return f.fixed\n"),
+               package.write("fields.py",
+                             "class F:\n    def __init__(self):\n        self.kind = 'k'\n"
+                             "        self.fixed = 'yes'\n")}
+    assert reimport(package.scope(), changed) is None
+    assert sys.modules[f"{package.name}.entry"].RESULT == "yes"
+
+
+def test_a_failed_reimport_puts_back_the_modules_loaded_before(package):
+    package.write("a.py", "OLD = 1\n")
+    package.write("entry.py", "from .a import OLD\n")
+    import_module(f"{package.name}.entry")
+    before = package.modules()
+    error = reimport(package.scope(), {package.write("entry.py", "from .a import NEW\n")})
+    assert isinstance(error, ImportError)
+    after = package.modules()
+    assert after.keys() == before.keys()
+    assert all(after[name] is before[name] for name in before)
+
+
+def test_the_batch_after_a_failed_one_brings_the_package_up_to_date(package):
+    package.write("a.py", "OLD = 1\n")
+    package.write("entry.py", "from .a import OLD\n")
+    import_module(f"{package.name}.entry")
+    assert reimport(package.scope(), {package.write("entry.py", "from .a import NEW\n")}) is not None
+    assert reimport(package.scope(), {package.write("a.py", "NEW = 2\n")}) is None
+    assert sys.modules[f"{package.name}.entry"].NEW == 2
+
+
+def test_an_always_kept_module_is_the_same_object_after_a_reimport(package):
+    package.write("state.py", "ITEMS = []\n")
+    package.write("entry.py", "from . import state\n")
+    import_module(f"{package.name}.entry")
+    state = sys.modules[f"{package.name}.state"]
+    changed = {package.write("entry.py", "from . import state\nVERSION = 2\n"),
+               package.write("state.py", "ITEMS = [1]\n")}
+    assert reimport(package.scope(always=["state"]), changed) is None
+    assert sys.modules[f"{package.name}.entry"].state is state
+
+
+def test_a_module_kept_unless_changed_survives_until_its_own_file_changes(package):
+    package.write("cache.py", "ITEMS = []\n")
+    package.write("entry.py", "from .cache import ITEMS\n")
+    import_module(f"{package.name}.entry")
+    cache = sys.modules[f"{package.name}.cache"]
+    scope = package.scope(unless_changed=["cache"])
+    assert reimport(scope, {package.write("entry.py", "from .cache import ITEMS\nV = 2\n")}) is None
+    assert sys.modules[f"{package.name}.cache"] is cache
+    assert reimport(scope, {package.write("cache.py", "ITEMS = [1]\n")}) is None
+    assert sys.modules[f"{package.name}.entry"].ITEMS == [1]
+
+
+def test_a_same_size_rewrite_in_the_same_second_is_not_served_from_old_bytecode(package):
+    package.write("a.py", "X = 1\n")
+    package.write("entry.py", "from .a import X\n")
+    import_module(f"{package.name}.entry")
+    source = package.root / "a.py"
+    assert Path(cache_from_source(str(source))).exists()  # the stale bytecode this guards against
+    stamp = source.stat().st_mtime
+    changed = package.write("a.py", "X = 2\n")
+    os.utime(source, (stamp, stamp))
+    assert reimport(package.scope(), {changed}) is None
+    assert sys.modules[f"{package.name}.entry"].X == 2
+
+
+def test_a_file_added_in_the_batch_is_importable(package):
+    package.write("entry.py", "Y = 0\n")
+    import_module(f"{package.name}.entry")
+    changed = {package.write("b.py", "Y = 3\n"), package.write("entry.py", "from .b import Y\n")}
+    assert reimport(package.scope(), changed) is None
+    assert sys.modules[f"{package.name}.entry"].Y == 3
