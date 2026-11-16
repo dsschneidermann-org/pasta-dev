@@ -432,6 +432,27 @@ def test_tool_calls_run_normally_once_the_declarations_validate(mcp):
     assert call(mcp, "listWorkspaces") == []
 
 
+# A failed hot reload rolls back to the last good build, whose registry validates, so the same gate
+# also asks whether the last reload failed.
+def test_tool_calls_are_refused_after_a_failed_reload(mcp, failed_reload):
+    with pytest.raises(ToolError, match="last hot reload failed"):
+        call(mcp, "listWorkspaces")
+
+
+def test_the_reload_refusal_names_the_error_and_the_reload_log(mcp, failed_reload):
+    from src._hmr_debug import LOG_PATH
+    with pytest.raises(ToolError) as refused:
+        call(mcp, "createWorkspace", {"name": "demo"})
+    assert "DECOMPOSITION" in str(refused.value)
+    assert str(LOG_PATH) in str(refused.value)
+
+
+def test_tool_calls_run_again_once_a_reload_succeeds(mcp, failed_reload):
+    from src.hmr_live_refresh import set_reload_failure
+    set_reload_failure(None)
+    assert call(mcp, "listWorkspaces") == []
+
+
 # --- describePageType requires a type ----------------------------------------
 def test_describe_page_type_requires_a_type(mcp):
     # The type argument is required; a call without it is rejected rather than treated as a listing.

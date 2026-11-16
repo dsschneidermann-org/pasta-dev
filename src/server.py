@@ -27,7 +27,7 @@ from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .event_cache import page_events
-from .hmr_live_refresh import ws_reloader
+from .hmr_live_refresh import reload_failure, ws_reloader
 from .instructions import render_instructions
 from .pagetypes._registry import (
     declaration_errors,
@@ -91,26 +91,34 @@ templates.env.globals["source_link"] = source_link  # pyright: ignore[reportArgu
 # registry that no longer validates. So ask again per request, against the live registry, at the
 # two points every caller passes through - which is what lets a gate hold even from a stale module.
 # Neither needs a reset: a reload that declares valid types simply answers None, and a cold start
-# still fails outright above.
+# still fails outright above. A failed reload rolls back to the last good build, whose registry
+# validates, so the gates also ask whether the last reload failed.
 #
 # Registered ahead of `add_no_cache_headers` so that one stays the outer middleware and stamps this
 # response too, since a cached refusal would outlive the fix.
 @app.middleware("http")
 async def refuse_invalid_declarations(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    failure = reload_failure()
     errors = declaration_errors()
     # The refusal page renders with the stylesheet and theme assets served from /static.
-    if errors is None or request.url.path.startswith("/static"):
+    if (failure is None and errors is None) or request.url.path.startswith("/static"):
         return await call_next(request)
+    if failure is not None:
+        message = "The last hot reload failed; the wiki is not being served."
+        trace = ("The last hot reload failed, so this server is refusing to serve out of the build "
+                 "loaded before it:\n\n"
+                 f"{failure}\n\n"
+                 "Fix the error and save - the next reload that succeeds will bring this page back.")
+    else:
+        message = "The page-type declarations are invalid; the wiki is not being served."
+        trace = ("The page-type declarations are invalid, so this server is refusing to serve "
+                 "rather than answer out of them:\n\n"
+                 f"{errors}\n\n"
+                 "Fix the declaration and save - the reload will bring this page back.")
     return templates.TemplateResponse(
         request=request,
         name="error.html",
-        context={
-            "message": "The page-type declarations are invalid; the wiki is not being served.",
-            "trace": ("The page-type declarations are invalid, so this server is refusing to serve "
-                      "rather than answer out of them:\n\n"
-                      f"{errors}\n\n"
-                      "Fix the declaration and save - the reload will bring this page back."),
-        },
+        context={"message": message, "trace": trace},
         status_code=503,
     )
 
@@ -331,13 +339,20 @@ class _RefuseInvalidDeclarations(Middleware):
         context: MiddlewareContext[mt.CallToolRequestParams],
         call_next: CallNext[mt.CallToolRequestParams, ToolResult],
     ) -> ToolResult:
+        failure = reload_failure()
         errors = declaration_errors()
-        if errors is None:
+        if failure is None and errors is None:
             return await call_next(context)
         # Resolved from the running server's package rather than the caller's cwd: a caller is
         # often working in a different checkout than the server it is talking to. The log holds the
         # traceback behind these errors, which the aggregated message deliberately does not carry.
         from ._hmr_debug import LOG_PATH
+        if failure is not None:
+            raise ToolError(
+                "The last hot reload failed, so this server is refusing to serve out of the build " +
+                f"loaded before it:\n{failure}\n" +
+                f"The full reload traceback is at {LOG_PATH}.\n" +
+                "Fix the error and save; the next reload that succeeds restores the tools.")
         raise ToolError(
             "The page-type declarations are invalid, so this server is refusing to serve rather " +
             f"than answer out of them:\n{errors}\n" +
