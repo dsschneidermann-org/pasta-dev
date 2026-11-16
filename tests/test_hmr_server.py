@@ -16,7 +16,7 @@ from fastmcp import FastMCP
 from mcp.server.connection import Connection
 
 import src.hmr_server as hmr_server
-from src.hmr_server import _LoggingErrorFilter, _mount
+from src.hmr_server import ReloadScope, _LoggingErrorFilter, _mount, modules_to_drop, needs_reimport
 
 
 @pytest.fixture
@@ -143,3 +143,35 @@ def test_one_broken_connection_does_not_stop_the_others_hearing_of_a_reload(capt
     assert healthy.sent == ["notifications/tools/list_changed",
                             "notifications/resources/list_changed",
                             "notifications/prompts/list_changed"]
+
+
+# --- Which modules a full reload re-imports -------------------------------------------
+# A made-up scope, so these do not depend on src's real module list.
+_SCOPE = ReloadScope("pkg", "pkg.entry", frozenset({"pkg.reloader"}), frozenset({"pkg.cache"}))
+_LOADED = {"pkg": "/r/pkg/__init__.py", "pkg.entry": "/r/pkg/entry.py",
+           "pkg.reloader": "/r/pkg/reloader.py", "pkg.cache": "/r/pkg/cache.py",
+           "pkgx": "/r/pkgx.py", "json": None}
+
+
+def test_a_reload_drops_every_package_module_but_the_kept_ones():
+    assert modules_to_drop(_SCOPE, _LOADED, frozenset()) == ["pkg", "pkg.entry"]
+
+
+def test_a_module_kept_unless_changed_is_dropped_once_its_own_file_changed():
+    changed = frozenset({"/r/pkg/cache.py"})
+    assert modules_to_drop(_SCOPE, _LOADED, changed) == ["pkg", "pkg.cache", "pkg.entry"]
+
+
+def test_an_always_kept_module_stays_even_when_its_file_changed():
+    assert "pkg.reloader" not in modules_to_drop(_SCOPE, _LOADED, frozenset({"/r/pkg/reloader.py"}))
+
+
+def test_a_module_outside_the_package_is_never_dropped():
+    # pkgx shares the prefix but not the package.
+    assert "pkgx" not in modules_to_drop(_SCOPE, _LOADED, frozenset({"/r/pkgx.py"}))
+
+
+def test_only_a_batch_with_python_source_reimports():
+    assert needs_reimport(frozenset({"/r/pkg/templates/page.html", "/r/pkg/entry.py"}))
+    assert not needs_reimport(frozenset({"/r/pkg/static/styles.css"}))
+    assert not needs_reimport(frozenset())

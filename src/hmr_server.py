@@ -35,8 +35,9 @@ import asyncio
 import logging
 import traceback
 from asyncio import Event, Lock, TaskGroup
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Set
 from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from types import TracebackType
@@ -69,6 +70,52 @@ _LIVE_REFRESH_FILE = str(Path(__file__).resolve().parent / "hmr_live_refresh.py"
 # console next to uvicorn's own output. A standalone module logger at INFO would be
 # dropped: uvicorn configures only its own loggers, not the root logger.
 logger = logging.getLogger("uvicorn.error")
+
+
+# --- What a reload re-imports -----------------------------------------------------------
+QUIET_WINDOW_MS = 300  # watchfiles awatch step: the quiet time before a batch of changes is reloaded
+
+
+@dataclass(frozen=True)
+class ReloadScope:
+    """The package a reload re-imports, the module it imports through, and what it leaves loaded."""
+    package: str
+    entry: str
+    always_kept: frozenset[str]
+    kept_unless_changed: frozenset[str]
+
+
+# hmr_server is the reloader and hmr_live_refresh holds the live sockets and the last failure, so
+# neither is ever re-imported. event_cache and _hmr_debug hold state of their own and import nothing
+# from the package, so they are re-imported only when their own file changed.
+SCOPE = ReloadScope(
+    package="src",
+    entry=TARGET_MODULE,
+    always_kept=frozenset({"src.hmr_server", "src.hmr_live_refresh"}),
+    kept_unless_changed=frozenset({"src.event_cache", "src._hmr_debug"}),
+)
+
+
+def _in_package(name: str, package: str) -> bool:
+    return name == package or name.startswith(f"{package}.")
+
+
+def modules_to_drop(scope: ReloadScope, loaded: Mapping[str, str | None],
+                    changed: Set[str]) -> list[str]:
+    """The loaded modules a reload re-imports, sorted by name.
+
+    `loaded` maps module names to their normalised file path, None when a module has no file, and
+    `changed` holds the batch's normalised paths."""
+    return sorted(
+        name for name, path in loaded.items()
+        if _in_package(name, scope.package)
+        and name not in scope.always_kept
+        and not (name in scope.kept_unless_changed and path not in changed))
+
+
+def needs_reimport(changed: Set[str]) -> bool:
+    """Whether a batch touches Python source, which is all a re-import reads."""
+    return any(path.endswith(".py") for path in changed)
 
 
 # --- Reload failure reporting ----------------------------------------------------------
