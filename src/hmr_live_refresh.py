@@ -41,8 +41,7 @@ class ReloaderConnectionManager:
 ws_reloader = ReloaderConnectionManager()
 
 
-# Why the last hot reload failed, until one succeeds. Both refusal gates read it, and they may be
-# the gates of the build a failed reload rolled back to, so it lives here rather than in either.
+# Kept here so the gates of a rolled-back build still see it.
 _reload_failure: str | None = None
 
 
