@@ -390,8 +390,7 @@ def test_status_revision_surfaced_and_echoed_via_server(mcp):
 
 
 # --- Declaration quarantine --------------------------------------------------
-# The gate is asked per call rather than at load, so that it holds even when this module is the
-# stale half of a reload. These drive it through the real tool path.
+# The gate is asked per call rather than at load. These drive it through the real tool path.
 
 def test_tool_calls_are_refused_while_a_page_type_declaration_is_invalid(mcp, invalid_declarations):
     # A describe answered from an invalid declaration contradicts itself, listing the fields that

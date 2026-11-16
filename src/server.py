@@ -86,13 +86,11 @@ templates.env.globals["source_link"] = source_link  # pyright: ignore[reportArgu
 
 # --- Declaration quarantine --------------------------------------------------
 # Validating in this module's body guards the moment it executes, not the surface it goes on to
-# serve. Under hot reload the two come apart: the page types can reload invalid while this module's
-# own re-exec fails, leaving the objects built by the last good exec mounted and answering out of a
-# registry that no longer validates. So ask again per request, against the live registry, at the
-# two points every caller passes through - which is what lets a gate hold even from a stale module.
-# Neither needs a reset: a reload that declares valid types simply answers None, and a cold start
-# still fails outright above. A failed reload rolls back to the last good build, whose registry
-# validates, so the gates also ask whether the last reload failed.
+# serve. So both surfaces ask again per request, at the two points every caller passes through:
+# whether the live registry validates, and whether the last hot reload failed. A failed reload rolls
+# back to the last good build, whose registry validates, so it is the second question that keeps the
+# surfaces refusing until a reload succeeds. Neither needs a reset: a later good reload clears the
+# failure, a registry that validates answers None, and a cold start still fails outright above.
 #
 # Registered ahead of `add_no_cache_headers` so that one stays the outer middleware and stamps this
 # response too, since a cached refusal would outlive the fix.

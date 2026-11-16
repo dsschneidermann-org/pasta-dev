@@ -81,9 +81,9 @@ class ReloadScope:
     kept_unless_changed: frozenset[str]
 
 
-# hmr_server is the reloader and hmr_live_refresh holds the live sockets and the last failure, so
-# neither is ever re-imported. event_cache and _hmr_debug hold state of their own and import nothing
-# from the package, so they are re-imported only when their own file changed.
+# State that has to outlive a reload is kept: always for the reloader and the state it shares with
+# the server, and, for a module that holds state but imports nothing from the package, until its own
+# file changes.
 SCOPE = ReloadScope(
     package="src",
     entry=TARGET_MODULE,
