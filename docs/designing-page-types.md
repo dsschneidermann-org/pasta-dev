@@ -77,9 +77,10 @@ optionally the statuses it is allowed in. Names follow the field they write:
 
 - **Pinned children** are declared on the parent and created in the same step as the
   parent (a feature brief creates its spec, implementation plan and testing plan; an
-  epic creates its research and design pages).
+  epic creates its design page).
 - **Ordinary children** are created later, as the work needs them (an epic's feature
-  briefs, and one agent-plan page per agent it dispatches).
+  briefs, one solution investigation per direction, and one agent-plan page per agent it
+  dispatches).
 - A **child guard** holds a parent's transition until its direct children of a given type
   are in an accepted set of states (ship waits until every plan step is done or skipped
   and every test case has passed or been skipped). It ignores archived children and
