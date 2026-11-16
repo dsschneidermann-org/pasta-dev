@@ -321,6 +321,23 @@ def test_pages_serve_normally_once_the_declarations_validate(client):
     assert client.get("/").status_code == 200
 
 
+def test_a_page_is_refused_after_a_failed_reload(client, failed_reload):
+    response = client.get("/")
+    assert response.status_code == 503
+    assert "DECOMPOSITION" in response.text
+
+
+def test_the_reload_refusal_keeps_the_live_reload_socket_and_is_not_cached(client, failed_reload):
+    response = client.get("/")
+    assert response.status_code == 503
+    assert "/ws/reloader" in response.text
+    assert "no-store" in response.headers["cache-control"]
+
+
+def test_static_assets_are_served_after_a_failed_reload(client, failed_reload):
+    assert client.get("/static/styles.css").status_code == 200
+
+
 def test_footer_links_the_source_and_carries_the_agpl_note(client, monkeypatch):
     monkeypatch.setitem(server.templates.env.globals, "source_link",
                         SourceLink(href="https://example.com/o/r", text="example.com/o/r"))

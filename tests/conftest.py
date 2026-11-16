@@ -68,3 +68,14 @@ def invalid_declarations(monkeypatch):
     )
     monkeypatch.setattr(_registry, "registered_pagetypes", lambda: {orphan.tag: orphan})
     return "field setter 'setPlatform' targets unknown field 'report.platform'"
+
+
+@pytest.fixture
+def failed_reload():
+    """Record a failed hot reload the way the dev server does, and clear it afterwards. Returns the
+    summary the refusals must quote."""
+    from src.hmr_live_refresh import set_reload_failure
+    summary = "ImportError: cannot import name 'DECOMPOSITION' from 'src.pagetypes._stage_guidance'"
+    set_reload_failure(summary)
+    yield summary
+    set_reload_failure(None)

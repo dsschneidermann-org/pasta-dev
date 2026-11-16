@@ -9,8 +9,8 @@ transaction. This module never imports store - the dependency runs store -> clea
 
 The timer is one module-level task, started through an idempotent `start_scheduler`
 from both `server.app_lifespan` and `hmr_server.reloader_lifespan` (only the latter
-runs under the dev server). The module is hot-reloadable: it cancels the running task
-before the reloader replaces it, and hmr_server restarts it on the new code.
+runs under the dev server). The dev server stops the sweep on the old module before a
+reload swaps it out, and starts it on the new one.
 
 The loop wakes every `MAX_SLEEP_SECONDS` and sweeps when the tick has just gone by,
 rather than sleeping the whole hour to it.
@@ -25,8 +25,6 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
-
-from reactivity.hmr.hooks import on_dispose  # pyright: ignore[reportMissingTypeStubs]
 
 from .model import Workspace
 
@@ -249,23 +247,3 @@ async def stop_scheduler() -> None:
     _ = task.cancel()
     with suppress(asyncio.CancelledError):
         await task
-
-
-# --- hot reload --------------------------------------------------------------
-
-
-def _stop_for_reload() -> None:
-    """Cancel the sweep just before the reloader replaces this module.
-
-    Without it the old task survives into the new namespace, still running the old
-    code with nothing left holding a handle to cancel it. Restarting is hmr_server's
-    job (`cleanup_reload_effect`).
-    """
-    global _task
-    if _task is not None:
-        _ = _task.cancel()
-        _task = None
-
-
-with suppress(KeyError):   # not a reactive module under pytest or --stdio
-    on_dispose(_stop_for_reload)

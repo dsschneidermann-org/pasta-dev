@@ -1,12 +1,12 @@
-"""Browser live-reload WebSocket connection manager.
+"""The dev server's state that has to outlive a hot reload: the live browser sockets and the
+last reload failure.
 
-This module is deliberately kept OUT of the hot-reload set: `src/hmr_server.py`
-excludes it from the reactive import finder. It holds live browser WebSocket
-connections as in-process state (`ws_reloader.active`); if it were re-executed on
-every source change, that state would be dropped and browser auto-refresh would
-silently stop working. The manager therefore lives here, imported by both the
-reactively-reloaded `src.server` (routes + mutation refreshes) and the stable
-`src.hmr_server` (file-change refreshes), so a single instance survives reloads.
+This module is deliberately kept OUT of the hot-reload set: `src/hmr_server.py` never
+re-imports it. It holds live browser WebSocket connections as in-process state
+(`ws_reloader.active`); if it were re-executed on every source change, that state would be
+dropped and browser auto-refresh would silently stop working. It is imported by both the
+reloaded `src.server` (routes, mutation refreshes, refusal gates) and the stable
+`src.hmr_server` (file-change refreshes, reload outcomes), so a single instance survives reloads.
 """
 
 from __future__ import annotations
@@ -37,5 +37,20 @@ class ReloaderConnectionManager:
 
 
 # Process-wide singleton. Must survive hot reloads, so it lives in this
-# (reload-excluded) module rather than in the reactively-reloaded server module.
+# (reload-excluded) module rather than in the reloaded server module.
 ws_reloader = ReloaderConnectionManager()
+
+
+# Kept here so the gates of a rolled-back build still see it.
+_reload_failure: str | None = None
+
+
+def set_reload_failure(summary: str | None) -> None:
+    """Record why the last reload failed, or clear it once a reload succeeds."""
+    global _reload_failure
+    _reload_failure = summary
+
+
+def reload_failure() -> str | None:
+    """Why the last reload failed, while no reload has succeeded since; otherwise None."""
+    return _reload_failure

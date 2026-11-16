@@ -390,8 +390,7 @@ def test_status_revision_surfaced_and_echoed_via_server(mcp):
 
 
 # --- Declaration quarantine --------------------------------------------------
-# The gate is asked per call rather than at load, so that it holds even when this module is the
-# stale half of a reload. These drive it through the real tool path.
+# The gate is asked per call rather than at load. These drive it through the real tool path.
 
 def test_tool_calls_are_refused_while_a_page_type_declaration_is_invalid(mcp, invalid_declarations):
     # A describe answered from an invalid declaration contradicts itself, listing the fields that
@@ -429,6 +428,27 @@ def test_the_refusal_points_at_the_running_servers_reload_log(mcp, invalid_decla
 
 def test_tool_calls_run_normally_once_the_declarations_validate(mcp):
     # No lingering quarantine: the gate is a live question, so a valid registry answers as usual.
+    assert call(mcp, "listWorkspaces") == []
+
+
+# A failed hot reload rolls back to the last good build, whose registry validates, so the same gate
+# also asks whether the last reload failed.
+def test_tool_calls_are_refused_after_a_failed_reload(mcp, failed_reload):
+    with pytest.raises(ToolError, match="last hot reload failed"):
+        call(mcp, "listWorkspaces")
+
+
+def test_the_reload_refusal_names_the_error_and_the_reload_log(mcp, failed_reload):
+    from src._hmr_debug import LOG_PATH
+    with pytest.raises(ToolError) as refused:
+        call(mcp, "createWorkspace", {"name": "demo"})
+    assert "DECOMPOSITION" in str(refused.value)
+    assert str(LOG_PATH) in str(refused.value)
+
+
+def test_tool_calls_run_again_once_a_reload_succeeds(mcp, failed_reload):
+    from src.hmr_live_refresh import set_reload_failure
+    set_reload_failure(None)
     assert call(mcp, "listWorkspaces") == []
 
 

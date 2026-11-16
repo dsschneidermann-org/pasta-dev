@@ -1,14 +1,14 @@
 """Combined hot-module-reload dev server for pasta.
 
-Runs one uvicorn server, one file watcher and one reactive (HMR) context that serve
-both surfaces of `src.server` with in-process hot reload - no process respawn:
+Runs one uvicorn server and one file watcher that serve both surfaces of `src.server`
+with in-process hot reload - no process respawn:
 
 * FastMCP tools  -> a stable proxy (`base_app`). The reloaded `src.server.mcp`
   is mounted under it; on a source change the old mount is swapped for the reloaded
   one and connected MCP client sessions are sent tools/list_changed, so sessions
   SURVIVE the reload instead of dropping.
 
-* FastAPI HTML   -> a reactive dispatcher that forwards every request to the freshly
+* FastAPI HTML   -> a dispatcher that forwards every request to the freshly
   reloaded `src.server.app`. On a source change connected browsers are told to
   reload over the existing /ws/reloader WebSocket (`ws_reloader.refresh`).
 
@@ -16,54 +16,51 @@ This merges the two reference patterns - uvicorn-hmr (serve a reloaded ASGI app 
 browser refresh) and mcp-hmr (stable proxy + session-preserving tool swap) - into
 one module, started from main.py.
 
-The hot part is powered by hmr (`reactivity.hmr`): the reloader installs an import
-finder so `src.server` and its submodules load as reactive modules that
-re-execute in place when their files change, propagating along the dependency graph.
+On a settled batch of source changes the whole src package is re-imported from disk,
+all or nothing. A failed import keeps the last good build loaded, and both surfaces
+refuse until a reload succeeds.
 
 Two brittleness notes (dev-only tool):
 * It reaches into a few private fastmcp/mcp internals (`base_app.providers` /
   `FastMCPProvider` for mount/unmount, the constructor of `mcp.server.connection.Connection`
   for connection capture). These changed across fastmcp versions; revisit on a fastmcp upgrade.
-* `src.server` and `src.cleanup` must be imported ONLY through the
-  reloader's finder (never at module top level), or the hot reload silently becomes
-  a no-op.
+* `src.hmr_server` and `src.hmr_live_refresh` are never re-imported, so an edit to
+  either needs a restart.
 """
 
 from __future__ import annotations
 
-import asyncio
+import importlib.util
 import logging
+import os
+import sys
 import traceback
 from asyncio import Event, Lock, TaskGroup
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Set
 from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
-from types import TracebackType
-from typing import Any, override
+from types import ModuleType
+from typing import Any
 from weakref import WeakSet
 
 import uvicorn
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.connection import Connection
-from reactivity import async_effect, derived  # pyright: ignore[reportMissingTypeStubs]
-from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter  # pyright: ignore[reportMissingTypeStubs]
-from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks  # pyright: ignore[reportMissingTypeStubs]
 from starlette.applications import Starlette
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
+from watchfiles import awatch  # pyright: ignore[reportUnknownVariableType]
 
-from .hmr_live_refresh import ws_reloader
+from .hmr_live_refresh import set_reload_failure, ws_reloader
 
-# The reactive target: imported ONLY through the reloader's finder (never at top level),
-# so it and its submodules become hot-reloadable reactive modules.
+# The module a reload imports through; it pulls in the rest of the package.
 TARGET_MODULE = "src.server"
 
-# Watch/reload the src package, but keep live_reload.py out of the reload set: it
-# owns the live browser sockets, which must survive reloads (see src.hmr_live_refresh).
+# Watch the src package; SCOPE below says which of its modules a reload leaves loaded.
 _PACKAGE_DIR = str(Path(__file__).resolve().parent)
-_LIVE_REFRESH_FILE = str(Path(__file__).resolve().parent / "hmr_live_refresh.py")
 
 # Reload notifications go through uvicorn's status logger so they land in the dev server
 # console next to uvicorn's own output. A standalone module logger at INFO would be
@@ -71,29 +68,98 @@ _LIVE_REFRESH_FILE = str(Path(__file__).resolve().parent / "hmr_live_refresh.py"
 logger = logging.getLogger("uvicorn.error")
 
 
+# --- What a reload re-imports -----------------------------------------------------------
+QUIET_WINDOW_MS = 300  # watchfiles awatch step: the quiet time before a batch of changes is reloaded
+
+
+@dataclass(frozen=True)
+class ReloadScope:
+    """The package a reload re-imports, the module it imports through, and what it leaves loaded."""
+    package: str
+    entry: str
+    always_kept: frozenset[str]
+    kept_unless_changed: frozenset[str]
+
+
+# State that has to outlive a reload is kept: always for the reloader and the state it shares with
+# the server, and, for a module that holds state but imports nothing from the package, until its own
+# file changes.
+SCOPE = ReloadScope(
+    package="src",
+    entry=TARGET_MODULE,
+    always_kept=frozenset({"src.hmr_server", "src.hmr_live_refresh"}),
+    kept_unless_changed=frozenset({"src.event_cache", "src._hmr_debug"}),
+)
+
+
+def _in_package(name: str, package: str) -> bool:
+    return name == package or name.startswith(f"{package}.")
+
+
+def modules_to_drop(scope: ReloadScope, loaded: Mapping[str, str | None],
+                    changed: Set[str]) -> list[str]:
+    """The loaded modules a reload re-imports, sorted by name.
+
+    `loaded` maps module names to their normalised file path, None when a module has no file, and
+    `changed` holds the batch's normalised paths."""
+    return sorted(
+        name for name, path in loaded.items()
+        if _in_package(name, scope.package)
+        and name not in scope.always_kept
+        and not (name in scope.kept_unless_changed and path not in changed))
+
+
+def needs_reimport(changed: Set[str]) -> bool:
+    """Whether a batch touches Python source, which is all a re-import reads."""
+    return any(path.endswith(".py") for path in changed)
+
+
+def reload_failure_summary(error: BaseException) -> str:
+    """The exception's own lines without its traceback."""
+    return "".join(traceback.format_exception_only(error)).strip()
+
+
+def _normalise(path: str) -> str:
+    """Make a watcher path and a module's __file__ comparable, case included on Windows."""
+    return os.path.normcase(str(Path(path).resolve()))
+
+
+def reimport(scope: ReloadScope, changed: Set[str]) -> Exception | None:
+    """Re-import the scope's entry from disk, all or nothing.
+
+    Every droppable module leaves sys.modules first, so the import runs each one again from what is
+    on disk now, in the order the imports themselves ask for. When it raises, the modules loaded
+    before are put back exactly as they were and the error is returned instead."""
+    snapshot = {name: module for name, module in sys.modules.items()
+                if _in_package(name, scope.package)}
+    loaded = {name: _normalise(file) if (file := getattr(module, "__file__", None)) else None
+              for name, module in snapshot.items()}
+    for name in modules_to_drop(scope, loaded, changed):
+        del sys.modules[name]
+    # Bytecode is checked against the source's mtime in whole seconds and its size, so a same-size
+    # rewrite within a second of the last compile would otherwise load the old code.
+    for path in changed:
+        if path.endswith(".py"):
+            Path(importlib.util.cache_from_source(path)).unlink(missing_ok=True)
+    importlib.invalidate_caches()
+    try:
+        _ = import_module(scope.entry)
+    except Exception as error:
+        for name in [name for name in sys.modules if _in_package(name, scope.package)]:
+            del sys.modules[name]
+        sys.modules.update(snapshot)
+        return error
+    return None
+
+
 # --- Reload failure reporting ----------------------------------------------------------
-class _LoggingErrorFilter(ErrorFilter):
-    """Restate a swallowed reload failure through the dev console's error logger.
-
-    hmr hands a module whose re-exec raised to `sys.excepthook` and then swallows it, so the dev
-    server keeps running - leaving a bare traceback among uvicorn's own lines, at no level and
-    saying nothing of what the failure cost. What the reader needs is the consequence: the edit did
-    not take, so the modules loaded before it are the ones still serving.
-
-    Only that summary is logged. The traceback itself still reaches `sys.excepthook`, which is
-    what tees it to the reload log, so nothing is lost and nothing is printed twice.
-    """
-
-    @override
-    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None,
-                 traceback_: TracebackType | None):
-        if exc_value is not None:
-            reason = "".join(traceback.format_exception_only(exc_type, exc_value)).strip()
-            logger.error(
-                "[HMR] reload FAILED - the edit did not take, and the modules loaded before it " +
-                "are still serving:\n%s", reason)
-        # hmr annotates these as never None, though a clean exit passes None and its __exit__ handles it.
-        return super().__exit__(exc_type, exc_value, traceback_)  # pyright: ignore[reportArgumentType]
+def _report_reload_failure(error: BaseException) -> None:
+    """Say on the dev console what a failed reload cost, and hand its traceback to sys.excepthook,
+    which tees it to the reload log."""
+    logger.error(
+        "[HMR] reload FAILED - the edit did not take; the build loaded before it stays loaded " +
+        "and both surfaces refuse until a reload succeeds:\n%s", reload_failure_summary(error))
+    sys.excepthook(type(error), error, error.__traceback__)
 
 
 # --- MCP connection capture ------------------------------------------------------------
@@ -151,21 +217,15 @@ def build_dev_app() -> Starlette:
     # The proxy is built ONCE and never rebuilt; only what is mounted under it swaps.
     base_app: FastMCP = FastMCP(name="pasta-hmr-proxy")
 
-    # Reactive handles on the reloaded module's two entrypoints. Reading either inside a
-    # reactive computation subscribes it to reloads of src.server (and its deps).
-    @derived(context=HMR_CONTEXT)
-    def current_mcp() -> FastMCP:
-        return import_module(TARGET_MODULE).mcp
-
-    @derived(context=HMR_CONTEXT)
-    def current_fastapi():
-        return import_module(TARGET_MODULE).app
+    # The src.server module serving now; a reload that imports cleanly replaces it.
+    serving: ModuleType | None = None
 
     # Only one mount is live at a time; a reload tears the old one down before mounting new.
     mount_lock = Lock()
     task_group: TaskGroup | None = None
     stop_event: Event | None = None
     finish_event: Event | None = None
+    watch_stop = Event()
 
     async def serve_mcp(mcp: FastMCP, stop: Event, finish: Event):
         async with mount_lock:
@@ -177,51 +237,48 @@ def build_dev_app() -> Starlette:
                 unmount()
                 finish.set()
 
-    @async_effect(context=HMR_CONTEXT, call_immediately=False)
-    async def mcp_reload_effect():
-        nonlocal stop_event, finish_event
-        # A live previous mount means this run is a reload, not the initial mount.
+    async def swap_in(server: ModuleType) -> None:
+        """Serve `server`: mount its tools in place of the previous ones and route to its app."""
+        nonlocal serving, stop_event, finish_event
+        # A live previous mount means this is a reload, not the initial mount.
         is_reload = stop_event is not None and finish_event is not None
-        # Tear down the previous mount (if any) before swapping in the reloaded server.
         if stop_event is not None and finish_event is not None:
             stop_event.set()
             _ = await finish_event.wait()
-        mcp = current_mcp()  # subscribe to reloads
         if is_reload:
             logger.info("[HMR] FastMCP server reloaded (src.server.mcp)")
+        serving = server
         stop_event, finish_event = Event(), Event()
         assert task_group is not None
-        _ = task_group.create_task(serve_mcp(mcp, stop_event, finish_event))
+        _ = task_group.create_task(serve_mcp(server.mcp, stop_event, finish_event))
 
-    # Reading an attribute subscribes this effect to src.cleanup, so an edit
-    # re-executes it promptly - ReactiveModule.load is otherwise lazy. Its on_dispose
-    # hook has already cancelled the old sweep by then; this starts the new one.
-    @async_effect(context=HMR_CONTEXT, call_immediately=False)
-    async def cleanup_reload_effect():
-        cleanup = import_module("src.cleanup")
-        await cleanup.stop_scheduler()
-        cleanup.start_scheduler(import_module(TARGET_MODULE).STORE)
+    async def reload(changed: frozenset[str]) -> None:
+        """Re-import the package and serve the result, or keep the last good build and refuse."""
+        assert serving is not None
+        previous = serving
+        error = reimport(SCOPE, changed)
+        if error is not None:
+            set_reload_failure(reload_failure_summary(error))
+            _report_reload_failure(error)
+            return
+        server = sys.modules[SCOPE.entry]
+        await previous.cleanup.stop_scheduler()
+        await swap_in(server)
+        server.cleanup.start_scheduler(server.STORE)
+        set_reload_failure(None)
 
-    class Reloader(AsyncReloader):
-        def __init__(self):
-            super().__init__(_PACKAGE_DIR, includes=[_PACKAGE_DIR], excludes=[_LIVE_REFRESH_FILE])
-            # Every re-exec is wrapped in this filter, so reporting belongs here. Keep the frame
-            # exclusions the base built.
-            self.error_filter: ErrorFilter = _LoggingErrorFilter(*self.error_filter.exclude_filenames)
-            self.error_filter.exclude_filenames.add(__file__)
-            # The loop holds a task only weakly; a pending refresh is kept here until it finishes.
-            self._refresh_tasks: set[asyncio.Task[None]] = set()
-
-        @override
-        def on_changes(self, files: set[Path]):
-            # Reload the changed modules (reactive propagation), then refresh browsers. The refresh
-            # is unconditional, a failed reload included: what a tab should land on then is the
-            # refusal, and since that page keeps the socket it is also how the tab recovers.
-            super().on_changes(files)
-            with suppress(RuntimeError):
-                task = asyncio.get_running_loop().create_task(ws_reloader.refresh())
-                self._refresh_tasks.add(task)
-                task.add_done_callback(self._refresh_tasks.discard)
+    async def watch() -> None:
+        # Browsers are refreshed after every batch, a failed reload included: what a tab should land
+        # on then is the refusal, and since that page keeps the socket it is also how the tab recovers.
+        async for changes in awatch(_PACKAGE_DIR, step=QUIET_WINDOW_MS, stop_event=watch_stop):
+            changed = frozenset(_normalise(path) for _, path in changes)
+            if needs_reimport(changed):
+                try:
+                    await reload(changed)
+                except Exception as error:  # a failed swap must not end the watcher
+                    set_reload_failure(reload_failure_summary(error))
+                    _report_reload_failure(error)
+            await ws_reloader.refresh()
 
     # /pasta/mcp is served by the stable proxy's ASGI app (built once). Its session manager is
     # started by mcp_asgi.lifespan; the reloader lifespan drives module reloads + mounts.
@@ -231,21 +288,19 @@ def build_dev_app() -> Starlette:
     async def reloader_lifespan(_app: Starlette):
         nonlocal task_group
         restore_connection_init = _capture_connections()
-        call_pre_reload_hooks()
         async with TaskGroup() as tg:
             task_group = tg
-            reloader = Reloader()  # installs the reactive import finder
-            await mcp_reload_effect()  # first mount of the current mcp
-            call_post_reload_hooks()
-            watch_task = tg.create_task(reloader.start_watching())
-            await cleanup_reload_effect()  # first start of the sweep
+            # A cold start that cannot import raises out of here, before uvicorn binds the port.
+            server = import_module(SCOPE.entry)
+            await swap_in(server)
+            server.cleanup.start_scheduler(server.STORE)
+            watch_task = tg.create_task(watch())
             try:
                 yield
             finally:
-                cleanup_reload_effect.dispose()
-                await import_module("src.cleanup").stop_scheduler()
-                reloader.stop_watching()
-                mcp_reload_effect.dispose()
+                watch_stop.set()
+                if serving is not None:
+                    await serving.cleanup.stop_scheduler()
                 if stop_event is not None:
                     stop_event.set()
                 _ = watch_task.cancel()
@@ -255,10 +310,11 @@ def build_dev_app() -> Starlette:
     last_fastapi_app: object = None
 
     async def fastapi_dispatch(scope: Scope, receive: Receive, send: Send):
-        # Forward every non-/pasta/mcp request (incl. the /ws/reloader websocket) to the
-        # freshly reloaded FastAPI app, re-pulled per request.
+        # Forward every non-/pasta/mcp request (incl. the /ws/reloader websocket) to the app of the
+        # build serving now.
         nonlocal last_fastapi_app
-        fastapi_app = current_fastapi()
+        assert serving is not None
+        fastapi_app = serving.app
         # src.server re-executing on reload rebuilds `app` as a new object; a changed
         # identity is the reload signal. Log the first request that observes each reload
         # (the initial startup request is skipped since there is nothing to compare to).
