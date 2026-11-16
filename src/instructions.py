@@ -86,9 +86,9 @@ testing-plan: The verification cases for a feature. Auto-created as a child of a
 
 feature-spec: The detailed product/UX specification for a feature, authored during planning on top of the grounded base and sealed before the plan review. Auto-created as a child of a feature-brief.
 
-epic: The root of a major feature too large for one feature-brief. One investigator agent per solution direction grounds that direction in the codebase, works it out and tests it on a solution-investigation child page of its own, and one judge checks those pages side by side. A human picks the direction; a design agent writes it up on the epic's auto-created solution-design child page, a reviewer checks it cold, and a human signs it off. The epic then decomposes into several child feature-briefs built by subagents, each dispatched from an agent-plan page of its own. Use it when the work splits into parts that each ship on their own; when it does not, use a feature-brief.
+epic: The root of a major feature that splits into parts that each ship on their own; for one feature use a feature-brief. Its solution-investigation and solution-design pages are created as its children.
 
-agent-plan: One subagent an epic dispatches - its role, capability, exact task and worktree, linked to the pages it works on: the epic's investigation or design pages, or the feature-briefs it builds. Its page id is the agent's id and the page it reports back into as it starts and works. Created as a child of an epic.
+agent-plan: One subagent an epic dispatches - its task and the page it reports back into - created as a child of that epic.
 """
 
 
