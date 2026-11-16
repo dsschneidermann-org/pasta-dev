@@ -16,6 +16,7 @@ from fastmcp import FastMCP
 from mcp.server.connection import Connection
 
 import src.hmr_server as hmr_server
+from src.hmr_live_refresh import reload_failure, set_reload_failure
 from src.hmr_server import (ReloadScope, _LoggingErrorFilter, _mount, modules_to_drop, needs_reimport,
                             reload_failure_summary)
 
@@ -190,3 +191,13 @@ def test_the_failure_summary_keeps_a_multi_line_message_whole():
     error = ValueError("Invalid page-type declarations:\n- bug-report: bad setter")
     assert reload_failure_summary(error) == (
         "ValueError: Invalid page-type declarations:\n- bug-report: bad setter")
+
+
+def test_a_recorded_reload_failure_holds_until_cleared():
+    assert reload_failure() is None
+    set_reload_failure("ImportError: boom")
+    try:
+        assert reload_failure() == "ImportError: boom"
+    finally:
+        set_reload_failure(None)
+    assert reload_failure() is None
