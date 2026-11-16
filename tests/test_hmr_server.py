@@ -16,7 +16,8 @@ from fastmcp import FastMCP
 from mcp.server.connection import Connection
 
 import src.hmr_server as hmr_server
-from src.hmr_server import ReloadScope, _LoggingErrorFilter, _mount, modules_to_drop, needs_reimport
+from src.hmr_server import (ReloadScope, _LoggingErrorFilter, _mount, modules_to_drop, needs_reimport,
+                            reload_failure_summary)
 
 
 @pytest.fixture
@@ -175,3 +176,17 @@ def test_only_a_batch_with_python_source_reimports():
     assert needs_reimport(frozenset({"/r/pkg/templates/page.html", "/r/pkg/entry.py"}))
     assert not needs_reimport(frozenset({"/r/pkg/static/styles.css"}))
     assert not needs_reimport(frozenset())
+
+
+def test_the_failure_summary_is_the_exception_without_its_traceback():
+    try:
+        raise ImportError("cannot import name 'NEW' from 'pkg.a'")
+    except ImportError as error:
+        summary = reload_failure_summary(error)
+    assert summary == "ImportError: cannot import name 'NEW' from 'pkg.a'"
+
+
+def test_the_failure_summary_keeps_a_multi_line_message_whole():
+    error = ValueError("Invalid page-type declarations:\n- bug-report: bad setter")
+    assert reload_failure_summary(error) == (
+        "ValueError: Invalid page-type declarations:\n- bug-report: bad setter")

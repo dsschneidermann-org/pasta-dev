@@ -118,6 +118,11 @@ def needs_reimport(changed: Set[str]) -> bool:
     return any(path.endswith(".py") for path in changed)
 
 
+def reload_failure_summary(error: BaseException) -> str:
+    """The exception's own lines without its traceback."""
+    return "".join(traceback.format_exception_only(error)).strip()
+
+
 # --- Reload failure reporting ----------------------------------------------------------
 class _LoggingErrorFilter(ErrorFilter):
     """Restate a swallowed reload failure through the dev console's error logger.
