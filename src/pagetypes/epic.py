@@ -1,5 +1,5 @@
-"""The `epic` page type, the `agent-plan` pages created under it, and its pinned `solution-research`
-and `solution-design` pages.
+"""The `epic` page type and the pages under it: the `solution-investigation` and `agent-plan` pages
+the controller creates, and the pinned `solution-design` page.
 
 They are declared together because they are designed against each other rather than on their
 own: the epic's gates read its children's statuses and the children's gates read the epic's, so
@@ -40,6 +40,7 @@ from .core.specs import (
     ElementFSMSpec,
     FSMSpec,
     ParentStateGuard,
+    RefCheck,
     WorkspaceGuidanceSpec,
 )
 from .core.args import _boolean, _text, standard_blocks
@@ -80,10 +81,10 @@ _CONTROLLER_NOTICE = """
     epic and dispatches its agents - runs commands on it. Research, design and every build are done
     by dispatched agents: each is handed one agent-plan page, a child of this epic whose page id is
     the agent's id, works from that page, reports back onto it, and writes only that page and the
-    pages it links to with works-on - this epic's solution-research or solution-design page, or the
-    feature-briefs it builds with their child pages. It never edits this epic or another agent's
-    page. The controller reads the research and design pages' digests rather than the whole pages,
-    and records here what an agent raises: addFinding or editFinding for a problem, and
+    pages it links to with works-on - this epic's solution-investigation or solution-design pages,
+    or the feature-briefs it builds with their child pages. It never edits this epic or another
+    agent's page. The controller reads the investigation and design pages' digests rather than the
+    whole pages, and records here what an agent raises: addFinding or editFinding for a problem, and
     editContract for a shared contract it corrected.
     """
 
@@ -92,13 +93,13 @@ _EPIC = PageType(
     tag="epic",
     name="Epic (major feature)",
     description=(
-        "The root of a major feature too large for one feature-brief. A research agent and a "
-        "design agent work out the solution on its pinned solution-research and solution-design "
-        "pages, a human picks the approach and signs off the design, and it then decomposes into "
-        "several child feature-briefs built by subagents, each dispatched from an agent-plan page "
-        "of its own under the epic. Use it when the work splits into parts that each ship on their "
-        "own; for one feature use a feature-brief, and for a small self-contained change use a "
-        "simple-change."
+        "The root of a major feature too large for one feature-brief. One investigator agent per "
+        "solution direction works it out on a solution-investigation page of its own, a human "
+        "picks the direction, a design agent writes it up on the pinned solution-design page and a "
+        "human signs the design off, and it then decomposes into several child feature-briefs "
+        "built by subagents, each dispatched from an agent-plan page of its own under the epic. Use "
+        "it when the work splits into parts that each ship on their own; for one feature use a "
+        "feature-brief, and for a small self-contained change use a simple-change."
     ),
     sections=(
         SectionSpec("notice", "Controller notice", (
@@ -107,33 +108,46 @@ _EPIC = PageType(
         SectionSpec("summary", "Summary", (
             _prose("body", description="""
                 The intent in a sentence or two: what you want to build and why it is worth building.
-                Write it before any code is read, because the research agent searches the repo from
-                this line. State the outcome you want, not the implementation you imagine. If the
-                outcome can be stated without joining two independent things with 'and', it is
-                probably one feature-brief rather than an epic.
+                Write it before any code is read, because each direction's investigator searches the
+                repo from this line. State the outcome you want, not the implementation you imagine.
+                If the outcome can be stated without joining two independent things with 'and', it
+                is probably one feature-brief rather than an epic.
                 """),
         )),
         SectionSpec("framing", "Framing", (
             _prose("why", description="""
                 Why the user wants this, in their words: the problem it removes or what it makes
                 possible, and why now. If they have not said, ask one open question with nothing to
-                pick from; never infer it from the summary. Research ranks approaches against this
-                paragraph, so a guessed why yields approaches that solve the wrong problem well.
+                pick from; never infer it from the summary. Each investigation weighs its direction
+                against this paragraph, so a guessed why yields directions that solve the wrong
+                problem well.
                 """),
             _list("outcomes", element_fields=("text", "kind", "said"), description="""
                 Each one goal, non-goal or anti-goal (kind), where an anti-goal is something that
                 would make this a failure even if it technically works. said is user when they
                 stated it and proposal when you filled it in, and you present every proposal to them
-                as yours. Write them before research begins: the approaches are judged against them,
-                and outcomes written after the approaches get fitted to them. Write each so a
-                reviewer could tell whether the built result meets it: the design copies these
-                verbatim, and a vague one becomes a criterion nobody can check.
+                as yours. Write them before research begins: every investigation assesses its
+                direction against each one by id, and outcomes written after the directions get
+                fitted to them. Write each so a reviewer could tell whether the built result meets
+                it: the design copies these verbatim, and a vague one becomes a criterion nobody can
+                check.
+                """),
+        )),
+        SectionSpec("directions", "Solution directions", (
+            _list("items", element_fields=("name", "scope", "said"), description="""
+                Each one distinct kind of solution worth investigating, named in name, with scope
+                saying what it would change or add and what it assumes, so the agent investigating
+                it knows what to look for. Write them with the user from the summary, the why and
+                the outcomes before any code is read. Two directions that would send an investigator
+                to the same code with the same question are one. said is user when they named it
+                and proposal when you did. Each gets one solution-investigation page, which records
+                this element's id; correct a direction in place with editDirection so the id holds.
                 """),
         )),
         SectionSpec("decision", "Approach decision", (
-            _list("chosen", element_fields=("approachId", "takes"), description="""
-                The approach the user picked, by the element id of that approach on this epic's
-                solution-research page. Usually one element; a hybrid gets one per approach it draws
+            _list("chosen", element_fields=("investigationId", "takes"), description="""
+                The direction the user picked, by the page id of its solution-investigation page
+                under this epic. Usually one element; a hybrid gets one per investigation it draws
                 from, with what it takes from each in takes. Record only a pick the user made, or,
                 when they handed you the how, your recommendation with takes saying it was your
                 call. The design agent is dispatched against exactly this.
@@ -170,7 +184,7 @@ _EPIC = PageType(
             _list("items", element_fields=("text", "answer", "needsHuman", "status"),
                   element_fsm=_QUESTION_FSM, description="""
                 Each one question only the user can settle, asked as a single decidable question in
-                their terms rather than a topic: the research page's questions, the design check's
+                their terms rather than a topic: the investigations' questions, the design check's
                 escalations and the decomposition's questions all land here, so this list is the one
                 record of what the user decided, and the approach pick is always one of them. Set
                 needsHuman while it waits on them, and answer it here with their words once decided,
@@ -213,9 +227,12 @@ _EPIC = PageType(
                    add_args=(_text(), _text("kind", choices=_OUTCOME_KINDS),
                              _text("said", choices=_SAID_BY)),
                    editable=True),
+        # Editable so a refined direction keeps the id its investigation page records.
+        *list_cmds("directions", add_args=(_text("name"), _text("scope"), _text("said", choices=_SAID_BY)),
+                   editable=True),
         # The pick is recorded while the user is choosing and frozen once they have chosen.
         *list_cmds("decision", field="chosen", singular="chosenApproach",
-                   add_args=(_text("approachId"), _text("takes", required=False)),
+                   add_args=(_text("investigationId"), _text("takes", required=False)),
                    legal_in=("deciding",)),
         *list_cmds("contracts", add_args=(_text("name"), _text("owner"), _text("shape")),
                    editable=True),
@@ -235,13 +252,15 @@ _EPIC = PageType(
                              _text("action", required=False, choices=_EPIC_FINDING_ACTIONS,
                                    description="how the finding was applied to the plan")),
                    legal_in=("planReview", "executing", "review"), editable=True),
-        # draft -> researching needs the intent, the why and the outcomes: research reads the repo
-        # from the first and judges approaches against the others, which are written before any
-        # approach exists so they cannot be fitted to one.
+        # draft -> researching needs the intent, the why, the outcomes and the directions: each
+        # direction's investigation reads the repo from the first and judges its direction against
+        # the outcomes, which are written before any direction is investigated so they cannot be
+        # fitted to one.
         transition_cmd("beginResearch", "draft -> researching",
-                       requires=(("summary", "body"), ("framing", "why"), ("framing", "outcomes"))),
+                       requires=(("summary", "body"), ("framing", "why"), ("framing", "outcomes"),
+                                 ("directions", "items"))),
         transition_cmd("presentFindings", "researching -> deciding", guards=(
-            ChildStateGuard("solution-research", ("reported",), "the research page must be reported"),)),
+            ChildStateGuard("solution-investigation", ("reported",), "every investigation must be reported"),)),
         transition_cmd("reopenResearch", "deciding -> researching", agency="either"),
         # A human picks the approach; the agent records it, then stops here.
         transition_cmd("chooseApproach", "deciding -> designing (human gate)", agency="human",
@@ -311,7 +330,7 @@ _EPIC = PageType(
                               ("researching", "designing", "decomposition", "executing"),
                               SUBAGENT_DISPATCH_DESC, SUBAGENT_DISPATCH_LABEL),
     ),
-    auto_children=(AutoChildSpec("solution-research"), AutoChildSpec("solution-design")),
+    auto_children=(AutoChildSpec("solution-design"),),
 )
 
 
@@ -340,7 +359,7 @@ _AGENT_PLAN_NOTICE = """
     reopen, accept or redispatch here. The dispatched agent creates the worktree named here, if one
     is named, and works only in it, runs start on this page as its first command, adds a report as
     each step lands, and ends with finish or block. It writes only this page and the pages this page
-    links to with works-on - the epic's solution-research or solution-design page, or the
+    links to with works-on - the epic's solution-investigation or solution-design pages, or the
     feature-briefs it builds with their child pages - and never runs a command on the epic or on
     another agent's page.
     """
@@ -351,9 +370,10 @@ _AGENT_PLAN = PageType(
     name="Agent plan",
     description=(
         "One subagent an epic dispatches: its role, capability, exact task and the worktree it "
-        "creates, linked to the pages it works on - the epic's research or design page, or the "
-        "feature-briefs it builds. Its page id is the agent's id, and the agent reports back onto "
-        "this page as it starts and works. Created by the controller as a direct child of its epic."
+        "creates, linked to the pages it works on - the epic's investigation or design pages, or "
+        "the feature-briefs it builds. Its page id is the agent's id, and the agent reports back "
+        "onto this page as it starts and works. Created by the controller as a direct child of its "
+        "epic."
     ),
     sections=(
         SectionSpec("notice", "Agent notice", (
@@ -361,10 +381,10 @@ _AGENT_PLAN = PageType(
         )),
         SectionSpec("assignment", "Assignment", (
             _scalar("role", description="""
-                What this agent is, named as a role a reader recognises - researcher, research judge,
-                designer, design reviewer, implementer, integration reviewer. One agent-plan page is
-                one dispatch, so the role describes this run rather than a definition shared with
-                other agents.
+                What this agent is, named as a role a reader recognises - investigator, investigation
+                judge, designer, design reviewer, implementer, integration reviewer. One agent-plan
+                page is one dispatch, so the role describes this run rather than a definition shared
+                with other agents.
                 """),
             _scalar("capability", choices=_MODEL_TIERS, description="""
                 The model tier this agent is dispatched on. Name it on every agent: an omitted tier
@@ -376,8 +396,9 @@ _AGENT_PLAN = PageType(
             _scalar("worktree", description="""
                 The git worktree this agent creates and works in, by name. Give every agent that
                 edits code a different one: two agents in one checkout overwrite each other's edits.
-                An agent that only reads code - a researcher, a judge, a designer or a design
-                reviewer - names none.
+                An agent that only reads code - a judge, a designer or a design reviewer - names
+                none. An investigator names none, or a throwaway spike worktree of its own when its
+                test needs code run; spike code is never integrated.
                 """),
         )),
         SectionSpec("task", "Task", (
@@ -386,10 +407,11 @@ _AGENT_PLAN = PageType(
                 handed this page id and nothing of the controller's context. Say which slice of the
                 epic it owns and what done looks like, name the shared contracts it touches by their
                 id on the epic, and add only the decisions it needs that the pages it works on cannot
-                tell it. Link each page it works on with addLink role works-on - the epic's
-                solution-research or solution-design page, or each feature-brief it builds - and each
-                agent-plan page that must be accepted before it starts with role depends-on. Point
-                at large artifacts by file path rather than pasting them.
+                tell it. Link each page it works on with addLink role works-on - one of the epic's
+                solution-investigation pages, or its solution-design page, or each feature-brief it
+                builds; a judge links every investigation it judges - and each agent-plan page that
+                must be accepted before it starts with role depends-on. Point at large artifacts by
+                file path rather than pasting them.
                 """),
         )),
         SectionSpec("reporting", "Reporting contract", (
@@ -457,10 +479,10 @@ _AGENT_PLAN = PageType(
 )
 
 
-# The research and design pages are pinned children of the epic, created with it and each kept
-# waiting until the epic reaches the stage that is theirs: research while it is researching,
-# design while it is designing. Sealing the design waits for the human's sign-off. Enforced in
-# the store.
+# The investigation pages are created under the epic, one per direction, and the design page is
+# pinned to it; each is kept waiting until the epic reaches the stage that is theirs: the
+# investigations while it is researching, the design while it is designing. Sealing the design
+# waits for the human's sign-off. Enforced in the store.
 _EPIC_RESEARCHING = ParentStateGuard(
     parent_type="epic",
     required_statuses=("researching",),
@@ -483,138 +505,208 @@ _JUDGE_SEVERITIES = ("blocking", "minor")
 _SIDES = ("pure", "effectful")
 # How far a recon entry can be trusted: opened, followed from something opened, or neither.
 _BASES = ("observed", "inferred", "assumed")
+# Shared by every investigation of an epic, so the directions compare like with like.
+_COSTS = ("small", "medium", "large")
+_HOLDS = ("yes", "partly", "no")
+_TEST_RESULTS = ("held", "falsified", "untested")
+_VIABILITY = ("viable", "viable-with-caveats", "not-viable")
 
 
-_SOLUTION_RESEARCH = PageType(
-    tag="solution-research",
-    name="Solution research",
+_SOLUTION_INVESTIGATION = PageType(
+    tag="solution-investigation",
+    name="Solution investigation",
     description=(
-        "The delegated research and brainstorming step of an epic: a research agent reads the "
-        "codebase and outside sources and returns grounded facts, two or three candidate "
-        "approaches and a digest, so the controller reads the digest instead of doing the research "
-        "itself. A judge agent checks it before the user sees it. Auto-created as a child of an "
-        "epic; architecture documents how the system is shaped today instead."
+        "One delegated investigation of an epic: an investigator agent takes one solution direction "
+        "from the epic, grounds it in the codebase and outside sources, works it out and tests it, "
+        "and returns a verdict and a digest, so the controller reads the digest instead of doing the "
+        "research itself. One judge agent checks every investigation of the epic side by side. "
+        "Created by the controller as a child of its epic, one per direction; architecture documents "
+        "how the system is shaped today instead."
     ),
     sections=(
         SectionSpec("understanding", "Understanding", (
             _prose("body", description="""
-                The epic's ask restated in your own words from its summary and framing: what is
-                wanted, for whom, and why. Where your restatement and the ask diverge, say so; that
-                gap is the first question for the user.
+                The direction restated in your own words from the epic's summary, framing and this
+                direction's scope: what it would build, and how that serves the why. Where the
+                direction as written and the ask diverge, say so; that gap is the first question for
+                the user.
+                """),
+        )),
+        SectionSpec("direction", "Direction", (
+            _scalar("directionId", description="""
+                The element id of the direction on the epic's directions list that this page
+                investigates, copied from your agent-plan task. One page investigates one direction;
+                an idea that is not a variant of it is a question for the user, not a second
+                direction here.
                 """),
         )),
         SectionSpec("components", "Components", (
             _list("items", element_fields=("name", "role", "side", "basis"), description="""
-                Each one file, module or subsystem the work would read or change, named in name as a
-                real path. role says what it does today and why it exists; side is pure or effectful
-                - I/O, storage, network, clock, randomness; basis is observed when you opened it,
-                inferred when it follows from something you opened, assumed when neither. Reach each
-                by following callers and imports, not by matching names: a guessed component sends
-                every approach down the wrong path, and a missed one is work no agent owns.
+                Each one file, module or subsystem this direction would read or change, named in name
+                as a real path. role says what it does today and why it exists; side is pure or
+                effectful - I/O, storage, network, clock, randomness; basis is observed when you
+                opened it, inferred when it follows from something you opened, assumed when neither.
+                Reach each by following callers and imports from where this direction lands, not by
+                matching names: a guessed component sends the sketch down the wrong path, and a
+                missed one is work no agent owns.
                 """),
         )),
         SectionSpec("constraints", "Constraints", (
             _list("items", element_fields=("text", "basis"), description="""
-                Each one hard requirement any approach must respect, its exact value copied from the
-                file that declares it, which you name: version floors, dependency limits, naming and
-                copy rules, platform and performance targets. basis is observed when you read the
+                Each one hard requirement this direction must respect, its exact value copied from
+                the file that declares it, which you name: version floors, dependency limits, naming
+                and copy rules, platform and performance targets. basis is observed when you read the
                 value there, inferred or assumed otherwise, so a guess is not later spent as a fact.
                 """),
         )),
         SectionSpec("conflicts", "Conflicts", (
             _list("items", element_fields=("text", "basis"), description="""
-                Each one collision with what already exists: code here that already does part of
-                this, an interface an approach would break, or a competing in-flight change, named by
-                file or page with what has to give, and its basis - observed, inferred or assumed.
-                If you searched and found none, add one element saying where you looked.
+                Each one collision this direction would have with what already exists: code here that
+                already does part of this, an interface it would break, or a competing in-flight
+                change, named by file or page with what has to give, and its basis - observed,
+                inferred or assumed. If you searched and found none, add one element saying where
+                you looked.
                 """),
         )),
         SectionSpec("documentation", "Documentation", (
             _list("items", element_fields=("text", "basis"), description="""
                 Each one pasta doc, architecture page or decision record covering the area this
-                touches, and the part of it any approach would make stale, so reconciling it once the
-                work lands is mechanical, with its basis - observed when you opened the page. If
-                there is none, say where you looked.
+                direction touches, and the part of it this direction would make stale, so reconciling
+                it once the work lands is mechanical, with its basis - observed when you opened the
+                page. If there is none, say where you looked.
                 """),
         )),
         SectionSpec("priorArt", "Prior art", (
             _list("items", element_fields=("name", "finding", "bearing"), description="""
                 Each one outside source you actually opened, through a source this workspace allows:
                 a library, an upstream document, a known pattern, a comparable project, named in
-                name. finding is what it says or does; bearing is what it means for this epic, such
-                as an approach it makes cheap or a pitfall it warns of. If nothing outside bears on
+                name. finding is what it says or does; bearing is what it means for this direction,
+                such as a part it makes cheap or a pitfall it warns of. If nothing outside bears on
                 an internal change, add one element saying what you checked.
                 """),
         )),
-        SectionSpec("approaches", "Approaches", (
-            _list("items", element_fields=("name", "sketch", "tradeoffs", "fit", "predicts",
-                                           "falsifier", "recommended"),
-                  description="""
-                Each one of the two or three ways of building this that survived your culling,
-                concrete enough to picture in sketch: which components change, what is new, how data
-                moves, citing the component paths above. tradeoffs is what it costs and what it buys;
-                fit is how it serves the why and the outcomes on the epic and avoids its anti-goals.
-                predicts is an observation that should hold if the approach is right, and falsifier
-                the observation that would show it wrong; an approach nothing could falsify is a
-                preference, not an approach. Set recommended on exactly one and say why in its fit.
-                Two approaches that differ only in naming are one approach. Correct an approach in
-                place with editApproach: the epic's chosen approach points at its id.
+        SectionSpec("sketch", "Sketch", (
+            _prose("body", description="""
+                How this direction would be built here, concrete enough to picture: which components
+                change, what is new, how data moves, citing the component paths above. It is for
+                choosing between directions, not the design: the chosen direction is designed later
+                on the epic's design page.
                 """),
         )),
-        SectionSpec("dropped", "Dropped approaches", (
+        SectionSpec("variants", "Dropped variants", (
             _list("items", element_fields=("name", "reason"), description="""
-                Each alternative you generated and culled, with what ruled it out: it works against
-                the why, the code rules it out, or a kept approach dominates it. This is what stops
-                'did you consider X' once the design is drawn. When there is genuinely one sensible
-                way, the others and why they do not fit go here.
+                Each variant of this direction you generated and culled, with what ruled it out: it
+                works against the why, the code rules it out, or the variant you sketched dominates
+                it. This is what stops 'did you consider X' once the design is drawn. When there was
+                one sensible way to build this direction, say so in one element.
+                """),
+        )),
+        SectionSpec("assessment", "Assessment", (
+            _prose("tradeoffs", description="""
+                What this direction costs and what it buys: complexity added, code touched, risk
+                carried, and what it makes easy or hard later, written to be read beside the epic's
+                other investigations.
+                """),
+            _scalar("cost", choices=_COSTS, description="""
+                The size of building this direction - small, medium or large - judged from the
+                components it changes and what is new. Every investigation of the epic uses the same
+                three sizes, so the user compares like with like.
+                """),
+            _list("fit", element_fields=("outcomeId", "holds", "note"), description="""
+                One element per outcome on the epic, by its element id in outcomeId. holds is yes
+                when the outcome holds if this direction is built - a goal met, a non-goal kept out,
+                an anti-goal avoided - and partly or no otherwise; note says why, citing the sketch
+                or a recon entry. An outcome left out is one the user cannot compare the directions
+                on.
+                """),
+        )),
+        SectionSpec("test", "Test", (
+            _scalar("predicts", description="""
+                An observation that should hold if this direction is right for this codebase: a
+                behaviour, a measurement, a call path that exists.
+                """),
+            _scalar("falsifier", description="""
+                The observation that would show this direction wrong. A direction nothing could
+                falsify is a preference, not a direction.
+                """),
+            _scalar("result", choices=_TEST_RESULTS, description="""
+                held when you checked for the falsifier and it did not occur, falsified when it did,
+                untested when neither reading nor a spike could check it. The evidence says which
+                and how.
+                """),
+            _prose("evidence", description="""
+                How the test was run: what you read, or what you ran in your spike worktree with its
+                command and output, naming the worktree and commit. Spike code is never integrated;
+                it exists only to make this observation.
+                """),
+        )),
+        SectionSpec("conclusion", "Conclusion", (
+            _scalar("viability", choices=_VIABILITY, description="""
+                Your verdict on this direction: viable, viable-with-caveats when it works only if a
+                caveat named in the tradeoffs is accepted, or not-viable when the falsifier fired or
+                the code rules it out. Make the strongest honest case for the direction and say
+                not-viable when that is what you found.
                 """),
         )),
         SectionSpec("questions", "Questions for the user", (
             _list("items", element_fields=("text", "why", "changes"), description="""
                 Each one question neither the epic nor the codebase answers and only the user can
                 settle, asked as a single decidable question in their terms. why is what you hope to
-                learn; changes names the approach it rules in or out, or what it changes in what gets
-                built. Anything you could settle by reading further is not a question here.
+                learn; changes names what the answer changes for this direction - whether it stays
+                viable, or what gets built. Anything you could settle by reading further is not a
+                question here.
                 """),
         )),
         SectionSpec("digest", "Digest", (
             _prose("body", description="""
-                At most 200 words, the only part of this page the controller reads by default: the
-                ask as you understood it, the three facts that most shape the choice, each approach
-                in one line with the recommendation marked, and how many questions wait. Write it
+                At most 150 words, the only part of this page the controller reads by default: the
+                direction in one line, the facts that most shape it, its cost, how it fares on the
+                outcomes, the test result, the viability, and how many questions wait. Write it
                 last, from the page, so it never says anything the page does not.
                 """),
         )),
-        # Written by the judge, a fresh agent that did not write this page, in `judging` only.
+        # Written by the judge, a fresh agent that wrote none of the epic's investigations, in
+        # `judging` only.
         SectionSpec("review", "Judge review", (
             _scalar("verdict", choices=_JUDGE_VERDICTS, description="""
-                pass only when the sampled entries marked observed checked out on reading, the
-                approaches are real alternatives grounded in the recon, each with a falsifier that
-                could actually be observed, and the digest matches the page; revise otherwise. Set it afresh on every pass, as the judge -
-                never as the agent that wrote the page.
+                pass only when the sampled entries marked observed checked out on reading, the page
+                stays inside its direction, the sketch is grounded in the recon, every outcome is
+                assessed, the test result is backed by its evidence, and the digest matches the
+                page; revise otherwise. Set it afresh on every pass, as the judge - never as the
+                agent that wrote the page.
                 """),
             _list("findings", element_fields=("issue", "severity"), description="""
                 Each one problem the judge found: what is wrong and where on the page, with severity
-                blocking when an approach rests on a false fact or a wrong component, and minor
-                otherwise. Minor findings alone are never a reason to revise.
+                blocking when the direction rests on a false fact or a wrong component, or states a
+                fact that another investigation of the epic contradicts and the code bears the other
+                out - name that page - and minor otherwise. Minor findings alone are never a reason
+                to revise.
                 """),
         )),
     ),
     commands=(
         set_prose_cmd("understanding"),
+        set_scalar_cmd("direction", "directionId"),
         *list_cmds("components", add_args=(_text("name"), _text("role"), _text("side", choices=_SIDES),
                                           _text("basis", choices=_BASES))),
         *list_cmds("constraints", add_args=(_text(), _text("basis", choices=_BASES))),
         *list_cmds("conflicts", add_args=(_text(), _text("basis", choices=_BASES))),
         *list_cmds("documentation", add_args=(_text(), _text("basis", choices=_BASES))),
         *list_cmds("priorArt", label="prior art", add_args=(_text("name"), _text("finding"), _text("bearing"))),
-        # Editable so a revised approach keeps the id the epic's chosen approach points at.
-        *list_cmds("approaches", singular="approach",
-                   add_args=(_text("name"), _text("sketch"), _text("tradeoffs"), _text("fit"),
-                             _text("predicts"), _text("falsifier"), _boolean("recommended", required=False)),
-                   editable=True),
-        *list_cmds("dropped", singular="droppedApproach", label="dropped approach",
-                   add_args=(_text("name"), _text("reason"))),
+        set_prose_cmd("sketch"),
+        *list_cmds("variants", add_args=(_text("name"), _text("reason"))),
+        set_prose_cmd("assessment", field="tradeoffs", name="setTradeoffs", label="tradeoffs"),
+        set_scalar_cmd("assessment", "cost", choices=_COSTS),
+        # Checked against the parent epic's outcomes, so every investigation is assessed on the same
+        # ones.
+        *list_cmds("assessment", field="fit",
+                   add_args=(_text("outcomeId"), _text("holds", choices=_HOLDS), _text("note")),
+                   ref_check=RefCheck(arg="outcomeId", scope="parent", section="framing", field="outcomes")),
+        set_scalar_cmd("test", "predicts"),
+        set_scalar_cmd("test", "falsifier"),
+        set_scalar_cmd("test", "result", choices=_TEST_RESULTS),
+        set_prose_cmd("test", field="evidence", name="setEvidence", label="evidence"),
+        set_scalar_cmd("conclusion", "viability", choices=_VIABILITY),
         *list_cmds("questions", add_args=(_text(), _text("why"), _text("changes"))),
         set_prose_cmd("digest"),
         set_scalar_cmd("review", "verdict", name="setReviewVerdict", choices=_JUDGE_VERDICTS,
@@ -625,25 +717,34 @@ _SOLUTION_RESEARCH = PageType(
         transition_cmd("begin", "waiting -> investigating", parent_guards=(_EPIC_RESEARCHING,)),
         transition_cmd("submitForJudging", "investigating -> judging", requires=(
             ("understanding", "body"),
+            ("direction", "directionId"),
             ("components", "items"),
             ("constraints", "items"),
             ("conflicts", "items"),
             ("documentation", "items"),
             ("priorArt", "items"),
-            ("approaches", "items"),
-            ("dropped", "items"),
+            ("sketch", "body"),
+            ("variants", "items"),
+            ("assessment", "tradeoffs"),
+            ("assessment", "cost"),
+            ("assessment", "fit"),
+            ("test", "predicts"),
+            ("test", "falsifier"),
+            ("test", "result"),
+            ("test", "evidence"),
+            ("conclusion", "viability"),
             ("digest", "body"),
         )),
         # `report` requires only that a verdict was recorded; a `revise` verdict should `revise`.
         transition_cmd("report", "judging -> reported", requires=(("review", "verdict"),)),
-        transition_cmd("revise", "judging -> investigating (send the research back)"),
+        transition_cmd("revise", "judging -> investigating (send the investigation back)"),
         # A reported page reopens only when the epic has gone back to researching.
         transition_cmd("reopen", "reported -> investigating", parent_guards=(_EPIC_RESEARCHING,)),
         add_link_cmd(),
         set_title_cmd(),
     ),
     fsm=FSMSpec(
-        name="SolutionResearch",
+        name="SolutionInvestigation",
         initial="waiting",
         states=("waiting", "investigating", "judging", "reported"),
         terminal_states=("reported",),
@@ -694,14 +795,14 @@ _SOLUTION_DESIGN = PageType(
         )),
         SectionSpec("approach", "Approach", (
             _prose("chosen", description="""
-                The approach the user picked on the epic, restated in full from its research
+                The approach the user picked on the epic, restated in full from its investigation's
                 sketch and grown into what will actually be built. For a hybrid, say what comes
-                from which approach.
+                from which investigation.
                 """),
             _list("alternatives", element_fields=("name", "tradeoff", "whyNot"), description="""
-                Each other approach from the research page, what it would have traded, and in whyNot
-                why it lost, in the user's reason where they gave one. This is what keeps the
-                choice from being reopened during the build.
+                Each other direction the epic investigated, from its investigation page, what it
+                would have traded, and in whyNot why it lost, in the user's reason where they gave
+                one. This is what keeps the choice from being reopened during the build.
                 """),
         )),
         SectionSpec("strategy", "Solution strategy", (
@@ -709,8 +810,8 @@ _SOLUTION_DESIGN = PageType(
                 How the chosen approach works: the parts, what each is responsible for, how data and
                 control move between them, and where pure logic ends and effects begin. Use a
                 heading per part, a code block for any shape and a table where parts are compared.
-                Cite the research page's component paths for anything that exists today, and write
-                for a builder who never saw the research.
+                Cite the chosen investigation's component paths for anything that exists today, and
+                write for a builder who never saw the investigations.
                 """),
         )),
         SectionSpec("decisions", "Decisions", (
@@ -733,9 +834,9 @@ _SOLUTION_DESIGN = PageType(
         SectionSpec("changes", "Expected changes", (
             _list("items", element_fields=("path", "change", "why"), description="""
                 Each one file or module that will be created, modified or deleted (change), with why.
-                An existing path must appear in the research page's components; a new one names
-                where it will live. The work is split into feature-briefs along these, so a missing
-                one is work no agent owns.
+                An existing path must appear in the chosen investigation's components; a new one
+                names where it will live. The work is split into feature-briefs along these, so a
+                missing one is work no agent owns.
                 """),
         )),
         SectionSpec("criteria", "Acceptance criteria", (
@@ -767,9 +868,9 @@ _SOLUTION_DESIGN = PageType(
                   element_fsm=_BUILDER_QUESTION_FSM, description="""
                 Each one question the reviewer would still need answered before planning, where a
                 wrong guess would change the build, with why. The designer resolves each into a pile:
-                answered when the page, the epic or the research already say (put the answer into the
-                design), minor when a sensible builder could settle it (settle it as a proposal
-                decision), or theirs when only the user can answer. Escalate a theirs question
+                answered when the page, the epic or the investigations already say (put the answer
+                into the design), minor when a sensible builder could settle it (settle it as a
+                proposal decision), or theirs when only the user can answer. Escalate a theirs question
                 while it waits on them, and resolve it only once its answer is on the epic, naming
                 that epic question's id in resolution.
                 """),
@@ -786,8 +887,8 @@ _SOLUTION_DESIGN = PageType(
         SectionSpec("review", "Design review", (
             _scalar("verdict", choices=_JUDGE_VERDICTS, description="""
                 pass only when the strategy is clear, every decision has its reason and rejected
-                alternatives, the expected changes agree with the research page's components, every
-                criterion is verifiable, and nothing is built that no outcome asked for; revise
+                alternatives, the expected changes agree with the chosen investigation's components,
+                every criterion is verifiable, and nothing is built that no outcome asked for; revise
                 otherwise. Set it afresh on every pass, as the reviewer - never as the designer.
                 """),
             _list("findings", element_fields=("issue", "severity"), description="""

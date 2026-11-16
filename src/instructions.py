@@ -86,11 +86,11 @@ testing-plan: The verification cases for a feature. Auto-created as a child of a
 
 feature-spec: The detailed product/UX specification for a feature, authored during planning on top of the grounded base and sealed before the plan review. Auto-created as a child of a feature-brief.
 
-epic: The root of a major feature too large for one feature-brief - a research agent and a design agent work out the solution on its pinned research and design pages, a human picks the approach and signs off the design, and it then decomposes into several child feature-briefs built by subagents, each dispatched from an agent-plan page of its own. Use it when the work splits into parts that each ship on their own; when it does not, use a feature-brief.
+epic: The root of a major feature too large for one feature-brief - one investigator agent per solution direction works it out on a solution-investigation page of its own, a human picks the direction, a design agent writes it up on the pinned design page and a human signs it off, and it then decomposes into several child feature-briefs built by subagents, each dispatched from an agent-plan page of its own. Use it when the work splits into parts that each ship on their own; when it does not, use a feature-brief.
 
-agent-plan: One subagent an epic dispatches - its role, capability, exact task and worktree, linked to the pages it works on: the epic's research or design page, or the feature-briefs it builds. Its page id is the agent's id and the page it reports back into as it starts and works. Created as a child of an epic.
+agent-plan: One subagent an epic dispatches - its role, capability, exact task and worktree, linked to the pages it works on: the epic's investigation or design pages, or the feature-briefs it builds. Its page id is the agent's id and the page it reports back into as it starts and works. Created as a child of an epic.
 
-solution-research: The delegated research and brainstorming step of an epic - a research agent grounds the work in the codebase and outside sources and returns two or three candidate approaches and a digest. Auto-created as a child of an epic.
+solution-investigation: One delegated investigation of an epic - an investigator agent grounds one solution direction in the codebase and outside sources, works it out and tests it, and returns a verdict and a digest; one judge checks every investigation of the epic side by side. Created as a child of an epic, one per direction.
 
 solution-design: The delegated design step of an epic - a design agent writes the approach the user chose as a design a builder could plan from, checked cold by a reviewer, which a human then signs off. Auto-created as a child of an epic.
 """

@@ -36,7 +36,7 @@ GROUNDING_TOOL_DESC = (
 RESEARCH_SOURCES_FIELD = "researchSources"
 RESEARCH_SOURCES_LABEL = "RESEARCH SOURCES GUIDANCE: "
 RESEARCH_SOURCES_DESC = (
-    "The outside sources a research agent may read for prior art - for example, named "
+    "The outside sources an investigator may read for prior art - for example, named "
     "documentation MCP servers or URLs - and whether web search is allowed."
 )
 

@@ -108,7 +108,7 @@ from src.pagetypes.architecture import _ARCHITECTURE
 from src.pagetypes.bug_report import _BUG_REPORT
 from src.pagetypes.decision_record import _DECISION_RECORD
 from src.pagetypes.document import _DOCUMENT
-from src.pagetypes.epic import _AGENT_PLAN, _EPIC, _SOLUTION_DESIGN, _SOLUTION_RESEARCH
+from src.pagetypes.epic import _AGENT_PLAN, _EPIC, _SOLUTION_DESIGN, _SOLUTION_INVESTIGATION
 from src.pagetypes.feature import (
     _FEATURE_BRIEF,
     _FEATURE_SPEC,
@@ -134,7 +134,7 @@ def _kinds(*names: str) -> tuple[BlockKindSpec, ...]:
 # mode empties that map, and these invariants must keep covering production all the same.
 PRODUCTION_TYPES = {page_type.tag: page_type for page_type in (
     _ARCHITECTURE, _DECISION_RECORD, _BUG_REPORT, _SIMPLE_CHANGE, _FEATURE_BRIEF, _FEATURE_SPEC,
-    _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _SOLUTION_RESEARCH, _SOLUTION_DESIGN,
+    _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _SOLUTION_INVESTIGATION, _SOLUTION_DESIGN,
     _DOCUMENT, _TOC,
 )}
 
