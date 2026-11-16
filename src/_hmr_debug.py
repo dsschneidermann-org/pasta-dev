@@ -1,12 +1,10 @@
 """Capture HMR reload-time errors to a log file.
 
-The hmr reloader (reactivity.hmr) only PRINTS a module's re-exec error and then
-swallows it (ErrorFilter -> sys.excepthook), and errors raised inside the async
-reload effect go to the event loop's exception handler - so a failed hot reload
-leaves no record a tool can read. This module tees those sinks to hmr_debug.log in
-the repo root, making reload failures - notably the load-ordering races a multi-file
-change can trigger - diagnosable after the fact rather than only visible as console
-output.
+The dev server reports a failed hot reload by handing its traceback to sys.excepthook,
+and errors raised inside its async reload tasks go to the event loop's exception
+handler - neither leaves a record a tool can read. This module tees those sinks to
+hmr_debug.log in the repo root, so a reload failure is diagnosable after the fact
+rather than only visible as console output.
 
 Wired in by an import at the end of server.py so it hot-loads with the server.
 Import-time side effect only, and idempotent: safe to import (and re-import) repeatedly.
@@ -36,7 +34,7 @@ def _fmt(exc_type: type[BaseException] | None, exc_value: BaseException | None,
     return "".join(traceback.format_exception(exc_type, exc_value, tb))
 
 
-# --- sys.excepthook (what ErrorFilter.__exit__ calls) ------------------------
+# --- sys.excepthook (where a failed reload's traceback is handed) -------------
 if not getattr(sys, "_hmr_dbg_excepthook_orig", None):
     setattr(sys, "_hmr_dbg_excepthook_orig", sys.excepthook)
 _excepthook_orig = getattr(sys, "_hmr_dbg_excepthook_orig")
