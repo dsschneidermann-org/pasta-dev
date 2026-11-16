@@ -57,6 +57,18 @@ def test_page_view_renders_body_and_sidebar(client):
     assert 'id="sidebar"' in response.text               # the nav sidebar layout
 
 
+def test_sidebar_workspace_link_keeps_the_archived_view(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    part = workspace.id.removeprefix("ws:")
+    workspace_link = '<a href="/{}"><strong>Workspace</strong></a>'
+    shown = client.get(f"/ws:{part}/page/{page.id}?archived=true").text
+    assert f'<a href="/{workspace.id}/page/{page.id}?archived=true">' in shown   # tree links keep it
+    assert workspace_link.format(f"{workspace.id}?archived=true") in shown
+    hidden = client.get(f"/ws:{part}/page/{page.id}").text
+    assert workspace_link.format(workspace.id) in hidden
+
+
 def test_page_view_has_model_toggle_to_page_type_doc(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page

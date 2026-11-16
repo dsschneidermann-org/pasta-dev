@@ -30,7 +30,7 @@
 {% block content %}
 <div id="layout">
     <nav id="sidebar">
-        <a href="/{{ workspace_id }}"><strong>Workspace</strong></a>
+        <a href="/{{ workspace_id }}{% if show_archived %}?archived=true{% endif %}"><strong>Workspace</strong></a>
         {% if show_archived %}
         <a style="float:right" href="{{ request.url.path }}">Hide archived</a>
         {% else %}
