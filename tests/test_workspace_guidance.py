@@ -305,7 +305,7 @@ def test_get_workspace_guidance_surfaces_stored_text_for_an_undeclared_field(sto
     wid = store.create_workspace("demo").id
     workspace = store.load_workspace(wid)
     workspace.guidance_config["retiredField"] = "old rule"   # left by a server declaring more fields
-    store._touch_and_save(workspace)
+    store._touch_and_save(workspace, [])
     assert store.get_workspace_guidance(wid)["undeclared"] == {"retiredField": "old rule"}
 
 
