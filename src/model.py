@@ -69,6 +69,7 @@ class Workspace:
     created_at: str = ""
     updated_at: str = ""
     guidance_config: dict[str, str] = field(default_factory=dict)
+    event_seq: int = 0                           # seq of the last lifecycle-log event this document reflects
 
     def get_page(self, page_id: str) -> Page | None:
         return self.pages.get(page_id)

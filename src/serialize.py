@@ -54,6 +54,7 @@ def workspace_to_dict(workspace: Workspace) -> dict[str, Any]:
         "created_at": workspace.created_at,
         "updated_at": workspace.updated_at,
         "guidance_config": dict(workspace.guidance_config),
+        "event_seq": workspace.event_seq,
         "pages": {page_id: page_to_dict(page) for page_id, page in workspace.pages.items()},
     }
 
@@ -68,4 +69,5 @@ def workspace_from_dict(data: dict[str, Any]) -> Workspace:
         created_at=data.get("created_at", ""),
         updated_at=data.get("updated_at", ""),
         guidance_config=dict(data.get("guidance_config", {})),
+        event_seq=int(data.get("event_seq", 0)),
     )

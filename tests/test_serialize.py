@@ -96,3 +96,16 @@ def test_page_status_revision_token_defaults_to_none_for_legacy_files():
     data = page_to_dict(_sample_page())
     del data["status_revision_token"]
     assert page_from_dict(data).status_revision_token is None
+
+
+def test_workspace_event_seq_round_trips():
+    workspace = Workspace(id="ws:1", name="demo", event_seq=7)
+    assert workspace_to_dict(workspace)["event_seq"] == 7
+    assert workspace_from_dict(workspace_to_dict(workspace)).event_seq == 7
+
+
+def test_workspace_event_seq_defaults_to_zero_for_legacy_files():
+    # a document written before the lifecycle log existed loads with event_seq 0
+    data = workspace_to_dict(Workspace(id="ws:1", name="demo"))
+    del data["event_seq"]
+    assert workspace_from_dict(data).event_seq == 0
