@@ -12,7 +12,7 @@ test-lifecycle/test-child family for auto-children, cross-page refs, guards, and
 import json
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -25,6 +25,8 @@ from src.errors import (
     NotFoundError,
     ValidationError,
 )
+from src import lifecycle_log
+from src import store as store_module
 from src.store import Store
 
 
@@ -2092,7 +2094,7 @@ def test_legacy_page_without_a_token_bootstraps_on_first_transition(store):
     # Simulate a page stored before this feature: clear its token on disk.
     loaded = store.load_workspace(workspace.id)
     loaded.pages[page.id].status_revision_token = None
-    store._touch_and_save(loaded)
+    store._touch_and_save(loaded, [])
 
     # A command presenting no token matches the null current token, and content keeps it null.
     store.mutate_page_batch(workspace.id, page.id, [{"command": "setSummary", "args": {"text": "s"}}])
@@ -2117,3 +2119,136 @@ def test_next_actions_edges_carry_the_revision(revstore):
     edges = [e for e in actions["do"] + actions["blocked"] + actions["humanGates"]
              if e["pageId"] == page.id]
     assert edges and all(edge["statusRevisionToken"] == token for edge in edges)
+
+
+# --- lifecycle log: commit first, then append --------------------------------
+
+def _epoch_ms(iso: str) -> int:
+    return (datetime.fromisoformat(iso) - datetime(1970, 1, 1, tzinfo=timezone.utc)) \
+        // timedelta(milliseconds=1)
+
+
+def _log_path(root: Path, workspace_id: str) -> Path:
+    return root / "events" / f"{workspace_id.replace(':', '_')}.jsonl"
+
+
+def _log_lines(root: Path, workspace_id: str) -> list[dict]:
+    path = _log_path(root, workspace_id)
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_bytes().decode("utf-8").split("\n")[:-1]]
+
+
+def test_a_commit_appends_its_events_stamped_after_the_document(store, tmp_path):
+    workspace = store.create_workspace("demo")
+    loaded = store.load_workspace(workspace.id)
+    loaded.event_seq = 4
+    store._touch_and_save(loaded, [lifecycle_log.status("p", "draft", "open")])
+
+    saved = store.load_workspace(workspace.id)
+    assert saved.event_seq == 5
+    assert _log_lines(tmp_path, workspace.id) == [
+        {"seq": 5, "ts": _epoch_ms(saved.updated_at), "page": "p", "kind": "status",
+         "from": "draft", "to": "open"}]
+    raw = _log_path(tmp_path, workspace.id).read_bytes()
+    assert raw.endswith(b'"to":"open"}\n') and b"\r" not in raw
+
+
+def test_a_commit_with_nothing_to_record_creates_no_log(store, tmp_path):
+    workspace = store.create_workspace("demo")
+    store._touch_and_save(store.load_workspace(workspace.id), [])
+    assert store.load_workspace(workspace.id).event_seq == 0
+    assert not (tmp_path / "events").exists()
+
+
+def test_a_failed_event_build_reserves_one_seq_and_writes_no_line(store, tmp_path):
+    workspace = store.create_workspace("demo")
+    store._touch_and_save(store.load_workspace(workspace.id), None)
+    assert store.load_workspace(workspace.id).event_seq == 1
+    assert not _log_path(tmp_path, workspace.id).exists()
+
+
+def test_guarded_events_turns_an_exception_into_none(store):
+    def boom():
+        raise RuntimeError("cannot build")
+    assert store._guarded_events(boom) is None
+    assert store._guarded_events(lambda: [lifecycle_log.archived("p")]) == [
+        {"page": "p", "kind": "archived"}]
+
+
+def test_read_lifecycle_log_serves_the_lines_and_an_empty_log_without_a_file(store):
+    workspace = store.create_workspace("demo")
+    assert store.read_lifecycle_log(workspace.id) == []
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("p")])
+    assert [(e["seq"], e["kind"]) for e in store.read_lifecycle_log(workspace.id)] == [(1, "archived")]
+
+
+def test_read_lifecycle_log_of_a_missing_workspace_is_not_found(store):
+    with pytest.raises(NotFoundError):
+        store.read_lifecycle_log("ws:nope")
+
+
+def test_a_clock_behind_the_document_commits_at_the_documents_instant(store, tmp_path, monkeypatch):
+    workspace = store.create_workspace("demo")
+    loaded = store.load_workspace(workspace.id)
+    ahead = datetime.now(timezone.utc) + timedelta(hours=2)
+    loaded.updated_at = ahead.isoformat()
+    store._touch_and_save(loaded, [])
+    monkeypatch.setattr(store_module, "_utc_now", lambda: ahead - timedelta(hours=1))
+
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("p")])
+
+    assert _log_lines(tmp_path, workspace.id)[0]["ts"] == _epoch_ms(ahead.isoformat())
+    assert store.load_workspace(workspace.id).updated_at == ahead.isoformat()
+
+
+def test_a_commit_that_fails_appends_nothing(store, tmp_path, monkeypatch):
+    workspace = store.create_workspace("demo")
+    loaded = store.load_workspace(workspace.id)
+
+    def refuse(*args, **kwargs):
+        raise OSError("disk full")
+    monkeypatch.setattr(Store, "_write_file", refuse)
+
+    with pytest.raises(OSError):
+        store._touch_and_save(loaded, [lifecycle_log.archived("p")])
+    assert not _log_path(tmp_path, workspace.id).exists()
+
+
+def test_an_append_that_fails_keeps_the_commit_and_leaves_a_served_gap(store, tmp_path, monkeypatch):
+    workspace = store.create_workspace("demo")
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("a")])
+    real_append = Store._append_to_log
+    calls = {"n": 0}
+
+    def fail_once(self, workspace_id, lines):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("events folder is read-only")
+        real_append(self, workspace_id, lines)
+    monkeypatch.setattr(Store, "_append_to_log", fail_once)
+
+    loaded = store.load_workspace(workspace.id)
+    loaded.name = "renamed workspace"
+    store._touch_and_save(loaded, [lifecycle_log.archived("b"), lifecycle_log.archived("c")])
+    assert store.load_workspace(workspace.id).name == "renamed workspace"     # committed anyway
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("d")])
+
+    assert [line["seq"] for line in _log_lines(tmp_path, workspace.id)] == [1, 4]
+    served = store.read_lifecycle_log(workspace.id)
+    assert [(e["kind"], e["seq"]) for e in served] == [("archived", 1), ("gap", 2), ("archived", 4)]
+    assert served[1]["missing"] == 2 and served[1]["ts"] == served[2]["ts"]
+
+
+def test_a_half_written_last_line_is_not_served_and_the_next_append_starts_a_new_line(store, tmp_path):
+    workspace = store.create_workspace("demo")
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("a")])
+    path = _log_path(tmp_path, workspace.id)
+    with open(path, "ab") as handle:
+        handle.write(b'{"seq":2,"ts":17,"pa')                      # a crash mid-append
+
+    assert [e["seq"] for e in store.read_lifecycle_log(workspace.id)] == [1]
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("b")])
+
+    assert path.read_bytes().split(b"\n")[1] == b'{"seq":2,"ts":17,"pa'
+    assert [e["seq"] for e in store.read_lifecycle_log(workspace.id)] == [1, 2]

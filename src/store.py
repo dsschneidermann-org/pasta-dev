@@ -19,15 +19,18 @@ Concurrency is in-process. Cross-process locking is a documented later step.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, final
 
-from . import cleanup, commands, fsm, render, render_html
+from . import cleanup, commands, fsm, lifecycle_log, render, render_html
+from .lifecycle_log import Event
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import JSONValue, Page, Workspace
@@ -62,9 +65,39 @@ NON_SEARCH_CHARS = "`*_'\"‘’“”"
 # "*.json" non-recursively, so a backup there would be listed as a duplicate workspace.
 BACKUP_DIRNAME = "backups"
 
+# Subdirectory for the append-only lifecycle logs, one <ws_token>.jsonl per workspace. Kept out of
+# the root for the same reason as backups, and never opened by the cleanup sweep.
+EVENTS_DIRNAME = "events"
+
+# Uvicorn's status logger, so a recording warning lands beside the server's own output.
+logger = logging.getLogger("uvicorn.error")
+
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return _utc_now().isoformat()
+
+
+def _commit_instant(updated_at: str) -> datetime:
+    """The instant of a commit: now, or the document's last commit instant when the clock reads
+    earlier than that, so the log's timestamps never go backwards along its seqs."""
+    now = _utc_now()
+    try:
+        loaded = datetime.fromisoformat(updated_at)
+    except ValueError:
+        return now
+    if loaded.tzinfo is None:
+        loaded = loaded.replace(tzinfo=timezone.utc)
+    return max(now, loaded)
+
+
+def _epoch_ms(instant: datetime) -> int:
+    return (instant - _EPOCH) // timedelta(milliseconds=1)
 
 
 def search_words(text: str) -> list[str]:
@@ -122,9 +155,12 @@ class MutatePageResult:
 @final
 class Store:
     def __init__(self, root: str | os.PathLike[str], id_factory: IdFactory = default_id_factory,
-                 revision_factory: RevisionFactory = default_revision_factory) -> None:
+                 revision_factory: RevisionFactory = default_revision_factory,
+                 backfill_dir: str | os.PathLike[str] | None = None) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        # Committed <ws_token>.jsonl back-fills that start a workspace's lifecycle log; None for none.
+        self._backfill_dir = Path(backfill_dir) if backfill_dir is not None else None
         self._id_factory = id_factory
         self._revision_factory = revision_factory
         self._transaction_locks: dict[str, threading.Lock] = {}
@@ -143,6 +179,9 @@ class Store:
     def _path_for(self, workspace_id: str) -> Path:
         # ":" is not a legal Windows filename character; the true id lives in the file.
         return self.root / f"{workspace_id.replace(':', '_')}.json"
+
+    def _events_path_for(self, workspace_id: str) -> Path:
+        return self.root / EVENTS_DIRNAME / f"{workspace_id.replace(':', '_')}.jsonl"
 
     @staticmethod
     def _id_for_path(path: Path) -> str:
@@ -184,9 +223,57 @@ class Store:
                 time.sleep(0.1)  # Permission error moving the tmp file can be retried.
                 os.replace(tmp, path)
 
-    def _touch_and_save(self, workspace: Workspace) -> None:
-        workspace.updated_at = _now()
+    def _touch_and_save(self, workspace: Workspace, events: list[Event] | None,
+                        backfill: Sequence[Event] = ()) -> None:
+        """Commit the workspace, then append the commit's lifecycle events to its log.
+
+        `events` are this commit's unstamped events; [] when there is nothing to record and None
+        when building them failed, which reserves one seq so the loss is served as a gap.
+        `backfill` holds already-stamped lines that start an empty log. The document is written
+        first, so the log never describes a commit that did not land; a failed append is logged
+        and never fails the write.
+        """
+        instant = _commit_instant(workspace.updated_at)
+        workspace.updated_at = instant.isoformat()
+        ts = _epoch_ms(instant)
+        installed = list(backfill)
+        if installed and installed[-1]["ts"] > ts:
+            logger.warning("[lifecycle-log] %s: back-fill ends after this commit; not installed",
+                           workspace.id)
+            installed = []
+        workspace.event_seq += len(installed)
+        lines = installed + (lifecycle_log.stamp(events, workspace.event_seq + 1, ts)
+                             if events is not None else [])
+        workspace.event_seq += len(events) if events is not None else 1
         self._write_file(self._path_for(workspace.id), workspace)
+        if lines:
+            try:
+                self._append_to_log(workspace.id, lines)
+            except Exception:
+                logger.warning("[lifecycle-log] %s: append failed; its events are served as a gap",
+                               workspace.id, exc_info=True)
+
+    def _append_to_log(self, workspace_id: str, lines: list[Event]) -> None:
+        """Append stamped lines in one write, first ending a line a crash left half-written."""
+        data = "".join(lifecycle_log.encode(line) for line in lines).encode("utf-8")
+        path = self._events_path_for(workspace_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with self._rw_lock_for(workspace_id).write(), open(path, "ab+") as handle:
+            end = handle.seek(0, os.SEEK_END)
+            if end:
+                _ = handle.seek(end - 1)
+                if handle.read(1) != b"\n":
+                    data = b"\n" + data
+            _ = handle.write(data)
+
+    @staticmethod
+    def _guarded_events(build: Callable[[], list[Event]]) -> list[Event] | None:
+        """The events `build` returns, or None when it raises: recording never fails a write."""
+        try:
+            return build()
+        except Exception:
+            logger.warning("[lifecycle-log] building a commit's events failed", exc_info=True)
+            return None
 
     def write_backup(self, workspace: Workspace, now: datetime) -> Path:
         """Write a full copy of `workspace` under `backups/` and return its path.
@@ -213,6 +300,15 @@ class Store:
         except json.JSONDecodeError as exc:
             raise PastaError(f"Workspace '{workspace_id}' file is corrupt: {exc}") from exc
         return workspace_from_dict(data)
+
+    def read_lifecycle_log(self, workspace_id: str) -> list[Event]:
+        """The workspace's lifecycle log as served events. Only reads: it never starts the log."""
+        path = self._events_path_for(workspace_id)
+        with self._rw_lock_for(workspace_id).read():
+            if not self._path_for(workspace_id).exists():
+                raise NotFoundError(f"Workspace '{workspace_id}' not found.")
+            data = path.read_bytes() if path.exists() else b""
+        return lifecycle_log.serve_lines(data.decode("utf-8", errors="replace"))
 
     # --- workspace operations ------------------------------------------------
     def list_workspaces(self) -> list[dict[str, str]]:
@@ -574,7 +670,7 @@ class Store:
                 workspace.pages[parent_id].child_ids.append(page.id)
             # Some types (feature-brief) create pinned children in the same commit.
             children = self._create_auto_children(workspace, page, page_type)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return CreatePageResult(page=page, children=children)
 
     def mutate_page_batch(
@@ -649,7 +745,7 @@ class Store:
                     created_so_far.update(result.created_ids)
 
             workspace.pages[page_id] = working
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return MutatePageResult(page=working, created_ids=created_ids,
                                     transitioned=working.status != page.status)
 
@@ -706,7 +802,7 @@ class Store:
             pruned: list[str] = []
             for root_id in sweep.prune:
                 pruned.extend(sorted(cleanup.delete_subtree(workspace, root_id)))
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return cleanup.SweepReport(
                 workspace_id, len(sweep.stamp), len(sweep.clear), pruned, backup, None
             )
@@ -744,7 +840,7 @@ class Store:
                 child = workspace.pages.get(child_id)
                 if child is not None and is_auto_child_type(parent_type, child.type):
                     apply(child)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return page
 
     def archive_page(self, workspace_id: str, page_id: str) -> Page:
@@ -786,7 +882,7 @@ class Store:
             page.status = status
             # A direct status edit regenerates the stamp too, so an out-of-band move invalidates held tokens.
             page.status_revision_token = self._next_revision(page.status_revision_token)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return page
 
     # --- page-tree structure (reparent / reorder / rename) ------------------
@@ -841,7 +937,7 @@ class Store:
             page.parent_id = new_parent_id
             new_siblings = self._sibling_ids(workspace, new_parent_id)
             new_siblings.append(page_id)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return page, list(new_siblings)
 
     def reorder_page(
@@ -867,7 +963,7 @@ class Store:
             siblings.remove(page_id)
             slot = commands.resolve_anchored_slot(siblings, to_index, preceding_id, context)
             siblings.insert(slot, page_id)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return page, list(siblings)
 
     def rename_page(self, workspace_id: str, page_id: str, title: str) -> Page:
@@ -885,7 +981,7 @@ class Store:
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
             page.title = title
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return page
 
     # --- page reference graph (link / unlink) --------------------------------
@@ -940,7 +1036,7 @@ class Store:
                 raise NotFoundError(f"Page '{from_id}' not found in workspace '{workspace_id}'.")
             role = self._validate_link(workspace, workspace_id, source, to_id, role)
             source.links.append({"to": to_id, "role": role})
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return source, list(source.links)
 
     def unlink_page(
@@ -959,14 +1055,14 @@ class Store:
             if edge is None:
                 raise NotFoundError(f"No '{role}' link from '{from_id}' to '{to_id}' to remove.")
             source.links.remove(edge)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return source, list(source.links)
 
     def _set_workspace_status(self, workspace_id: str, status: str) -> Workspace:
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
             workspace.status = status
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return workspace
 
     def archive_workspace(self, workspace_id: str) -> Workspace:
@@ -994,7 +1090,7 @@ class Store:
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
             workspace.guidance_config[field] = text
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, [])
             return workspace
 
     # --- helpers -------------------------------------------------------------
