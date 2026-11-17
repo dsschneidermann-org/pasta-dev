@@ -308,3 +308,13 @@ def test_build_backfill_rejects_a_linked_feature_brief_without_plans():
     pages["prs"]["1"] = [_record(FB, FB_PLAN, None)]
     with pytest.raises(ValueError, match=FB):
         dataset.build_backfill(prs, lines, pages)
+
+
+def test_summary_reports_pages_lines_mapping_and_longest_wait():
+    prs, lines, pages = _fixture()
+    assert dataset.summary(dataset.build_backfill(prs, lines, pages), pages) == [
+        "pages: 12 (bug-report 2, feature-brief 2, implementation-plan 2, simple-change 2, testing-plan 2, toc 2)",
+        "lines: 22",
+        "PRs mapped to a real page: 5",
+        "back-fill-only moment pages: 2",
+        f"longest wait: {FB} 5.4 days"]

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import re
 import sys
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -285,3 +286,21 @@ def _created(page_id: str, ts: int, page_type: str, title: str, parent: str | No
 
 def _status(page_id: str, ts: int, from_: str, to: str) -> Event:
     return {"ts": ts, "page": page_id, "kind": "status", "from": from_, "to": to}
+
+
+def summary(lines: list[Event], pages: dict[str, Any]) -> list[str]:
+    """What a build produced, one printable line each."""
+    created = [line for line in lines if line["kind"] == "created"]
+    per_type = Counter(line["type"] for line in created)
+    moment_pages = {line["page"]: line["ts"] for line in created if line["type"] in LINKED_TYPES}
+    finished = {line["page"]: line["ts"] for line in lines
+                if line["kind"] == "status" and line["page"] in moment_pages}
+    waits = {page_id: finished[page_id] - FINISH_MS - created_at for page_id, created_at in moment_pages.items()}
+    longest = max(waits, key=lambda page_id: waits[page_id])
+    return [
+        f"pages: {len(created)} ({', '.join(f'{page_type} {count}' for page_type, count in sorted(per_type.items()))})",
+        f"lines: {len(lines)}",
+        f"PRs mapped to a real page: {len(pages['prs'])}",
+        f"back-fill-only moment pages: {sum(':bf-' in page_id for page_id in moment_pages)}",
+        f"longest wait: {longest} {waits[longest] / 86_400_000:.1f} days",
+    ]
