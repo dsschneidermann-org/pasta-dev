@@ -13,6 +13,9 @@ import json
 from typing import Any
 
 from .model import Page
+from .pagetypes.core.fields import FieldSpec
+from .pagetypes.core.pagetype import PageType, initial_sections
+from .pagetypes.core.specs import LIST
 
 # One event: the event-line keys (seq, ts, page, kind, then the kind's own keys). The events a
 # writer builds are unstamped - they carry no seq or ts until the commit stamps them.
@@ -65,6 +68,91 @@ def deleted(page: Page) -> Event:
     """A page the cleanup sweep removed, with the last type, title and status it had."""
     return {"page": page.id, "kind": "deleted", "type": page.type, "title": page.title,
             "status": page.status}
+
+
+def _edited(page_id: str, section: str, field: str) -> Event:
+    return {"page": page_id, "kind": "edited", "section": section, "field": field}
+
+
+def _el_added(page_id: str, section: str, field: str, el: str, el_status: str | None) -> Event:
+    return {"page": page_id, "kind": "el_added", "section": section, "field": field, "el": el,
+            "status": el_status}
+
+
+def _el_status(page_id: str, section: str, field: str, el: str, from_: str, to: str) -> Event:
+    return {"page": page_id, "kind": "el_status", "section": section, "field": field, "el": el,
+            "from": from_, "to": to}
+
+
+def _el_edited(page_id: str, section: str, field: str, el: str) -> Event:
+    return {"page": page_id, "kind": "el_edited", "section": section, "field": field, "el": el}
+
+
+def _el_removed(page_id: str, section: str, field: str, el: str) -> Event:
+    return {"page": page_id, "kind": "el_removed", "section": section, "field": field, "el": el}
+
+
+# --- deriving one commit's events --------------------------------------------
+
+def diff_page(before: Page, after: Page, page_type: PageType | None) -> list[Event]:
+    """The events that take `before` to `after`: renamed, linked, unlinked, edited, the element
+    events, and status last.
+
+    The before side is normalised the way the command core normalises its working copy, so a field
+    the type gained since the page was stored, or a fixed field it refreshes, is not an edit. With
+    no page type only the title, links and status are compared.
+    """
+    page_id = after.id
+    events: list[Event] = []
+    if before.title != after.title:
+        events.append(renamed(page_id, before.title, after.title))
+    before_links = [(link["to"], link["role"]) for link in before.links]
+    after_links = [(link["to"], link["role"]) for link in after.links]
+    events += [linked(page_id, to, role) for to, role in after_links if (to, role) not in before_links]
+    events += [unlinked(page_id, to, role) for to, role in before_links if (to, role) not in after_links]
+    if page_type is not None:
+        before_sections = initial_sections(page_type, before.sections)
+        element_events: list[Event] = []
+        for section in page_type.sections:
+            for field_spec in section.fields:
+                old = before_sections.get(section.key, {}).get(field_spec.key)
+                new = after.sections.get(section.key, {}).get(field_spec.key)
+                if field_spec.kind == LIST:
+                    element_events += _diff_list(page_id, section.key, field_spec, old, new)
+                elif old != new:
+                    events.append(_edited(page_id, section.key, field_spec.key))
+        events += element_events
+    if before.status != after.status:
+        events.append(status(page_id, before.status, after.status))
+    return events
+
+
+def _elements_by_id(value: Any) -> dict[str, dict[str, Any]]:
+    """A list field's elements keyed by id; an element without a string id cannot be followed."""
+    if not isinstance(value, list):
+        return {}
+    return {element["id"]: element for element in value
+            if isinstance(element, dict) and isinstance(element.get("id"), str)}
+
+
+def _diff_list(page_id: str, section: str, field_spec: FieldSpec, old: Any, new: Any) -> list[Event]:
+    field = field_spec.key
+    has_fsm = field_spec.element_fsm is not None
+    before = _elements_by_id(old)
+    after = _elements_by_id(new)
+    events: list[Event] = []
+    for el, element in after.items():
+        prior = before.get(el)
+        if prior is None:
+            events.append(_el_added(page_id, section, field, el,
+                                    element.get("status") if has_fsm else None))
+        elif has_fsm and prior.get("status") != element.get("status"):
+            events.append(_el_status(page_id, section, field, el,
+                                     prior.get("status"), element.get("status")))
+        elif prior != element:
+            events.append(_el_edited(page_id, section, field, el))
+    events += [_el_removed(page_id, section, field, el) for el in before if el not in after]
+    return events
 
 
 # --- stamping and encoding ---------------------------------------------------
