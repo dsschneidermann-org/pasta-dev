@@ -1,0 +1,457 @@
+[
+  {
+    "number": 1,
+    "title": "Drop the block set: a blocks field is add, remove, reorder",
+    "created_at": null,
+    "merged_at": "2026-08-25T18:48:23Z",
+    "closed_at": null
+  },
+  {
+    "number": 2,
+    "title": "Make initial_sections idempotent, and backfill from it in apply_command",
+    "created_at": null,
+    "merged_at": "2026-08-25T19:11:23Z",
+    "closed_at": null
+  },
+  {
+    "number": 3,
+    "title": "Nav tree: bullet per node and status suffix in the link",
+    "created_at": null,
+    "merged_at": "2026-08-25T19:27:06Z",
+    "closed_at": null
+  },
+  {
+    "number": 4,
+    "title": "Render url-named fields as clickable links in the web view",
+    "created_at": null,
+    "merged_at": "2026-08-25T19:29:40Z",
+    "closed_at": null
+  },
+  {
+    "number": 5,
+    "title": "Block-arg helpers: replace BLOCK_ARGS/STANDARD_BLOCK_KINDS and drop block_vocabulary",
+    "created_at": null,
+    "merged_at": "2026-08-27T10:14:15Z",
+    "closed_at": null
+  },
+  {
+    "number": 6,
+    "title": "Clarify block-field prop naming (standardize on block_kinds)",
+    "created_at": null,
+    "merged_at": "2026-08-27T16:12:15Z",
+    "closed_at": null
+  },
+  {
+    "number": 7,
+    "title": "Expose recordCommit on simple-change/bug-report and drop commit url",
+    "created_at": null,
+    "merged_at": "2026-08-27T18:51:44Z",
+    "closed_at": null
+  },
+  {
+    "number": 8,
+    "title": "Gate the review stage on every step/case, add a skipped mark",
+    "created_at": null,
+    "merged_at": "2026-08-28T07:19:51Z",
+    "closed_at": null
+  },
+  {
+    "number": 9,
+    "title": "Split validation out of __post_init__ into a recursive validations pass",
+    "created_at": null,
+    "merged_at": "2026-08-28T13:27:01Z",
+    "closed_at": null
+  },
+  {
+    "number": 10,
+    "title": "Add a per-command status_revision_token optimistic-concurrency stamp",
+    "created_at": null,
+    "merged_at": "2026-08-29T02:02:37Z",
+    "closed_at": null
+  },
+  {
+    "number": 11,
+    "title": "Move status_revision_token into each command's args",
+    "created_at": null,
+    "merged_at": "2026-08-29T08:45:42Z",
+    "closed_at": null
+  },
+  {
+    "number": 12,
+    "title": "Add mutable per-workspace guidance texts",
+    "created_at": null,
+    "merged_at": "2026-08-30T18:56:21Z",
+    "closed_at": null
+  },
+  {
+    "number": 13,
+    "title": "Retire the pagetypes package __init__ import hub",
+    "created_at": null,
+    "merged_at": "2026-08-31T17:32:41Z",
+    "closed_at": null
+  },
+  {
+    "number": 14,
+    "title": "PEP8 style cleanup: blank-line spacing, comment tone, remove shadowed md2html",
+    "created_at": null,
+    "merged_at": "2026-08-31T18:20:05Z",
+    "closed_at": null
+  },
+  {
+    "number": 15,
+    "title": "Convert pagetypes/core class methods to module-level functions",
+    "created_at": null,
+    "merged_at": "2026-09-01T10:23:55Z",
+    "closed_at": null
+  },
+  {
+    "number": 16,
+    "title": "Rename page-workflow \"state\" to \"status\" in prose and local names",
+    "created_at": null,
+    "merged_at": "2026-09-01T11:03:49Z",
+    "closed_at": null
+  },
+  {
+    "number": 17,
+    "title": "Carry guidance once, inside `next`, on every write",
+    "created_at": null,
+    "merged_at": "2026-09-01T12:06:49Z",
+    "closed_at": null
+  },
+  {
+    "number": 18,
+    "title": "Rewrite README.md as a user-facing GitHub landing page",
+    "created_at": null,
+    "merged_at": "2026-09-01T13:59:24Z",
+    "closed_at": null
+  },
+  {
+    "number": 19,
+    "title": "Report the revision a rejected batch leaves behind",
+    "created_at": null,
+    "merged_at": "2026-09-01T14:47:15Z",
+    "closed_at": null
+  },
+  {
+    "number": 20,
+    "title": "Read page types through one `registered_pagetypes()` accessor",
+    "created_at": null,
+    "merged_at": null,
+    "closed_at": "2026-09-02T11:41:58Z"
+  },
+  {
+    "number": 21,
+    "title": "Read page types through one `registered_pagetypes()` accessor",
+    "created_at": null,
+    "merged_at": "2026-09-02T13:50:05Z",
+    "closed_at": null
+  },
+  {
+    "number": 22,
+    "title": "Let the doc renderer choose its bindings, and derive page machines from the registry",
+    "created_at": null,
+    "merged_at": "2026-09-02T17:54:01Z",
+    "closed_at": null
+  },
+  {
+    "number": 23,
+    "title": "Build each page type's status machine eagerly and report failures through validation",
+    "created_at": null,
+    "merged_at": "2026-09-02T19:09:52Z",
+    "closed_at": null
+  },
+  {
+    "number": 24,
+    "title": "Build element FSM machines with the page type that declares them",
+    "created_at": null,
+    "merged_at": "2026-09-04T09:46:15Z",
+    "closed_at": null
+  },
+  {
+    "number": 25,
+    "title": "Surface stage-entry commands in `do`: a legal_in command highlights where its scope opens",
+    "created_at": null,
+    "merged_at": null,
+    "closed_at": "2026-10-12T17:55:18Z"
+  },
+  {
+    "number": 26,
+    "title": "Add a `groundingTool` guidance field, and fix where `mergeProcess` shows",
+    "created_at": null,
+    "merged_at": "2026-09-12T19:51:28Z",
+    "closed_at": null
+  },
+  {
+    "number": 27,
+    "title": "Move `ElementBlocksSpec` from `args.py` to `fields.py`",
+    "created_at": null,
+    "merged_at": "2026-09-12T21:21:36Z",
+    "closed_at": null
+  },
+  {
+    "number": 28,
+    "title": "Label the guidance texts surfaced in `next` / `nextActions`",
+    "created_at": null,
+    "merged_at": "2026-09-12T20:51:23Z",
+    "closed_at": null
+  },
+  {
+    "number": 29,
+    "title": "Match a search term through the emphasis or quotes wrapping it",
+    "created_at": null,
+    "merged_at": "2026-09-17T12:16:26Z",
+    "closed_at": null
+  },
+  {
+    "number": 30,
+    "title": "Refuse to serve page types that did not validate, and report the failed reload",
+    "created_at": null,
+    "merged_at": "2026-09-17T12:55:26Z",
+    "closed_at": null
+  },
+  {
+    "number": 31,
+    "title": "Archived pages are only deleted when scheduled for deletion",
+    "created_at": null,
+    "merged_at": "2026-09-29T09:42:40Z",
+    "closed_at": null
+  },
+  {
+    "number": 32,
+    "title": "Add a done state to the feature-brief lifecycle",
+    "created_at": null,
+    "merged_at": "2026-09-29T10:32:23Z",
+    "closed_at": null
+  },
+  {
+    "number": 33,
+    "title": "Show the done stage in the README lifecycle diagram",
+    "created_at": null,
+    "merged_at": null,
+    "closed_at": "2026-09-29T10:52:08Z"
+  },
+  {
+    "number": 34,
+    "title": "Make the MCP instructions self-describing; require a type for describePageType",
+    "created_at": null,
+    "merged_at": "2026-09-30T08:12:13Z",
+    "closed_at": null
+  },
+  {
+    "number": 35,
+    "title": "Bump the uv group across 1 directory with 3 updates",
+    "created_at": null,
+    "merged_at": null,
+    "closed_at": "2026-11-08T10:34:52Z"
+  },
+  {
+    "number": 36,
+    "title": "Review guidance: prune tests on removed code and concept-explaining comments",
+    "created_at": null,
+    "merged_at": "2026-10-02T07:04:17Z",
+    "closed_at": null
+  },
+  {
+    "number": 37,
+    "title": "Pyright stage 1: per-kind command dataclasses",
+    "created_at": null,
+    "merged_at": "2026-10-15T14:04:22Z",
+    "closed_at": null
+  },
+  {
+    "number": 38,
+    "title": "Pyright stage 2: type the HMR dev tooling (0 errors)",
+    "created_at": null,
+    "merged_at": "2026-10-15T15:01:35Z",
+    "closed_at": null
+  },
+  {
+    "number": 39,
+    "title": "Pyright stage 3: type the JSON page data in product code",
+    "created_at": null,
+    "merged_at": "2026-10-15T16:54:17Z",
+    "closed_at": null
+  },
+  {
+    "number": 40,
+    "title": "Reject a ref argument that is not an id instead of crashing the ref check",
+    "created_at": null,
+    "merged_at": "2026-10-15T18:36:06Z",
+    "closed_at": null
+  },
+  {
+    "number": 41,
+    "title": "Abort a batch whose command args are not an object instead of crashing",
+    "created_at": null,
+    "merged_at": "2026-10-15T18:37:55Z",
+    "closed_at": null
+  },
+  {
+    "number": 42,
+    "title": "Type-check a block's body args the way a command's args are checked",
+    "created_at": null,
+    "merged_at": "2026-10-15T18:46:10Z",
+    "closed_at": null
+  },
+  {
+    "number": 43,
+    "title": "Pyright stage 4: clear the lint rules so basedpyright passes as a gate",
+    "created_at": null,
+    "merged_at": "2026-10-21T10:04:26Z",
+    "closed_at": null
+  },
+  {
+    "number": 44,
+    "title": "Give the web UI a pink colour theme in light and dark",
+    "created_at": "2026-10-20T13:02:47Z",
+    "merged_at": null,
+    "closed_at": null
+  },
+  {
+    "number": 45,
+    "title": "Link pinned children and the parent page from the top of a page",
+    "created_at": null,
+    "merged_at": "2026-11-06T21:24:38Z",
+    "closed_at": null
+  },
+  {
+    "number": 46,
+    "title": "Drop populated fields' instructions from mutatePageBatch's next",
+    "created_at": null,
+    "merged_at": "2026-11-06T13:00:17Z",
+    "closed_at": null
+  },
+  {
+    "number": 47,
+    "title": "Send stage guidance from mutatePageBatch only on a transition",
+    "created_at": null,
+    "merged_at": "2026-11-06T14:23:03Z",
+    "closed_at": null
+  },
+  {
+    "number": 48,
+    "title": "Store a backtick code span as a code run instead of rejecting it",
+    "created_at": null,
+    "merged_at": null,
+    "closed_at": "2026-11-06T13:43:16Z"
+  },
+  {
+    "number": 49,
+    "title": "Send a full mutatePageBatch next on a transition and once guidance has lapsed",
+    "created_at": null,
+    "merged_at": "2026-11-06T21:20:06Z",
+    "closed_at": null
+  },
+  {
+    "number": 50,
+    "title": "Allow single balanced backticks in a text run",
+    "created_at": null,
+    "merged_at": "2026-11-06T21:56:33Z",
+    "closed_at": null
+  },
+  {
+    "number": 51,
+    "title": "Retire the pasta skill name in favour of cook",
+    "created_at": null,
+    "merged_at": "2026-11-06T21:58:34Z",
+    "closed_at": null
+  },
+  {
+    "number": 52,
+    "title": "Upgrade dependencies to their latest releases, including FastMCP 4",
+    "created_at": null,
+    "merged_at": "2026-11-07T21:36:22Z",
+    "closed_at": null
+  },
+  {
+    "number": 53,
+    "title": "Resolve a builtin in a docs signature by its exact name",
+    "created_at": null,
+    "merged_at": "2026-11-07T22:20:56Z",
+    "closed_at": null
+  },
+  {
+    "number": 54,
+    "title": "Write inline code in docstrings and comments with single backticks",
+    "created_at": null,
+    "merged_at": "2026-11-07T22:41:22Z",
+    "closed_at": null
+  },
+  {
+    "number": 55,
+    "title": "Link the active git remote and an AGPL note in the web UI footer",
+    "created_at": null,
+    "merged_at": "2026-11-09T18:40:44Z",
+    "closed_at": null
+  },
+  {
+    "number": 56,
+    "title": "Bottom link after Child pages and a floating Top link in the web UI",
+    "created_at": null,
+    "merged_at": "2026-11-09T18:32:11Z",
+    "closed_at": null
+  },
+  {
+    "number": 57,
+    "title": "Epic: record findings while executing, edit findings/contracts in place, controller-only notice",
+    "created_at": null,
+    "merged_at": "2026-11-09T20:17:30Z",
+    "closed_at": null
+  },
+  {
+    "number": 58,
+    "title": "Split the epic's agent plan into one agent-plan page per agent",
+    "created_at": null,
+    "merged_at": "2026-11-10T11:38:16Z",
+    "closed_at": null
+  },
+  {
+    "number": 59,
+    "title": "Add a page-type design brief and a pasta-workflow-creation skill",
+    "created_at": null,
+    "merged_at": "2026-11-10T11:09:29Z",
+    "closed_at": null
+  },
+  {
+    "number": 60,
+    "title": "Epic: delegated research and design stages, one solution investigation per direction and a pinned solution-design page",
+    "created_at": "2026-11-10T12:56:18Z",
+    "merged_at": null,
+    "closed_at": null
+  },
+  {
+    "number": 61,
+    "title": "Add getWorkspaceGuidance to read every workspace guidance field",
+    "created_at": null,
+    "merged_at": "2026-11-10T19:32:21Z",
+    "closed_at": null
+  },
+  {
+    "number": 62,
+    "title": "Include the page status in the outline response",
+    "created_at": null,
+    "merged_at": "2026-11-10T19:49:43Z",
+    "closed_at": null
+  },
+  {
+    "number": 63,
+    "title": "gen_page_type_docs.py removes the pages of states the registry no longer generates",
+    "created_at": null,
+    "merged_at": "2026-11-10T21:41:26Z",
+    "closed_at": null
+  },
+  {
+    "number": 64,
+    "title": "Replace hmr's reactive reload with a debounced full reload of every module",
+    "created_at": null,
+    "merged_at": "2026-11-16T19:48:41Z",
+    "closed_at": null
+  },
+  {
+    "number": 65,
+    "title": "Keep the archived view on the nav sidebar's Workspace link",
+    "created_at": null,
+    "merged_at": "2026-11-16T19:55:32Z",
+    "closed_at": null
+  }
+]

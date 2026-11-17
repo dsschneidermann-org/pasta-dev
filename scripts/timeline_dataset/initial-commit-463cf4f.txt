@@ -1,0 +1,62 @@
+2026-07-20  First pass: file-backed pasta MCP server (FastMCP + python-statemachine)
+2026-07-20  Add feature-brief page type + required-field transition preconditions
+2026-07-20  Add Sphinx docs site with per-page-type Mermaid state diagrams
+2026-07-20  Pure core: blocks kind, element FSMs, ready lock + 3 new types
+2026-07-20  Store: auto-created children, ref integrity, ship guard
+2026-07-20  Docs + introspection: describe fields, diagrams, architecture
+2026-07-20  Tools: archive/unarchive pages + workspaces, tree includeArchived
+2026-07-20  Tools: outline, renderPage (Markdown), search
+2026-07-20  Tools: nextActions, attention, mutatePageBatch
+2026-07-21  Web UI: live wiki views with WebSocket auto-reload
+2026-07-21  HMR: hot module reload for FastAPI + FastMCP in one dev server
+2026-07-22  Add document page type + inline-run block grammar
+2026-07-22  Add theme switcher and css
+2026-07-22  Anchored reorder and positioned insert (stale-read-safe)
+2026-07-22  Add reparentPage and reorderPage page-tree operations
+2026-07-22  Render inline page refs as titled links; verify refs before mutation
+2026-07-23  Render full page shape: all sections + Child-pages links
+2026-07-23  Add page link/unlink reference graph and References render section
+2026-07-23  Add Model toggle: overlay a page's page-type Sphinx doc in an iframe
+2026-07-24  Generate per-state Sphinx docs for every page type
+2026-07-24  Capture describePageType on each state page; drop overview pages
+2026-07-24  Add test-variant page types to decouple tests from the live registry
+2026-07-28  Add simple-change page type - lightweight bug-report-style flow for minor changes
+2026-07-28  Add readable instructions tool to MCP interface
+2026-07-28  Gate beginImplementation on ready plan children; allow status-marks in ready plans
+2026-07-29  Lock feature-spec authoring in the sealed state
+2026-07-29  Reshape feature-brief into ground -> plan -> plan-review flow
+2026-07-29  Gate plan-child finalize on parent feature reaching planning
+2026-07-30  Add Archive/Unarchive button to the wiki page view
+2026-07-30  Derive page FSM transitions from legal_in, remove explicit transitions
+2026-07-30  Add field-op command-helper factories in pagetypes.py
+2026-07-31  Add toc (table of contents) page type
+2026-07-31  Add claude skill for /pasta, /cook
+2026-07-31  Lock authoring commands in terminal FSM states
+2026-08-01  Make production page types off-limits in test mode
+2026-08-01  Add web page-state dropdown for direct state override
+2026-08-01  Human-gate close for simple-change and bug-report via a done state
+2026-08-02  Add pyright config, fix some type errors
+2026-08-02  Add field-setter instructions and stage-scoped field setters in do
+2026-08-09  Batch opaque-id skip: chain inserts/reorders in mutatePageBatch
+2026-08-11  Add the epic + agent-plan page types for multi-brief features
+2026-08-11  Mandate a worktree name on every dispatch in an agent plan
+2026-08-13  Hide archived pages from the tree MCP tool
+2026-08-13  Resolve page ids with an explicit id: prefix, spanning archived pages
+2026-08-13  Exclude descendants of an archived page from text search
+2026-08-13  Stage a feature-brief's instructions: quiet the plan children until planning
+2026-08-13  Add a manual end-to-end probe of the feature-brief workflow
+2026-08-13  Seal the feature-spec before any step or case is written
+2026-08-13  Sweep archived and orphaned pages on an hourly timer
+2026-08-14  Echo a state's stage guidance when a write enters it
+2026-08-16  Guard workspace file reads against the write that replaces it
+2026-08-21  Add AGPL license
+2026-08-21  Add the decision-record page type and guide how both doc types are written
+2026-08-21  Split each page type into its own module under src/pagetypes
+2026-08-22  Render the web page view as structured HTML
+2026-08-22  Resolve page ids in list elements into titled links
+2026-08-22  Declare block-bearing element fields and their command surface
+2026-08-22  Give implementation-plan steps a block-bearing detail field
+2026-08-22  Update page status styling, allow markdown=true to return the rendered markdown pages
+2026-08-23  Declare BlockKindSpec, the block-kind vocabulary type
+2026-08-23  Add sleep and retry on file replacement permission error
+2026-08-23  Add pytest-testmon for incremental unit test support
