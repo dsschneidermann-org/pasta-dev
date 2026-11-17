@@ -8,7 +8,7 @@ import json
 
 from src import lifecycle_log
 from src.commands import apply_command, create_page
-from src.model import Page
+from src.model import Page, Workspace
 from src.pagetypes._registry import get_page_type
 from src.pagetypes.core.pagetype import initial_sections
 
@@ -246,3 +246,58 @@ def test_elements_without_a_string_id_are_skipped_and_a_non_list_value_is_empty(
     assert lifecycle_log.diff_page(before, after, FIELDS) == [
         {"page": "test-fields:1", "kind": "el_added", "section": "items", "field": "items",
          "el": "e1", "status": None}]
+
+
+# --- baseline and sweep_events -------------------------------------------------
+
+def _ws(*pages: Page, roots: list[str]) -> Workspace:
+    return Workspace(id="ws:t", name="t", root_page_ids=roots, pages={p.id: p for p in pages})
+
+
+def _p(page_id, children=(), parent=None, archived=False, links=()) -> Page:
+    return Page(id=page_id, type="test-fields", title=page_id.upper(), status="active",
+                parent_id=parent, child_ids=list(children), archived=archived, links=list(links))
+
+
+def _pages(events):
+    return [event["page"] for event in events]
+
+
+def test_baseline_walks_the_tree_in_pre_order_including_archived_pages():
+    ws = _ws(_p("a", ["a1", "a2"]), _p("a1", ["a11"], parent="a"), _p("a11", parent="a1"),
+             _p("a2", parent="a", archived=True), _p("b"), roots=["a", "b"])
+    events = lifecycle_log.baseline(ws)
+    assert _pages(events) == ["a", "a1", "a11", "a2", "b"]
+    assert all(event["kind"] == "present" for event in events)
+    assert events[3]["archived"] is True and events[3]["parent"] == "a"
+
+
+def test_baseline_lists_each_page_once_despite_a_cycle_and_skips_a_dangling_id():
+    ws = _ws(_p("a", ["b", "gone"]), _p("b", ["a"], parent="a"), roots=["a"])
+    assert _pages(lifecycle_log.baseline(ws)) == ["a", "b"]
+
+
+def test_baseline_puts_unreached_pages_last_in_id_order_with_their_parents_first():
+    # "y" is filed nowhere and its child "c" sorts before it: the parent is pulled ahead.
+    ws = _ws(_p("root"), _p("c", parent="y"), _p("y", ["c"]), _p("x"), roots=["root"])
+    assert _pages(lifecycle_log.baseline(ws)) == ["root", "y", "c", "x"]
+
+
+def test_baseline_of_an_empty_workspace_is_empty():
+    assert lifecycle_log.baseline(_ws(roots=[])) == []
+
+
+def test_sweep_events_unlink_survivors_then_delete_in_the_given_order():
+    survivor = _p("live", links=[{"to": "gone", "role": "relates-to"}, {"to": "live2", "role": "x"}])
+    gone = _p("gone", ["kid"], archived=True, links=[{"to": "kid", "role": "inner"}])
+    kid = _p("kid", parent="gone")
+    kid.status = "done-ish"
+    ws = _ws(_p("root", ["live", "gone", "live2"]), survivor, gone, kid, _p("live2"),
+             roots=["root"])
+    assert lifecycle_log.sweep_events(ws, ["gone", "kid", "missing"]) == [
+        {"page": "live", "kind": "unlinked", "to": "gone", "role": "relates-to"},
+        {"page": "gone", "kind": "deleted", "type": "test-fields", "title": "GONE",
+         "status": "active"},
+        {"page": "kid", "kind": "deleted", "type": "test-fields", "title": "KID",
+         "status": "done-ish"},
+    ]

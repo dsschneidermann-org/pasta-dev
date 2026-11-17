@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .model import Page
+from .model import Page, Workspace
 from .pagetypes.core.fields import FieldSpec
 from .pagetypes.core.pagetype import PageType, initial_sections
 from .pagetypes.core.specs import LIST
@@ -153,6 +153,44 @@ def _diff_list(page_id: str, section: str, field_spec: FieldSpec, old: Any, new:
             events.append(_el_edited(page_id, section, field, el))
     events += [_el_removed(page_id, section, field, el) for el in before if el not in after]
     return events
+
+
+def baseline(workspace: Workspace) -> list[Event]:
+    """One present event per page, parents before children: the tree in pre-order from the root
+    pages, archived pages included, then the pages the tree does not reach in id order, each
+    preceded by its own unreached ancestors."""
+    order: list[str] = []
+    seen: set[str] = set()
+    stack = list(reversed(workspace.root_page_ids))
+    while stack:
+        page_id = stack.pop()
+        if page_id in seen or page_id not in workspace.pages:
+            continue
+        seen.add(page_id)
+        order.append(page_id)
+        stack.extend(reversed(workspace.pages[page_id].child_ids))
+    for page_id in sorted(set(workspace.pages) - seen):
+        chain: list[str] = []
+        current: str | None = page_id
+        while current is not None and current in workspace.pages and current not in seen \
+                and current not in chain:
+            chain.append(current)
+            current = workspace.pages[current].parent_id
+        for ancestor in reversed(chain):
+            seen.add(ancestor)
+            order.append(ancestor)
+    return [present(workspace.pages[page_id]) for page_id in order]
+
+
+def sweep_events(workspace: Workspace, pruned_ids: list[str]) -> list[Event]:
+    """What a cleanup sweep that deletes `pruned_ids` does, read off the workspace before it runs:
+    every link a surviving page loses, then each deleted page with its last values."""
+    pruned = set(pruned_ids)
+    events = [unlinked(page.id, link["to"], link["role"])
+              for page in workspace.pages.values() if page.id not in pruned
+              for link in page.links if link.get("to") in pruned]
+    return events + [deleted(workspace.pages[page_id]) for page_id in pruned_ids
+                     if page_id in workspace.pages]
 
 
 # --- stamping and encoding ---------------------------------------------------
