@@ -6,11 +6,12 @@ is covered in test_store.py.
 """
 
 import asyncio
+import json
 from datetime import datetime, timezone
 
 import pytest
 
-from src import cleanup
+from src import cleanup, lifecycle_log
 from src.model import Page, Workspace
 from src.store import Store
 
@@ -256,3 +257,69 @@ def test_scheduler_disabled_by_env(tmp_path, monkeypatch):
         assert cleanup._task is None
 
     asyncio.run(scenario())
+
+
+# --- the sweep keeps the replayed history -------------------------------------
+
+AFTER_EXPIRY = datetime(2026, 8, 19, 9, 5, tzinfo=timezone.utc)
+
+
+def _log_bytes(root, workspace_id) -> bytes:
+    return (root / "events" / f"{workspace_id.replace(':', '_')}.jsonl").read_bytes()
+
+
+def _unstamped(lines: bytes) -> list[dict]:
+    return [{key: value for key, value in json.loads(line).items() if key not in ("seq", "ts")}
+            for line in lines.decode("utf-8").split("\n")[:-1]]
+
+
+def test_a_pruning_sweep_appends_unlinked_and_deleted_and_keeps_every_earlier_byte(tmp_path):
+    store = Store(tmp_path)
+    workspace = store.create_workspace("demo")
+    keep = store.create_page(workspace.id, "test-fields", "Keep").page
+    gone = store.create_page(workspace.id, "test-fields", "Gone").page
+    kid = store.create_page(workspace.id, "test-fields", "Kid", parent_id=gone.id).page
+    store.link_page(workspace.id, keep.id, gone.id, "relates-to")
+    store.link_page(workspace.id, kid.id, gone.id, "inner")             # lost with the subtree
+    store.schedule_page_deletion(workspace.id, gone.id)
+
+    before_stamp = _log_bytes(tmp_path, workspace.id)
+    store.cleanup_workspace(workspace.id, NOW)                          # stamps only
+    assert _log_bytes(tmp_path, workspace.id) == before_stamp
+
+    before = _log_bytes(tmp_path, workspace.id)
+    served_before = store.read_lifecycle_log(workspace.id)
+    replay_before = lifecycle_log.timeline_payload(workspace.id, "demo", served_before)
+
+    report = store.cleanup_workspace(workspace.id, AFTER_EXPIRY)
+
+    after = _log_bytes(tmp_path, workspace.id)
+    assert sorted(report.pruned) == sorted([gone.id, kid.id])
+    assert after.startswith(before)                                     # nothing earlier rewritten
+    pruned_in_order = sorted([gone.id, kid.id])
+    titles = {gone.id: "Gone", kid.id: "Kid"}
+    assert _unstamped(after[len(before):]) == [
+        {"page": keep.id, "kind": "unlinked", "to": gone.id, "role": "relates-to"},
+        *({"page": page_id, "kind": "deleted", "type": "test-fields", "title": titles[page_id],
+           "status": "active"} for page_id in pruned_in_order),
+    ]
+    cut = served_before[-1]["seq"]
+    served_after = [event for event in store.read_lifecycle_log(workspace.id) if event["seq"] <= cut]
+    assert lifecycle_log.timeline_payload(workspace.id, "demo", served_after) == replay_before
+    assert [path.name for path in (tmp_path / "events").iterdir()] == [
+        f"{workspace.id.replace(':', '_')}.jsonl"]
+
+
+def test_a_sweep_with_nothing_to_prune_records_nothing(tmp_path):
+    store = Store(tmp_path)
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Back").page
+    store.schedule_page_deletion(workspace.id, page.id)
+    store.cleanup_workspace(workspace.id, NOW)
+    store.unarchive_page(workspace.id, page.id)
+    before = _log_bytes(tmp_path, workspace.id)
+
+    report = store.cleanup_workspace(workspace.id, NOW)                 # clears the stamp
+
+    assert report.cleared == 1
+    assert _log_bytes(tmp_path, workspace.id) == before

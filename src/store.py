@@ -892,6 +892,14 @@ class Store:
                 except OSError as exc:
                     return cleanup.SweepReport(workspace_id, 0, 0, [], None, str(exc))
 
+            # Read off the workspace before anything is deleted, in the order the report lists them.
+            pruned_order: list[str] = []
+            for root_id in sweep.prune:
+                for page_id in sorted(cleanup._descendants(workspace, root_id)):
+                    if page_id in workspace.pages and page_id not in pruned_order:
+                        pruned_order.append(page_id)
+            events = self._guarded_events(lambda: lifecycle_log.sweep_events(workspace, pruned_order))
+
             for page_id in sweep.clear:
                 workspace.pages[page_id].expires_at = None
             for page_id, expiry in sweep.stamp.items():
@@ -899,7 +907,7 @@ class Store:
             pruned: list[str] = []
             for root_id in sweep.prune:
                 pruned.extend(sorted(cleanup.delete_subtree(workspace, root_id)))
-            self._touch_and_save(workspace, [])
+            self._touch_and_save(workspace, events)
             return cleanup.SweepReport(
                 workspace_id, len(sweep.stamp), len(sweep.clear), pruned, backup, None
             )
