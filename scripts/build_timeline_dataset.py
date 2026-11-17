@@ -67,7 +67,7 @@ DAY_SPAN_MS = 12 * HOUR_MS
 BUMP_MS = 1_000
 FINISH_STATUS = {"feature-brief": "shipped", "simple-change": "closed", "bug-report": "closed"}
 
-# The title rule of the dataset the user judged, which types a moment no real page is linked to.
+# Types a moment that no real page is linked to, by its title.
 BUG = re.compile(r"\b(fix|crash|crashing|error)\b|against the write|rejected batch"
                  r"|instead of (rejecting|crashing)", re.IGNORECASE)
 SMALL_EDIT_VERBS = frozenset((
