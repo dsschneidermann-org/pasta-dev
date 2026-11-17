@@ -26,8 +26,9 @@ from __future__ import annotations
 
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))   # make `src` importable when run as a bare script
@@ -88,3 +89,52 @@ def title_type(title: str) -> str:
     if title.split(" ")[0] in SMALL_EDIT_VERBS or title.startswith(SMALL_EDIT_PREFIXES):
         return "simple-change"
     return "feature-brief"
+
+
+def linked_pages(documents: Iterable[dict[str, Any]]) -> dict[int, list[dict[str, Any]]]:
+    """Per PR #1-#65, the workspace's feature-brief, simple-change and bug-report pages whose pull
+    request url names it, sorted by id. A page seen in several documents keeps the record of the
+    first one, so the live document is read before its backups."""
+    found: dict[int, dict[str, dict[str, Any]]] = {}
+    for document in documents:
+        if document.get("id") != WORKSPACE_ID:
+            continue
+        for page_id, page in document.get("pages", {}).items():
+            if page.get("type") not in LINKED_TYPES:
+                continue
+            url = (page.get("sections", {}).get("pull_request") or {}).get("url")
+            match = PR_URL.match(url) if isinstance(url, str) else None
+            if match is None or int(match.group(1)) not in PR_NUMBERS:
+                continue
+            found.setdefault(int(match.group(1)), {}).setdefault(page_id, _page_record(page_id, page))
+    return {number: [records[page_id] for page_id in sorted(records)]
+            for number, records in sorted(found.items())}
+
+
+def _page_record(page_id: str, page: dict[str, Any]) -> dict[str, Any]:
+    def first_child(prefix: str) -> str | None:
+        if page["type"] != "feature-brief":
+            return None
+        return next((child for child in page.get("child_ids", []) if child.startswith(prefix)), None)
+
+    return {"id": page_id, "type": page["type"],
+            "implementation_plan": first_child("implementation-plan:"),
+            "testing_plan": first_child("testing-plan:")}
+
+
+def workspace_pages(live: dict[str, Any], documents: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    """The workspace-pages.json value: the live document's Features and Bug Reports trunks and the
+    pages carrying each PR's link across every document."""
+    if live.get("id") != WORKSPACE_ID:
+        raise ValueError(f"the live document is {live.get('id')!r}, not {WORKSPACE_ID}")
+    pages = live.get("pages", {})
+    tocs: dict[str, str] = {}
+    for title in ("Features", "Bug Reports"):
+        toc = next((page_id for page_id in live.get("root_page_ids", [])
+                    if pages.get(page_id, {}).get("type") == "toc"
+                    and pages[page_id].get("title") == title), None)
+        if toc is None:
+            raise ValueError(f"the live document has no root toc titled {title!r}")
+        tocs[title] = toc
+    return {"workspace": WORKSPACE_ID, "tocs": tocs,
+            "prs": {str(number): records for number, records in linked_pages(documents).items()}}
