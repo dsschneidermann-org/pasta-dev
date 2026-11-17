@@ -11,7 +11,9 @@ test-lifecycle/test-child family for auto-children, cross-page refs, guards, and
 
 import json
 import os
+import statistics
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -25,8 +27,10 @@ from src.errors import (
     NotFoundError,
     ValidationError,
 )
-from src import lifecycle_log
+from src import commands, lifecycle_log
 from src import store as store_module
+from src.ids import default_id_factory
+from src.pagetypes._registry import get_page_type
 from src.store import Store
 
 
@@ -2575,3 +2579,218 @@ def test_workspace_level_writes_record_nothing(store):
         store.set_workspace_guidance(workspace.id, "buildTool", "uv"),
         store.archive_workspace(workspace.id),
         store.unarchive_workspace(workspace.id))) == []
+
+
+# --- lifecycle log: never fails, slows or bloats a write ----------------------
+
+def test_a_write_commits_when_the_log_cannot_be_appended(store, tmp_path, monkeypatch):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "P").page
+    gone = store.create_page(workspace.id, "test-fields", "Gone").page
+    store.schedule_page_deletion(workspace.id, gone.id)
+    store.cleanup_workspace(workspace.id, NOW)
+    lines_before = _log_lines(tmp_path, workspace.id)
+
+    def unwritable(self, workspace_id, lines):
+        raise OSError("events folder is read-only")
+    monkeypatch.setattr(Store, "_append_to_log", unwritable)
+
+    created = store.create_page(workspace.id, "test-fields", "Q").page
+    _mutate(store, workspace.id, page.id, [{"command": "setLabel", "args": {"label": "kept"}}])
+    report = store.cleanup_workspace(workspace.id, AFTER_EXPIRY)
+
+    assert store.get_page(workspace.id, created.id).title == "Q"
+    assert store.get_page(workspace.id, page.id).sections["basics"]["label"] == "kept"
+    assert report.pruned == [gone.id] and report.error is None
+    assert _log_lines(tmp_path, workspace.id) == lines_before
+
+    monkeypatch.undo()
+    store.rename_page(workspace.id, page.id, "Afterwards")
+    gaps = [event for event in store.read_lifecycle_log(workspace.id) if event["kind"] == "gap"]
+    assert [(gap["seq"], gap["missing"]) for gap in gaps] == [(lines_before[-1]["seq"] + 1, 3)]
+
+
+def test_a_write_commits_when_its_events_cannot_be_built(store, monkeypatch):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "P").page
+    gone = store.create_page(workspace.id, "test-fields", "Gone").page
+    store.schedule_page_deletion(workspace.id, gone.id)
+    store.cleanup_workspace(workspace.id, NOW)
+    seq_before = store.load_workspace(workspace.id).event_seq
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("cannot build")
+    for name in ("created", "diff_page", "sweep_events"):
+        monkeypatch.setattr(lifecycle_log, name, boom)
+
+    created = store.create_page(workspace.id, "test-fields", "Q").page
+    _mutate(store, workspace.id, page.id, [{"command": "setLabel", "args": {"label": "kept"}}])
+    report = store.cleanup_workspace(workspace.id, AFTER_EXPIRY)
+
+    assert store.get_page(workspace.id, created.id).title == "Q"
+    assert store.get_page(workspace.id, page.id).sections["basics"]["label"] == "kept"
+    assert report.pruned == [gone.id]
+    assert store.load_workspace(workspace.id).event_seq == seq_before + 3     # one seq each
+    monkeypatch.undo()
+    store.rename_page(workspace.id, page.id, "Afterwards")
+    assert [(e["kind"], e["missing"]) for e in store.read_lifecycle_log(workspace.id)
+            if e["kind"] == "gap"] == [("gap", 3)]
+
+
+def test_every_recorded_line_carries_its_commits_instant(tmp_path, monkeypatch):
+    store, data, workspace, parent, child = _started_store(tmp_path, _backfill_text(BACKFILL))
+    commits: list[tuple[int, str]] = []
+    real_write = Store._write_file
+
+    def remembering(self, path, document):
+        if path.parent == data:
+            commits.append((document.event_seq, document.updated_at))
+        real_write(self, path, document)
+    monkeypatch.setattr(Store, "_write_file", remembering)
+
+    store.rename_page(workspace.id, parent.id, "One")
+    store.link_page(workspace.id, child.id, parent.id, "relates-to")
+    store.set_page_status(workspace.id, parent.id, "active")            # records nothing
+    store.archive_page(workspace.id, child.id)
+
+    for line in _log_lines(data, workspace.id)[len(BACKFILL):]:
+        commit_updated_at = next(updated_at for event_seq, updated_at in commits
+                                 if event_seq >= line["seq"])
+        assert line["ts"] == _epoch_ms(commit_updated_at)
+
+
+def test_lines_carry_no_section_text(store, tmp_path):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "P").page
+    text = "secret-prose " * 800                                       # about 10 KB
+    _mutate(store, workspace.id, page.id, [{"command": "setBody", "args": {"text": text}}])
+    _mutate(store, workspace.id, page.id, [{"command": "addItem", "args": {"text": text, "note": text}}])
+    item = store.get_page(workspace.id, page.id).sections["items"]["items"][0]["id"]
+    _mutate(store, workspace.id, page.id, [
+        {"command": "editItem", "args": {"itemId": item, "text": text + "!"}}])
+
+    raw = _log_path(tmp_path, workspace.id).read_bytes().split(b"\n")[:-1]
+    content_lines = [line for line in raw if json.loads(line)["kind"] in ("edited", "el_added", "el_edited")]
+    assert len(content_lines) == 3
+    assert all(len(line) < 300 and b"secret-prose" not in line for line in content_lines)
+
+
+def test_the_document_gains_only_the_event_seq_key(store, tmp_path):
+    workspace = store.create_workspace("demo")
+    store.create_page(workspace.id, "test-fields", "P")
+    document = json.loads((tmp_path / f"{workspace.id.replace(':', '_')}.json").read_text(encoding="utf-8"))
+    assert set(document) == {"id", "name", "status", "root_page_ids", "created_at", "updated_at",
+                             "guidance_config", "pages", "event_seq"}
+    page = next(iter(document["pages"].values()))
+    assert set(page) == {"id", "type", "title", "status", "parent_id", "child_ids", "sections",
+                         "archived", "links", "expires_at", "delete_scheduled",
+                         "status_revision_token"}
+
+
+def _generated_workspace(store, pages=200) -> tuple[str, str]:
+    """A workspace of `pages` test-fields pages with some content each, written in one commit.
+    Returns its id and one page id to write to."""
+    workspace = store.create_workspace("big")
+    loaded = store.load_workspace(workspace.id)
+    page_type = get_page_type("test-fields")
+    for index in range(pages):
+        page = commands.create_page(page_type, f"Page {index}", None, default_id_factory)
+        page.sections["basics"]["body"] = f"body of page {index} " * 40
+        loaded.pages[page.id] = page
+        loaded.root_page_ids.append(page.id)
+    store._touch_and_save(loaded, [])
+    return workspace.id, loaded.root_page_ids[0]
+
+
+def _timed(write) -> float:
+    started = time.perf_counter()
+    write()
+    return time.perf_counter() - started
+
+
+def test_recording_adds_under_five_ms_to_a_write(store, monkeypatch):
+    workspace_id, page_id = _generated_workspace(store)
+    real_touch, real_diff = Store._touch_and_save, lifecycle_log.diff_page
+    recording = {"on": True}
+
+    def touch(self, workspace, events, backfill=()):
+        real_touch(self, workspace, events if recording["on"] else [], backfill)
+
+    def diff(before, after, page_type):
+        return real_diff(before, after, page_type) if recording["on"] else []
+    monkeypatch.setattr(Store, "_touch_and_save", touch)
+    monkeypatch.setattr(lifecycle_log, "diff_page", diff)
+
+    def write(index):
+        _mutate(store, workspace_id, page_id, [{"command": "setBody", "args": {"text": f"v{index}"}}])
+
+    for index in range(5):                                              # warm up, start the log
+        write(index)
+    with_recording, without = [], []
+    for index in range(50):
+        recording["on"] = True
+        with_recording.append(_timed(lambda: write(1000 + index)))
+        recording["on"] = False
+        without.append(_timed(lambda: write(2000 + index)))
+    assert statistics.median(with_recording) - statistics.median(without) < 0.005
+
+
+def test_a_long_log_does_not_slow_a_write(store, tmp_path):
+    short_id, short_page = _generated_workspace(store)
+    long_id, long_page = _generated_workspace(store)
+    for workspace_id, page_id in ((short_id, short_page), (long_id, long_page)):
+        _mutate(store, workspace_id, page_id, [{"command": "setBody", "args": {"text": "start"}}])
+    long_log = _log_path(tmp_path, long_id)
+    first = store.load_workspace(long_id).event_seq + 1
+    with open(long_log, "ab") as handle:
+        handle.write("".join(lifecycle_log.encode({"seq": seq, "ts": 1, "page": long_page,
+                                                   "kind": "edited", "section": "basics",
+                                                   "field": "body"})
+                             for seq in range(first, first + 100_000)).encode("utf-8"))
+    loaded = store.load_workspace(long_id)
+    loaded.event_seq = first + 100_000 - 1
+    store._touch_and_save(loaded, [])
+
+    def write(workspace_id, page_id, index):
+        _mutate(store, workspace_id, page_id, [{"command": "setBody", "args": {"text": f"v{index}"}}])
+
+    for index in range(5):
+        write(short_id, short_page, index)
+        write(long_id, long_page, index)
+    short_times, long_times = [], []
+    for index in range(50):
+        short_times.append(_timed(lambda: write(short_id, short_page, 100 + index)))
+        long_times.append(_timed(lambda: write(long_id, long_page, 100 + index)))
+    assert abs(statistics.median(long_times) - statistics.median(short_times)) < 0.005
+    assert store.read_lifecycle_log(long_id)[-1]["seq"] == store.load_workspace(long_id).event_seq
+
+
+def test_appends_from_two_stores_on_one_folder_add_no_blank_line(tmp_path):
+    first, second = Store(tmp_path), Store(tmp_path)
+    workspace = first.create_workspace("demo")
+    first._touch_and_save(first.load_workspace(workspace.id), [lifecycle_log.archived("a")])
+    second._touch_and_save(second.load_workspace(workspace.id), [lifecycle_log.archived("b")])
+    first._touch_and_save(first.load_workspace(workspace.id), [lifecycle_log.archived("c")])
+
+    raw = _log_path(tmp_path, workspace.id).read_bytes()
+    assert b"\n\n" not in raw and not raw.startswith(b"\n")
+    assert [line["page"] for line in _log_lines(tmp_path, workspace.id)] == ["a", "b", "c"]
+
+
+def test_a_steady_append_does_not_open_the_log_for_reading(store, tmp_path, monkeypatch):
+    workspace = store.create_workspace("demo")
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("a")])
+    log = _log_path(tmp_path, workspace.id)
+    real_open = open
+    read_opens = []
+
+    def watching(file, mode="r", *args, **kwargs):
+        if Path(file) == log and ("r" in mode or "+" in mode):
+            read_opens.append(mode)
+        return real_open(file, mode, *args, **kwargs)
+    monkeypatch.setattr("builtins.open", watching)
+
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("b")])
+
+    assert read_opens == []
+    assert [line["page"] for line in _log_lines(tmp_path, workspace.id)] == ["a", "b"]

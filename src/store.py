@@ -201,6 +201,8 @@ class Store:
         self.root.mkdir(parents=True, exist_ok=True)
         # Committed <ws_token>.jsonl back-fills that start a workspace's lifecycle log; None for none.
         self._backfill_dir = Path(backfill_dir) if backfill_dir is not None else None
+        # Each log's size right after this store's own last append, which ended in a newline.
+        self._log_sizes: dict[str, int] = {}
         self._id_factory = id_factory
         self._revision_factory = revision_factory
         self._transaction_locks: dict[str, threading.Lock] = {}
@@ -294,17 +296,29 @@ class Store:
                                workspace.id, exc_info=True)
 
     def _append_to_log(self, workspace_id: str, lines: list[Event]) -> None:
-        """Append stamped lines in one write, first ending a line a crash left half-written."""
+        """Append stamped lines in one write, first ending a line a crash left half-written.
+
+        The log is opened for reading only when its size is not the one this store's own last
+        append left: opening a just-modified file for reading can cost tens of milliseconds (a
+        virus scanner rescanning it), while a write-only append costs well under one.
+        """
         data = "".join(lifecycle_log.encode(line) for line in lines).encode("utf-8")
         path = self._events_path_for(workspace_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with self._rw_lock_for(workspace_id).write(), open(path, "ab+") as handle:
-            end = handle.seek(0, os.SEEK_END)
-            if end:
-                _ = handle.seek(end - 1)
-                if handle.read(1) != b"\n":
-                    data = b"\n" + data
-            _ = handle.write(data)
+        with self._rw_lock_for(workspace_id).write():
+            try:
+                size = path.stat().st_size
+            except FileNotFoundError:
+                size = 0
+                path.parent.mkdir(parents=True, exist_ok=True)
+            if size and self._log_sizes.get(workspace_id) != size:
+                with open(path, "rb") as handle:
+                    _ = handle.seek(size - 1)
+                    if handle.read(1) != b"\n":
+                        data = b"\n" + data
+            _ = self._log_sizes.pop(workspace_id, None)
+            with open(path, "ab") as handle:
+                _ = handle.write(data)
+            self._log_sizes[workspace_id] = size + len(data)
 
     @staticmethod
     def _guarded_events(build: Callable[[], list[Event]]) -> list[Event] | None:
