@@ -39,6 +39,7 @@ from typing import Any, NamedTuple
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))   # make `src` importable when run as a bare script
 
+from src import lifecycle_log
 from src.lifecycle_log import Event
 
 WORKSPACE_ID = "ws:mrteq0c5-238cf6"
@@ -345,6 +346,26 @@ def collect(data_dir: Path, out_path: Path) -> int:
     return 0
 
 
+def build(dataset_dir: Path, out_path: Path) -> int:
+    try:
+        prs = json.loads((dataset_dir / PULL_REQUESTS_FILE).read_bytes().decode("utf-8"))
+        commit_text = (dataset_dir / INITIAL_COMMIT_FILE).read_bytes().decode("utf-8")
+        commit_lines = parse_commit_lines(commit_text.replace("\r\n", "\n"))
+        pages = json.loads((dataset_dir / WORKSPACE_PAGES_FILE).read_bytes().decode("utf-8"))
+        problems = input_problems(prs, commit_lines)
+        if problems:
+            raise ValueError("; ".join(problems))
+        lines = build_backfill(prs, commit_lines, pages)
+    except (OSError, ValueError, KeyError) as error:
+        print(f"build: {error}; nothing written", file=sys.stderr)
+        return 1
+    _write(out_path, "".join(lifecycle_log.encode(line) for line in lines))
+    for line in summary(lines, pages):
+        print(f"build: {line}")
+    print(f"build: wrote {out_path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Build the initial back-fill of pasta's own workspace log from the repo's history.")
@@ -354,8 +375,12 @@ def main(argv: list[str] | None = None) -> int:
     collect_parser.add_argument(
         "--data-dir", type=Path, default=Path(os.environ.get("PASTA_DATA_DIR", ".pasta-data")),
         help="the data folder to read (default: $PASTA_DATA_DIR, else .pasta-data)")
+    commands.add_parser("build", help=f"write {BACKFILL_PATH.relative_to(REPO_ROOT).as_posix()} "
+                                      f"from the committed inputs")
     args = parser.parse_args(argv)
-    return collect(args.data_dir, DATASET_DIR / WORKSPACE_PAGES_FILE)
+    if args.command == "collect":
+        return collect(args.data_dir, DATASET_DIR / WORKSPACE_PAGES_FILE)
+    return build(DATASET_DIR, BACKFILL_PATH)
 
 
 if __name__ == "__main__":

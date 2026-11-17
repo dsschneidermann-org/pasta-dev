@@ -381,3 +381,28 @@ def test_collect_fails_without_writing_on_a_missing_live_file_toc_or_bad_json(tm
     (data / "backups" / "ws_mrteq0c5-238cf6" / "20260902T120522Z.json").write_bytes(b"{not json")
     assert dataset.collect(data, out) == 1
     assert not out.exists()
+
+
+def test_build_fails_without_writing_on_a_missing_or_incomplete_input(tmp_path):
+    out = tmp_path / "out.jsonl"
+    missing = tmp_path / "missing"
+    missing.mkdir()
+    for name in (dataset.PULL_REQUESTS_FILE, dataset.INITIAL_COMMIT_FILE):
+        (missing / name).write_bytes((dataset.DATASET_DIR / name).read_bytes())
+    assert dataset.build(missing, out) == 1
+    assert not out.exists()
+
+    prs, lines, pages = _fixture()
+    incomplete = tmp_path / "incomplete"
+    _write_json(incomplete / dataset.PULL_REQUESTS_FILE, prs)
+    (incomplete / dataset.INITIAL_COMMIT_FILE).write_bytes(
+        "".join(f"{date}  {text}\n" for date, text in lines).encode("utf-8"))
+    _write_json(incomplete / dataset.WORKSPACE_PAGES_FILE, pages)
+    assert dataset.build(incomplete, out) == 1
+    assert not out.exists()
+
+
+def test_build_writes_a_backfill_the_store_accepts(tmp_path):
+    out = tmp_path / "backfill" / "out.jsonl"
+    assert dataset.build(dataset.DATASET_DIR, out) == 0
+    assert lifecycle_log.check_backfill(out.read_bytes().decode("utf-8")) is not None
