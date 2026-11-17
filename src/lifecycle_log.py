@@ -10,7 +10,7 @@ page-type registry and nothing that performs I/O.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, TypeIs
 
 from .model import Page, Workspace
 from .pagetypes.core.fields import FieldSpec
@@ -79,7 +79,8 @@ def _el_added(page_id: str, section: str, field: str, el: str, el_status: str | 
             "status": el_status}
 
 
-def _el_status(page_id: str, section: str, field: str, el: str, from_: str, to: str) -> Event:
+def _el_status(page_id: str, section: str, field: str, el: str, from_: str | None,
+               to: str | None) -> Event:
     return {"page": page_id, "kind": "el_status", "section": section, "field": field, "el": el,
             "from": from_, "to": to}
 
@@ -129,10 +130,10 @@ def diff_page(before: Page, after: Page, page_type: PageType | None) -> list[Eve
 
 def _elements_by_id(value: Any) -> dict[str, dict[str, Any]]:
     """A list field's elements keyed by id; an element without a string id cannot be followed."""
-    if not isinstance(value, list):
+    if not _is_list(value):
         return {}
     return {element["id"]: element for element in value
-            if isinstance(element, dict) and isinstance(element.get("id"), str)}
+            if _is_object(element) and isinstance(element.get("id"), str)}
 
 
 def _diff_list(page_id: str, section: str, field_spec: FieldSpec, old: Any, new: Any) -> list[Event]:
@@ -206,3 +207,95 @@ def stamp(events: list[Event], first_seq: int, ts: int) -> list[Event]:
 def encode(event: Event) -> str:
     """One log line: compact JSON in the event's key order, ended by a newline."""
     return json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
+
+
+# --- checking and serving stored lines ---------------------------------------
+
+_STR: tuple[type, ...] = (str,)
+_STR_OR_NONE: tuple[type, ...] = (str, type(None))
+_ELEMENT: tuple[tuple[str, tuple[type, ...]], ...] = (("section", _STR), ("field", _STR), ("el", _STR))
+
+# Each written kind and the keys it carries, with the types a line may hold for them.
+_KIND_KEYS: dict[str, tuple[tuple[str, tuple[type, ...]], ...]] = {
+    "created": (("type", _STR), ("title", _STR), ("parent", _STR_OR_NONE), ("status", _STR)),
+    "present": (("type", _STR), ("title", _STR), ("parent", _STR_OR_NONE), ("status", _STR),
+                ("archived", (bool,)), ("links", (list,))),
+    "status": (("from", _STR), ("to", _STR)),
+    "renamed": (("from", _STR), ("title", _STR)),
+    "moved": (("from_parent", _STR_OR_NONE), ("to_parent", _STR_OR_NONE)),
+    "linked": (("to", _STR), ("role", _STR)),
+    "unlinked": (("to", _STR), ("role", _STR)),
+    "archived": (),
+    "unarchived": (),
+    "deleted": (("type", _STR), ("title", _STR), ("status", _STR)),
+    "edited": (("section", _STR), ("field", _STR)),
+    "el_added": (*_ELEMENT, ("status", _STR_OR_NONE)),
+    "el_status": (*_ELEMENT, ("from", _STR), ("to", _STR)),
+    "el_edited": _ELEMENT,
+    "el_removed": _ELEMENT,
+}
+
+
+def _is_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_object(value: Any) -> TypeIs[dict[str, Any]]:
+    return isinstance(value, dict)
+
+
+def _is_list(value: Any) -> TypeIs[list[Any]]:
+    return isinstance(value, list)
+
+
+def _is_event_line(line: Any) -> TypeIs[Event]:
+    if not _is_object(line):
+        return False
+    keys = _KIND_KEYS.get(line.get("kind", ""))
+    return (keys is not None and _is_int(line.get("seq")) and line["seq"] >= 1
+            and _is_int(line.get("ts")) and isinstance(line.get("page"), str)
+            and all(key in line and isinstance(line[key], types) for key, types in keys))
+
+
+def check_backfill(text: str) -> list[Event] | None:
+    """The lines of a back-fill file, or None when it is not exactly lines 1..N of a log: every
+    line an event of the line format, seq 1, 2, ... with no hole, ts never decreasing, and a
+    newline after the last line."""
+    if not text.endswith("\n"):
+        return None
+    events: list[Event] = []
+    for index, piece in enumerate(text[:-1].split("\n")):
+        try:
+            line = json.loads(piece)
+        except ValueError:
+            return None
+        if not _is_event_line(line) or line["seq"] != index + 1:
+            return None
+        if events and line["ts"] < events[-1]["ts"]:
+            return None
+        events.append(line)
+    return events
+
+
+def serve_lines(text: str) -> list[Event]:
+    """The log's lines as events, in file order, with a gap event wherever seqs skip.
+
+    The piece after the last newline is a line still being written, or torn by a crash, and is
+    never served. A line that is not an object with an integer seq is skipped.
+    """
+    served: list[Event] = []
+    previous = 0
+    for piece in text.split("\n")[:-1]:
+        try:
+            line = json.loads(piece)
+        except ValueError:
+            continue
+        if not _is_object(line) or not _is_int(line.get("seq")):
+            continue
+        seq: int = line["seq"]
+        if seq > previous + 1:
+            served.append({"seq": previous + 1, "ts": line.get("ts"), "page": None, "kind": "gap",
+                           "missing": seq - previous - 1})
+        served.append(line)
+        previous = seq
+    return served

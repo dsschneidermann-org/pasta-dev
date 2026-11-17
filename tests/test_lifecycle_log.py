@@ -301,3 +301,103 @@ def test_sweep_events_unlink_survivors_then_delete_in_the_given_order():
         {"page": "kid", "kind": "deleted", "type": "test-fields", "title": "KID",
          "status": "done-ish"},
     ]
+
+
+# --- check_backfill --------------------------------------------------------------
+
+BACKFILL_LINES = [
+    {"seq": 1, "ts": 1000, "page": "toc:f", "kind": "created", "type": "toc", "title": "Features",
+     "parent": None, "status": "active"},
+    {"seq": 2, "ts": 2000, "page": "feature-brief:x", "kind": "created", "type": "feature-brief",
+     "title": "Add a thing", "parent": "toc:f", "status": "draft"},
+    {"seq": 3, "ts": 2000, "page": "feature-brief:x", "kind": "status", "from": "draft",
+     "to": "shipped"},
+]
+
+
+def _text(lines):
+    return "".join(lifecycle_log.encode(line) for line in lines)
+
+
+def _with(index, **changes):
+    lines = [dict(line) for line in BACKFILL_LINES]
+    lines[index].update(changes)
+    return lines
+
+
+def test_check_backfill_accepts_a_valid_file_and_its_lines_re_encode_byte_for_byte():
+    text = _text(BACKFILL_LINES)
+    checked = lifecycle_log.check_backfill(text)
+    assert checked == BACKFILL_LINES
+    assert _text(checked) == text
+
+
+def test_check_backfill_accepts_unknown_extra_keys():
+    assert lifecycle_log.check_backfill(_text(_with(2, note="later key"))) is not None
+
+
+def test_check_backfill_rejects_a_seq_hole_or_a_first_seq_other_than_one():
+    assert lifecycle_log.check_backfill(_text(_with(2, seq=4))) is None
+    assert lifecycle_log.check_backfill(_text(BACKFILL_LINES[1:])) is None
+
+
+def test_check_backfill_rejects_a_decreasing_ts():
+    assert lifecycle_log.check_backfill(_text(_with(2, ts=1500))) is None
+
+
+def test_check_backfill_rejects_lines_that_are_not_events():
+    good = _text(BACKFILL_LINES)
+    assert lifecycle_log.check_backfill(good + "not json\n") is None
+    assert lifecycle_log.check_backfill(good + "\n") is None                      # blank line
+    assert lifecycle_log.check_backfill(good + "[4]\n") is None                   # not an object
+    assert lifecycle_log.check_backfill(_text(_with(2, kind="exploded"))) is None
+    assert lifecycle_log.check_backfill(_text(_with(1, title=7))) is None
+    assert lifecycle_log.check_backfill(_text(_with(0, seq=True))) is None
+    assert lifecycle_log.check_backfill(_text(_with(0, ts="1000"))) is None
+    missing_parent = [dict(line) for line in BACKFILL_LINES]
+    del missing_parent[1]["parent"]
+    assert lifecycle_log.check_backfill(_text(missing_parent)) is None
+
+
+def test_check_backfill_rejects_a_missing_final_newline_and_empty_text():
+    assert lifecycle_log.check_backfill(_text(BACKFILL_LINES)[:-1]) is None
+    assert lifecycle_log.check_backfill("") is None
+
+
+# --- serve_lines -----------------------------------------------------------------
+
+def _line(seq, ts=None, **extra):
+    return lifecycle_log.encode({"seq": seq, "ts": ts if ts is not None else seq * 10,
+                                 "page": "p", "kind": "archived", **extra})
+
+
+def test_serve_lines_of_nothing_is_nothing():
+    assert lifecycle_log.serve_lines("") == []
+
+
+def test_serve_lines_parses_in_disk_order():
+    served = lifecycle_log.serve_lines(_line(1) + _line(2))
+    assert [event["seq"] for event in served] == [1, 2]
+    assert served[0] == {"seq": 1, "ts": 10, "page": "p", "kind": "archived"}
+
+
+def test_serve_lines_skips_bad_lines_and_drops_an_unterminated_tail():
+    text = _line(1) + "garbage\n" + '"a string"\n' + '{"seq": "2"}\n' + _line(2) + '{"seq":3,"ts'
+    assert [event["seq"] for event in lifecycle_log.serve_lines(text)] == [1, 2]
+
+
+def test_serve_lines_marks_a_hole_with_a_gap_event():
+    served = lifecycle_log.serve_lines(_line(1) + _line(2) + _line(5, ts=77))
+    assert served[2] == {"seq": 3, "ts": 77, "page": None, "kind": "gap", "missing": 2}
+    assert [event["kind"] for event in served] == ["archived", "archived", "gap", "archived"]
+
+
+def test_serve_lines_marks_a_leading_hole():
+    served = lifecycle_log.serve_lines(_line(4, ts=40))
+    assert served[0] == {"seq": 1, "ts": 40, "page": None, "kind": "gap", "missing": 3}
+    assert served[1]["seq"] == 4
+
+
+def test_serve_lines_puts_no_gap_before_a_seq_that_does_not_advance():
+    served = lifecycle_log.serve_lines(_line(1) + _line(2) + _line(2) + _line(3))
+    assert [event["kind"] for event in served] == ["archived"] * 4
