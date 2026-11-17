@@ -6,12 +6,14 @@ copy -> edit -> batch -> overwrite pattern:
   1. take the workspace's transaction lock,
   2. load + deserialize (a fresh in-memory copy),
   3. apply the pure-core mutation(s) in memory,
-  4. serialize to a temp file and copy it over the destination.
+  4. serialize to a temp file and copy it over the destination,
+  5. append the commit's lifecycle events to the workspace's log, best effort.
 
 Each workspace has two locks because neither prevents the other's failure: the
-transaction lock serializes writers over steps 1-4, and the readers-writer lock keeps
-a reader out of step 4's copy, which readers reach without the transaction lock. They
-never nest in a cycle: the readers-writer lock is taken and released inside the other.
+transaction lock serializes writers over steps 1-5, and the readers-writer lock keeps
+a reader out of step 4's copy and step 5's append, which readers reach without the
+transaction lock. They never nest in a cycle: the readers-writer lock is taken and
+released inside the other.
 
 Concurrency is in-process. Cross-process locking is a documented later step.
 """
@@ -30,9 +32,9 @@ from pathlib import Path
 from typing import Any, final
 
 from . import cleanup, commands, fsm, lifecycle_log, render, render_html
-from .lifecycle_log import Event
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
+from .lifecycle_log import Event
 from .model import JSONValue, Page, Workspace
 from .pagetypes.core.specs import BLOCK_ARRAY, LIST, RefCheck, WorkspaceGuidanceSpec, status_guidance
 from .pagetypes.core.commands import (
@@ -320,8 +322,7 @@ class Store:
                 _ = handle.write(data)
             self._log_sizes[workspace_id] = size + len(data)
 
-    @staticmethod
-    def _guarded_events(build: Callable[[], list[Event]]) -> list[Event] | None:
+    def _guarded_events(self, build: Callable[[], list[Event]]) -> list[Event] | None:
         """The events `build` returns, or None when it raises: recording never fails a write."""
         try:
             return build()
