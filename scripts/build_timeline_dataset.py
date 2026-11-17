@@ -27,12 +27,15 @@ from __future__ import annotations
 import re
 import sys
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))   # make `src` importable when run as a bare script
+
+from src.lifecycle_log import Event
 
 WORKSPACE_ID = "ws:mrteq0c5-238cf6"
 LIVE_FILENAME = "ws_mrteq0c5-238cf6.json"
@@ -201,3 +204,84 @@ def moments(prs: list[dict[str, Any]], commit_lines: list[tuple[str, str]]) -> l
             moment = moment._replace(ts=ordered[-1].ts + BUMP_MS)
         ordered.append(moment)
     return ordered
+
+
+@dataclass
+class _MomentPage:
+    id: str
+    type: str
+    title: str
+    created: int
+    last: int          # its latest moment: a page several PRs share finishes after the last of them
+    plans: tuple[str, str] | None
+
+
+def build_backfill(prs: list[dict[str, Any]], commit_lines: list[tuple[str, str]],
+                   pages: dict[str, Any]) -> list[Event]:
+    """The back-fill's lines, seq 1..N: the two trunks, then per moment its page - the real page
+    a PR's link was found on, else a back-fill-only one - with a feature-brief's two plans, each
+    created when its work started and finished an hour after its moment."""
+    built: dict[str, _MomentPage] = {}
+    counter = 0
+    for moment in moments(prs, commit_lines):
+        records = pages["prs"].get(str(moment.pr), []) if moment.pr is not None else []
+        if records:
+            chosen = min(records, key=lambda record: (id_time_ms(record["id"]), record["id"]))
+            page = built.get(chosen["id"])
+            if page is not None:
+                page.title, page.last = moment.title, moment.ts
+                continue
+            built[chosen["id"]] = _MomentPage(
+                chosen["id"], chosen["type"], moment.title,
+                min(id_time_ms(chosen["id"]), moment.ts), moment.ts, _real_plans(chosen))
+            continue
+        page_type = title_type(moment.title)
+        counter += 1
+        page_id = f"{page_type}:bf-{counter:04d}"
+        plans = None
+        if page_type == "feature-brief":
+            plans = (f"implementation-plan:bf-{counter + 1:04d}", f"testing-plan:bf-{counter + 2:04d}")
+            counter += 2
+        built[page_id] = _MomentPage(page_id, page_type, moment.title, moment.ts, moment.ts, plans)
+    return _lines(list(built.values()), pages["tocs"])
+
+
+def _real_plans(record: dict[str, Any]) -> tuple[str, str] | None:
+    if record["type"] != "feature-brief":
+        return None
+    if not record["implementation_plan"] or not record["testing_plan"]:
+        raise ValueError(f"{record['id']} carries a PR link but lacks an implementation-plan or "
+                         "testing-plan child")
+    return record["implementation_plan"], record["testing_plan"]
+
+
+def _lines(pages: list[_MomentPage], tocs: dict[str, str]) -> list[Event]:
+    if not pages:
+        raise ValueError("no moments to back-fill")
+    earliest = min(page.created for page in pages)
+    unstamped = [_created(tocs["Features"], earliest, "toc", "Features", None, "active"),
+                 _created(tocs["Bug Reports"], earliest, "toc", "Bug Reports", None, "active")]
+    for page in pages:
+        parent = tocs["Bug Reports"] if page.type == "bug-report" else tocs["Features"]
+        unstamped.append(_created(page.id, page.created, page.type, page.title, parent, "draft"))
+        if page.plans is not None:
+            plan, cases = page.plans
+            unstamped += [
+                _created(plan, page.created, "implementation-plan", f"{page.title} - implementation plan",
+                         page.id, "draft"),
+                _created(cases, page.created, "testing-plan", f"{page.title} - testing plan", page.id, "draft"),
+                _status(plan, page.last + IMPLEMENTATION_READY_MS, "draft", "ready"),
+                _status(cases, page.last + TESTING_READY_MS, "draft", "ready")]
+        unstamped.append(_status(page.id, page.last + FINISH_MS, "draft", FINISH_STATUS[page.type]))
+    # A stable sort, so lines at one instant keep their build order: trunks, then a page before its plans.
+    ordered = sorted(unstamped, key=lambda line: line["ts"])
+    return [{"seq": seq} | line for seq, line in enumerate(ordered, start=1)]
+
+
+def _created(page_id: str, ts: int, page_type: str, title: str, parent: str | None, status: str) -> Event:
+    return {"ts": ts, "page": page_id, "kind": "created", "type": page_type, "title": title,
+            "parent": parent, "status": status}
+
+
+def _status(page_id: str, ts: int, from_: str, to: str) -> Event:
+    return {"ts": ts, "page": page_id, "kind": "status", "from": from_, "to": to}

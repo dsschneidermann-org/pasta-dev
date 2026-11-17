@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 import pytest
 
 from scripts import build_timeline_dataset as dataset
+from src import lifecycle_log
 
 
 def _utc(ms: int) -> datetime:
@@ -190,3 +191,120 @@ def test_moments_put_prs_first_on_a_tie_and_bump_by_a_second():
                                _pr(2, merged="2026-07-20T15:00:00Z")], [("2026-07-20", "line")])
     assert [(moment.ts, moment.pr) for moment in moments] == [
         (at_three, 1), (at_three + 1000, 2), (at_three + 2000, None)]
+
+
+# --- building the back-fill lines ------------------------------------------------
+
+def _base36(number: int) -> str:
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    encoded = ""
+    while number:
+        number, remainder = divmod(number, 36)
+        encoded = digits[remainder] + encoded
+    return encoded
+
+
+def _page_id(page_type: str, *parts: int) -> str:
+    return f"{page_type}:{_base36(_ms(*parts))}-abc123"
+
+
+FB = _page_id("feature-brief", 2026, 8, 20, 10)
+FB_PLAN, FB_CASES = _page_id("implementation-plan", 2026, 8, 20, 10), _page_id("testing-plan", 2026, 8, 20, 10)
+SHARED = _page_id("simple-change", 2026, 9, 1, 9)
+EARLY_BUG, LATE_FEATURE = _page_id("bug-report", 2026, 9, 1, 8), _page_id("feature-brief", 2026, 9, 2, 8)
+LATE_BUG = _page_id("bug-report", 2026, 9, 5, 10)
+PR_ONE_AT, PR_THREE_AT = 1787683703000, _ms(2026, 9, 2, 13, 50, 5)
+PR_FOUR_AT, PR_FIVE_AT = _ms(2026, 9, 3, 10), _ms(2026, 9, 4, 10)
+
+
+def _record(page_id: str, plan: str | None = None, cases: str | None = None) -> dict:
+    return {"id": page_id, "type": page_id.split(":")[0], "implementation_plan": plan, "testing_plan": cases}
+
+
+def _fixture() -> tuple[list[dict], list[tuple[str, str]], dict]:
+    prs = [_pr(1, merged="2026-08-25T18:48:23Z"),
+           _pr(2, closed="2026-09-02T11:41:58Z", title="Earlier title"),
+           _pr(3, merged="2026-09-02T13:50:05Z", title="Later title"),
+           _pr(4, merged="2026-09-03T10:00:00Z"),
+           _pr(5, merged="2026-09-04T10:00:00Z")]
+    lines = [("2026-07-20", "Add X"), ("2026-07-21", "Rename Y")]
+    pages = {"workspace": dataset.WORKSPACE_ID,
+             "tocs": {"Features": FEATURES, "Bug Reports": BUG_REPORTS},
+             "prs": {"1": [_record(FB, FB_PLAN, FB_CASES)], "2": [_record(SHARED)], "3": [_record(SHARED)],
+                     "4": [_record(EARLY_BUG), _record(LATE_FEATURE, "implementation-plan:x-1", "testing-plan:x-2")],
+                     "5": [_record(LATE_BUG)]}}
+    return prs, lines, pages
+
+
+def _by_kind(lines: list[dict], kind: str) -> dict[str, list[dict]]:
+    found: dict[str, list[dict]] = {}
+    for line in lines:
+        if line["kind"] == kind:
+            found.setdefault(line["page"], []).append(line)
+    return found
+
+
+def test_build_backfill_uses_real_ids_and_decoded_create_times_for_linked_prs():
+    lines = dataset.build_backfill(*_fixture())
+    created, status = _by_kind(lines, "created"), _by_kind(lines, "status")
+    assert created[FB] == [{"seq": created[FB][0]["seq"], "ts": _ms(2026, 8, 20, 10), "page": FB,
+                            "kind": "created", "type": "feature-brief", "title": "PR 1",
+                            "parent": FEATURES, "status": "draft"}]
+    assert [(line["ts"], line["type"], line["title"], line["parent"]) for line in created[FB_PLAN] + created[FB_CASES]] == [
+        (_ms(2026, 8, 20, 10), "implementation-plan", "PR 1 - implementation plan", FB),
+        (_ms(2026, 8, 20, 10), "testing-plan", "PR 1 - testing plan", FB)]
+    assert [(line["ts"], line["from"], line["to"]) for line in status[FB_PLAN] + status[FB_CASES] + status[FB]] == [
+        (PR_ONE_AT + 1_800_000, "draft", "ready"), (PR_ONE_AT + 2_700_000, "draft", "ready"),
+        (PR_ONE_AT + 3_600_000, "draft", "shipped")]
+    assert EARLY_BUG in created and LATE_FEATURE not in created
+    assert created[EARLY_BUG][0]["parent"] == BUG_REPORTS
+    assert [(line["ts"], line["to"]) for line in status[EARLY_BUG]] == [(PR_FOUR_AT + 3_600_000, "closed")]
+    assert created[LATE_BUG][0]["ts"] == PR_FIVE_AT
+
+
+def test_build_backfill_makes_prs_sharing_a_page_one_page():
+    lines = dataset.build_backfill(*_fixture())
+    created, status = _by_kind(lines, "created"), _by_kind(lines, "status")
+    assert [(line["ts"], line["title"], line["parent"]) for line in created[SHARED]] == [
+        (_ms(2026, 9, 1, 9), "Later title", FEATURES)]
+    assert [(line["ts"], line["to"]) for line in status[SHARED]] == [(PR_THREE_AT + 3_600_000, "closed")]
+
+
+def test_build_backfill_numbers_backfill_only_pages_and_plans():
+    created = _by_kind(dataset.build_backfill(*_fixture()), "created")
+    backfill_only = {page_id: lines[0] for page_id, lines in created.items() if ":bf-" in page_id}
+    assert {page_id: (line["ts"], line["title"], line["parent"]) for page_id, line in backfill_only.items()} == {
+        "feature-brief:bf-0001": (_ms(2026, 7, 20, 15), "Add X", FEATURES),
+        "implementation-plan:bf-0002": (_ms(2026, 7, 20, 15), "Add X - implementation plan", "feature-brief:bf-0001"),
+        "testing-plan:bf-0003": (_ms(2026, 7, 20, 15), "Add X - testing plan", "feature-brief:bf-0001"),
+        "simple-change:bf-0004": (_ms(2026, 7, 21, 15), "Rename Y", FEATURES)}
+
+
+def test_build_backfill_lines_are_a_valid_backfill():
+    lines = dataset.build_backfill(*_fixture())
+    earliest = _ms(2026, 7, 20, 15)
+    assert lines[:2] == [
+        {"seq": 1, "ts": earliest, "page": FEATURES, "kind": "created", "type": "toc", "title": "Features",
+         "parent": None, "status": "active"},
+        {"seq": 2, "ts": earliest, "page": BUG_REPORTS, "kind": "created", "type": "toc",
+         "title": "Bug Reports", "parent": None, "status": "active"}]
+    assert [line["seq"] for line in lines] == list(range(1, len(lines) + 1))
+    assert [line["ts"] for line in lines] == sorted(line["ts"] for line in lines)
+    first_line = {}
+    for index, line in enumerate(lines):
+        first_line.setdefault(line["page"], (index, line["kind"]))
+        if line["kind"] == "created" and line["parent"] is not None:
+            assert first_line[line["parent"]][0] < index
+    assert all(kind == "created" for _, kind in first_line.values())
+    for line in lines:
+        expected = (["seq", "ts", "page", "kind", "type", "title", "parent", "status"] if line["kind"] == "created"
+                    else ["seq", "ts", "page", "kind", "from", "to"])
+        assert list(line) == expected
+    assert lifecycle_log.check_backfill("".join(lifecycle_log.encode(line) for line in lines)) == lines
+
+
+def test_build_backfill_rejects_a_linked_feature_brief_without_plans():
+    prs, lines, pages = _fixture()
+    pages["prs"]["1"] = [_record(FB, FB_PLAN, None)]
+    with pytest.raises(ValueError, match=FB):
+        dataset.build_backfill(prs, lines, pages)
