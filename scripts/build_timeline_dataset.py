@@ -24,6 +24,9 @@ pull-requests.json holds null for the other two; the moment rule reads exactly t
 
 from __future__ import annotations
 
+import argparse
+import json
+import os
 import re
 import sys
 from collections import Counter
@@ -304,3 +307,56 @@ def summary(lines: list[Event], pages: dict[str, Any]) -> list[str]:
         f"back-fill-only moment pages: {sum(':bf-' in page_id for page_id in moment_pages)}",
         f"longest wait: {longest} {waits[longest] / 86_400_000:.1f} days",
     ]
+
+
+# --- effects: reading the data folder and writing the committed files -------------
+
+def read_documents(data_dir: Path) -> list[tuple[Path, dict[str, Any]]]:
+    """Every workspace document in the data folder, its root files first, then its backups. Only
+    reads: the data folder belongs to the running server."""
+    paths = sorted(data_dir.glob("*.json")) + sorted((data_dir / "backups").rglob("*.json"))
+    return [(path, json.loads(path.read_bytes().decode("utf-8"))) for path in paths]
+
+
+def _write(path: Path, text: str) -> None:
+    # Bytes, so every line ends in exactly "\n" on Windows too.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(text.encode("utf-8"))
+
+
+def _json_text(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+
+
+def collect(data_dir: Path, out_path: Path) -> int:
+    live_path = data_dir / LIVE_FILENAME
+    try:
+        documents = read_documents(data_dir)
+        live = next((document for path, document in documents if path == live_path), None)
+        if live is None:
+            raise ValueError(f"no live document {live_path}")
+        value = workspace_pages(live, (document for _, document in documents))
+    except (OSError, ValueError) as error:
+        print(f"collect: {error}; nothing written", file=sys.stderr)
+        return 1
+    _write(out_path, _json_text(value))
+    print(f"collect: read {len(documents)} documents; {len(value['prs'])} PRs mapped to a page; "
+          f"wrote {out_path}")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Build the initial back-fill of pasta's own workspace log from the repo's history.")
+    commands = parser.add_subparsers(dest="command", required=True)
+    collect_parser = commands.add_parser(
+        "collect", help=f"read the data folder into {DATASET_DIR.name}/{WORKSPACE_PAGES_FILE}")
+    collect_parser.add_argument(
+        "--data-dir", type=Path, default=Path(os.environ.get("PASTA_DATA_DIR", ".pasta-data")),
+        help="the data folder to read (default: $PASTA_DATA_DIR, else .pasta-data)")
+    args = parser.parse_args(argv)
+    return collect(args.data_dir, DATASET_DIR / WORKSPACE_PAGES_FILE)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -5,6 +5,7 @@ folders, and the committed back-fill against its committed inputs - so nothing h
 gitignored data folder, the network or a page type.
 """
 
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -318,3 +319,65 @@ def test_summary_reports_pages_lines_mapping_and_longest_wait():
         "PRs mapped to a real page: 5",
         "back-fill-only moment pages: 2",
         f"longest wait: {FB} 5.4 days"]
+
+
+# --- collect and build on disk ---------------------------------------------------
+
+def _write_json(path, value) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(json.dumps(value, indent=2).encode("utf-8"))
+
+
+def _snapshot(folder) -> dict[str, bytes]:
+    return {str(path.relative_to(folder)): path.read_bytes() for path in folder.rglob("*") if path.is_file()}
+
+
+def _data_folder(tmp_path):
+    data = tmp_path / "data"
+    _write_json(data / dataset.LIVE_FILENAME, _live())
+    backup_only = "feature-brief:a0000009-000009"
+    _write_json(data / "backups" / dataset.LIVE_FILENAME, _document({
+        backup_only: _linked("feature-brief", PULL + "40", ("implementation-plan:p-1", "testing-plan:p-2"))}))
+    _write_json(data / "backups" / "ws_mrteq0c5-238cf6" / "20260901T120502Z.json", _document({
+        "simple-change:a0000003-000003": _linked("simple-change", PULL + "2"),
+        "bug-report:a0000004-000004": _linked("bug-report", PULL + "2")}))
+    _write_json(data / "ws_other-000000.json", _document(
+        {"simple-change:a000000c-00000c": _linked("simple-change", PULL + "3")}, workspace_id="ws:other-000000"))
+    return data
+
+
+def test_collect_writes_only_its_output_and_leaves_the_data_folder_unchanged(tmp_path):
+    data = _data_folder(tmp_path)
+    before = _snapshot(data)
+    out = tmp_path / "out" / "workspace-pages.json"
+    assert dataset.collect(data, out) == 0
+    expected = {
+        "workspace": dataset.WORKSPACE_ID,
+        "tocs": {"Features": FEATURES, "Bug Reports": BUG_REPORTS},
+        "prs": {
+            "2": [_record("bug-report:a0000004-000004"), _record("simple-change:a0000003-000003")],
+            "12": [_record("bug-report:a0000002-000002")],
+            "40": [_record("feature-brief:a0000009-000009", "implementation-plan:p-1", "testing-plan:p-2")]}}
+    assert out.read_bytes() == (json.dumps(expected, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    assert _snapshot(data) == before
+
+
+def test_collect_fails_without_writing_on_a_missing_live_file_toc_or_bad_json(tmp_path):
+    out = tmp_path / "workspace-pages.json"
+    data = _data_folder(tmp_path)
+    live = data / dataset.LIVE_FILENAME
+
+    live.rename(tmp_path / "moved.json")
+    assert dataset.collect(data, out) == 1
+    assert not out.exists()
+
+    without_bug_reports = _live()
+    without_bug_reports["root_page_ids"].remove(BUG_REPORTS)
+    _write_json(live, without_bug_reports)
+    assert dataset.collect(data, out) == 1
+    assert not out.exists()
+
+    _write_json(live, _live())
+    (data / "backups" / "ws_mrteq0c5-238cf6" / "20260902T120522Z.json").write_bytes(b"{not json")
+    assert dataset.collect(data, out) == 1
+    assert not out.exists()
