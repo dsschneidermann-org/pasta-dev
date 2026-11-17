@@ -2252,3 +2252,160 @@ def test_a_half_written_last_line_is_not_served_and_the_next_append_starts_a_new
 
     assert path.read_bytes().split(b"\n")[1] == b'{"seq":2,"ts":17,"pa'
     assert [e["seq"] for e in store.read_lifecycle_log(workspace.id)] == [1, 2]
+
+
+# --- lifecycle log: the first write starts it, once ---------------------------
+
+def _as_before_ship(root: Path, workspace_id: str) -> None:
+    """Make a workspace look as it did before recording shipped: no event_seq, no log."""
+    path = root / f"{workspace_id.replace(':', '_')}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.pop("event_seq", None)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    log = _log_path(root, workspace_id)
+    if log.exists():
+        log.unlink()
+
+
+def _backfill_text(lines: list[dict]) -> str:
+    return "".join(lifecycle_log.encode(line) for line in lines)
+
+
+BACKFILL = [
+    {"seq": 1, "ts": 1_700_000_000_000, "page": "test-fields:bf-0001", "kind": "created",
+     "type": "test-fields", "title": "From PR history", "parent": None, "status": "active"},
+    {"seq": 2, "ts": 1_700_000_360_000, "page": "test-fields:bf-0002", "kind": "created",
+     "type": "test-fields", "title": "Ünïcode title", "parent": "test-fields:bf-0001",
+     "status": "active"},
+]
+
+
+def _started_store(tmp_path, backfill_text=None):
+    """A store with a back-fill folder, and a workspace of two pages that predates recording."""
+    data, folder = tmp_path / "data", tmp_path / "backfill"
+    folder.mkdir()
+    store = Store(data, backfill_dir=folder)
+    workspace = store.create_workspace("demo")
+    parent = store.create_page(workspace.id, "test-fields", "Parent").page
+    child = store.create_page(workspace.id, "test-fields", "Child", parent_id=parent.id).page
+    _as_before_ship(data, workspace.id)
+    if backfill_text is not None:
+        (folder / f"{workspace.id.replace(':', '_')}.jsonl").write_bytes(backfill_text.encode("utf-8"))
+    return store, data, workspace, parent, child
+
+
+def test_the_first_write_installs_the_backfill_verbatim_then_the_baseline(tmp_path):
+    text = _backfill_text(BACKFILL)
+    store, data, workspace, parent, child = _started_store(tmp_path, text)
+
+    store.rename_page(workspace.id, parent.id, "Parent renamed")
+
+    raw = _log_path(data, workspace.id).read_bytes()
+    assert raw.startswith(text.encode("utf-8"))                    # copied byte for byte
+    lines = _log_lines(data, workspace.id)
+    baseline = lines[2:4]
+    assert [(line["seq"], line["kind"], line["page"]) for line in baseline] == [
+        (3, "present", parent.id), (4, "present", child.id)]
+    assert baseline[0]["ts"] == baseline[1]["ts"] >= BACKFILL[-1]["ts"]
+    assert baseline[1]["parent"] == parent.id and baseline[0]["title"] == "Parent"
+    assert store.load_workspace(workspace.id).event_seq == lines[-1]["seq"]
+
+
+def test_a_second_write_does_not_start_the_log_again(tmp_path):
+    store, data, workspace, parent, _child = _started_store(tmp_path, _backfill_text(BACKFILL))
+    store.rename_page(workspace.id, parent.id, "Once")
+    before = _log_lines(data, workspace.id)
+
+    store.rename_page(workspace.id, parent.id, "Twice")
+
+    after = _log_lines(data, workspace.id)
+    assert after[:len(before)] == before
+    assert not [line for line in after[len(before):] if line["kind"] in ("present", "created")]
+
+
+def test_a_log_that_already_has_lines_is_never_written_into_and_lends_its_last_seq(tmp_path):
+    store, data, workspace, _parent, _child = _started_store(tmp_path, _backfill_text(BACKFILL))
+    log = _log_path(data, workspace.id)
+    log.parent.mkdir(parents=True, exist_ok=True)
+    existing = (_backfill_text([{"seq": seq, "ts": seq, "page": "p", "kind": "archived"}
+                                for seq in range(1, 8)]) + '{"seq":8,"ts"').encode("utf-8")
+    log.write_bytes(existing)
+
+    store.set_workspace_guidance(workspace.id, "buildTool", "uv")   # a write that records nothing
+
+    assert log.read_bytes() == existing
+    assert store.load_workspace(workspace.id).event_seq == 7
+
+
+@pytest.mark.parametrize("broken", [
+    [BACKFILL[0], {**BACKFILL[1], "seq": 3}],                       # a hole in seq
+    [BACKFILL[0], {**BACKFILL[1], "ts": BACKFILL[0]["ts"] - 1}],      # ts goes backwards
+    [BACKFILL[0], {**BACKFILL[1], "ts": 4_102_444_800_000}],          # ends after the commit (2100)
+], ids=["hole", "decreasing-ts", "ends-in-the-future"])
+def test_a_backfill_that_fails_is_skipped_and_the_baseline_still_written(tmp_path, broken):
+    store, data, workspace, parent, child = _started_store(tmp_path, _backfill_text(broken))
+
+    store.rename_page(workspace.id, parent.id, "Renamed")
+
+    lines = _log_lines(data, workspace.id)
+    assert [(line["seq"], line["kind"], line["page"]) for line in lines[:2]] == [
+        (1, "present", parent.id), (2, "present", child.id)]
+
+
+def test_a_backfill_file_that_does_not_parse_is_skipped(tmp_path):
+    store, data, workspace, parent, _child = _started_store(tmp_path, "not a log line\n")
+    store.rename_page(workspace.id, parent.id, "Renamed")
+    assert _log_lines(data, workspace.id)[0]["kind"] == "present"
+
+
+def test_without_a_backfill_folder_the_log_starts_with_the_baseline_alone(tmp_path):
+    store = Store(tmp_path)
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "P").page
+    _as_before_ship(tmp_path, workspace.id)
+
+    store.set_workspace_guidance(workspace.id, "buildTool", "uv")
+
+    lines = _log_lines(tmp_path, workspace.id)
+    assert [(line["seq"], line["kind"], line["page"]) for line in lines] == [(1, "present", page.id)]
+    assert lines[0]["ts"] <= _epoch_ms(store.load_workspace(workspace.id).updated_at)
+    assert store.load_workspace(workspace.id).event_seq == 1
+
+
+def test_an_empty_workspace_records_nothing_until_it_has_a_page(store, tmp_path):
+    workspace = store.create_workspace("demo")
+    store.set_workspace_guidance(workspace.id, "buildTool", "uv")
+    assert not _log_path(tmp_path, workspace.id).exists()
+    assert store.load_workspace(workspace.id).event_seq == 0
+
+
+def test_a_baseline_that_cannot_be_built_still_commits_and_is_served_as_a_gap(tmp_path, monkeypatch):
+    store = Store(tmp_path)
+    workspace = store.create_workspace("demo")
+    store.create_page(workspace.id, "test-fields", "P")
+    _as_before_ship(tmp_path, workspace.id)
+
+    def boom(_workspace):
+        raise RuntimeError("cannot build the baseline")
+    monkeypatch.setattr(lifecycle_log, "baseline", boom)
+
+    store.set_workspace_guidance(workspace.id, "buildTool", "uv")
+    assert store.load_workspace(workspace.id).guidance_config == {"buildTool": "uv"}
+    assert store.load_workspace(workspace.id).event_seq == 1
+    store._touch_and_save(store.load_workspace(workspace.id), [lifecycle_log.archived("p")])
+
+    served = store.read_lifecycle_log(workspace.id)
+    assert [(e["kind"], e["seq"]) for e in served] == [("gap", 1), ("archived", 2)]
+
+
+def test_the_lent_seq_is_read_backwards_across_blocks_past_a_corrupt_and_a_torn_line(tmp_path):
+    store, data, workspace, _parent, _child = _started_store(tmp_path)
+    log = _log_path(data, workspace.id)
+    log.parent.mkdir(parents=True, exist_ok=True)
+    many = _backfill_text([{"seq": seq, "ts": seq, "page": "p" * 60, "kind": "archived"}
+                           for seq in range(1, 3001)])                     # ~280 KB, several blocks
+    log.write_bytes((many + "not json\n" + '{"seq":3002,"ts').encode("utf-8"))
+
+    store.set_workspace_guidance(workspace.id, "buildTool", "uv")
+
+    assert store.load_workspace(workspace.id).event_seq == 3000

@@ -100,6 +100,46 @@ def _epoch_ms(instant: datetime) -> int:
     return (instant - _EPOCH) // timedelta(milliseconds=1)
 
 
+_TAIL_BLOCK = 64 * 1024
+
+
+def _last_logged_seq(path: Path) -> int | None:
+    """The seq of the last complete line of a log that parses, read backwards from its end; None
+    when no complete line does. A final piece without a newline is still being written or torn."""
+    with open(path, "rb") as handle:
+        position = handle.seek(0, os.SEEK_END)
+        buffer = b""
+        past_the_tail = False
+        while position > 0:
+            start = max(0, position - _TAIL_BLOCK)
+            _ = handle.seek(start)
+            buffer = handle.read(position - start) + buffer
+            position = start
+            if not past_the_tail:
+                cut = buffer.rfind(b"\n")
+                if cut == -1:
+                    continue
+                buffer = buffer[:cut]
+                past_the_tail = True
+            pieces = buffer.split(b"\n")
+            # Until the file's start is read, the first piece may be cut off at the block edge.
+            buffer, complete = (pieces[0], pieces[1:]) if position > 0 else (b"", pieces)
+            for piece in reversed(complete):
+                seq = _line_seq(piece)
+                if seq is not None:
+                    return seq
+    return None
+
+
+def _line_seq(piece: bytes) -> int | None:
+    try:
+        line = json.loads(piece)
+    except ValueError:
+        return None
+    seq = line.get("seq") if isinstance(line, dict) else None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    return seq if isinstance(seq, int) and not isinstance(seq, bool) else None
+
+
 def search_words(text: str) -> list[str]:
     """`text` lowercased and split into the words search matches on, each stripped of its
     wrapping characters.
@@ -300,6 +340,59 @@ class Store:
         except json.JSONDecodeError as exc:
             raise PastaError(f"Workspace '{workspace_id}' file is corrupt: {exc}") from exc
         return workspace_from_dict(data)
+
+    def _load_for_write(self, workspace_id: str) -> Workspace:
+        """Load a workspace for a write transaction, starting its lifecycle log on the first write.
+
+        Called with the transaction lock held. A document that has never recorded an event starts
+        its log once: when the log already has lines (the document was restored from an older
+        copy) it only adopts their last seq and never writes the file; otherwise it commits the
+        workspace's checked back-fill, if one is committed, followed by a baseline of every page
+        it holds now.
+        """
+        workspace = self.load_workspace(workspace_id)
+        if workspace.event_seq != 0:
+            return workspace
+        path = self._events_path_for(workspace_id)
+        try:
+            with self._rw_lock_for(workspace_id).read():
+                has_lines = path.exists() and path.stat().st_size > 0
+                last_seq = _last_logged_seq(path) if has_lines else None
+        except OSError:
+            logger.warning("[lifecycle-log] %s: cannot read the log; not started", workspace_id,
+                           exc_info=True)
+            return workspace
+        if has_lines:
+            if last_seq is None:
+                logger.warning("[lifecycle-log] %s: no line of the log parses; seq stays 0",
+                               workspace_id)
+            workspace.event_seq = last_seq or 0
+            return workspace
+        backfill = self._read_backfill(workspace_id)
+        baseline = self._guarded_events(lambda: lifecycle_log.baseline(workspace))
+        if backfill or baseline is None or baseline:
+            self._touch_and_save(workspace, baseline, backfill=backfill)
+        return workspace
+
+    def _read_backfill(self, workspace_id: str) -> list[Event]:
+        """The workspace's committed back-fill lines, or [] when there is none or it fails its check."""
+        if self._backfill_dir is None:
+            return []
+        path = self._backfill_dir / f"{workspace_id.replace(':', '_')}.jsonl"
+        try:
+            if not path.exists():
+                return []
+            text = path.read_bytes().decode("utf-8", errors="replace").replace("\r\n", "\n")
+        except OSError:
+            logger.warning("[lifecycle-log] %s: cannot read back-fill %s", workspace_id, path,
+                           exc_info=True)
+            return []
+        checked = lifecycle_log.check_backfill(text)
+        if checked is None:
+            logger.warning("[lifecycle-log] %s: back-fill %s fails its check; not installed",
+                           workspace_id, path)
+            return []
+        return checked
 
     def read_lifecycle_log(self, workspace_id: str) -> list[Event]:
         """The workspace's lifecycle log as served events. Only reads: it never starts the log."""
@@ -658,7 +751,7 @@ class Store:
                 f"Unknown page type '{type_tag}'. Registered: {', '.join(sorted(registered_pagetypes()))}."
             )
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             if parent_id is not None and parent_id not in workspace.pages:
                 raise NotFoundError(f"Parent page '{parent_id}' not found in workspace '{workspace_id}'.")
             page = commands.create_page(page_type, title, parent_id, self._id_factory)
@@ -689,7 +782,7 @@ class Store:
         if not batch:
             raise ValidationError("mutatePageBatch requires at least one command.")
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -782,7 +875,7 @@ class Store:
         if now.tzinfo is None:
             raise ValidationError("cleanup_workspace requires a timezone-aware datetime.")
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             sweep = cleanup.classify(workspace, now)
             if not (sweep.stamp or sweep.clear or sweep.prune):
                 return cleanup.SweepReport(workspace_id, 0, 0, [], None, None)
@@ -818,7 +911,7 @@ class Store:
         can never disagree on a pinned child.
         """
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -867,7 +960,7 @@ class Store:
         the type's declared statuses. Returns the updated page.
         """
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -913,7 +1006,7 @@ class Store:
         Positioning is reorder_page's job. Returns the moved page and the resulting sibling id order.
         """
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -949,7 +1042,7 @@ class Store:
         order (archived siblings included). Returns the moved page and the resulting sibling id order.
         """
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -976,7 +1069,7 @@ class Store:
         if not title or not title.strip():
             raise ValidationError("Page title must be a non-empty string.")
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -1030,7 +1123,7 @@ class Store:
         """
         role = role.strip()
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             source = workspace.get_page(from_id)
             if source is None:
                 raise NotFoundError(f"Page '{from_id}' not found in workspace '{workspace_id}'.")
@@ -1047,7 +1140,7 @@ class Store:
         """
         role = role.strip()
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             source = self._link_source(workspace, workspace_id, from_id, to_id)
             edge = next(
                 (link for link in source.links if link["to"] == to_id and link["role"] == role), None
@@ -1060,7 +1153,7 @@ class Store:
 
     def _set_workspace_status(self, workspace_id: str, status: str) -> Workspace:
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             workspace.status = status
             self._touch_and_save(workspace, [])
             return workspace
@@ -1088,7 +1181,7 @@ class Store:
                 f"Declared: {', '.join(sorted(valid)) or '(none)'}."
             )
         with self._transaction_lock_for(workspace_id):
-            workspace = self.load_workspace(workspace_id)
+            workspace = self._load_for_write(workspace_id)
             workspace.guidance_config[field] = text
             self._touch_and_save(workspace, [])
             return workspace
