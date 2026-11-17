@@ -2409,3 +2409,169 @@ def test_the_lent_seq_is_read_backwards_across_blocks_past_a_corrupt_and_a_torn_
     store.set_workspace_guidance(workspace.id, "buildTool", "uv")
 
     assert store.load_workspace(workspace.id).event_seq == 3000
+
+
+# --- lifecycle log: what each writer records ----------------------------------
+
+def _recorded(store, workspace_id, write):
+    """The events that `write` appends to the log, without their seq and ts."""
+    before = len(store.read_lifecycle_log(workspace_id))
+    write()
+    return [{key: value for key, value in event.items() if key not in ("seq", "ts")}
+            for event in store.read_lifecycle_log(workspace_id)[before:]]
+
+
+def test_create_page_records_the_page_then_its_pinned_children(store):
+    workspace = store.create_workspace("demo")
+    created = []
+    recorded = _recorded(store, workspace.id, lambda: created.append(
+        store.create_page(workspace.id, "test-lifecycle", "Feature")))
+
+    page, child = created[0].page, _child(created[0], "test-child")
+    assert recorded == [
+        {"page": page.id, "kind": "created", "type": "test-lifecycle", "title": "Feature",
+         "parent": None, "status": "draft"},
+        {"page": child.id, "kind": "created", "type": "test-child", "title": child.title,
+         "parent": page.id, "status": "draft"},
+    ]
+
+
+def test_the_writes_own_events_follow_the_baseline(tmp_path):
+    store, data, workspace, parent, _child_page = _started_store(tmp_path)
+    store.rename_page(workspace.id, parent.id, "Renamed")
+    lines = _log_lines(data, workspace.id)
+    assert [line["kind"] for line in lines] == ["present", "present", "renamed"]
+    assert lines[-1]["ts"] == _epoch_ms(store.load_workspace(workspace.id).updated_at)
+    assert lines[-1]["ts"] >= lines[0]["ts"]
+
+
+def test_mutate_page_batch_records_its_content_and_element_events(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-lifecycle", "F").page
+    assert _recorded(store, workspace.id, lambda: _mutate(store, workspace.id, page.id, [
+        {"command": "setSummary", "args": {"text": "why"}}])) == [
+        {"page": page.id, "kind": "edited", "section": "summary", "field": "body"}]
+
+    recorded = _recorded(store, workspace.id, lambda: _mutate(store, workspace.id, page.id, [
+        {"command": "askQuestion", "args": {"text": "Which way?"}}]))
+    question = store.get_page(workspace.id, page.id).sections["questions"]["items"][0]["id"]
+    assert recorded == [{"page": page.id, "kind": "el_added", "section": "questions",
+                         "field": "items", "el": question, "status": "open"}]
+
+    assert _recorded(store, workspace.id, lambda: _mutate(store, workspace.id, page.id, [
+        {"command": "answerQuestion", "args": {"questionId": question, "answer": "left"}}])) == [
+        {"page": page.id, "kind": "el_status", "section": "questions", "field": "items",
+         "el": question, "from": "open", "to": "answered"}]
+
+
+def test_a_compound_command_records_its_element_then_the_status_last(store):
+    workspace = store.create_workspace("demo")
+    flow = store.create_page(workspace.id, "test-flow", "Change").page
+    assert _recorded(store, workspace.id, lambda: _mutate(store, workspace.id, flow.id, [
+        {"command": "open"}])) == [
+        {"page": flow.id, "kind": "status", "from": "draft", "to": "open"}]
+
+    recorded = _recorded(store, workspace.id, lambda: _mutate(store, workspace.id, flow.id, [
+        {"command": "close", "args": {"sha": "abc123", "message": "Ship it"}}]))
+    commit = store.get_page(workspace.id, flow.id).sections["resolution"]["commits"][0]["id"]
+    assert recorded == [
+        {"page": flow.id, "kind": "el_added", "section": "resolution", "field": "commits",
+         "el": commit, "status": None},
+        {"page": flow.id, "kind": "status", "from": "open", "to": "closed"},
+    ]
+
+
+def test_add_link_and_set_title_in_a_batch_record_linked_and_renamed(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Old").page
+    other = store.create_page(workspace.id, "test-fields", "Other").page
+    assert _recorded(store, workspace.id, lambda: _mutate(store, workspace.id, page.id, [
+        {"command": "setTitle", "args": {"title": "New"}},
+        {"command": "addLink", "args": {"toId": other.id, "role": "relates-to"}}])) == [
+        {"page": page.id, "kind": "renamed", "from": "Old", "title": "New"},
+        {"page": page.id, "kind": "linked", "to": other.id, "role": "relates-to"},
+    ]
+
+
+def test_a_rejected_batch_records_nothing(store, tmp_path):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "P").page
+    before = _log_path(tmp_path, workspace.id).read_bytes()
+    with pytest.raises(PastaError):
+        _mutate(store, workspace.id, page.id, [
+            {"command": "setLabel", "args": {"label": "x"}},
+            {"command": "noSuchCommand"}])
+    assert _log_path(tmp_path, workspace.id).read_bytes() == before
+
+
+def test_reparent_records_moved_only_when_the_parent_changes(store):
+    workspace = store.create_workspace("demo")
+    parent = store.create_page(workspace.id, "test-fields", "Parent").page
+    page = store.create_page(workspace.id, "test-fields", "P").page
+    assert _recorded(store, workspace.id,
+                     lambda: store.reparent_page(workspace.id, page.id, parent.id)) == [
+        {"page": page.id, "kind": "moved", "from_parent": None, "to_parent": parent.id}]
+    assert _recorded(store, workspace.id,
+                     lambda: store.reparent_page(workspace.id, page.id, parent.id)) == []
+
+
+def test_reorder_records_nothing(store):
+    workspace = store.create_workspace("demo")
+    first = store.create_page(workspace.id, "test-fields", "A").page
+    second = store.create_page(workspace.id, "test-fields", "B").page
+    assert _recorded(store, workspace.id,
+                     lambda: store.reorder_page(workspace.id, first.id, 1, second.id)) == []
+
+
+def test_rename_records_renamed_only_when_the_title_changes(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Old").page
+    assert _recorded(store, workspace.id, lambda: store.rename_page(workspace.id, page.id, "New")) == [
+        {"page": page.id, "kind": "renamed", "from": "Old", "title": "New"}]
+    assert _recorded(store, workspace.id, lambda: store.rename_page(workspace.id, page.id, "New")) == []
+
+
+def test_link_and_unlink_record_on_the_source_page(store):
+    workspace = store.create_workspace("demo")
+    source = store.create_page(workspace.id, "test-fields", "S").page
+    target = store.create_page(workspace.id, "test-fields", "T").page
+    assert _recorded(store, workspace.id,
+                     lambda: store.link_page(workspace.id, source.id, target.id, "depends-on")) == [
+        {"page": source.id, "kind": "linked", "to": target.id, "role": "depends-on"}]
+    assert _recorded(store, workspace.id,
+                     lambda: store.unlink_page(workspace.id, source.id, target.id, "depends-on")) == [
+        {"page": source.id, "kind": "unlinked", "to": target.id, "role": "depends-on"}]
+
+
+def test_archive_and_unarchive_record_the_page_and_its_pinned_children(store):
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "F")
+    page, child = result.page, _child(result, "test-child")
+    assert _recorded(store, workspace.id, lambda: store.archive_page(workspace.id, page.id)) == [
+        {"page": page.id, "kind": "archived"}, {"page": child.id, "kind": "archived"}]
+    # Already archived: scheduling or calling off the deletion changes no archived flag.
+    assert _recorded(store, workspace.id,
+                     lambda: store.schedule_page_deletion(workspace.id, page.id)) == []
+    assert _recorded(store, workspace.id,
+                     lambda: store.unschedule_page_deletion(workspace.id, page.id)) == []
+    assert _recorded(store, workspace.id, lambda: store.unarchive_page(workspace.id, page.id)) == [
+        {"page": page.id, "kind": "unarchived"}, {"page": child.id, "kind": "unarchived"}]
+
+
+def test_set_page_status_records_the_move_only_when_the_status_changes(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-flow", "C").page
+    assert _recorded(store, workspace.id,
+                     lambda: store.set_page_status(workspace.id, page.id, "open")) == [
+        {"page": page.id, "kind": "status", "from": "draft", "to": "open"}]
+    assert _recorded(store, workspace.id,
+                     lambda: store.set_page_status(workspace.id, page.id, "open")) == []
+
+
+def test_workspace_level_writes_record_nothing(store):
+    workspace = store.create_workspace("demo")
+    store.create_page(workspace.id, "test-fields", "P")
+    assert _recorded(store, workspace.id, lambda: (
+        store.set_workspace_guidance(workspace.id, "buildTool", "uv"),
+        store.archive_workspace(workspace.id),
+        store.unarchive_workspace(workspace.id))) == []

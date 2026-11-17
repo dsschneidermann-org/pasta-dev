@@ -763,7 +763,9 @@ class Store:
                 workspace.pages[parent_id].child_ids.append(page.id)
             # Some types (feature-brief) create pinned children in the same commit.
             children = self._create_auto_children(workspace, page, page_type)
-            self._touch_and_save(workspace, [])
+            events = self._guarded_events(lambda: [lifecycle_log.created(page),
+                                                   *map(lifecycle_log.created, children)])
+            self._touch_and_save(workspace, events)
             return CreatePageResult(page=page, children=children)
 
     def mutate_page_batch(
@@ -838,7 +840,9 @@ class Store:
                     created_so_far.update(result.created_ids)
 
             workspace.pages[page_id] = working
-            self._touch_and_save(workspace, [])
+            # `page` is still the stored pre-image: every command applied to a copy of it.
+            events = self._guarded_events(lambda: lifecycle_log.diff_page(page, working, page_type))
+            self._touch_and_save(workspace, events)
             return MutatePageResult(page=working, created_ids=created_ids,
                                     transitioned=working.status != page.status)
 
@@ -926,14 +930,19 @@ class Store:
                 if delete_scheduled is not None:
                     target.delete_scheduled = delete_scheduled
 
-            apply(page)
             # A pinned child's archived state mirrors its parent's: cascade onto this page's pinned children.
             parent_type = get_page_type(page.type)
-            for child_id in page.child_ids:
-                child = workspace.pages.get(child_id)
-                if child is not None and is_auto_child_type(parent_type, child.type):
-                    apply(child)
-            self._touch_and_save(workspace, [])
+            targets = [page, *(child for child_id in page.child_ids
+                               if (child := workspace.pages.get(child_id)) is not None
+                               and is_auto_child_type(parent_type, child.type))]
+            was_archived = {target.id: target.archived for target in targets}
+            for target in targets:
+                apply(target)
+            events = self._guarded_events(lambda: [
+                lifecycle_log.archived(target.id) if target.archived
+                else lifecycle_log.unarchived(target.id)
+                for target in targets if target.archived != was_archived[target.id]])
+            self._touch_and_save(workspace, events)
             return page
 
     def archive_page(self, workspace_id: str, page_id: str) -> Page:
@@ -972,10 +981,13 @@ class Store:
                     f"'{status}' is not a valid status for page type '{page.type}'. " +
                     f"Valid statuses: {', '.join(page_type.fsm.states)}."
                 )
+            old_status = page.status
             page.status = status
             # A direct status edit regenerates the stamp too, so an out-of-band move invalidates held tokens.
             page.status_revision_token = self._next_revision(page.status_revision_token)
-            self._touch_and_save(workspace, [])
+            events = self._guarded_events(lambda: [lifecycle_log.status(page_id, old_status, status)]
+                                          if old_status != status else [])
+            self._touch_and_save(workspace, events)
             return page
 
     # --- page-tree structure (reparent / reorder / rename) ------------------
@@ -1026,11 +1038,15 @@ class Store:
                         f"Cannot reparent '{page_id}' under '{new_parent_id}': that would create a " +
                         f"cycle (the new parent is the page itself or one of its descendants)."
                     )
+            old_parent_id = page.parent_id
             self._sibling_ids(workspace, page.parent_id).remove(page_id)
             page.parent_id = new_parent_id
             new_siblings = self._sibling_ids(workspace, new_parent_id)
             new_siblings.append(page_id)
-            self._touch_and_save(workspace, [])
+            events = self._guarded_events(
+                lambda: [lifecycle_log.moved(page_id, old_parent_id, new_parent_id)]
+                if old_parent_id != new_parent_id else [])
+            self._touch_and_save(workspace, events)
             return page, list(new_siblings)
 
     def reorder_page(
@@ -1073,8 +1089,11 @@ class Store:
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
+            old_title = page.title
             page.title = title
-            self._touch_and_save(workspace, [])
+            events = self._guarded_events(lambda: [lifecycle_log.renamed(page_id, old_title, title)]
+                                          if old_title != title else [])
+            self._touch_and_save(workspace, events)
             return page
 
     # --- page reference graph (link / unlink) --------------------------------
@@ -1129,7 +1148,8 @@ class Store:
                 raise NotFoundError(f"Page '{from_id}' not found in workspace '{workspace_id}'.")
             role = self._validate_link(workspace, workspace_id, source, to_id, role)
             source.links.append({"to": to_id, "role": role})
-            self._touch_and_save(workspace, [])
+            events = self._guarded_events(lambda: [lifecycle_log.linked(from_id, to_id, role)])
+            self._touch_and_save(workspace, events)
             return source, list(source.links)
 
     def unlink_page(
@@ -1148,7 +1168,8 @@ class Store:
             if edge is None:
                 raise NotFoundError(f"No '{role}' link from '{from_id}' to '{to_id}' to remove.")
             source.links.remove(edge)
-            self._touch_and_save(workspace, [])
+            events = self._guarded_events(lambda: [lifecycle_log.unlinked(from_id, to_id, role)])
+            self._touch_and_save(workspace, events)
             return source, list(source.links)
 
     def _set_workspace_status(self, workspace_id: str, status: str) -> Workspace:
