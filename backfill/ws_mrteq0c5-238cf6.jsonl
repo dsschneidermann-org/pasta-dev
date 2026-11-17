@@ -1,0 +1,626 @@
+{"seq":1,"ts":1784540400000,"page":"toc:ms90fb2w-721ea1","kind":"created","type":"toc","title":"Features","parent":null,"status":"active"}
+{"seq":2,"ts":1784540400000,"page":"toc:ms90fbg0-ba90c1","kind":"created","type":"toc","title":"Bug Reports","parent":null,"status":"active"}
+{"seq":3,"ts":1784540400000,"page":"feature-brief:bf-0001","kind":"created","type":"feature-brief","title":"First pass: file-backed pasta MCP server (FastMCP + python-statemachine)","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":4,"ts":1784540400000,"page":"implementation-plan:bf-0002","kind":"created","type":"implementation-plan","title":"First pass: file-backed pasta MCP server (FastMCP + python-statemachine) - implementation plan","parent":"feature-brief:bf-0001","status":"draft"}
+{"seq":5,"ts":1784540400000,"page":"testing-plan:bf-0003","kind":"created","type":"testing-plan","title":"First pass: file-backed pasta MCP server (FastMCP + python-statemachine) - testing plan","parent":"feature-brief:bf-0001","status":"draft"}
+{"seq":6,"ts":1784542200000,"page":"implementation-plan:bf-0002","kind":"status","from":"draft","to":"ready"}
+{"seq":7,"ts":1784543100000,"page":"testing-plan:bf-0003","kind":"status","from":"draft","to":"ready"}
+{"seq":8,"ts":1784544000000,"page":"feature-brief:bf-0001","kind":"status","from":"draft","to":"shipped"}
+{"seq":9,"ts":1784545200000,"page":"feature-brief:bf-0004","kind":"created","type":"feature-brief","title":"Add feature-brief page type + required-field transition preconditions","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":10,"ts":1784545200000,"page":"implementation-plan:bf-0005","kind":"created","type":"implementation-plan","title":"Add feature-brief page type + required-field transition preconditions - implementation plan","parent":"feature-brief:bf-0004","status":"draft"}
+{"seq":11,"ts":1784545200000,"page":"testing-plan:bf-0006","kind":"created","type":"testing-plan","title":"Add feature-brief page type + required-field transition preconditions - testing plan","parent":"feature-brief:bf-0004","status":"draft"}
+{"seq":12,"ts":1784547000000,"page":"implementation-plan:bf-0005","kind":"status","from":"draft","to":"ready"}
+{"seq":13,"ts":1784547900000,"page":"testing-plan:bf-0006","kind":"status","from":"draft","to":"ready"}
+{"seq":14,"ts":1784548800000,"page":"feature-brief:bf-0004","kind":"status","from":"draft","to":"shipped"}
+{"seq":15,"ts":1784550000000,"page":"feature-brief:bf-0007","kind":"created","type":"feature-brief","title":"Add Sphinx docs site with per-page-type Mermaid state diagrams","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":16,"ts":1784550000000,"page":"implementation-plan:bf-0008","kind":"created","type":"implementation-plan","title":"Add Sphinx docs site with per-page-type Mermaid state diagrams - implementation plan","parent":"feature-brief:bf-0007","status":"draft"}
+{"seq":17,"ts":1784550000000,"page":"testing-plan:bf-0009","kind":"created","type":"testing-plan","title":"Add Sphinx docs site with per-page-type Mermaid state diagrams - testing plan","parent":"feature-brief:bf-0007","status":"draft"}
+{"seq":18,"ts":1784551800000,"page":"implementation-plan:bf-0008","kind":"status","from":"draft","to":"ready"}
+{"seq":19,"ts":1784552700000,"page":"testing-plan:bf-0009","kind":"status","from":"draft","to":"ready"}
+{"seq":20,"ts":1784553600000,"page":"feature-brief:bf-0007","kind":"status","from":"draft","to":"shipped"}
+{"seq":21,"ts":1784554800000,"page":"feature-brief:bf-0010","kind":"created","type":"feature-brief","title":"Pure core: blocks kind, element FSMs, ready lock + 3 new types","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":22,"ts":1784554800000,"page":"implementation-plan:bf-0011","kind":"created","type":"implementation-plan","title":"Pure core: blocks kind, element FSMs, ready lock + 3 new types - implementation plan","parent":"feature-brief:bf-0010","status":"draft"}
+{"seq":23,"ts":1784554800000,"page":"testing-plan:bf-0012","kind":"created","type":"testing-plan","title":"Pure core: blocks kind, element FSMs, ready lock + 3 new types - testing plan","parent":"feature-brief:bf-0010","status":"draft"}
+{"seq":24,"ts":1784556600000,"page":"implementation-plan:bf-0011","kind":"status","from":"draft","to":"ready"}
+{"seq":25,"ts":1784557500000,"page":"testing-plan:bf-0012","kind":"status","from":"draft","to":"ready"}
+{"seq":26,"ts":1784558400000,"page":"feature-brief:bf-0010","kind":"status","from":"draft","to":"shipped"}
+{"seq":27,"ts":1784559600000,"page":"feature-brief:bf-0013","kind":"created","type":"feature-brief","title":"Store: auto-created children, ref integrity, ship guard","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":28,"ts":1784559600000,"page":"implementation-plan:bf-0014","kind":"created","type":"implementation-plan","title":"Store: auto-created children, ref integrity, ship guard - implementation plan","parent":"feature-brief:bf-0013","status":"draft"}
+{"seq":29,"ts":1784559600000,"page":"testing-plan:bf-0015","kind":"created","type":"testing-plan","title":"Store: auto-created children, ref integrity, ship guard - testing plan","parent":"feature-brief:bf-0013","status":"draft"}
+{"seq":30,"ts":1784561400000,"page":"implementation-plan:bf-0014","kind":"status","from":"draft","to":"ready"}
+{"seq":31,"ts":1784562300000,"page":"testing-plan:bf-0015","kind":"status","from":"draft","to":"ready"}
+{"seq":32,"ts":1784563200000,"page":"feature-brief:bf-0013","kind":"status","from":"draft","to":"shipped"}
+{"seq":33,"ts":1784564400000,"page":"feature-brief:bf-0016","kind":"created","type":"feature-brief","title":"Docs + introspection: describe fields, diagrams, architecture","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":34,"ts":1784564400000,"page":"implementation-plan:bf-0017","kind":"created","type":"implementation-plan","title":"Docs + introspection: describe fields, diagrams, architecture - implementation plan","parent":"feature-brief:bf-0016","status":"draft"}
+{"seq":35,"ts":1784564400000,"page":"testing-plan:bf-0018","kind":"created","type":"testing-plan","title":"Docs + introspection: describe fields, diagrams, architecture - testing plan","parent":"feature-brief:bf-0016","status":"draft"}
+{"seq":36,"ts":1784566200000,"page":"implementation-plan:bf-0017","kind":"status","from":"draft","to":"ready"}
+{"seq":37,"ts":1784567100000,"page":"testing-plan:bf-0018","kind":"status","from":"draft","to":"ready"}
+{"seq":38,"ts":1784568000000,"page":"feature-brief:bf-0016","kind":"status","from":"draft","to":"shipped"}
+{"seq":39,"ts":1784569200000,"page":"feature-brief:bf-0019","kind":"created","type":"feature-brief","title":"Tools: archive/unarchive pages + workspaces, tree includeArchived","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":40,"ts":1784569200000,"page":"implementation-plan:bf-0020","kind":"created","type":"implementation-plan","title":"Tools: archive/unarchive pages + workspaces, tree includeArchived - implementation plan","parent":"feature-brief:bf-0019","status":"draft"}
+{"seq":41,"ts":1784569200000,"page":"testing-plan:bf-0021","kind":"created","type":"testing-plan","title":"Tools: archive/unarchive pages + workspaces, tree includeArchived - testing plan","parent":"feature-brief:bf-0019","status":"draft"}
+{"seq":42,"ts":1784571000000,"page":"implementation-plan:bf-0020","kind":"status","from":"draft","to":"ready"}
+{"seq":43,"ts":1784571900000,"page":"testing-plan:bf-0021","kind":"status","from":"draft","to":"ready"}
+{"seq":44,"ts":1784572800000,"page":"feature-brief:bf-0019","kind":"status","from":"draft","to":"shipped"}
+{"seq":45,"ts":1784574000000,"page":"feature-brief:bf-0022","kind":"created","type":"feature-brief","title":"Tools: outline, renderPage (Markdown), search","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":46,"ts":1784574000000,"page":"implementation-plan:bf-0023","kind":"created","type":"implementation-plan","title":"Tools: outline, renderPage (Markdown), search - implementation plan","parent":"feature-brief:bf-0022","status":"draft"}
+{"seq":47,"ts":1784574000000,"page":"testing-plan:bf-0024","kind":"created","type":"testing-plan","title":"Tools: outline, renderPage (Markdown), search - testing plan","parent":"feature-brief:bf-0022","status":"draft"}
+{"seq":48,"ts":1784575800000,"page":"implementation-plan:bf-0023","kind":"status","from":"draft","to":"ready"}
+{"seq":49,"ts":1784576700000,"page":"testing-plan:bf-0024","kind":"status","from":"draft","to":"ready"}
+{"seq":50,"ts":1784577600000,"page":"feature-brief:bf-0022","kind":"status","from":"draft","to":"shipped"}
+{"seq":51,"ts":1784578800000,"page":"feature-brief:bf-0025","kind":"created","type":"feature-brief","title":"Tools: nextActions, attention, mutatePageBatch","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":52,"ts":1784578800000,"page":"implementation-plan:bf-0026","kind":"created","type":"implementation-plan","title":"Tools: nextActions, attention, mutatePageBatch - implementation plan","parent":"feature-brief:bf-0025","status":"draft"}
+{"seq":53,"ts":1784578800000,"page":"testing-plan:bf-0027","kind":"created","type":"testing-plan","title":"Tools: nextActions, attention, mutatePageBatch - testing plan","parent":"feature-brief:bf-0025","status":"draft"}
+{"seq":54,"ts":1784580600000,"page":"implementation-plan:bf-0026","kind":"status","from":"draft","to":"ready"}
+{"seq":55,"ts":1784581500000,"page":"testing-plan:bf-0027","kind":"status","from":"draft","to":"ready"}
+{"seq":56,"ts":1784582400000,"page":"feature-brief:bf-0025","kind":"status","from":"draft","to":"shipped"}
+{"seq":57,"ts":1784635200000,"page":"feature-brief:bf-0028","kind":"created","type":"feature-brief","title":"Web UI: live wiki views with WebSocket auto-reload","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":58,"ts":1784635200000,"page":"implementation-plan:bf-0029","kind":"created","type":"implementation-plan","title":"Web UI: live wiki views with WebSocket auto-reload - implementation plan","parent":"feature-brief:bf-0028","status":"draft"}
+{"seq":59,"ts":1784635200000,"page":"testing-plan:bf-0030","kind":"created","type":"testing-plan","title":"Web UI: live wiki views with WebSocket auto-reload - testing plan","parent":"feature-brief:bf-0028","status":"draft"}
+{"seq":60,"ts":1784637000000,"page":"implementation-plan:bf-0029","kind":"status","from":"draft","to":"ready"}
+{"seq":61,"ts":1784637900000,"page":"testing-plan:bf-0030","kind":"status","from":"draft","to":"ready"}
+{"seq":62,"ts":1784638800000,"page":"feature-brief:bf-0028","kind":"status","from":"draft","to":"shipped"}
+{"seq":63,"ts":1784656800000,"page":"feature-brief:bf-0031","kind":"created","type":"feature-brief","title":"HMR: hot module reload for FastAPI + FastMCP in one dev server","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":64,"ts":1784656800000,"page":"implementation-plan:bf-0032","kind":"created","type":"implementation-plan","title":"HMR: hot module reload for FastAPI + FastMCP in one dev server - implementation plan","parent":"feature-brief:bf-0031","status":"draft"}
+{"seq":65,"ts":1784656800000,"page":"testing-plan:bf-0033","kind":"created","type":"testing-plan","title":"HMR: hot module reload for FastAPI + FastMCP in one dev server - testing plan","parent":"feature-brief:bf-0031","status":"draft"}
+{"seq":66,"ts":1784658600000,"page":"implementation-plan:bf-0032","kind":"status","from":"draft","to":"ready"}
+{"seq":67,"ts":1784659500000,"page":"testing-plan:bf-0033","kind":"status","from":"draft","to":"ready"}
+{"seq":68,"ts":1784660400000,"page":"feature-brief:bf-0031","kind":"status","from":"draft","to":"shipped"}
+{"seq":69,"ts":1784715120000,"page":"feature-brief:bf-0034","kind":"created","type":"feature-brief","title":"Add document page type + inline-run block grammar","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":70,"ts":1784715120000,"page":"implementation-plan:bf-0035","kind":"created","type":"implementation-plan","title":"Add document page type + inline-run block grammar - implementation plan","parent":"feature-brief:bf-0034","status":"draft"}
+{"seq":71,"ts":1784715120000,"page":"testing-plan:bf-0036","kind":"created","type":"testing-plan","title":"Add document page type + inline-run block grammar - testing plan","parent":"feature-brief:bf-0034","status":"draft"}
+{"seq":72,"ts":1784716920000,"page":"implementation-plan:bf-0035","kind":"status","from":"draft","to":"ready"}
+{"seq":73,"ts":1784717820000,"page":"testing-plan:bf-0036","kind":"status","from":"draft","to":"ready"}
+{"seq":74,"ts":1784718720000,"page":"feature-brief:bf-0034","kind":"status","from":"draft","to":"shipped"}
+{"seq":75,"ts":1784723760000,"page":"feature-brief:bf-0037","kind":"created","type":"feature-brief","title":"Add theme switcher and css","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":76,"ts":1784723760000,"page":"implementation-plan:bf-0038","kind":"created","type":"implementation-plan","title":"Add theme switcher and css - implementation plan","parent":"feature-brief:bf-0037","status":"draft"}
+{"seq":77,"ts":1784723760000,"page":"testing-plan:bf-0039","kind":"created","type":"testing-plan","title":"Add theme switcher and css - testing plan","parent":"feature-brief:bf-0037","status":"draft"}
+{"seq":78,"ts":1784725560000,"page":"implementation-plan:bf-0038","kind":"status","from":"draft","to":"ready"}
+{"seq":79,"ts":1784726460000,"page":"testing-plan:bf-0039","kind":"status","from":"draft","to":"ready"}
+{"seq":80,"ts":1784727360000,"page":"feature-brief:bf-0037","kind":"status","from":"draft","to":"shipped"}
+{"seq":81,"ts":1784732400000,"page":"feature-brief:bf-0040","kind":"created","type":"feature-brief","title":"Anchored reorder and positioned insert (stale-read-safe)","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":82,"ts":1784732400000,"page":"implementation-plan:bf-0041","kind":"created","type":"implementation-plan","title":"Anchored reorder and positioned insert (stale-read-safe) - implementation plan","parent":"feature-brief:bf-0040","status":"draft"}
+{"seq":83,"ts":1784732400000,"page":"testing-plan:bf-0042","kind":"created","type":"testing-plan","title":"Anchored reorder and positioned insert (stale-read-safe) - testing plan","parent":"feature-brief:bf-0040","status":"draft"}
+{"seq":84,"ts":1784734200000,"page":"implementation-plan:bf-0041","kind":"status","from":"draft","to":"ready"}
+{"seq":85,"ts":1784735100000,"page":"testing-plan:bf-0042","kind":"status","from":"draft","to":"ready"}
+{"seq":86,"ts":1784736000000,"page":"feature-brief:bf-0040","kind":"status","from":"draft","to":"shipped"}
+{"seq":87,"ts":1784741040000,"page":"feature-brief:bf-0043","kind":"created","type":"feature-brief","title":"Add reparentPage and reorderPage page-tree operations","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":88,"ts":1784741040000,"page":"implementation-plan:bf-0044","kind":"created","type":"implementation-plan","title":"Add reparentPage and reorderPage page-tree operations - implementation plan","parent":"feature-brief:bf-0043","status":"draft"}
+{"seq":89,"ts":1784741040000,"page":"testing-plan:bf-0045","kind":"created","type":"testing-plan","title":"Add reparentPage and reorderPage page-tree operations - testing plan","parent":"feature-brief:bf-0043","status":"draft"}
+{"seq":90,"ts":1784742840000,"page":"implementation-plan:bf-0044","kind":"status","from":"draft","to":"ready"}
+{"seq":91,"ts":1784743740000,"page":"testing-plan:bf-0045","kind":"status","from":"draft","to":"ready"}
+{"seq":92,"ts":1784744640000,"page":"feature-brief:bf-0043","kind":"status","from":"draft","to":"shipped"}
+{"seq":93,"ts":1784749680000,"page":"feature-brief:bf-0046","kind":"created","type":"feature-brief","title":"Render inline page refs as titled links; verify refs before mutation","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":94,"ts":1784749680000,"page":"implementation-plan:bf-0047","kind":"created","type":"implementation-plan","title":"Render inline page refs as titled links; verify refs before mutation - implementation plan","parent":"feature-brief:bf-0046","status":"draft"}
+{"seq":95,"ts":1784749680000,"page":"testing-plan:bf-0048","kind":"created","type":"testing-plan","title":"Render inline page refs as titled links; verify refs before mutation - testing plan","parent":"feature-brief:bf-0046","status":"draft"}
+{"seq":96,"ts":1784751480000,"page":"implementation-plan:bf-0047","kind":"status","from":"draft","to":"ready"}
+{"seq":97,"ts":1784752380000,"page":"testing-plan:bf-0048","kind":"status","from":"draft","to":"ready"}
+{"seq":98,"ts":1784753280000,"page":"feature-brief:bf-0046","kind":"status","from":"draft","to":"shipped"}
+{"seq":99,"ts":1784804400000,"page":"feature-brief:bf-0049","kind":"created","type":"feature-brief","title":"Render full page shape: all sections + Child-pages links","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":100,"ts":1784804400000,"page":"implementation-plan:bf-0050","kind":"created","type":"implementation-plan","title":"Render full page shape: all sections + Child-pages links - implementation plan","parent":"feature-brief:bf-0049","status":"draft"}
+{"seq":101,"ts":1784804400000,"page":"testing-plan:bf-0051","kind":"created","type":"testing-plan","title":"Render full page shape: all sections + Child-pages links - testing plan","parent":"feature-brief:bf-0049","status":"draft"}
+{"seq":102,"ts":1784806200000,"page":"implementation-plan:bf-0050","kind":"status","from":"draft","to":"ready"}
+{"seq":103,"ts":1784807100000,"page":"testing-plan:bf-0051","kind":"status","from":"draft","to":"ready"}
+{"seq":104,"ts":1784808000000,"page":"feature-brief:bf-0049","kind":"status","from":"draft","to":"shipped"}
+{"seq":105,"ts":1784818800000,"page":"feature-brief:bf-0052","kind":"created","type":"feature-brief","title":"Add page link/unlink reference graph and References render section","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":106,"ts":1784818800000,"page":"implementation-plan:bf-0053","kind":"created","type":"implementation-plan","title":"Add page link/unlink reference graph and References render section - implementation plan","parent":"feature-brief:bf-0052","status":"draft"}
+{"seq":107,"ts":1784818800000,"page":"testing-plan:bf-0054","kind":"created","type":"testing-plan","title":"Add page link/unlink reference graph and References render section - testing plan","parent":"feature-brief:bf-0052","status":"draft"}
+{"seq":108,"ts":1784820600000,"page":"implementation-plan:bf-0053","kind":"status","from":"draft","to":"ready"}
+{"seq":109,"ts":1784821500000,"page":"testing-plan:bf-0054","kind":"status","from":"draft","to":"ready"}
+{"seq":110,"ts":1784822400000,"page":"feature-brief:bf-0052","kind":"status","from":"draft","to":"shipped"}
+{"seq":111,"ts":1784833200000,"page":"feature-brief:bf-0055","kind":"created","type":"feature-brief","title":"Add Model toggle: overlay a page's page-type Sphinx doc in an iframe","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":112,"ts":1784833200000,"page":"implementation-plan:bf-0056","kind":"created","type":"implementation-plan","title":"Add Model toggle: overlay a page's page-type Sphinx doc in an iframe - implementation plan","parent":"feature-brief:bf-0055","status":"draft"}
+{"seq":113,"ts":1784833200000,"page":"testing-plan:bf-0057","kind":"created","type":"testing-plan","title":"Add Model toggle: overlay a page's page-type Sphinx doc in an iframe - testing plan","parent":"feature-brief:bf-0055","status":"draft"}
+{"seq":114,"ts":1784835000000,"page":"implementation-plan:bf-0056","kind":"status","from":"draft","to":"ready"}
+{"seq":115,"ts":1784835900000,"page":"testing-plan:bf-0057","kind":"status","from":"draft","to":"ready"}
+{"seq":116,"ts":1784836800000,"page":"feature-brief:bf-0055","kind":"status","from":"draft","to":"shipped"}
+{"seq":117,"ts":1784890800000,"page":"feature-brief:bf-0058","kind":"created","type":"feature-brief","title":"Generate per-state Sphinx docs for every page type","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":118,"ts":1784890800000,"page":"implementation-plan:bf-0059","kind":"created","type":"implementation-plan","title":"Generate per-state Sphinx docs for every page type - implementation plan","parent":"feature-brief:bf-0058","status":"draft"}
+{"seq":119,"ts":1784890800000,"page":"testing-plan:bf-0060","kind":"created","type":"testing-plan","title":"Generate per-state Sphinx docs for every page type - testing plan","parent":"feature-brief:bf-0058","status":"draft"}
+{"seq":120,"ts":1784892600000,"page":"implementation-plan:bf-0059","kind":"status","from":"draft","to":"ready"}
+{"seq":121,"ts":1784893500000,"page":"testing-plan:bf-0060","kind":"status","from":"draft","to":"ready"}
+{"seq":122,"ts":1784894400000,"page":"feature-brief:bf-0058","kind":"status","from":"draft","to":"shipped"}
+{"seq":123,"ts":1784905200000,"page":"feature-brief:bf-0061","kind":"created","type":"feature-brief","title":"Capture describePageType on each state page; drop overview pages","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":124,"ts":1784905200000,"page":"implementation-plan:bf-0062","kind":"created","type":"implementation-plan","title":"Capture describePageType on each state page; drop overview pages - implementation plan","parent":"feature-brief:bf-0061","status":"draft"}
+{"seq":125,"ts":1784905200000,"page":"testing-plan:bf-0063","kind":"created","type":"testing-plan","title":"Capture describePageType on each state page; drop overview pages - testing plan","parent":"feature-brief:bf-0061","status":"draft"}
+{"seq":126,"ts":1784907000000,"page":"implementation-plan:bf-0062","kind":"status","from":"draft","to":"ready"}
+{"seq":127,"ts":1784907900000,"page":"testing-plan:bf-0063","kind":"status","from":"draft","to":"ready"}
+{"seq":128,"ts":1784908800000,"page":"feature-brief:bf-0061","kind":"status","from":"draft","to":"shipped"}
+{"seq":129,"ts":1784919600000,"page":"feature-brief:bf-0064","kind":"created","type":"feature-brief","title":"Add test-variant page types to decouple tests from the live registry","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":130,"ts":1784919600000,"page":"implementation-plan:bf-0065","kind":"created","type":"implementation-plan","title":"Add test-variant page types to decouple tests from the live registry - implementation plan","parent":"feature-brief:bf-0064","status":"draft"}
+{"seq":131,"ts":1784919600000,"page":"testing-plan:bf-0066","kind":"created","type":"testing-plan","title":"Add test-variant page types to decouple tests from the live registry - testing plan","parent":"feature-brief:bf-0064","status":"draft"}
+{"seq":132,"ts":1784921400000,"page":"implementation-plan:bf-0065","kind":"status","from":"draft","to":"ready"}
+{"seq":133,"ts":1784922300000,"page":"testing-plan:bf-0066","kind":"status","from":"draft","to":"ready"}
+{"seq":134,"ts":1784923200000,"page":"feature-brief:bf-0064","kind":"status","from":"draft","to":"shipped"}
+{"seq":135,"ts":1785236400000,"page":"feature-brief:bf-0067","kind":"created","type":"feature-brief","title":"Add simple-change page type - lightweight bug-report-style flow for minor changes","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":136,"ts":1785236400000,"page":"implementation-plan:bf-0068","kind":"created","type":"implementation-plan","title":"Add simple-change page type - lightweight bug-report-style flow for minor changes - implementation plan","parent":"feature-brief:bf-0067","status":"draft"}
+{"seq":137,"ts":1785236400000,"page":"testing-plan:bf-0069","kind":"created","type":"testing-plan","title":"Add simple-change page type - lightweight bug-report-style flow for minor changes - testing plan","parent":"feature-brief:bf-0067","status":"draft"}
+{"seq":138,"ts":1785238200000,"page":"implementation-plan:bf-0068","kind":"status","from":"draft","to":"ready"}
+{"seq":139,"ts":1785239100000,"page":"testing-plan:bf-0069","kind":"status","from":"draft","to":"ready"}
+{"seq":140,"ts":1785240000000,"page":"feature-brief:bf-0067","kind":"status","from":"draft","to":"shipped"}
+{"seq":141,"ts":1785250800000,"page":"feature-brief:bf-0070","kind":"created","type":"feature-brief","title":"Add readable instructions tool to MCP interface","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":142,"ts":1785250800000,"page":"implementation-plan:bf-0071","kind":"created","type":"implementation-plan","title":"Add readable instructions tool to MCP interface - implementation plan","parent":"feature-brief:bf-0070","status":"draft"}
+{"seq":143,"ts":1785250800000,"page":"testing-plan:bf-0072","kind":"created","type":"testing-plan","title":"Add readable instructions tool to MCP interface - testing plan","parent":"feature-brief:bf-0070","status":"draft"}
+{"seq":144,"ts":1785252600000,"page":"implementation-plan:bf-0071","kind":"status","from":"draft","to":"ready"}
+{"seq":145,"ts":1785253500000,"page":"testing-plan:bf-0072","kind":"status","from":"draft","to":"ready"}
+{"seq":146,"ts":1785254400000,"page":"feature-brief:bf-0070","kind":"status","from":"draft","to":"shipped"}
+{"seq":147,"ts":1785265200000,"page":"feature-brief:bf-0073","kind":"created","type":"feature-brief","title":"Gate beginImplementation on ready plan children; allow status-marks in ready plans","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":148,"ts":1785265200000,"page":"implementation-plan:bf-0074","kind":"created","type":"implementation-plan","title":"Gate beginImplementation on ready plan children; allow status-marks in ready plans - implementation plan","parent":"feature-brief:bf-0073","status":"draft"}
+{"seq":149,"ts":1785265200000,"page":"testing-plan:bf-0075","kind":"created","type":"testing-plan","title":"Gate beginImplementation on ready plan children; allow status-marks in ready plans - testing plan","parent":"feature-brief:bf-0073","status":"draft"}
+{"seq":150,"ts":1785267000000,"page":"implementation-plan:bf-0074","kind":"status","from":"draft","to":"ready"}
+{"seq":151,"ts":1785267900000,"page":"testing-plan:bf-0075","kind":"status","from":"draft","to":"ready"}
+{"seq":152,"ts":1785268800000,"page":"feature-brief:bf-0073","kind":"status","from":"draft","to":"shipped"}
+{"seq":153,"ts":1785322800000,"page":"feature-brief:bf-0076","kind":"created","type":"feature-brief","title":"Lock feature-spec authoring in the sealed state","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":154,"ts":1785322800000,"page":"implementation-plan:bf-0077","kind":"created","type":"implementation-plan","title":"Lock feature-spec authoring in the sealed state - implementation plan","parent":"feature-brief:bf-0076","status":"draft"}
+{"seq":155,"ts":1785322800000,"page":"testing-plan:bf-0078","kind":"created","type":"testing-plan","title":"Lock feature-spec authoring in the sealed state - testing plan","parent":"feature-brief:bf-0076","status":"draft"}
+{"seq":156,"ts":1785324600000,"page":"implementation-plan:bf-0077","kind":"status","from":"draft","to":"ready"}
+{"seq":157,"ts":1785325500000,"page":"testing-plan:bf-0078","kind":"status","from":"draft","to":"ready"}
+{"seq":158,"ts":1785326400000,"page":"feature-brief:bf-0076","kind":"status","from":"draft","to":"shipped"}
+{"seq":159,"ts":1785337200000,"page":"feature-brief:bf-0079","kind":"created","type":"feature-brief","title":"Reshape feature-brief into ground -> plan -> plan-review flow","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":160,"ts":1785337200000,"page":"implementation-plan:bf-0080","kind":"created","type":"implementation-plan","title":"Reshape feature-brief into ground -> plan -> plan-review flow - implementation plan","parent":"feature-brief:bf-0079","status":"draft"}
+{"seq":161,"ts":1785337200000,"page":"testing-plan:bf-0081","kind":"created","type":"testing-plan","title":"Reshape feature-brief into ground -> plan -> plan-review flow - testing plan","parent":"feature-brief:bf-0079","status":"draft"}
+{"seq":162,"ts":1785339000000,"page":"implementation-plan:bf-0080","kind":"status","from":"draft","to":"ready"}
+{"seq":163,"ts":1785339900000,"page":"testing-plan:bf-0081","kind":"status","from":"draft","to":"ready"}
+{"seq":164,"ts":1785340800000,"page":"feature-brief:bf-0079","kind":"status","from":"draft","to":"shipped"}
+{"seq":165,"ts":1785351600000,"page":"feature-brief:bf-0082","kind":"created","type":"feature-brief","title":"Gate plan-child finalize on parent feature reaching planning","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":166,"ts":1785351600000,"page":"implementation-plan:bf-0083","kind":"created","type":"implementation-plan","title":"Gate plan-child finalize on parent feature reaching planning - implementation plan","parent":"feature-brief:bf-0082","status":"draft"}
+{"seq":167,"ts":1785351600000,"page":"testing-plan:bf-0084","kind":"created","type":"testing-plan","title":"Gate plan-child finalize on parent feature reaching planning - testing plan","parent":"feature-brief:bf-0082","status":"draft"}
+{"seq":168,"ts":1785353400000,"page":"implementation-plan:bf-0083","kind":"status","from":"draft","to":"ready"}
+{"seq":169,"ts":1785354300000,"page":"testing-plan:bf-0084","kind":"status","from":"draft","to":"ready"}
+{"seq":170,"ts":1785355200000,"page":"feature-brief:bf-0082","kind":"status","from":"draft","to":"shipped"}
+{"seq":171,"ts":1785409200000,"page":"feature-brief:bf-0085","kind":"created","type":"feature-brief","title":"Add Archive/Unarchive button to the wiki page view","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":172,"ts":1785409200000,"page":"implementation-plan:bf-0086","kind":"created","type":"implementation-plan","title":"Add Archive/Unarchive button to the wiki page view - implementation plan","parent":"feature-brief:bf-0085","status":"draft"}
+{"seq":173,"ts":1785409200000,"page":"testing-plan:bf-0087","kind":"created","type":"testing-plan","title":"Add Archive/Unarchive button to the wiki page view - testing plan","parent":"feature-brief:bf-0085","status":"draft"}
+{"seq":174,"ts":1785411000000,"page":"implementation-plan:bf-0086","kind":"status","from":"draft","to":"ready"}
+{"seq":175,"ts":1785411900000,"page":"testing-plan:bf-0087","kind":"status","from":"draft","to":"ready"}
+{"seq":176,"ts":1785412800000,"page":"feature-brief:bf-0085","kind":"status","from":"draft","to":"shipped"}
+{"seq":177,"ts":1785423600000,"page":"feature-brief:bf-0088","kind":"created","type":"feature-brief","title":"Derive page FSM transitions from legal_in, remove explicit transitions","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":178,"ts":1785423600000,"page":"implementation-plan:bf-0089","kind":"created","type":"implementation-plan","title":"Derive page FSM transitions from legal_in, remove explicit transitions - implementation plan","parent":"feature-brief:bf-0088","status":"draft"}
+{"seq":179,"ts":1785423600000,"page":"testing-plan:bf-0090","kind":"created","type":"testing-plan","title":"Derive page FSM transitions from legal_in, remove explicit transitions - testing plan","parent":"feature-brief:bf-0088","status":"draft"}
+{"seq":180,"ts":1785425400000,"page":"implementation-plan:bf-0089","kind":"status","from":"draft","to":"ready"}
+{"seq":181,"ts":1785426300000,"page":"testing-plan:bf-0090","kind":"status","from":"draft","to":"ready"}
+{"seq":182,"ts":1785427200000,"page":"feature-brief:bf-0088","kind":"status","from":"draft","to":"shipped"}
+{"seq":183,"ts":1785438000000,"page":"feature-brief:bf-0091","kind":"created","type":"feature-brief","title":"Add field-op command-helper factories in pagetypes.py","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":184,"ts":1785438000000,"page":"implementation-plan:bf-0092","kind":"created","type":"implementation-plan","title":"Add field-op command-helper factories in pagetypes.py - implementation plan","parent":"feature-brief:bf-0091","status":"draft"}
+{"seq":185,"ts":1785438000000,"page":"testing-plan:bf-0093","kind":"created","type":"testing-plan","title":"Add field-op command-helper factories in pagetypes.py - testing plan","parent":"feature-brief:bf-0091","status":"draft"}
+{"seq":186,"ts":1785439800000,"page":"implementation-plan:bf-0092","kind":"status","from":"draft","to":"ready"}
+{"seq":187,"ts":1785440700000,"page":"testing-plan:bf-0093","kind":"status","from":"draft","to":"ready"}
+{"seq":188,"ts":1785441600000,"page":"feature-brief:bf-0091","kind":"status","from":"draft","to":"shipped"}
+{"seq":189,"ts":1785495600000,"page":"feature-brief:bf-0094","kind":"created","type":"feature-brief","title":"Add toc (table of contents) page type","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":190,"ts":1785495600000,"page":"implementation-plan:bf-0095","kind":"created","type":"implementation-plan","title":"Add toc (table of contents) page type - implementation plan","parent":"feature-brief:bf-0094","status":"draft"}
+{"seq":191,"ts":1785495600000,"page":"testing-plan:bf-0096","kind":"created","type":"testing-plan","title":"Add toc (table of contents) page type - testing plan","parent":"feature-brief:bf-0094","status":"draft"}
+{"seq":192,"ts":1785497400000,"page":"implementation-plan:bf-0095","kind":"status","from":"draft","to":"ready"}
+{"seq":193,"ts":1785498300000,"page":"testing-plan:bf-0096","kind":"status","from":"draft","to":"ready"}
+{"seq":194,"ts":1785499200000,"page":"feature-brief:bf-0094","kind":"status","from":"draft","to":"shipped"}
+{"seq":195,"ts":1785510000000,"page":"feature-brief:bf-0097","kind":"created","type":"feature-brief","title":"Add claude skill for /pasta, /cook","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":196,"ts":1785510000000,"page":"implementation-plan:bf-0098","kind":"created","type":"implementation-plan","title":"Add claude skill for /pasta, /cook - implementation plan","parent":"feature-brief:bf-0097","status":"draft"}
+{"seq":197,"ts":1785510000000,"page":"testing-plan:bf-0099","kind":"created","type":"testing-plan","title":"Add claude skill for /pasta, /cook - testing plan","parent":"feature-brief:bf-0097","status":"draft"}
+{"seq":198,"ts":1785511800000,"page":"implementation-plan:bf-0098","kind":"status","from":"draft","to":"ready"}
+{"seq":199,"ts":1785512700000,"page":"testing-plan:bf-0099","kind":"status","from":"draft","to":"ready"}
+{"seq":200,"ts":1785513600000,"page":"feature-brief:bf-0097","kind":"status","from":"draft","to":"shipped"}
+{"seq":201,"ts":1785524400000,"page":"feature-brief:bf-0100","kind":"created","type":"feature-brief","title":"Lock authoring commands in terminal FSM states","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":202,"ts":1785524400000,"page":"implementation-plan:bf-0101","kind":"created","type":"implementation-plan","title":"Lock authoring commands in terminal FSM states - implementation plan","parent":"feature-brief:bf-0100","status":"draft"}
+{"seq":203,"ts":1785524400000,"page":"testing-plan:bf-0102","kind":"created","type":"testing-plan","title":"Lock authoring commands in terminal FSM states - testing plan","parent":"feature-brief:bf-0100","status":"draft"}
+{"seq":204,"ts":1785526200000,"page":"implementation-plan:bf-0101","kind":"status","from":"draft","to":"ready"}
+{"seq":205,"ts":1785527100000,"page":"testing-plan:bf-0102","kind":"status","from":"draft","to":"ready"}
+{"seq":206,"ts":1785528000000,"page":"feature-brief:bf-0100","kind":"status","from":"draft","to":"shipped"}
+{"seq":207,"ts":1785582000000,"page":"feature-brief:bf-0103","kind":"created","type":"feature-brief","title":"Make production page types off-limits in test mode","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":208,"ts":1785582000000,"page":"implementation-plan:bf-0104","kind":"created","type":"implementation-plan","title":"Make production page types off-limits in test mode - implementation plan","parent":"feature-brief:bf-0103","status":"draft"}
+{"seq":209,"ts":1785582000000,"page":"testing-plan:bf-0105","kind":"created","type":"testing-plan","title":"Make production page types off-limits in test mode - testing plan","parent":"feature-brief:bf-0103","status":"draft"}
+{"seq":210,"ts":1785583800000,"page":"implementation-plan:bf-0104","kind":"status","from":"draft","to":"ready"}
+{"seq":211,"ts":1785584700000,"page":"testing-plan:bf-0105","kind":"status","from":"draft","to":"ready"}
+{"seq":212,"ts":1785585600000,"page":"feature-brief:bf-0103","kind":"status","from":"draft","to":"shipped"}
+{"seq":213,"ts":1785596400000,"page":"feature-brief:bf-0106","kind":"created","type":"feature-brief","title":"Add web page-state dropdown for direct state override","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":214,"ts":1785596400000,"page":"implementation-plan:bf-0107","kind":"created","type":"implementation-plan","title":"Add web page-state dropdown for direct state override - implementation plan","parent":"feature-brief:bf-0106","status":"draft"}
+{"seq":215,"ts":1785596400000,"page":"testing-plan:bf-0108","kind":"created","type":"testing-plan","title":"Add web page-state dropdown for direct state override - testing plan","parent":"feature-brief:bf-0106","status":"draft"}
+{"seq":216,"ts":1785598200000,"page":"implementation-plan:bf-0107","kind":"status","from":"draft","to":"ready"}
+{"seq":217,"ts":1785599100000,"page":"testing-plan:bf-0108","kind":"status","from":"draft","to":"ready"}
+{"seq":218,"ts":1785600000000,"page":"feature-brief:bf-0106","kind":"status","from":"draft","to":"shipped"}
+{"seq":219,"ts":1785610800000,"page":"feature-brief:bf-0109","kind":"created","type":"feature-brief","title":"Human-gate close for simple-change and bug-report via a done state","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":220,"ts":1785610800000,"page":"implementation-plan:bf-0110","kind":"created","type":"implementation-plan","title":"Human-gate close for simple-change and bug-report via a done state - implementation plan","parent":"feature-brief:bf-0109","status":"draft"}
+{"seq":221,"ts":1785610800000,"page":"testing-plan:bf-0111","kind":"created","type":"testing-plan","title":"Human-gate close for simple-change and bug-report via a done state - testing plan","parent":"feature-brief:bf-0109","status":"draft"}
+{"seq":222,"ts":1785612600000,"page":"implementation-plan:bf-0110","kind":"status","from":"draft","to":"ready"}
+{"seq":223,"ts":1785613500000,"page":"testing-plan:bf-0111","kind":"status","from":"draft","to":"ready"}
+{"seq":224,"ts":1785614400000,"page":"feature-brief:bf-0109","kind":"status","from":"draft","to":"shipped"}
+{"seq":225,"ts":1785672000000,"page":"feature-brief:bf-0112","kind":"created","type":"feature-brief","title":"Add pyright config, fix some type errors","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":226,"ts":1785672000000,"page":"implementation-plan:bf-0113","kind":"created","type":"implementation-plan","title":"Add pyright config, fix some type errors - implementation plan","parent":"feature-brief:bf-0112","status":"draft"}
+{"seq":227,"ts":1785672000000,"page":"testing-plan:bf-0114","kind":"created","type":"testing-plan","title":"Add pyright config, fix some type errors - testing plan","parent":"feature-brief:bf-0112","status":"draft"}
+{"seq":228,"ts":1785673800000,"page":"implementation-plan:bf-0113","kind":"status","from":"draft","to":"ready"}
+{"seq":229,"ts":1785674700000,"page":"testing-plan:bf-0114","kind":"status","from":"draft","to":"ready"}
+{"seq":230,"ts":1785675600000,"page":"feature-brief:bf-0112","kind":"status","from":"draft","to":"shipped"}
+{"seq":231,"ts":1785693600000,"page":"feature-brief:bf-0115","kind":"created","type":"feature-brief","title":"Add field-setter instructions and stage-scoped field setters in do","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":232,"ts":1785693600000,"page":"implementation-plan:bf-0116","kind":"created","type":"implementation-plan","title":"Add field-setter instructions and stage-scoped field setters in do - implementation plan","parent":"feature-brief:bf-0115","status":"draft"}
+{"seq":233,"ts":1785693600000,"page":"testing-plan:bf-0117","kind":"created","type":"testing-plan","title":"Add field-setter instructions and stage-scoped field setters in do - testing plan","parent":"feature-brief:bf-0115","status":"draft"}
+{"seq":234,"ts":1785695400000,"page":"implementation-plan:bf-0116","kind":"status","from":"draft","to":"ready"}
+{"seq":235,"ts":1785696300000,"page":"testing-plan:bf-0117","kind":"status","from":"draft","to":"ready"}
+{"seq":236,"ts":1785697200000,"page":"feature-brief:bf-0115","kind":"status","from":"draft","to":"shipped"}
+{"seq":237,"ts":1786287600000,"page":"feature-brief:bf-0118","kind":"created","type":"feature-brief","title":"Batch opaque-id skip: chain inserts/reorders in mutatePageBatch","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":238,"ts":1786287600000,"page":"implementation-plan:bf-0119","kind":"created","type":"implementation-plan","title":"Batch opaque-id skip: chain inserts/reorders in mutatePageBatch - implementation plan","parent":"feature-brief:bf-0118","status":"draft"}
+{"seq":239,"ts":1786287600000,"page":"testing-plan:bf-0120","kind":"created","type":"testing-plan","title":"Batch opaque-id skip: chain inserts/reorders in mutatePageBatch - testing plan","parent":"feature-brief:bf-0118","status":"draft"}
+{"seq":240,"ts":1786289400000,"page":"implementation-plan:bf-0119","kind":"status","from":"draft","to":"ready"}
+{"seq":241,"ts":1786290300000,"page":"testing-plan:bf-0120","kind":"status","from":"draft","to":"ready"}
+{"seq":242,"ts":1786291200000,"page":"feature-brief:bf-0118","kind":"status","from":"draft","to":"shipped"}
+{"seq":243,"ts":1786449600000,"page":"feature-brief:bf-0121","kind":"created","type":"feature-brief","title":"Add the epic + agent-plan page types for multi-brief features","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":244,"ts":1786449600000,"page":"implementation-plan:bf-0122","kind":"created","type":"implementation-plan","title":"Add the epic + agent-plan page types for multi-brief features - implementation plan","parent":"feature-brief:bf-0121","status":"draft"}
+{"seq":245,"ts":1786449600000,"page":"testing-plan:bf-0123","kind":"created","type":"testing-plan","title":"Add the epic + agent-plan page types for multi-brief features - testing plan","parent":"feature-brief:bf-0121","status":"draft"}
+{"seq":246,"ts":1786451400000,"page":"implementation-plan:bf-0122","kind":"status","from":"draft","to":"ready"}
+{"seq":247,"ts":1786452300000,"page":"testing-plan:bf-0123","kind":"status","from":"draft","to":"ready"}
+{"seq":248,"ts":1786453200000,"page":"feature-brief:bf-0121","kind":"status","from":"draft","to":"shipped"}
+{"seq":249,"ts":1786471200000,"page":"feature-brief:bf-0124","kind":"created","type":"feature-brief","title":"Mandate a worktree name on every dispatch in an agent plan","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":250,"ts":1786471200000,"page":"implementation-plan:bf-0125","kind":"created","type":"implementation-plan","title":"Mandate a worktree name on every dispatch in an agent plan - implementation plan","parent":"feature-brief:bf-0124","status":"draft"}
+{"seq":251,"ts":1786471200000,"page":"testing-plan:bf-0126","kind":"created","type":"testing-plan","title":"Mandate a worktree name on every dispatch in an agent plan - testing plan","parent":"feature-brief:bf-0124","status":"draft"}
+{"seq":252,"ts":1786473000000,"page":"implementation-plan:bf-0125","kind":"status","from":"draft","to":"ready"}
+{"seq":253,"ts":1786473900000,"page":"testing-plan:bf-0126","kind":"status","from":"draft","to":"ready"}
+{"seq":254,"ts":1786474800000,"page":"feature-brief:bf-0124","kind":"status","from":"draft","to":"shipped"}
+{"seq":255,"ts":1786614685714,"page":"feature-brief:bf-0127","kind":"created","type":"feature-brief","title":"Hide archived pages from the tree MCP tool","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":256,"ts":1786614685714,"page":"implementation-plan:bf-0128","kind":"created","type":"implementation-plan","title":"Hide archived pages from the tree MCP tool - implementation plan","parent":"feature-brief:bf-0127","status":"draft"}
+{"seq":257,"ts":1786614685714,"page":"testing-plan:bf-0129","kind":"created","type":"testing-plan","title":"Hide archived pages from the tree MCP tool - testing plan","parent":"feature-brief:bf-0127","status":"draft"}
+{"seq":258,"ts":1786616485714,"page":"implementation-plan:bf-0128","kind":"status","from":"draft","to":"ready"}
+{"seq":259,"ts":1786617385714,"page":"testing-plan:bf-0129","kind":"status","from":"draft","to":"ready"}
+{"seq":260,"ts":1786618285714,"page":"feature-brief:bf-0127","kind":"status","from":"draft","to":"shipped"}
+{"seq":261,"ts":1786620857143,"page":"simple-change:bf-0130","kind":"created","type":"simple-change","title":"Resolve page ids with an explicit id: prefix, spanning archived pages","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":262,"ts":1786624457143,"page":"simple-change:bf-0130","kind":"status","from":"draft","to":"closed"}
+{"seq":263,"ts":1786627028571,"page":"feature-brief:bf-0131","kind":"created","type":"feature-brief","title":"Exclude descendants of an archived page from text search","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":264,"ts":1786627028571,"page":"implementation-plan:bf-0132","kind":"created","type":"implementation-plan","title":"Exclude descendants of an archived page from text search - implementation plan","parent":"feature-brief:bf-0131","status":"draft"}
+{"seq":265,"ts":1786627028571,"page":"testing-plan:bf-0133","kind":"created","type":"testing-plan","title":"Exclude descendants of an archived page from text search - testing plan","parent":"feature-brief:bf-0131","status":"draft"}
+{"seq":266,"ts":1786628828571,"page":"implementation-plan:bf-0132","kind":"status","from":"draft","to":"ready"}
+{"seq":267,"ts":1786629728571,"page":"testing-plan:bf-0133","kind":"status","from":"draft","to":"ready"}
+{"seq":268,"ts":1786630628571,"page":"feature-brief:bf-0131","kind":"status","from":"draft","to":"shipped"}
+{"seq":269,"ts":1786633200000,"page":"feature-brief:bf-0134","kind":"created","type":"feature-brief","title":"Stage a feature-brief's instructions: quiet the plan children until planning","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":270,"ts":1786633200000,"page":"implementation-plan:bf-0135","kind":"created","type":"implementation-plan","title":"Stage a feature-brief's instructions: quiet the plan children until planning - implementation plan","parent":"feature-brief:bf-0134","status":"draft"}
+{"seq":271,"ts":1786633200000,"page":"testing-plan:bf-0136","kind":"created","type":"testing-plan","title":"Stage a feature-brief's instructions: quiet the plan children until planning - testing plan","parent":"feature-brief:bf-0134","status":"draft"}
+{"seq":272,"ts":1786635000000,"page":"implementation-plan:bf-0135","kind":"status","from":"draft","to":"ready"}
+{"seq":273,"ts":1786635900000,"page":"testing-plan:bf-0136","kind":"status","from":"draft","to":"ready"}
+{"seq":274,"ts":1786636800000,"page":"feature-brief:bf-0134","kind":"status","from":"draft","to":"shipped"}
+{"seq":275,"ts":1786639371429,"page":"feature-brief:bf-0137","kind":"created","type":"feature-brief","title":"Add a manual end-to-end probe of the feature-brief workflow","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":276,"ts":1786639371429,"page":"implementation-plan:bf-0138","kind":"created","type":"implementation-plan","title":"Add a manual end-to-end probe of the feature-brief workflow - implementation plan","parent":"feature-brief:bf-0137","status":"draft"}
+{"seq":277,"ts":1786639371429,"page":"testing-plan:bf-0139","kind":"created","type":"testing-plan","title":"Add a manual end-to-end probe of the feature-brief workflow - testing plan","parent":"feature-brief:bf-0137","status":"draft"}
+{"seq":278,"ts":1786641171429,"page":"implementation-plan:bf-0138","kind":"status","from":"draft","to":"ready"}
+{"seq":279,"ts":1786642071429,"page":"testing-plan:bf-0139","kind":"status","from":"draft","to":"ready"}
+{"seq":280,"ts":1786642971429,"page":"feature-brief:bf-0137","kind":"status","from":"draft","to":"shipped"}
+{"seq":281,"ts":1786645542857,"page":"feature-brief:bf-0140","kind":"created","type":"feature-brief","title":"Seal the feature-spec before any step or case is written","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":282,"ts":1786645542857,"page":"implementation-plan:bf-0141","kind":"created","type":"implementation-plan","title":"Seal the feature-spec before any step or case is written - implementation plan","parent":"feature-brief:bf-0140","status":"draft"}
+{"seq":283,"ts":1786645542857,"page":"testing-plan:bf-0142","kind":"created","type":"testing-plan","title":"Seal the feature-spec before any step or case is written - testing plan","parent":"feature-brief:bf-0140","status":"draft"}
+{"seq":284,"ts":1786647342857,"page":"implementation-plan:bf-0141","kind":"status","from":"draft","to":"ready"}
+{"seq":285,"ts":1786648242857,"page":"testing-plan:bf-0142","kind":"status","from":"draft","to":"ready"}
+{"seq":286,"ts":1786649142857,"page":"feature-brief:bf-0140","kind":"status","from":"draft","to":"shipped"}
+{"seq":287,"ts":1786651714286,"page":"feature-brief:bf-0143","kind":"created","type":"feature-brief","title":"Sweep archived and orphaned pages on an hourly timer","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":288,"ts":1786651714286,"page":"implementation-plan:bf-0144","kind":"created","type":"implementation-plan","title":"Sweep archived and orphaned pages on an hourly timer - implementation plan","parent":"feature-brief:bf-0143","status":"draft"}
+{"seq":289,"ts":1786651714286,"page":"testing-plan:bf-0145","kind":"created","type":"testing-plan","title":"Sweep archived and orphaned pages on an hourly timer - testing plan","parent":"feature-brief:bf-0143","status":"draft"}
+{"seq":290,"ts":1786653514286,"page":"implementation-plan:bf-0144","kind":"status","from":"draft","to":"ready"}
+{"seq":291,"ts":1786654414286,"page":"testing-plan:bf-0145","kind":"status","from":"draft","to":"ready"}
+{"seq":292,"ts":1786655314286,"page":"feature-brief:bf-0143","kind":"status","from":"draft","to":"shipped"}
+{"seq":293,"ts":1786719600000,"page":"feature-brief:bf-0146","kind":"created","type":"feature-brief","title":"Echo a state's stage guidance when a write enters it","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":294,"ts":1786719600000,"page":"implementation-plan:bf-0147","kind":"created","type":"implementation-plan","title":"Echo a state's stage guidance when a write enters it - implementation plan","parent":"feature-brief:bf-0146","status":"draft"}
+{"seq":295,"ts":1786719600000,"page":"testing-plan:bf-0148","kind":"created","type":"testing-plan","title":"Echo a state's stage guidance when a write enters it - testing plan","parent":"feature-brief:bf-0146","status":"draft"}
+{"seq":296,"ts":1786721400000,"page":"implementation-plan:bf-0147","kind":"status","from":"draft","to":"ready"}
+{"seq":297,"ts":1786722300000,"page":"testing-plan:bf-0148","kind":"status","from":"draft","to":"ready"}
+{"seq":298,"ts":1786723200000,"page":"feature-brief:bf-0146","kind":"status","from":"draft","to":"shipped"}
+{"seq":299,"ts":1786892400000,"page":"bug-report:bf-0149","kind":"created","type":"bug-report","title":"Guard workspace file reads against the write that replaces it","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":300,"ts":1786896000000,"page":"bug-report:bf-0149","kind":"status","from":"draft","to":"closed"}
+{"seq":301,"ts":1787310000000,"page":"feature-brief:bf-0150","kind":"created","type":"feature-brief","title":"Add AGPL license","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":302,"ts":1787310000000,"page":"implementation-plan:bf-0151","kind":"created","type":"implementation-plan","title":"Add AGPL license - implementation plan","parent":"feature-brief:bf-0150","status":"draft"}
+{"seq":303,"ts":1787310000000,"page":"testing-plan:bf-0152","kind":"created","type":"testing-plan","title":"Add AGPL license - testing plan","parent":"feature-brief:bf-0150","status":"draft"}
+{"seq":304,"ts":1787311800000,"page":"implementation-plan:bf-0151","kind":"status","from":"draft","to":"ready"}
+{"seq":305,"ts":1787312700000,"page":"testing-plan:bf-0152","kind":"status","from":"draft","to":"ready"}
+{"seq":306,"ts":1787313600000,"page":"feature-brief:bf-0150","kind":"status","from":"draft","to":"shipped"}
+{"seq":307,"ts":1787324400000,"page":"feature-brief:bf-0153","kind":"created","type":"feature-brief","title":"Add the decision-record page type and guide how both doc types are written","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":308,"ts":1787324400000,"page":"implementation-plan:bf-0154","kind":"created","type":"implementation-plan","title":"Add the decision-record page type and guide how both doc types are written - implementation plan","parent":"feature-brief:bf-0153","status":"draft"}
+{"seq":309,"ts":1787324400000,"page":"testing-plan:bf-0155","kind":"created","type":"testing-plan","title":"Add the decision-record page type and guide how both doc types are written - testing plan","parent":"feature-brief:bf-0153","status":"draft"}
+{"seq":310,"ts":1787326200000,"page":"implementation-plan:bf-0154","kind":"status","from":"draft","to":"ready"}
+{"seq":311,"ts":1787327100000,"page":"testing-plan:bf-0155","kind":"status","from":"draft","to":"ready"}
+{"seq":312,"ts":1787328000000,"page":"feature-brief:bf-0153","kind":"status","from":"draft","to":"shipped"}
+{"seq":313,"ts":1787338800000,"page":"feature-brief:bf-0156","kind":"created","type":"feature-brief","title":"Split each page type into its own module under src/pagetypes","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":314,"ts":1787338800000,"page":"implementation-plan:bf-0157","kind":"created","type":"implementation-plan","title":"Split each page type into its own module under src/pagetypes - implementation plan","parent":"feature-brief:bf-0156","status":"draft"}
+{"seq":315,"ts":1787338800000,"page":"testing-plan:bf-0158","kind":"created","type":"testing-plan","title":"Split each page type into its own module under src/pagetypes - testing plan","parent":"feature-brief:bf-0156","status":"draft"}
+{"seq":316,"ts":1787340600000,"page":"implementation-plan:bf-0157","kind":"status","from":"draft","to":"ready"}
+{"seq":317,"ts":1787341500000,"page":"testing-plan:bf-0158","kind":"status","from":"draft","to":"ready"}
+{"seq":318,"ts":1787342400000,"page":"feature-brief:bf-0156","kind":"status","from":"draft","to":"shipped"}
+{"seq":319,"ts":1787393520000,"page":"feature-brief:bf-0159","kind":"created","type":"feature-brief","title":"Render the web page view as structured HTML","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":320,"ts":1787393520000,"page":"implementation-plan:bf-0160","kind":"created","type":"implementation-plan","title":"Render the web page view as structured HTML - implementation plan","parent":"feature-brief:bf-0159","status":"draft"}
+{"seq":321,"ts":1787393520000,"page":"testing-plan:bf-0161","kind":"created","type":"testing-plan","title":"Render the web page view as structured HTML - testing plan","parent":"feature-brief:bf-0159","status":"draft"}
+{"seq":322,"ts":1787395320000,"page":"implementation-plan:bf-0160","kind":"status","from":"draft","to":"ready"}
+{"seq":323,"ts":1787396220000,"page":"testing-plan:bf-0161","kind":"status","from":"draft","to":"ready"}
+{"seq":324,"ts":1787397120000,"page":"feature-brief:bf-0159","kind":"status","from":"draft","to":"shipped"}
+{"seq":325,"ts":1787402160000,"page":"simple-change:bf-0162","kind":"created","type":"simple-change","title":"Resolve page ids in list elements into titled links","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":326,"ts":1787405760000,"page":"simple-change:bf-0162","kind":"status","from":"draft","to":"closed"}
+{"seq":327,"ts":1787410800000,"page":"feature-brief:bf-0163","kind":"created","type":"feature-brief","title":"Declare block-bearing element fields and their command surface","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":328,"ts":1787410800000,"page":"implementation-plan:bf-0164","kind":"created","type":"implementation-plan","title":"Declare block-bearing element fields and their command surface - implementation plan","parent":"feature-brief:bf-0163","status":"draft"}
+{"seq":329,"ts":1787410800000,"page":"testing-plan:bf-0165","kind":"created","type":"testing-plan","title":"Declare block-bearing element fields and their command surface - testing plan","parent":"feature-brief:bf-0163","status":"draft"}
+{"seq":330,"ts":1787412600000,"page":"implementation-plan:bf-0164","kind":"status","from":"draft","to":"ready"}
+{"seq":331,"ts":1787413500000,"page":"testing-plan:bf-0165","kind":"status","from":"draft","to":"ready"}
+{"seq":332,"ts":1787414400000,"page":"feature-brief:bf-0163","kind":"status","from":"draft","to":"shipped"}
+{"seq":333,"ts":1787419440000,"page":"feature-brief:bf-0166","kind":"created","type":"feature-brief","title":"Give implementation-plan steps a block-bearing detail field","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":334,"ts":1787419440000,"page":"implementation-plan:bf-0167","kind":"created","type":"implementation-plan","title":"Give implementation-plan steps a block-bearing detail field - implementation plan","parent":"feature-brief:bf-0166","status":"draft"}
+{"seq":335,"ts":1787419440000,"page":"testing-plan:bf-0168","kind":"created","type":"testing-plan","title":"Give implementation-plan steps a block-bearing detail field - testing plan","parent":"feature-brief:bf-0166","status":"draft"}
+{"seq":336,"ts":1787421240000,"page":"implementation-plan:bf-0167","kind":"status","from":"draft","to":"ready"}
+{"seq":337,"ts":1787422140000,"page":"testing-plan:bf-0168","kind":"status","from":"draft","to":"ready"}
+{"seq":338,"ts":1787423040000,"page":"feature-brief:bf-0166","kind":"status","from":"draft","to":"shipped"}
+{"seq":339,"ts":1787428080000,"page":"feature-brief:bf-0169","kind":"created","type":"feature-brief","title":"Update page status styling, allow markdown=true to return the rendered markdown pages","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":340,"ts":1787428080000,"page":"implementation-plan:bf-0170","kind":"created","type":"implementation-plan","title":"Update page status styling, allow markdown=true to return the rendered markdown pages - implementation plan","parent":"feature-brief:bf-0169","status":"draft"}
+{"seq":341,"ts":1787428080000,"page":"testing-plan:bf-0171","kind":"created","type":"testing-plan","title":"Update page status styling, allow markdown=true to return the rendered markdown pages - testing plan","parent":"feature-brief:bf-0169","status":"draft"}
+{"seq":342,"ts":1787429880000,"page":"implementation-plan:bf-0170","kind":"status","from":"draft","to":"ready"}
+{"seq":343,"ts":1787430780000,"page":"testing-plan:bf-0171","kind":"status","from":"draft","to":"ready"}
+{"seq":344,"ts":1787431680000,"page":"feature-brief:bf-0169","kind":"status","from":"draft","to":"shipped"}
+{"seq":345,"ts":1787482800000,"page":"feature-brief:bf-0172","kind":"created","type":"feature-brief","title":"Declare BlockKindSpec, the block-kind vocabulary type","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":346,"ts":1787482800000,"page":"implementation-plan:bf-0173","kind":"created","type":"implementation-plan","title":"Declare BlockKindSpec, the block-kind vocabulary type - implementation plan","parent":"feature-brief:bf-0172","status":"draft"}
+{"seq":347,"ts":1787482800000,"page":"testing-plan:bf-0174","kind":"created","type":"testing-plan","title":"Declare BlockKindSpec, the block-kind vocabulary type - testing plan","parent":"feature-brief:bf-0172","status":"draft"}
+{"seq":348,"ts":1787484600000,"page":"implementation-plan:bf-0173","kind":"status","from":"draft","to":"ready"}
+{"seq":349,"ts":1787485500000,"page":"testing-plan:bf-0174","kind":"status","from":"draft","to":"ready"}
+{"seq":350,"ts":1787486400000,"page":"feature-brief:bf-0172","kind":"status","from":"draft","to":"shipped"}
+{"seq":351,"ts":1787497200000,"page":"feature-brief:bf-0175","kind":"created","type":"feature-brief","title":"Add sleep and retry on file replacement permission error","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":352,"ts":1787497200000,"page":"implementation-plan:bf-0176","kind":"created","type":"implementation-plan","title":"Add sleep and retry on file replacement permission error - implementation plan","parent":"feature-brief:bf-0175","status":"draft"}
+{"seq":353,"ts":1787497200000,"page":"testing-plan:bf-0177","kind":"created","type":"testing-plan","title":"Add sleep and retry on file replacement permission error - testing plan","parent":"feature-brief:bf-0175","status":"draft"}
+{"seq":354,"ts":1787499000000,"page":"implementation-plan:bf-0176","kind":"status","from":"draft","to":"ready"}
+{"seq":355,"ts":1787499900000,"page":"testing-plan:bf-0177","kind":"status","from":"draft","to":"ready"}
+{"seq":356,"ts":1787500800000,"page":"feature-brief:bf-0175","kind":"status","from":"draft","to":"shipped"}
+{"seq":357,"ts":1787511600000,"page":"feature-brief:bf-0178","kind":"created","type":"feature-brief","title":"Add pytest-testmon for incremental unit test support","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":358,"ts":1787511600000,"page":"implementation-plan:bf-0179","kind":"created","type":"implementation-plan","title":"Add pytest-testmon for incremental unit test support - implementation plan","parent":"feature-brief:bf-0178","status":"draft"}
+{"seq":359,"ts":1787511600000,"page":"testing-plan:bf-0180","kind":"created","type":"testing-plan","title":"Add pytest-testmon for incremental unit test support - testing plan","parent":"feature-brief:bf-0178","status":"draft"}
+{"seq":360,"ts":1787513400000,"page":"implementation-plan:bf-0179","kind":"status","from":"draft","to":"ready"}
+{"seq":361,"ts":1787514300000,"page":"testing-plan:bf-0180","kind":"status","from":"draft","to":"ready"}
+{"seq":362,"ts":1787515200000,"page":"feature-brief:bf-0178","kind":"status","from":"draft","to":"shipped"}
+{"seq":363,"ts":1787650130198,"page":"simple-change:mt8gqcd2-2065c2","kind":"created","type":"simple-change","title":"Drop the block set: a blocks field is add, remove, reorder","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":364,"ts":1787684384037,"page":"simple-change:mt914isl-8ecfc4","kind":"created","type":"simple-change","title":"Make initial_sections idempotent, and backfill from it in apply_command","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":365,"ts":1787685144419,"page":"simple-change:mt91ktib-5748b7","kind":"created","type":"simple-change","title":"Nav tree: bullet per node and status suffix in the link","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":366,"ts":1787685182529,"page":"simple-change:mt91lmwx-0f3695","kind":"created","type":"simple-change","title":"Render url-named fields as clickable links in the web view","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":367,"ts":1787685274712,"page":"feature-brief:mt91nm1k-10abf0","kind":"created","type":"feature-brief","title":"Block-arg helpers: replace BLOCK_ARGS/STANDARD_BLOCK_KINDS and drop block_vocabulary","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":368,"ts":1787685274712,"page":"implementation-plan:mt91nm1k-17bff4","kind":"created","type":"implementation-plan","title":"Block-arg helpers: replace BLOCK_ARGS/STANDARD_BLOCK_KINDS and drop block_vocabulary - implementation plan","parent":"feature-brief:mt91nm1k-10abf0","status":"draft"}
+{"seq":369,"ts":1787685274712,"page":"testing-plan:mt91nm1k-70c434","kind":"created","type":"testing-plan","title":"Block-arg helpers: replace BLOCK_ARGS/STANDARD_BLOCK_KINDS and drop block_vocabulary - testing plan","parent":"feature-brief:mt91nm1k-10abf0","status":"draft"}
+{"seq":370,"ts":1787687303000,"page":"simple-change:mt8gqcd2-2065c2","kind":"status","from":"draft","to":"closed"}
+{"seq":371,"ts":1787688683000,"page":"simple-change:mt914isl-8ecfc4","kind":"status","from":"draft","to":"closed"}
+{"seq":372,"ts":1787689626000,"page":"simple-change:mt91ktib-5748b7","kind":"status","from":"draft","to":"closed"}
+{"seq":373,"ts":1787689780000,"page":"simple-change:mt91lmwx-0f3695","kind":"status","from":"draft","to":"closed"}
+{"seq":374,"ts":1787827207657,"page":"simple-change:mtbe5q7d-06819d","kind":"created","type":"simple-change","title":"Clarify block-field prop naming (standardize on block_kinds)","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":375,"ts":1787827455000,"page":"implementation-plan:mt91nm1k-17bff4","kind":"status","from":"draft","to":"ready"}
+{"seq":376,"ts":1787828355000,"page":"testing-plan:mt91nm1k-70c434","kind":"status","from":"draft","to":"ready"}
+{"seq":377,"ts":1787829255000,"page":"feature-brief:mt91nm1k-10abf0","kind":"status","from":"draft","to":"shipped"}
+{"seq":378,"ts":1787850735000,"page":"simple-change:mtbe5q7d-06819d","kind":"status","from":"draft","to":"closed"}
+{"seq":379,"ts":1787856704000,"page":"feature-brief:bf-0181","kind":"created","type":"feature-brief","title":"Expose recordCommit on simple-change/bug-report and drop commit url","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":380,"ts":1787856704000,"page":"implementation-plan:bf-0182","kind":"created","type":"implementation-plan","title":"Expose recordCommit on simple-change/bug-report and drop commit url - implementation plan","parent":"feature-brief:bf-0181","status":"draft"}
+{"seq":381,"ts":1787856704000,"page":"testing-plan:bf-0183","kind":"created","type":"testing-plan","title":"Expose recordCommit on simple-change/bug-report and drop commit url - testing plan","parent":"feature-brief:bf-0181","status":"draft"}
+{"seq":382,"ts":1787858504000,"page":"implementation-plan:bf-0182","kind":"status","from":"draft","to":"ready"}
+{"seq":383,"ts":1787859404000,"page":"testing-plan:bf-0183","kind":"status","from":"draft","to":"ready"}
+{"seq":384,"ts":1787860304000,"page":"feature-brief:bf-0181","kind":"status","from":"draft","to":"shipped"}
+{"seq":385,"ts":1787863546970,"page":"feature-brief:mtbzslsq-b27da5","kind":"created","type":"feature-brief","title":"Gate the review stage on every step/case, add a skipped mark","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":386,"ts":1787863546970,"page":"implementation-plan:mtbzslsq-6526b1","kind":"created","type":"implementation-plan","title":"Gate the review stage on every step/case, add a skipped mark - implementation plan","parent":"feature-brief:mtbzslsq-b27da5","status":"draft"}
+{"seq":387,"ts":1787863546970,"page":"testing-plan:mtbzslsq-8edc3c","kind":"created","type":"testing-plan","title":"Gate the review stage on every step/case, add a skipped mark - testing plan","parent":"feature-brief:mtbzslsq-b27da5","status":"draft"}
+{"seq":388,"ts":1787902958296,"page":"feature-brief:mtcn9brs-55efa8","kind":"created","type":"feature-brief","title":"Split validation out of __post_init__ into a recursive validations pass","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":389,"ts":1787902958296,"page":"implementation-plan:mtcn9brs-e267e6","kind":"created","type":"implementation-plan","title":"Split validation out of __post_init__ into a recursive validations pass - implementation plan","parent":"feature-brief:mtcn9brs-55efa8","status":"draft"}
+{"seq":390,"ts":1787902958296,"page":"testing-plan:mtcn9brs-f2c4c3","kind":"created","type":"testing-plan","title":"Split validation out of __post_init__ into a recursive validations pass - testing plan","parent":"feature-brief:mtcn9brs-55efa8","status":"draft"}
+{"seq":391,"ts":1787903391000,"page":"implementation-plan:mtbzslsq-6526b1","kind":"status","from":"draft","to":"ready"}
+{"seq":392,"ts":1787904291000,"page":"testing-plan:mtbzslsq-8edc3c","kind":"status","from":"draft","to":"ready"}
+{"seq":393,"ts":1787905191000,"page":"feature-brief:mtbzslsq-b27da5","kind":"status","from":"draft","to":"shipped"}
+{"seq":394,"ts":1787924530725,"page":"feature-brief:mtd03p5x-fd743c","kind":"created","type":"feature-brief","title":"Add a per-command status_revision_token optimistic-concurrency stamp","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":395,"ts":1787924530725,"page":"implementation-plan:mtd03p5x-749ecf","kind":"created","type":"implementation-plan","title":"Add a per-command status_revision_token optimistic-concurrency stamp - implementation plan","parent":"feature-brief:mtd03p5x-fd743c","status":"draft"}
+{"seq":396,"ts":1787924530725,"page":"testing-plan:mtd03p5y-a88366","kind":"created","type":"testing-plan","title":"Add a per-command status_revision_token optimistic-concurrency stamp - testing plan","parent":"feature-brief:mtd03p5x-fd743c","status":"draft"}
+{"seq":397,"ts":1787925421000,"page":"implementation-plan:mtcn9brs-e267e6","kind":"status","from":"draft","to":"ready"}
+{"seq":398,"ts":1787926321000,"page":"testing-plan:mtcn9brs-f2c4c3","kind":"status","from":"draft","to":"ready"}
+{"seq":399,"ts":1787927221000,"page":"feature-brief:mtcn9brs-55efa8","kind":"status","from":"draft","to":"shipped"}
+{"seq":400,"ts":1787970757000,"page":"implementation-plan:mtd03p5x-749ecf","kind":"status","from":"draft","to":"ready"}
+{"seq":401,"ts":1787971657000,"page":"testing-plan:mtd03p5y-a88366","kind":"status","from":"draft","to":"ready"}
+{"seq":402,"ts":1787972557000,"page":"feature-brief:mtd03p5x-fd743c","kind":"status","from":"draft","to":"shipped"}
+{"seq":403,"ts":1787989590347,"page":"feature-brief:mte2u5hn-87a8f5","kind":"created","type":"feature-brief","title":"Add mutable per-workspace guidance texts","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":404,"ts":1787989590347,"page":"implementation-plan:mte2u5hn-f0bdb1","kind":"created","type":"implementation-plan","title":"Add mutable per-workspace guidance texts - implementation plan","parent":"feature-brief:mte2u5hn-87a8f5","status":"draft"}
+{"seq":405,"ts":1787989590347,"page":"testing-plan:mte2u5hn-5b13b8","kind":"created","type":"testing-plan","title":"Add mutable per-workspace guidance texts - testing plan","parent":"feature-brief:mte2u5hn-87a8f5","status":"draft"}
+{"seq":406,"ts":1787989886610,"page":"simple-change:mte30i36-c3800b","kind":"created","type":"simple-change","title":"Move status_revision_token into each command's args","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":407,"ts":1787996742000,"page":"simple-change:mte30i36-c3800b","kind":"status","from":"draft","to":"closed"}
+{"seq":408,"ts":1788117981000,"page":"implementation-plan:mte2u5hn-f0bdb1","kind":"status","from":"draft","to":"ready"}
+{"seq":409,"ts":1788118881000,"page":"testing-plan:mte2u5hn-5b13b8","kind":"status","from":"draft","to":"ready"}
+{"seq":410,"ts":1788119781000,"page":"feature-brief:mte2u5hn-87a8f5","kind":"status","from":"draft","to":"shipped"}
+{"seq":411,"ts":1788121057607,"page":"bug-report:mtg93y9z-f3bee2","kind":"created","type":"bug-report","title":"Retire the pagetypes package __init__ import hub","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":412,"ts":1788200405000,"page":"simple-change:bf-0184","kind":"created","type":"simple-change","title":"PEP8 style cleanup: blank-line spacing, comment tone, remove shadowed md2html","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":413,"ts":1788201161000,"page":"bug-report:mtg93y9z-f3bee2","kind":"status","from":"draft","to":"closed"}
+{"seq":414,"ts":1788204005000,"page":"simple-change:bf-0184","kind":"status","from":"draft","to":"closed"}
+{"seq":415,"ts":1788206016813,"page":"simple-change:mthnox7x-b482d7","kind":"created","type":"simple-change","title":"Convert pagetypes/core class methods to module-level functions","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":416,"ts":1788260629000,"page":"simple-change:bf-0185","kind":"created","type":"simple-change","title":"Rename page-workflow \"state\" to \"status\" in prose and local names","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":417,"ts":1788261835000,"page":"simple-change:mthnox7x-b482d7","kind":"status","from":"draft","to":"closed"}
+{"seq":418,"ts":1788262210398,"page":"bug-report:mtil5cgu-637123","kind":"created","type":"bug-report","title":"Carry guidance once, inside `next`, on every write","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":419,"ts":1788264229000,"page":"simple-change:bf-0185","kind":"status","from":"draft","to":"closed"}
+{"seq":420,"ts":1788264627952,"page":"feature-brief:mtiml5v4-6c209f","kind":"created","type":"feature-brief","title":"Surface stage-entry commands in `do`: a legal_in command highlights where its scope opens","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":421,"ts":1788264627952,"page":"implementation-plan:mtiml5v5-6eeb03","kind":"created","type":"implementation-plan","title":"Surface stage-entry commands in `do`: a legal_in command highlights where its scope opens - implementation plan","parent":"feature-brief:mtiml5v4-6c209f","status":"draft"}
+{"seq":422,"ts":1788264627952,"page":"testing-plan:mtiml5v5-87add0","kind":"created","type":"testing-plan","title":"Surface stage-entry commands in `do`: a legal_in command highlights where its scope opens - testing plan","parent":"feature-brief:mtiml5v4-6c209f","status":"draft"}
+{"seq":423,"ts":1788268009000,"page":"bug-report:mtil5cgu-637123","kind":"status","from":"draft","to":"closed"}
+{"seq":424,"ts":1788271164000,"page":"feature-brief:bf-0186","kind":"created","type":"feature-brief","title":"Rewrite README.md as a user-facing GitHub landing page","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":425,"ts":1788271164000,"page":"implementation-plan:bf-0187","kind":"created","type":"implementation-plan","title":"Rewrite README.md as a user-facing GitHub landing page - implementation plan","parent":"feature-brief:bf-0186","status":"draft"}
+{"seq":426,"ts":1788271164000,"page":"testing-plan:bf-0188","kind":"created","type":"testing-plan","title":"Rewrite README.md as a user-facing GitHub landing page - testing plan","parent":"feature-brief:bf-0186","status":"draft"}
+{"seq":427,"ts":1788272964000,"page":"implementation-plan:bf-0187","kind":"status","from":"draft","to":"ready"}
+{"seq":428,"ts":1788273864000,"page":"testing-plan:bf-0188","kind":"status","from":"draft","to":"ready"}
+{"seq":429,"ts":1788274035000,"page":"bug-report:bf-0189","kind":"created","type":"bug-report","title":"Report the revision a rejected batch leaves behind","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":430,"ts":1788274251869,"page":"simple-change:mtisbfq5-9c02c8","kind":"created","type":"simple-change","title":"Read page types through one `registered_pagetypes()` accessor","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":431,"ts":1788274764000,"page":"feature-brief:bf-0186","kind":"status","from":"draft","to":"shipped"}
+{"seq":432,"ts":1788277635000,"page":"bug-report:bf-0189","kind":"status","from":"draft","to":"closed"}
+{"seq":433,"ts":1788355345780,"page":"feature-brief:mtk4lk6s-7ee69a","kind":"created","type":"feature-brief","title":"Let the doc renderer choose its bindings, and derive page machines from the registry","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":434,"ts":1788355345780,"page":"implementation-plan:mtk4lk6t-fe4243","kind":"created","type":"implementation-plan","title":"Let the doc renderer choose its bindings, and derive page machines from the registry - implementation plan","parent":"feature-brief:mtk4lk6s-7ee69a","status":"draft"}
+{"seq":435,"ts":1788355345780,"page":"testing-plan:mtk4lk6t-234b2e","kind":"created","type":"testing-plan","title":"Let the doc renderer choose its bindings, and derive page machines from the registry - testing plan","parent":"feature-brief:mtk4lk6s-7ee69a","status":"draft"}
+{"seq":436,"ts":1788360605000,"page":"simple-change:mtisbfq5-9c02c8","kind":"status","from":"draft","to":"closed"}
+{"seq":437,"ts":1788371436421,"page":"simple-change:mtke6ft1-9723f0","kind":"created","type":"simple-change","title":"Build each page type's status machine eagerly and report failures through validation","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":438,"ts":1788373441000,"page":"implementation-plan:mtk4lk6t-fe4243","kind":"status","from":"draft","to":"ready"}
+{"seq":439,"ts":1788374341000,"page":"testing-plan:mtk4lk6t-234b2e","kind":"status","from":"draft","to":"ready"}
+{"seq":440,"ts":1788375241000,"page":"feature-brief:mtk4lk6s-7ee69a","kind":"status","from":"draft","to":"shipped"}
+{"seq":441,"ts":1788376807592,"page":"feature-brief:mtkhdk88-6138eb","kind":"created","type":"feature-brief","title":"Build element FSM machines with the page type that declares them","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":442,"ts":1788376807592,"page":"implementation-plan:mtkhdk88-8075bc","kind":"created","type":"implementation-plan","title":"Build element FSM machines with the page type that declares them - implementation plan","parent":"feature-brief:mtkhdk88-6138eb","status":"draft"}
+{"seq":443,"ts":1788376807592,"page":"testing-plan:mtkhdk88-e7683f","kind":"created","type":"testing-plan","title":"Build element FSM machines with the page type that declares them - testing plan","parent":"feature-brief:mtkhdk88-6138eb","status":"draft"}
+{"seq":444,"ts":1788379792000,"page":"simple-change:mtke6ft1-9723f0","kind":"status","from":"draft","to":"closed"}
+{"seq":445,"ts":1788516975000,"page":"implementation-plan:mtkhdk88-8075bc","kind":"status","from":"draft","to":"ready"}
+{"seq":446,"ts":1788517875000,"page":"testing-plan:mtkhdk88-e7683f","kind":"status","from":"draft","to":"ready"}
+{"seq":447,"ts":1788518775000,"page":"feature-brief:mtkhdk88-6138eb","kind":"status","from":"draft","to":"shipped"}
+{"seq":448,"ts":1789239808489,"page":"simple-change:mtyr6nzd-05cb5a","kind":"created","type":"simple-change","title":"Move `ElementBlocksSpec` from `args.py` to `fields.py`","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":449,"ts":1789239943633,"page":"simple-change:mtyr9k9d-06c180","kind":"created","type":"simple-change","title":"Add a `groundingTool` guidance field, and fix where `mergeProcess` shows","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":450,"ts":1789243709940,"page":"bug-report:mtytiad0-00af23","kind":"created","type":"bug-report","title":"Match a search term through the emphasis or quotes wrapping it","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":451,"ts":1789244995251,"page":"simple-change:mtyu9u43-75dd8c","kind":"created","type":"simple-change","title":"Label the guidance texts surfaced in `next` / `nextActions`","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":452,"ts":1789246288000,"page":"simple-change:mtyr9k9d-06c180","kind":"status","from":"draft","to":"closed"}
+{"seq":453,"ts":1789249883000,"page":"simple-change:mtyu9u43-75dd8c","kind":"status","from":"draft","to":"closed"}
+{"seq":454,"ts":1789251696000,"page":"simple-change:mtyr6nzd-05cb5a","kind":"status","from":"draft","to":"closed"}
+{"seq":455,"ts":1789647124422,"page":"bug-report:mu5houyu-344a56","kind":"created","type":"bug-report","title":"Refuse to serve page types that did not validate, and report the failed reload","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":456,"ts":1789650986000,"page":"bug-report:mtytiad0-00af23","kind":"status","from":"draft","to":"closed"}
+{"seq":457,"ts":1789653326000,"page":"bug-report:mu5houyu-344a56","kind":"status","from":"draft","to":"closed"}
+{"seq":458,"ts":1790671726295,"page":"feature-brief:mumfpmtz-f10791","kind":"created","type":"feature-brief","title":"Archived pages are only deleted when scheduled for deletion","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":459,"ts":1790671726295,"page":"implementation-plan:mumfpmtz-ab69c6","kind":"created","type":"implementation-plan","title":"Archived pages are only deleted when scheduled for deletion - implementation plan","parent":"feature-brief:mumfpmtz-f10791","status":"draft"}
+{"seq":460,"ts":1790671726295,"page":"testing-plan:mumfpmtz-14fd6a","kind":"created","type":"testing-plan","title":"Archived pages are only deleted when scheduled for deletion - testing plan","parent":"feature-brief:mumfpmtz-f10791","status":"draft"}
+{"seq":461,"ts":1790675109761,"page":"feature-brief:mumhq5j5-651720","kind":"created","type":"feature-brief","title":"Add a done state to the feature-brief lifecycle","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":462,"ts":1790675109761,"page":"implementation-plan:mumhq5j5-2d339e","kind":"created","type":"implementation-plan","title":"Add a done state to the feature-brief lifecycle - implementation plan","parent":"feature-brief:mumhq5j5-651720","status":"draft"}
+{"seq":463,"ts":1790675109761,"page":"testing-plan:mumhq5j5-0f81e3","kind":"created","type":"testing-plan","title":"Add a done state to the feature-brief lifecycle - testing plan","parent":"feature-brief:mumhq5j5-651720","status":"draft"}
+{"seq":464,"ts":1790676760000,"page":"implementation-plan:mumfpmtz-ab69c6","kind":"status","from":"draft","to":"ready"}
+{"seq":465,"ts":1790677660000,"page":"testing-plan:mumfpmtz-14fd6a","kind":"status","from":"draft","to":"ready"}
+{"seq":466,"ts":1790678560000,"page":"feature-brief:mumfpmtz-f10791","kind":"status","from":"draft","to":"shipped"}
+{"seq":467,"ts":1790679024268,"page":"feature-brief:mumk21zg-588866","kind":"created","type":"feature-brief","title":"Make the MCP instructions self-describing; require a type for describePageType","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":468,"ts":1790679024268,"page":"implementation-plan:mumk21zg-1eb06b","kind":"created","type":"implementation-plan","title":"Make the MCP instructions self-describing; require a type for describePageType - implementation plan","parent":"feature-brief:mumk21zg-588866","status":"draft"}
+{"seq":469,"ts":1790679024268,"page":"testing-plan:mumk21zg-adb5f3","kind":"created","type":"testing-plan","title":"Make the MCP instructions self-describing; require a type for describePageType - testing plan","parent":"feature-brief:mumk21zg-588866","status":"draft"}
+{"seq":470,"ts":1790679128000,"page":"simple-change:bf-0190","kind":"created","type":"simple-change","title":"Show the done stage in the README lifecycle diagram","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":471,"ts":1790679743000,"page":"implementation-plan:mumhq5j5-2d339e","kind":"status","from":"draft","to":"ready"}
+{"seq":472,"ts":1790680643000,"page":"testing-plan:mumhq5j5-0f81e3","kind":"status","from":"draft","to":"ready"}
+{"seq":473,"ts":1790681543000,"page":"feature-brief:mumhq5j5-651720","kind":"status","from":"draft","to":"shipped"}
+{"seq":474,"ts":1790682728000,"page":"simple-change:bf-0190","kind":"status","from":"draft","to":"closed"}
+{"seq":475,"ts":1790757733000,"page":"implementation-plan:mumk21zg-1eb06b","kind":"status","from":"draft","to":"ready"}
+{"seq":476,"ts":1790758633000,"page":"testing-plan:mumk21zg-adb5f3","kind":"status","from":"draft","to":"ready"}
+{"seq":477,"ts":1790759533000,"page":"feature-brief:mumk21zg-588866","kind":"status","from":"draft","to":"shipped"}
+{"seq":478,"ts":1790924325376,"page":"simple-change:muqm3pj4-6873e3","kind":"created","type":"simple-change","title":"Review guidance: prune tests on removed code and concept-explaining comments","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":479,"ts":1790924702602,"page":"feature-brief:muqmbslm-a61298","kind":"created","type":"feature-brief","title":"Pyright stage 1: per-kind command dataclasses","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":480,"ts":1790924702602,"page":"implementation-plan:muqmbslm-7c982d","kind":"created","type":"implementation-plan","title":"Pyright stage 1: per-kind command dataclasses - implementation plan","parent":"feature-brief:muqmbslm-a61298","status":"draft"}
+{"seq":481,"ts":1790924702602,"page":"testing-plan:muqmbslm-b765b8","kind":"created","type":"testing-plan","title":"Pyright stage 1: per-kind command dataclasses - testing plan","parent":"feature-brief:muqmbslm-a61298","status":"draft"}
+{"seq":482,"ts":1790928257000,"page":"simple-change:muqm3pj4-6873e3","kind":"status","from":"draft","to":"closed"}
+{"seq":483,"ts":1791829518000,"page":"implementation-plan:mtiml5v5-6eeb03","kind":"status","from":"draft","to":"ready"}
+{"seq":484,"ts":1791830418000,"page":"testing-plan:mtiml5v5-87add0","kind":"status","from":"draft","to":"ready"}
+{"seq":485,"ts":1791831318000,"page":"feature-brief:mtiml5v4-6c209f","kind":"status","from":"draft","to":"shipped"}
+{"seq":486,"ts":1792073939262,"page":"feature-brief:mv9mjxa6-7152e9","kind":"created","type":"feature-brief","title":"Pyright stage 2: type the HMR dev tooling (0 errors)","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":487,"ts":1792073939262,"page":"implementation-plan:mv9mjxa7-0d822b","kind":"created","type":"implementation-plan","title":"Pyright stage 2: type the HMR dev tooling (0 errors) - implementation plan","parent":"feature-brief:mv9mjxa6-7152e9","status":"draft"}
+{"seq":488,"ts":1792073939262,"page":"testing-plan:mv9mjxa7-b5e55b","kind":"created","type":"testing-plan","title":"Pyright stage 2: type the HMR dev tooling (0 errors) - testing plan","parent":"feature-brief:mv9mjxa6-7152e9","status":"draft"}
+{"seq":489,"ts":1792074862000,"page":"implementation-plan:muqmbslm-7c982d","kind":"status","from":"draft","to":"ready"}
+{"seq":490,"ts":1792075762000,"page":"testing-plan:muqmbslm-b765b8","kind":"status","from":"draft","to":"ready"}
+{"seq":491,"ts":1792076447997,"page":"feature-brief:mv9o1p19-8501da","kind":"created","type":"feature-brief","title":"Pyright stage 3: type the JSON page data in product code","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":492,"ts":1792076447997,"page":"implementation-plan:mv9o1p1a-0ce868","kind":"created","type":"implementation-plan","title":"Pyright stage 3: type the JSON page data in product code - implementation plan","parent":"feature-brief:mv9o1p19-8501da","status":"draft"}
+{"seq":493,"ts":1792076447997,"page":"testing-plan:mv9o1p1a-f59ee5","kind":"created","type":"testing-plan","title":"Pyright stage 3: type the JSON page data in product code - testing plan","parent":"feature-brief:mv9o1p19-8501da","status":"draft"}
+{"seq":494,"ts":1792076448211,"page":"feature-brief:mv9o1p77-457515","kind":"created","type":"feature-brief","title":"Pyright stage 4: clear the lint rules so basedpyright passes as a gate","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":495,"ts":1792076448211,"page":"implementation-plan:mv9o1p77-023691","kind":"created","type":"implementation-plan","title":"Pyright stage 4: clear the lint rules so basedpyright passes as a gate - implementation plan","parent":"feature-brief:mv9o1p77-457515","status":"draft"}
+{"seq":496,"ts":1792076448211,"page":"testing-plan:mv9o1p77-b00bc6","kind":"created","type":"testing-plan","title":"Pyright stage 4: clear the lint rules so basedpyright passes as a gate - testing plan","parent":"feature-brief:mv9o1p77-457515","status":"draft"}
+{"seq":497,"ts":1792076662000,"page":"feature-brief:muqmbslm-a61298","kind":"status","from":"draft","to":"shipped"}
+{"seq":498,"ts":1792077390285,"page":"bug-report:mv9olw3x-58f199","kind":"created","type":"bug-report","title":"Reject a ref argument that is not an id instead of crashing the ref check","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":499,"ts":1792077391569,"page":"bug-report:mv9olx3l-fba0e6","kind":"created","type":"bug-report","title":"Abort a batch whose command args are not an object instead of crashing","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":500,"ts":1792078295000,"page":"implementation-plan:mv9mjxa7-0d822b","kind":"status","from":"draft","to":"ready"}
+{"seq":501,"ts":1792079195000,"page":"testing-plan:mv9mjxa7-b5e55b","kind":"status","from":"draft","to":"ready"}
+{"seq":502,"ts":1792080095000,"page":"feature-brief:mv9mjxa6-7152e9","kind":"status","from":"draft","to":"shipped"}
+{"seq":503,"ts":1792083718620,"page":"bug-report:mv9sdj30-2cc7fc","kind":"created","type":"bug-report","title":"Type-check a block's body args the way a command's args are checked","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":504,"ts":1792085057000,"page":"implementation-plan:mv9o1p1a-0ce868","kind":"status","from":"draft","to":"ready"}
+{"seq":505,"ts":1792085957000,"page":"testing-plan:mv9o1p1a-f59ee5","kind":"status","from":"draft","to":"ready"}
+{"seq":506,"ts":1792086857000,"page":"feature-brief:mv9o1p19-8501da","kind":"status","from":"draft","to":"shipped"}
+{"seq":507,"ts":1792092966000,"page":"bug-report:mv9olw3x-58f199","kind":"status","from":"draft","to":"closed"}
+{"seq":508,"ts":1792093075000,"page":"bug-report:mv9olx3l-fba0e6","kind":"status","from":"draft","to":"closed"}
+{"seq":509,"ts":1792093570000,"page":"bug-report:mv9sdj30-2cc7fc","kind":"status","from":"draft","to":"closed"}
+{"seq":510,"ts":1792419187230,"page":"feature-brief:mvfc3sbi-d512cc","kind":"created","type":"feature-brief","title":"Give the web UI a pink colour theme in light and dark","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":511,"ts":1792419187230,"page":"implementation-plan:mvfc3sbi-daaf44","kind":"created","type":"implementation-plan","title":"Give the web UI a pink colour theme in light and dark - implementation plan","parent":"feature-brief:mvfc3sbi-d512cc","status":"draft"}
+{"seq":512,"ts":1792419187230,"page":"testing-plan:mvfc3sbi-bfca2e","kind":"created","type":"testing-plan","title":"Give the web UI a pink colour theme in light and dark - testing plan","parent":"feature-brief:mvfc3sbi-d512cc","status":"draft"}
+{"seq":513,"ts":1792503167000,"page":"implementation-plan:mvfc3sbi-daaf44","kind":"status","from":"draft","to":"ready"}
+{"seq":514,"ts":1792504067000,"page":"testing-plan:mvfc3sbi-bfca2e","kind":"status","from":"draft","to":"ready"}
+{"seq":515,"ts":1792504967000,"page":"feature-brief:mvfc3sbi-d512cc","kind":"status","from":"draft","to":"shipped"}
+{"seq":516,"ts":1792568935118,"page":"feature-brief:mvht9ej2-e568f1","kind":"created","type":"feature-brief","title":"Link pinned children and the parent page from the top of a page","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":517,"ts":1792568935118,"page":"implementation-plan:mvht9ej4-e8ae2e","kind":"created","type":"implementation-plan","title":"Link pinned children and the parent page from the top of a page - implementation plan","parent":"feature-brief:mvht9ej2-e568f1","status":"draft"}
+{"seq":518,"ts":1792568935118,"page":"testing-plan:mvht9ej4-d3fb2f","kind":"created","type":"testing-plan","title":"Link pinned children and the parent page from the top of a page - testing plan","parent":"feature-brief:mvht9ej2-e568f1","status":"draft"}
+{"seq":519,"ts":1792578866000,"page":"implementation-plan:mv9o1p77-023691","kind":"status","from":"draft","to":"ready"}
+{"seq":520,"ts":1792579766000,"page":"testing-plan:mv9o1p77-b00bc6","kind":"status","from":"draft","to":"ready"}
+{"seq":521,"ts":1792580666000,"page":"feature-brief:mv9o1p77-457515","kind":"status","from":"draft","to":"shipped"}
+{"seq":522,"ts":1793702961968,"page":"feature-brief:mw0kfj8w-ab4d9b","kind":"created","type":"feature-brief","title":"Drop populated fields' instructions from mutatePageBatch's next","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":523,"ts":1793702961968,"page":"implementation-plan:mw0kfj8x-d8bcd7","kind":"created","type":"implementation-plan","title":"Drop populated fields' instructions from mutatePageBatch's next - implementation plan","parent":"feature-brief:mw0kfj8w-ab4d9b","status":"draft"}
+{"seq":524,"ts":1793702961968,"page":"testing-plan:mw0kfj8x-e6e564","kind":"created","type":"testing-plan","title":"Drop populated fields' instructions from mutatePageBatch's next - testing plan","parent":"feature-brief:mw0kfj8w-ab4d9b","status":"draft"}
+{"seq":525,"ts":1793704341405,"page":"feature-brief:mw0l93ml-a44e6b","kind":"created","type":"feature-brief","title":"Store a backtick code span as a code run instead of rejecting it","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":526,"ts":1793704341405,"page":"implementation-plan:mw0l93mm-6920c7","kind":"created","type":"implementation-plan","title":"Store a backtick code span as a code run instead of rejecting it - implementation plan","parent":"feature-brief:mw0l93ml-a44e6b","status":"draft"}
+{"seq":527,"ts":1793704341405,"page":"testing-plan:mw0l93mm-58c225","kind":"created","type":"testing-plan","title":"Store a backtick code span as a code run instead of rejecting it - testing plan","parent":"feature-brief:mw0l93ml-a44e6b","status":"draft"}
+{"seq":528,"ts":1793970383437,"page":"feature-brief:mw4znaz1-e5165a","kind":"created","type":"feature-brief","title":"Send stage guidance from mutatePageBatch only on a transition","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":529,"ts":1793970383437,"page":"implementation-plan:mw4znaz2-a6a057","kind":"created","type":"implementation-plan","title":"Send stage guidance from mutatePageBatch only on a transition - implementation plan","parent":"feature-brief:mw4znaz1-e5165a","status":"draft"}
+{"seq":530,"ts":1793970383437,"page":"testing-plan:mw4znaz2-18096f","kind":"created","type":"testing-plan","title":"Send stage guidance from mutatePageBatch only on a transition - testing plan","parent":"feature-brief:mw4znaz1-e5165a","status":"draft"}
+{"seq":531,"ts":1793971817000,"page":"implementation-plan:mw0kfj8x-d8bcd7","kind":"status","from":"draft","to":"ready"}
+{"seq":532,"ts":1793972717000,"page":"testing-plan:mw0kfj8x-e6e564","kind":"status","from":"draft","to":"ready"}
+{"seq":533,"ts":1793973617000,"page":"feature-brief:mw0kfj8w-ab4d9b","kind":"status","from":"draft","to":"shipped"}
+{"seq":534,"ts":1793974396000,"page":"implementation-plan:mw0l93mm-6920c7","kind":"status","from":"draft","to":"ready"}
+{"seq":535,"ts":1793975296000,"page":"testing-plan:mw0l93mm-58c225","kind":"status","from":"draft","to":"ready"}
+{"seq":536,"ts":1793976196000,"page":"feature-brief:mw0l93ml-a44e6b","kind":"status","from":"draft","to":"shipped"}
+{"seq":537,"ts":1793976561779,"page":"feature-brief:mw53bq7n-a128c5","kind":"created","type":"feature-brief","title":"Send a full mutatePageBatch next on a transition and once guidance has lapsed","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":538,"ts":1793976561779,"page":"implementation-plan:mw53bq7n-d798c9","kind":"created","type":"implementation-plan","title":"Send a full mutatePageBatch next on a transition and once guidance has lapsed - implementation plan","parent":"feature-brief:mw53bq7n-a128c5","status":"draft"}
+{"seq":539,"ts":1793976561779,"page":"testing-plan:mw53bq7n-563cc9","kind":"created","type":"testing-plan","title":"Send a full mutatePageBatch next on a transition and once guidance has lapsed - testing plan","parent":"feature-brief:mw53bq7n-a128c5","status":"draft"}
+{"seq":540,"ts":1793976783000,"page":"implementation-plan:mw4znaz2-a6a057","kind":"status","from":"draft","to":"ready"}
+{"seq":541,"ts":1793977683000,"page":"testing-plan:mw4znaz2-18096f","kind":"status","from":"draft","to":"ready"}
+{"seq":542,"ts":1793978583000,"page":"feature-brief:mw4znaz1-e5165a","kind":"status","from":"draft","to":"shipped"}
+{"seq":543,"ts":1794000533218,"page":"feature-brief:mw5hlioy-20d166","kind":"created","type":"feature-brief","title":"Allow single balanced backticks in a text run","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":544,"ts":1794000533218,"page":"implementation-plan:mw5hlioy-af383d","kind":"created","type":"implementation-plan","title":"Allow single balanced backticks in a text run - implementation plan","parent":"feature-brief:mw5hlioy-20d166","status":"draft"}
+{"seq":545,"ts":1794000533218,"page":"testing-plan:mw5hlioy-48ca23","kind":"created","type":"testing-plan","title":"Allow single balanced backticks in a text run - testing plan","parent":"feature-brief:mw5hlioy-20d166","status":"draft"}
+{"seq":546,"ts":1794000834166,"page":"feature-brief:mw5hrywm-7ffca7","kind":"created","type":"feature-brief","title":"Retire the pasta skill name in favour of cook","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":547,"ts":1794000834166,"page":"implementation-plan:mw5hrywm-3a887d","kind":"created","type":"implementation-plan","title":"Retire the pasta skill name in favour of cook - implementation plan","parent":"feature-brief:mw5hrywm-7ffca7","status":"draft"}
+{"seq":548,"ts":1794000834166,"page":"testing-plan:mw5hrywm-50777f","kind":"created","type":"testing-plan","title":"Retire the pasta skill name in favour of cook - testing plan","parent":"feature-brief:mw5hrywm-7ffca7","status":"draft"}
+{"seq":549,"ts":1794001806000,"page":"implementation-plan:mw53bq7n-d798c9","kind":"status","from":"draft","to":"ready"}
+{"seq":550,"ts":1794002078000,"page":"implementation-plan:mvht9ej4-e8ae2e","kind":"status","from":"draft","to":"ready"}
+{"seq":551,"ts":1794002706000,"page":"testing-plan:mw53bq7n-563cc9","kind":"status","from":"draft","to":"ready"}
+{"seq":552,"ts":1794002978000,"page":"testing-plan:mvht9ej4-d3fb2f","kind":"status","from":"draft","to":"ready"}
+{"seq":553,"ts":1794003606000,"page":"feature-brief:mw53bq7n-a128c5","kind":"status","from":"draft","to":"shipped"}
+{"seq":554,"ts":1794003878000,"page":"feature-brief:mvht9ej2-e568f1","kind":"status","from":"draft","to":"shipped"}
+{"seq":555,"ts":1794003993000,"page":"implementation-plan:mw5hlioy-af383d","kind":"status","from":"draft","to":"ready"}
+{"seq":556,"ts":1794004114000,"page":"implementation-plan:mw5hrywm-3a887d","kind":"status","from":"draft","to":"ready"}
+{"seq":557,"ts":1794004893000,"page":"testing-plan:mw5hlioy-48ca23","kind":"status","from":"draft","to":"ready"}
+{"seq":558,"ts":1794005014000,"page":"testing-plan:mw5hrywm-50777f","kind":"status","from":"draft","to":"ready"}
+{"seq":559,"ts":1794005793000,"page":"feature-brief:mw5hlioy-20d166","kind":"status","from":"draft","to":"shipped"}
+{"seq":560,"ts":1794005914000,"page":"feature-brief:mw5hrywm-7ffca7","kind":"status","from":"draft","to":"shipped"}
+{"seq":561,"ts":1794042325664,"page":"feature-brief:mw66h9y8-378d1c","kind":"created","type":"feature-brief","title":"Upgrade dependencies to their latest releases, including FastMCP 4","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":562,"ts":1794042325664,"page":"implementation-plan:mw66h9y8-5b1f2a","kind":"created","type":"implementation-plan","title":"Upgrade dependencies to their latest releases, including FastMCP 4 - implementation plan","parent":"feature-brief:mw66h9y8-378d1c","status":"draft"}
+{"seq":563,"ts":1794042325664,"page":"testing-plan:mw66h9y8-587513","kind":"created","type":"testing-plan","title":"Upgrade dependencies to their latest releases, including FastMCP 4 - testing plan","parent":"feature-brief:mw66h9y8-378d1c","status":"draft"}
+{"seq":564,"ts":1794087999433,"page":"bug-report:mw6xo821-49d3cc","kind":"created","type":"bug-report","title":"Resolve a builtin in a docs signature by its exact name","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":565,"ts":1794089182000,"page":"implementation-plan:mw66h9y8-5b1f2a","kind":"status","from":"draft","to":"ready"}
+{"seq":566,"ts":1794090082000,"page":"testing-plan:mw66h9y8-587513","kind":"status","from":"draft","to":"ready"}
+{"seq":567,"ts":1794090167797,"page":"simple-change:mw6yyp6d-b9b66e","kind":"created","type":"simple-change","title":"Write inline code in docstrings and comments with single backticks","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":568,"ts":1794090982000,"page":"feature-brief:mw66h9y8-378d1c","kind":"status","from":"draft","to":"shipped"}
+{"seq":569,"ts":1794093656000,"page":"bug-report:mw6xo821-49d3cc","kind":"status","from":"draft","to":"closed"}
+{"seq":570,"ts":1794094882000,"page":"simple-change:mw6yyp6d-b9b66e","kind":"status","from":"draft","to":"closed"}
+{"seq":571,"ts":1794134092000,"page":"simple-change:bf-0191","kind":"created","type":"simple-change","title":"Bump the uv group across 1 directory with 3 updates","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":572,"ts":1794137692000,"page":"simple-change:bf-0191","kind":"status","from":"draft","to":"closed"}
+{"seq":573,"ts":1794168244588,"page":"feature-brief:mw89g5m4-805cc7","kind":"created","type":"feature-brief","title":"Link the active git remote and an AGPL note in the web UI footer","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":574,"ts":1794168244588,"page":"implementation-plan:mw89g5m4-966f0c","kind":"created","type":"implementation-plan","title":"Link the active git remote and an AGPL note in the web UI footer - implementation plan","parent":"feature-brief:mw89g5m4-805cc7","status":"draft"}
+{"seq":575,"ts":1794168244588,"page":"testing-plan:mw89g5m4-8d04b3","kind":"created","type":"testing-plan","title":"Link the active git remote and an AGPL note in the web UI footer - testing plan","parent":"feature-brief:mw89g5m4-805cc7","status":"draft"}
+{"seq":576,"ts":1794170714389,"page":"feature-brief:mw8ax3bp-627909","kind":"created","type":"feature-brief","title":"Bottom link after Child pages and a floating Top link in the web UI","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":577,"ts":1794170714389,"page":"implementation-plan:mw8ax3bp-2ce380","kind":"created","type":"implementation-plan","title":"Bottom link after Child pages and a floating Top link in the web UI - implementation plan","parent":"feature-brief:mw8ax3bp-627909","status":"draft"}
+{"seq":578,"ts":1794170714389,"page":"testing-plan:mw8ax3bp-202f70","kind":"created","type":"testing-plan","title":"Bottom link after Child pages and a floating Top link in the web UI - testing plan","parent":"feature-brief:mw8ax3bp-627909","status":"draft"}
+{"seq":579,"ts":1794226529543,"page":"feature-brief:mw985ekn-63568e","kind":"created","type":"feature-brief","title":"Epic: record findings while executing, edit findings/contracts in place, controller-only notice","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":580,"ts":1794226529543,"page":"implementation-plan:mw985ekn-1b91c0","kind":"created","type":"implementation-plan","title":"Epic: record findings while executing, edit findings/contracts in place, controller-only notice - implementation plan","parent":"feature-brief:mw985ekn-63568e","status":"draft"}
+{"seq":581,"ts":1794226529543,"page":"testing-plan:mw985ekn-880622","kind":"created","type":"testing-plan","title":"Epic: record findings while executing, edit findings/contracts in place, controller-only notice - testing plan","parent":"feature-brief:mw985ekn-63568e","status":"draft"}
+{"seq":582,"ts":1794250931000,"page":"implementation-plan:mw8ax3bp-2ce380","kind":"status","from":"draft","to":"ready"}
+{"seq":583,"ts":1794251444000,"page":"implementation-plan:mw89g5m4-966f0c","kind":"status","from":"draft","to":"ready"}
+{"seq":584,"ts":1794251831000,"page":"testing-plan:mw8ax3bp-202f70","kind":"status","from":"draft","to":"ready"}
+{"seq":585,"ts":1794252344000,"page":"testing-plan:mw89g5m4-8d04b3","kind":"status","from":"draft","to":"ready"}
+{"seq":586,"ts":1794252731000,"page":"feature-brief:mw8ax3bp-627909","kind":"status","from":"draft","to":"shipped"}
+{"seq":587,"ts":1794253244000,"page":"feature-brief:mw89g5m4-805cc7","kind":"status","from":"draft","to":"shipped"}
+{"seq":588,"ts":1794255909489,"page":"feature-brief:mw9pn4a9-25ad3d","kind":"created","type":"feature-brief","title":"Split the epic's agent plan into one agent-plan page per agent","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":589,"ts":1794255909489,"page":"implementation-plan:mw9pn4a9-5b6fbc","kind":"created","type":"implementation-plan","title":"Split the epic's agent plan into one agent-plan page per agent - implementation plan","parent":"feature-brief:mw9pn4a9-25ad3d","status":"draft"}
+{"seq":590,"ts":1794255909489,"page":"testing-plan:mw9pn4a9-d26295","kind":"created","type":"testing-plan","title":"Split the epic's agent plan into one agent-plan page per agent - testing plan","parent":"feature-brief:mw9pn4a9-25ad3d","status":"draft"}
+{"seq":591,"ts":1794257250000,"page":"implementation-plan:mw985ekn-1b91c0","kind":"status","from":"draft","to":"ready"}
+{"seq":592,"ts":1794258150000,"page":"testing-plan:mw985ekn-880622","kind":"status","from":"draft","to":"ready"}
+{"seq":593,"ts":1794259050000,"page":"feature-brief:mw985ekn-63568e","kind":"status","from":"draft","to":"shipped"}
+{"seq":594,"ts":1794308969000,"page":"feature-brief:bf-0192","kind":"created","type":"feature-brief","title":"Add a page-type design brief and a pasta-workflow-creation skill","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":595,"ts":1794308969000,"page":"implementation-plan:bf-0193","kind":"created","type":"implementation-plan","title":"Add a page-type design brief and a pasta-workflow-creation skill - implementation plan","parent":"feature-brief:bf-0192","status":"draft"}
+{"seq":596,"ts":1794308969000,"page":"testing-plan:bf-0194","kind":"created","type":"testing-plan","title":"Add a page-type design brief and a pasta-workflow-creation skill - testing plan","parent":"feature-brief:bf-0192","status":"draft"}
+{"seq":597,"ts":1794310769000,"page":"implementation-plan:bf-0193","kind":"status","from":"draft","to":"ready"}
+{"seq":598,"ts":1794311669000,"page":"testing-plan:bf-0194","kind":"status","from":"draft","to":"ready"}
+{"seq":599,"ts":1794312496000,"page":"implementation-plan:mw9pn4a9-5b6fbc","kind":"status","from":"draft","to":"ready"}
+{"seq":600,"ts":1794312569000,"page":"feature-brief:bf-0192","kind":"status","from":"draft","to":"shipped"}
+{"seq":601,"ts":1794313396000,"page":"testing-plan:mw9pn4a9-d26295","kind":"status","from":"draft","to":"ready"}
+{"seq":602,"ts":1794314063714,"page":"feature-brief:mwao9kde-4a8483","kind":"created","type":"feature-brief","title":"Epic: delegated research and design stages, one solution investigation per direction and a pinned solution-design page","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":603,"ts":1794314063714,"page":"implementation-plan:mwao9kdf-631e10","kind":"created","type":"implementation-plan","title":"Epic: delegated research and design stages, one solution investigation per direction and a pinned solution-design page - implementation plan","parent":"feature-brief:mwao9kde-4a8483","status":"draft"}
+{"seq":604,"ts":1794314063714,"page":"testing-plan:mwao9kdf-892ab4","kind":"created","type":"testing-plan","title":"Epic: delegated research and design stages, one solution investigation per direction and a pinned solution-design page - testing plan","parent":"feature-brief:mwao9kde-4a8483","status":"draft"}
+{"seq":605,"ts":1794314296000,"page":"feature-brief:mw9pn4a9-25ad3d","kind":"status","from":"draft","to":"shipped"}
+{"seq":606,"ts":1794317178000,"page":"implementation-plan:mwao9kdf-631e10","kind":"status","from":"draft","to":"ready"}
+{"seq":607,"ts":1794318078000,"page":"testing-plan:mwao9kdf-892ab4","kind":"status","from":"draft","to":"ready"}
+{"seq":608,"ts":1794318978000,"page":"feature-brief:mwao9kde-4a8483","kind":"status","from":"draft","to":"shipped"}
+{"seq":609,"ts":1794335720788,"page":"feature-brief:mwb15r2s-dae659","kind":"created","type":"feature-brief","title":"Add getWorkspaceGuidance to read every workspace guidance field","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":610,"ts":1794335720788,"page":"implementation-plan:mwb15r2s-a10f35","kind":"created","type":"implementation-plan","title":"Add getWorkspaceGuidance to read every workspace guidance field - implementation plan","parent":"feature-brief:mwb15r2s-dae659","status":"draft"}
+{"seq":611,"ts":1794335720788,"page":"testing-plan:mwb15r2s-aa0dd3","kind":"created","type":"testing-plan","title":"Add getWorkspaceGuidance to read every workspace guidance field - testing plan","parent":"feature-brief:mwb15r2s-dae659","status":"draft"}
+{"seq":612,"ts":1794339706441,"page":"simple-change:mwb3j6fd-b0a424","kind":"created","type":"simple-change","title":"Include the page status in the outline response","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":613,"ts":1794340941000,"page":"implementation-plan:mwb15r2s-a10f35","kind":"status","from":"draft","to":"ready"}
+{"seq":614,"ts":1794341841000,"page":"testing-plan:mwb15r2s-aa0dd3","kind":"status","from":"draft","to":"ready"}
+{"seq":615,"ts":1794342741000,"page":"feature-brief:mwb15r2s-dae659","kind":"status","from":"draft","to":"shipped"}
+{"seq":616,"ts":1794342963188,"page":"bug-report:mwb5gzck-79c843","kind":"created","type":"bug-report","title":"gen_page_type_docs.py removes the pages of states the registry no longer generates","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":617,"ts":1794343783000,"page":"simple-change:mwb3j6fd-b0a424","kind":"status","from":"draft","to":"closed"}
+{"seq":618,"ts":1794350486000,"page":"bug-report:mwb5gzck-79c843","kind":"status","from":"draft","to":"closed"}
+{"seq":619,"ts":1794835963256,"page":"feature-brief:mwjazomw-805d3a","kind":"created","type":"feature-brief","title":"Replace hmr's reactive reload with a debounced full reload of every module","parent":"toc:ms90fb2w-721ea1","status":"draft"}
+{"seq":620,"ts":1794835963256,"page":"implementation-plan:mwjazomw-0f62fb","kind":"created","type":"implementation-plan","title":"Replace hmr's reactive reload with a debounced full reload of every module - implementation plan","parent":"feature-brief:mwjazomw-805d3a","status":"draft"}
+{"seq":621,"ts":1794835963256,"page":"testing-plan:mwjazomw-ebe997","kind":"created","type":"testing-plan","title":"Replace hmr's reactive reload with a debounced full reload of every module - testing plan","parent":"feature-brief:mwjazomw-805d3a","status":"draft"}
+{"seq":622,"ts":1794836102210,"page":"bug-report:mwjb2nuq-8f9cfc","kind":"created","type":"bug-report","title":"Keep the archived view on the nav sidebar's Workspace link","parent":"toc:ms90fbg0-ba90c1","status":"draft"}
+{"seq":623,"ts":1794860321000,"page":"implementation-plan:mwjazomw-0f62fb","kind":"status","from":"draft","to":"ready"}
+{"seq":624,"ts":1794861221000,"page":"testing-plan:mwjazomw-ebe997","kind":"status","from":"draft","to":"ready"}
+{"seq":625,"ts":1794862121000,"page":"feature-brief:mwjazomw-805d3a","kind":"status","from":"draft","to":"shipped"}
+{"seq":626,"ts":1794862532000,"page":"bug-report:mwjb2nuq-8f9cfc","kind":"status","from":"draft","to":"closed"}

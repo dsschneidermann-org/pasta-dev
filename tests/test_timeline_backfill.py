@@ -6,7 +6,10 @@ gitignored data folder, the network or a page type.
 """
 
 import json
+import re
+from collections import Counter
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -406,3 +409,129 @@ def test_build_writes_a_backfill_the_store_accepts(tmp_path):
     out = tmp_path / "backfill" / "out.jsonl"
     assert dataset.build(dataset.DATASET_DIR, out) == 0
     assert lifecycle_log.check_backfill(out.read_bytes().decode("utf-8")) is not None
+
+
+# --- the committed back-fill against its committed inputs ------------------------
+
+@pytest.fixture(scope="module")
+def committed():
+    text = dataset.BACKFILL_PATH.read_bytes().decode("utf-8")
+    prs = json.loads((dataset.DATASET_DIR / dataset.PULL_REQUESTS_FILE).read_bytes().decode("utf-8"))
+    commit_lines = dataset.parse_commit_lines(
+        (dataset.DATASET_DIR / dataset.INITIAL_COMMIT_FILE).read_bytes().decode("utf-8"))
+    pages = json.loads((dataset.DATASET_DIR / dataset.WORKSPACE_PAGES_FILE).read_bytes().decode("utf-8"))
+    lines = lifecycle_log.check_backfill(text)
+    assert lines is not None
+    created = {line["page"]: line for line in lines if line["kind"] == "created"}
+    status = {line["page"]: line for line in lines if line["kind"] == "status"}
+    return {"text": text, "lines": lines, "prs": prs, "commit_lines": commit_lines, "pages": pages,
+            "created": created, "status": status}
+
+
+def _moment_pages(committed) -> dict[str, dict]:
+    return {page_id: line for page_id, line in committed["created"].items()
+            if line["type"] in dataset.LINKED_TYPES}
+
+
+def _chosen(records: list[dict]) -> dict:
+    return min(records, key=lambda record: dataset.id_time_ms(record["id"]))
+
+
+def test_committed_backfill_passes_the_store_check(committed):
+    assert len(committed["lines"]) == 626
+    assert {line["kind"] for line in committed["lines"]} == {"created", "status"}
+    assert committed["text"].endswith("\n") and "\r" not in committed["text"]
+
+
+def test_committed_backfill_counts_pages_by_type(committed):
+    created_lines = [line for line in committed["lines"] if line["kind"] == "created"]
+    assert len(created_lines) == len(committed["created"]) == 314
+    assert Counter(line["type"] for line in created_lines) == {
+        "toc": 2, "feature-brief": 93, "simple-change": 21, "bug-report": 12,
+        "implementation-plan": 93, "testing-plan": 93}
+    assert len(committed["status"]) == 312
+    moment_pages = _moment_pages(committed)
+    assert len(moment_pages) == 126
+    assert sum(":bf-" not in page_id for page_id in moment_pages) == 56
+    assert sum(":bf-" in page_id for page_id in moment_pages) == 70
+    bf_numbers = sorted(int(page_id.rsplit("-", 1)[1]) for page_id in committed["created"] if ":bf-" in page_id)
+    assert bf_numbers == list(range(1, 195))
+    assert len(committed["pages"]["prs"]) == 57
+
+
+def test_committed_backfill_titles_come_from_prs_and_commit_lines(committed):
+    moment_titles = ({pr["title"] for pr in committed["prs"]}
+                     | {text for _, text in committed["commit_lines"]})
+    assert {line["title"] for line in _moment_pages(committed).values()} == moment_titles
+    for line in committed["created"].values():
+        if line["type"] in ("implementation-plan", "testing-plan"):
+            suffix = " - implementation plan" if line["type"] == "implementation-plan" else " - testing plan"
+            assert line["title"] == committed["created"][line["parent"]]["title"] + suffix
+    tocs = committed["pages"]["tocs"]
+    assert {title: committed["created"][toc]["title"] for title, toc in tocs.items()} == {
+        "Features": "Features", "Bug Reports": "Bug Reports"}
+    assert all(committed["created"][toc]["type"] == "toc" for toc in tocs.values())
+
+
+def test_committed_backfill_uses_real_pages_for_linked_prs_and_title_types_otherwise(committed):
+    created, tocs = committed["created"], committed["pages"]["tocs"]
+    chosen = {_chosen(records)["id"]: _chosen(records) for records in committed["pages"]["prs"].values()}
+    real = {page_id for page_id in _moment_pages(committed) if ":bf-" not in page_id}
+    assert real == set(chosen)
+    for page_id, record in chosen.items():
+        assert created[page_id]["type"] == record["type"]
+        if record["type"] == "feature-brief":
+            assert created[record["implementation_plan"]]["parent"] == page_id
+            assert created[record["testing_plan"]]["parent"] == page_id
+    for page_id, line in _moment_pages(committed).items():
+        if ":bf-" in page_id:
+            assert line["type"] == dataset.title_type(line["title"])
+        assert line["parent"] == (tocs["Bug Reports"] if line["type"] == "bug-report" else tocs["Features"])
+
+
+def test_committed_backfill_create_plan_and_finish_times(committed):
+    created, status = committed["created"], committed["status"]
+    chosen = {number: _chosen(records)["id"] for number, records in committed["pages"]["prs"].items()}
+    backfill_only = iter(sorted((page_id for page_id in _moment_pages(committed) if ":bf-" in page_id),
+                                key=lambda page_id: int(page_id.rsplit("-", 1)[1])))
+    first: dict[str, int] = {}
+    last: dict[str, int] = {}
+    for moment in dataset.moments(committed["prs"], committed["commit_lines"]):
+        page_id = chosen.get(str(moment.pr)) or next(backfill_only)
+        first.setdefault(page_id, moment.ts)
+        last[page_id] = moment.ts
+    assert set(first) == set(_moment_pages(committed))
+    for page_id, line in _moment_pages(committed).items():
+        expected = first[page_id] if ":bf-" in page_id else min(dataset.id_time_ms(page_id), first[page_id])
+        assert line["ts"] == expected <= first[page_id]
+        assert (status[page_id]["ts"], status[page_id]["from"], status[page_id]["to"]) == (
+            last[page_id] + 3_600_000, "draft", dataset.FINISH_STATUS[line["type"]])
+    for page_id, line in created.items():
+        if line["type"] in ("implementation-plan", "testing-plan"):
+            feature = line["parent"]
+            assert line["ts"] == created[feature]["ts"]
+            offset = 1_800_000 if line["type"] == "implementation-plan" else 2_700_000
+            assert (status[page_id]["ts"], status[page_id]["to"]) == (last[feature] + offset, "ready")
+    earliest = min(line["ts"] for line in created.values())
+    assert all(created[toc]["ts"] == earliest for toc in committed["pages"]["tocs"].values())
+    pr_25 = "feature-brief:mtiml5v4-6c209f"
+    assert _utc(created[pr_25]["ts"]).date().isoformat() == "2026-09-01"
+    assert _utc(status[pr_25]["ts"]).date().isoformat() == "2026-10-12"
+
+
+def test_committed_backfill_rebuilds_byte_for_byte(committed, tmp_path):
+    rebuilt = dataset.build_backfill(committed["prs"], committed["commit_lines"], committed["pages"])
+    committed_bytes = dataset.BACKFILL_PATH.read_bytes()
+    assert "".join(lifecycle_log.encode(line) for line in rebuilt).encode("utf-8") == committed_bytes
+    out = tmp_path / "out.jsonl"
+    assert dataset.build(dataset.DATASET_DIR, out) == 0
+    assert out.read_bytes() == committed_bytes
+
+
+BASE36_DECODE = re.compile(r"\bint\(.*,\s*36\)")
+
+
+def test_no_page_id_time_is_decoded_under_src():
+    source = dataset.REPO_ROOT / "src"
+    assert [path for path in source.rglob("*.py") if BASE36_DECODE.search(path.read_text(encoding="utf-8"))] == []
+    assert BASE36_DECODE.search(Path(dataset.__file__).read_text(encoding="utf-8"))
