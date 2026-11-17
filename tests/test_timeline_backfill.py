@@ -124,3 +124,69 @@ def test_workspace_pages_finds_the_root_tocs_and_rejects_a_missing_one():
         dataset.workspace_pages(without_bug_reports, [])
     with pytest.raises(ValueError, match="ws:other"):
         dataset.workspace_pages({**live, "id": "ws:other-000000"}, [])
+
+
+# --- commit lines, input checks and moments --------------------------------------
+
+def _ms(*parts: int) -> int:
+    return int(datetime(*parts, tzinfo=UTC).timestamp() * 1000)
+
+
+def _pr(number: int, merged: str | None = None, closed: str | None = None, created: str | None = None,
+        title: str | None = None) -> dict:
+    return {"number": number, "title": title or f"PR {number}", "created_at": created,
+            "merged_at": merged, "closed_at": closed}
+
+
+def test_parse_commit_lines_reads_dated_lines_and_rejects_others():
+    assert dataset.parse_commit_lines("2026-07-20  First pass\n2026-07-21  Second\n") == [
+        ("2026-07-20", "First pass"), ("2026-07-21", "Second")]
+    for bad in ("2026-07-20 One space\n", "First pass\n", "2026-07-20  First\n\n2026-07-21  Second\n"):
+        with pytest.raises(ValueError, match="not a dated commit line"):
+            dataset.parse_commit_lines(bad)
+
+
+def test_input_problems_names_missing_prs_timeless_prs_and_a_wrong_count():
+    prs = [_pr(number, merged="2026-08-25T18:48:23Z") for number in dataset.PR_NUMBERS]
+    lines = [("2026-07-20", f"line {index}") for index in range(62)]
+    assert dataset.input_problems(prs, lines) == []
+
+    without_seven = [pr for pr in prs if pr["number"] != 7]
+    problems = dataset.input_problems(without_seven, lines)
+    assert any("#7" in problem for problem in problems)
+    assert any("126" in problem for problem in problems)
+
+    timeless = [_pr(3) if pr["number"] == 3 else pr for pr in prs]
+    assert dataset.input_problems(timeless, lines) == [
+        "PR #3 has no merged_at, closed_at or created_at"]
+
+
+def test_moments_take_the_recorded_pr_time_by_precedence():
+    prs = [_pr(1, merged="2026-08-25T18:48:23Z", closed="2026-08-26T00:00:00Z",
+               created="2026-08-20T00:00:00Z"),
+           _pr(2, closed="2026-08-27T10:00:00Z", created="2026-08-21T00:00:00Z"),
+           _pr(3, created="2026-08-28T10:00:00Z")]
+    assert [(moment.ts, moment.pr) for moment in dataset.moments(prs, [])] == [
+        (1787683703000, 1), (_ms(2026, 8, 27, 10), 2), (_ms(2026, 8, 28, 10), 3)]
+
+
+def test_moments_spread_a_days_commit_lines_over_nine_to_twenty_one_utc():
+    lines = [("2026-07-20", "one"),
+             ("2026-07-21", "first of two"), ("2026-07-21", "second of two"),
+             ("2026-07-22", "a"), ("2026-07-22", "b"), ("2026-07-22", "c")]
+    assert [(moment.ts, moment.title, moment.pr) for moment in dataset.moments([], lines)] == [
+        (_ms(2026, 7, 20, 15), "one", None),
+        (_ms(2026, 7, 21, 12), "first of two", None), (_ms(2026, 7, 21, 18), "second of two", None),
+        (_ms(2026, 7, 22, 11), "a", None), (_ms(2026, 7, 22, 15), "b", None),
+        (_ms(2026, 7, 22, 19), "c", None)]
+
+
+def test_moments_put_prs_first_on_a_tie_and_bump_by_a_second():
+    at_three = _ms(2026, 7, 20, 15)
+    moments = dataset.moments([_pr(1, merged="2026-07-20T15:00:00Z")], [("2026-07-20", "line")])
+    assert [(moment.ts, moment.pr) for moment in moments] == [(at_three, 1), (at_three + 1000, None)]
+
+    moments = dataset.moments([_pr(1, merged="2026-07-20T15:00:00Z"),
+                               _pr(2, merged="2026-07-20T15:00:00Z")], [("2026-07-20", "line")])
+    assert [(moment.ts, moment.pr) for moment in moments] == [
+        (at_three, 1), (at_three + 1000, 2), (at_three + 2000, None)]

@@ -27,6 +27,7 @@ from __future__ import annotations
 import re
 import sys
 from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -45,6 +46,7 @@ PR_NUMBERS = range(1, 66)
 EXPECTED_MOMENTS = 127
 LINKED_TYPES = ("feature-brief", "simple-change", "bug-report")
 PR_URL = re.compile(r"^https://github\.com/dsschneidermann-org/pasta-dev/pull/(\d+)(?:[/?#]|$)")
+COMMIT_LINE = re.compile(r"^(\d{4}-\d{2}-\d{2})  (.+)$")
 
 HOUR_MS = 3_600_000
 IMPLEMENTATION_READY_MS = 1_800_000
@@ -138,3 +140,64 @@ def workspace_pages(live: dict[str, Any], documents: Iterable[dict[str, Any]]) -
         tocs[title] = toc
     return {"workspace": WORKSPACE_ID, "tocs": tocs,
             "prs": {str(number): records for number, records in linked_pages(documents).items()}}
+
+
+def parse_commit_lines(text: str) -> list[tuple[str, str]]:
+    """The (date, text) of each line of the initial commit's dated message lines."""
+    pieces = text.split("\n")
+    if pieces and pieces[-1] == "":
+        pieces.pop()
+    lines: list[tuple[str, str]] = []
+    for piece in pieces:
+        match = COMMIT_LINE.match(piece)
+        if match is None:
+            raise ValueError(f"not a dated commit line: {piece!r}")
+        lines.append((match.group(1), match.group(2)))
+    return lines
+
+
+def input_problems(prs: list[dict[str, Any]], commit_lines: list[tuple[str, str]]) -> list[str]:
+    """What keeps the inputs from being the repo's whole history; [] when they are complete."""
+    numbers = {pr.get("number") for pr in prs}
+    problems = [f"PR #{number} is missing from {PULL_REQUESTS_FILE}"
+                for number in PR_NUMBERS if number not in numbers]
+    problems += [f"PR #{pr.get('number')} has no merged_at, closed_at or created_at"
+                 for pr in prs if _pr_time(pr) is None]
+    if len(prs) + len(commit_lines) != EXPECTED_MOMENTS:
+        problems.append(f"{len(prs)} PRs and {len(commit_lines)} commit lines make "
+                        f"{len(prs) + len(commit_lines)} moments, not {EXPECTED_MOMENTS}")
+    return problems
+
+
+def _pr_time(pr: dict[str, Any]) -> str | None:
+    return pr.get("merged_at") or pr.get("closed_at") or pr.get("created_at")
+
+
+def _iso_ms(text: str) -> int:
+    return round(datetime.fromisoformat(text).timestamp() * 1000)
+
+
+def moments(prs: list[dict[str, Any]], commit_lines: list[tuple[str, str]]) -> list[Moment]:
+    """Every PR and commit line as a moment, in time order and strictly increasing."""
+    ranked: list[tuple[Moment, int]] = []
+    for pr in prs:
+        time = _pr_time(pr)
+        if time is None:
+            raise ValueError(f"PR #{pr['number']} has no merged_at, closed_at or created_at")
+        ranked.append((Moment(_iso_ms(time), pr["title"], pr["number"]), 0))
+    by_day: dict[str, list[str]] = {}
+    for date, text in commit_lines:
+        by_day.setdefault(date, []).append(text)
+    for date, texts in by_day.items():
+        day_ms = _iso_ms(f"{date}T00:00:00+00:00")
+        for index, text in enumerate(texts):
+            # (index + 0.5) / len(texts) of the span, rounded half up in integers
+            numerator, denominator = (2 * index + 1) * DAY_SPAN_MS, 2 * len(texts)
+            offset = (2 * numerator + denominator) // (2 * denominator)
+            ranked.append((Moment(day_ms + DAY_START_MS + offset, text, None), 1))
+    ordered: list[Moment] = []
+    for moment, _ in sorted(ranked, key=lambda pair: (pair[0].ts, pair[1])):
+        if ordered and moment.ts <= ordered[-1].ts:
+            moment = moment._replace(ts=ordered[-1].ts + BUMP_MS)
+        ordered.append(moment)
+    return ordered
