@@ -13,8 +13,9 @@ import json
 from typing import Any, TypeIs
 
 from .model import Page, Workspace
+from .pagetypes._registry import registered_pagetypes
 from .pagetypes.core.fields import FieldSpec
-from .pagetypes.core.pagetype import PageType, initial_sections
+from .pagetypes.core.pagetype import PageType, element_fsm_sites, initial_sections
 from .pagetypes.core.specs import LIST
 
 # One event: the event-line keys (seq, ts, page, kind, then the kind's own keys). The events a
@@ -299,3 +300,42 @@ def serve_lines(text: str) -> list[Event]:
         served.append(line)
         previous = seq
     return served
+
+
+# --- the replay JSON ---------------------------------------------------------
+
+def timeline_types() -> dict[str, dict[str, Any]]:
+    """Per registered page type, what a replay needs to read its statuses: the initial status, the
+    statuses that finish it, its element-FSM lists and its human-gated status edges.
+
+    A type finishes in its terminal states when it declares any, else in its last status unless
+    that is where it starts.
+    """
+    types: dict[str, dict[str, Any]] = {}
+    for tag, page_type in sorted(registered_pagetypes().items()):
+        fsm = page_type.fsm
+        if fsm.terminal_states:
+            finish = list(fsm.terminal_states)
+        else:
+            finish = [fsm.states[-1]] if fsm.states and fsm.states[-1] != fsm.initial else []
+        gates = sorted({(source, dest) for _event, source, dest, agency in fsm.transitions
+                        if agency == "human"})
+        types[tag] = {
+            "initial": fsm.initial,
+            "finish": finish,
+            "elements": {f"{section}.{field}": element_fsm.name
+                         for section, field, element_fsm in element_fsm_sites(page_type)},
+            "gates": [[source, dest] for source, dest in gates],
+        }
+    return types
+
+
+def timeline_payload(workspace_id: str, name: str, events: list[Event]) -> dict[str, Any]:
+    """The replay JSON: the served events with their time span and the per-type table."""
+    return {
+        "workspace": {"id": workspace_id, "name": name},
+        "t0": events[0]["ts"] if events else None,
+        "t1": events[-1]["ts"] if events else None,
+        "types": timeline_types(),
+        "events": events,
+    }

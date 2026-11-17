@@ -9,7 +9,7 @@ import json
 from src import lifecycle_log
 from src.commands import apply_command, create_page
 from src.model import Page, Workspace
-from src.pagetypes._registry import get_page_type
+from src.pagetypes._registry import get_page_type, registered_pagetypes
 from src.pagetypes.core.pagetype import initial_sections
 
 
@@ -401,3 +401,42 @@ def test_serve_lines_marks_a_leading_hole():
 def test_serve_lines_puts_no_gap_before_a_seq_that_does_not_advance():
     served = lifecycle_log.serve_lines(_line(1) + _line(2) + _line(2) + _line(3))
     assert [event["kind"] for event in served] == ["archived"] * 4
+
+
+# --- timeline_types and timeline_payload ----------------------------------------
+
+def test_timeline_types_lists_every_registered_type():
+    assert set(lifecycle_log.timeline_types()) == set(registered_pagetypes())
+
+
+def test_timeline_types_reads_finish_elements_and_human_gates_from_the_registry():
+    types = lifecycle_log.timeline_types()
+    assert types["test-lifecycle"] == {
+        "initial": "draft",
+        "finish": ["done", "abandoned"],                     # its terminal states
+        "elements": {"questions.items": "TestQuestion"},
+        "gates": [["building", "review"], ["review", "done"]],
+    }
+    assert types["test-child"] == {
+        "initial": "draft",
+        "finish": ["ready"],                                 # no terminal states: its last status
+        "elements": {"steps.items": "TestStep", "checks.items": "TestCheck"},
+        "gates": [],
+    }
+    assert types["test-flow"]["finish"] == ["closed"]
+    assert types["test-fields"]["finish"] == []             # one status: nothing to finish into
+
+
+def test_timeline_payload_wraps_the_events_with_their_first_and_last_ts():
+    events = lifecycle_log.serve_lines(_line(1, ts=100) + _line(3, ts=300))
+    payload = lifecycle_log.timeline_payload("ws:t", "Demo", events)
+    assert list(payload) == ["workspace", "t0", "t1", "types", "events"]
+    assert payload["workspace"] == {"id": "ws:t", "name": "Demo"}
+    assert (payload["t0"], payload["t1"]) == (100, 300)
+    assert payload["types"] == lifecycle_log.timeline_types()
+    assert payload["events"] is events
+
+
+def test_timeline_payload_without_events_has_no_t0_or_t1():
+    payload = lifecycle_log.timeline_payload("ws:t", "Demo", [])
+    assert payload["events"] == [] and payload["t0"] is None and payload["t1"] is None
