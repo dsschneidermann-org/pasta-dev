@@ -41,6 +41,7 @@ from .render_html import md2html
 from .serialize import page_to_dict
 from .source_link import read_remote_url, to_source_link
 from .store import Store
+from .timeline import build_timeline
 
 # Fail fast: validate every page type once at load. This runs on a cold start and re-runs on
 # every HMR reload (this module re-executes then), so a misconfigured type surfaces every error
@@ -200,6 +201,25 @@ async def route_tree(request: Request, workspaceIdPart: str, archived: str | Non
                 "show_archived": show_archived,
                 "body": body,
             }
+        )
+
+
+# The workspace's event log replayed as a metro map. Read-only like every other view, and it leaves
+# out the live-reload socket, so an agent's write never restarts a replay someone is watching.
+@app.get("/ws:{workspaceIdPart}/timeline", response_class=HTMLResponse)
+async def route_timeline(request: Request, workspaceIdPart: str):
+    with _guard_http():
+        workspace_id = f"ws:{workspaceIdPart}"
+        workspace = STORE.load_workspace(workspace_id)
+        payload = build_timeline(STORE.read_events(workspace_id), workspace, time.time())
+        return templates.TemplateResponse(
+            request=request,
+            name="timeline.html",
+            context={
+                "workspace_id": workspace_id,
+                "workspace_name": workspace.name,
+                "payload": payload,
+            },
         )
 
 
