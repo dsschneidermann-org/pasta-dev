@@ -13,6 +13,12 @@ from __future__ import annotations
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+from .event_log import Event
+from .ids import id_time
+from .model import Workspace
 
 LINE_TYPES = ("feature-brief", "bug-report", "simple-change")   # also the colour slot order
 DELIVERED = {"feature-brief": "shipped", "bug-report": "closed", "simple-change": "closed"}
@@ -75,3 +81,139 @@ def to_playback(t: float, segments: Sequence[Segment]) -> float:
         return segments[-1].p1
     segment = segments[bisect_right([s.t0 for s in segments], t) - 1]
     return segment.p0 + (t - segment.t0) / (segment.t1 - segment.t0) * (segment.p1 - segment.p0)
+
+
+def is_hidden(workspace: Workspace, page_id: str) -> bool:
+    """Whether the page is out of the live tree: gone, archived, or under an archived ancestor."""
+    page = workspace.pages.get(page_id)
+    while page is not None:
+        if page.archived:
+            return True
+        page = workspace.pages.get(page.parent_id) if page.parent_id else None
+    return page_id not in workspace.pages
+
+
+@dataclass(frozen=True)
+class _Stop:
+    at: float
+    kind: str
+    status: str
+
+
+@dataclass(frozen=True)
+class _Line:
+    page_id: str
+    type: str
+    title: str
+    stops: list[_Stop]
+    end: str               # delivered | dropped | open
+    end_at: float | None   # None while open: the line runs to the end of the replay
+
+
+def _seconds(at: str) -> float:
+    return datetime.fromisoformat(at).timestamp()
+
+
+def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
+    """One page's line from its events, already in time order."""
+    times = [_seconds(event["at"]) for event in events]
+    born = id_time(page_id)
+    start = min(times[0], born) if born is not None else times[0]
+    page_type = events[0]["type"]
+
+    created = next((event for event in events if event["event"] == "created"), None)
+    first_status = next((event for event in events if event["event"] == "status"), None)
+    if created is not None:
+        status = created.get("status", "")
+    elif first_status is not None:
+        status = first_status.get("from", first_status.get("status", ""))
+    else:
+        status = events[0].get("status", "")
+
+    # The created event is the first station; every other event adds one of its own.
+    stops = [_Stop(start, "created", status)]
+    archived = False
+    status_at = archive_at = None
+    for event, at in zip(events, times):
+        kind = event["event"]
+        if kind == "status":
+            status, status_at = event.get("status", status), at
+        elif kind == "archived":
+            archived, archive_at = True, at
+        elif kind == "unarchived":
+            archived = False
+        else:
+            continue
+        stops.append(_Stop(at, kind, status))
+
+    if status == DELIVERED.get(page_type):
+        end, end_at = "delivered", status_at if status_at is not None else stops[-1].at
+    elif status == DROPPED.get(page_type):
+        end, end_at = "dropped", status_at if status_at is not None else stops[-1].at
+    elif archived:
+        end, end_at = "dropped", archive_at
+    elif is_hidden(workspace, page_id):
+        end, end_at = "dropped", max(times[-1], stops[-1].at)
+    else:
+        end, end_at = "open", None
+
+    page = workspace.pages.get(page_id)
+    title = page.title if page is not None else events[-1].get("title", page_id)
+    return _Line(page_id, page_type, title, stops, end, end_at)
+
+
+def _round(value: float) -> float:
+    return round(value, 3)
+
+
+def build_timeline(events: Sequence[Event], workspace: Workspace, now: float) -> dict[str, Any]:
+    """The replay of a workspace's log as plain JSON for the timeline view: the playback clock,
+    one line per tracked page packed into lanes, and every station in the order it is narrated."""
+    by_page: dict[str, list[Event]] = {}
+    for event in sorted(events, key=lambda event: _seconds(event["at"])):
+        if event.get("type") in LINE_TYPES:
+            by_page.setdefault(event["pageId"], []).append(event)
+    if not by_page:
+        return {"start": _round(now), "end": _round(now), "duration": 0, "baseRate": BASE_RATE,
+                "segments": [], "lanes": 0, "lines": [], "feed": []}
+
+    lines = [_line(page_id, page_events, workspace) for page_id, page_events in by_page.items()]
+    stop_times = [stop.at for line in lines for stop in line.stops]
+    start, end = min(stop_times), max(now, *stop_times)
+    segments = playback_segments(stop_times, start, end)
+    duration = segments[-1].p1 if segments else 0.0
+
+    placed: list[tuple[float, float, _Line]] = []
+    for line in lines:
+        p0 = to_playback(line.stops[0].at, segments)
+        p1 = to_playback(line.end_at, segments) if line.end_at is not None else duration
+        placed.append((p0, p1, line))
+    placed.sort(key=lambda item: (item[0], item[2].page_id))
+
+    lane_ends: list[float] = []
+    payload_lines: list[dict[str, Any]] = []
+    for p0, p1, line in placed:
+        occupied = max(p1, p0 + MIN_LINE)
+        lane = next((index for index, lane_end in enumerate(lane_ends) if lane_end + LANE_GAP <= p0), None)
+        if lane is None:
+            lane = len(lane_ends)
+            lane_ends.append(occupied)
+        else:
+            lane_ends[lane] = occupied
+        payload_lines.append({
+            "id": line.page_id, "type": line.type, "title": line.title, "lane": lane,
+            "p0": _round(p0), "p1": _round(p1), "end": line.end,
+            "stops": [{"p": _round(to_playback(stop.at, segments)), "at": _round(stop.at),
+                       "kind": stop.kind, "status": stop.status} for stop in line.stops],
+        })
+
+    feed = sorted(
+        ({"p": stop["p"], "line": index, "stop": number}
+         for index, line in enumerate(payload_lines) for number, stop in enumerate(line["stops"])),
+        key=lambda entry: (entry["p"], entry["line"]),
+    )
+    return {
+        "start": _round(start), "end": _round(end), "duration": _round(duration), "baseRate": BASE_RATE,
+        "segments": [[_round(s.t0), _round(s.t1), _round(s.p0), _round(s.p1)] for s in segments],
+        "lanes": len(lane_ends), "lines": payload_lines, "feed": feed,
+    }
