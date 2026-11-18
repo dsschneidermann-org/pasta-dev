@@ -500,3 +500,16 @@ def test_instructions_lists_workspace_guidance_setup(mcp):
     assert "setWorkspaceGuidance" in text
     assert "buildTool" in text          # a fixture guidance field, in test mode
     assert '"name": "getWorkspaceGuidance"' in text   # named in the guidance section, so its schema is listed
+
+
+# --- the timeline stays a web view ---------------------------------------------
+def test_no_mcp_tool_exposes_the_timeline(mcp):
+    async def _tools():
+        async with Client(mcp) as client:
+            return await client.list_tools()
+
+    tools = asyncio.run(_tools())
+    assert tools
+    for tool in tools:
+        text = f"{tool.name} {tool.description or ''}".lower()
+        assert "timeline" not in text and "lifecycle log" not in text, tool.name
