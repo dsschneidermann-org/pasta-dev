@@ -299,5 +299,58 @@ const MODEL_A = compareWithBruteForce('fixture A', FIXTURE_A);
   ok(get('feature-brief:tail1').endedAt === null && get('feature-brief:tail1').finishT === atR(14), 'a recorded page lives on');
 }
 
+// --- Metro layout ----------------------------------------------------------------------------
+function checkLayout(name, events) {
+  const m = TL.fold(payload(events));
+  const layout = TL.layoutMetro(m);
+  ok(layout.height > 0, name + ': the layout has a height');
+  const trunkRows = new Set(m.pages.filter(p => p.trunk).map(p => p.track));
+  const byTrack = new Map();
+  for (const p of m.pages) {
+    if (p.trunk || p.track === null) continue;
+    ok(!trunkRows.has(p.track), name + ': ' + p.id + ' branches onto a trunk row');
+    if (!byTrack.has(p.track)) byTrack.set(p.track, []);
+    byTrack.get(p.track).push(p);
+  }
+  let overlaps = 0;
+  for (const lanes of byTrack.values()) {
+    lanes.sort((a, b) => a.lane0 - b.lane0);
+    for (let i = 1; i < lanes.length; i++) if (lanes[i].lane0 < lanes[i - 1].lane1 + 30 * 60000) overlaps++;
+  }
+  ok(overlaps === 0, name + ': no two lanes overlap on a track (' + overlaps + ' overlaps)');
+  let disagreements = 0;
+  for (const T of sampleMoments(events, 11)) {
+    for (const p of m.pages) {
+      const inside = p.shown.some(([from, to]) => from <= T && T < to);
+      if (inside !== TL.isShown(m, p, T)) disagreements++;
+    }
+  }
+  ok(disagreements === 0, name + ': shown intervals agree with isShown (' + disagreements + ' disagreements)');
+  return m;
+}
+{
+  const m = checkLayout('fixture B', FIXTURE_B), get = id => m.byId.get(id);
+  ok(get('feature-brief:h1').track === null && get('epic:e2').track === null, 'pages present and hidden at the baseline get no track');
+  const f1 = get('feature-brief:f1');
+  ok(get('implementation-plan:ip1').acts[0].y === f1.y, 'a step done after its plan finished sits on the feature track');
+  ok(get('testing-plan:tp1').acts[0].y === f1.y, 'a case passed after its plan finished sits on the feature track');
+  ok(get('implementation-plan:ip1').settleY === f1.y, 'a plan merges back into its feature');
+  ok(get('toc:t1').trunk && f1.settleY === get('toc:t1').y, 'a shipped feature merges back into its trunk');
+  ok(f1.marks.filter(mark => mark.k === 'ship')[0].y === f1.y, 'the ship node sits at the end of its own lane');
+  ok(f1.marks.filter(mark => mark.k === 'rename')[0].y === get('toc:t1').y, 'a mark after finish sits where the page merged');
+}
+{
+  const m = checkLayout('fixture A', FIXTURE_A), get = id => m.byId.get(id);
+  const features = get(FEATURES), first = get('feature-brief:bf-0001');
+  ok(features.trunk && get(BUGS).trunk && get('toc:docs').trunk, 'every toc is a trunk');
+  ok(first.track !== null && first.track !== features.track && first.finishT !== null && first.settleY === features.y,
+    'the first back-filled feature-brief branches off the Features trunk and merges back');
+  ok(first.branchY === features.y, 'it branches from the Features trunk');
+  ok(get('feature-brief:new-under').track !== null, 'a page revealed later keeps a track');
+  ok(get('feature-brief:new-done').track === null && get('feature-brief:new-done').settleY === features.y,
+    'a page present and finished is a settled glyph on its parent');
+  ok(get('feature-brief:new-live').lane0 === A_R && get('feature-brief:new-live').track !== null, 'a page present and open has a track from recording start');
+}
+
 console.log(failures ? failures + ' FAILURES' : 'all checks passed');
 process.exit(failures ? 1 : 0);

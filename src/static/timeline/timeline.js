@@ -80,7 +80,7 @@
         id: event.page, type: event.type, born: t, present, finishT: null, endedAt: null, deleted: false, kidIndex,
         titles: [{ t, v: event.title }], parents: [{ t, v: parent }], statuses: [{ t, v: event.status }],
         archived: [{ t, v: present ? event.archived === true : false }], marks: [], acts: [],
-        trunk: false, track: null, y: null, lane0: null, lane1: null, shown: [], settleY: null,
+        trunk: false, track: null, y: null, lane0: null, lane1: null, shown: [], branchY: null, settleY: null,
       };
       byId.set(p.id, p);
       pages.push(p);
@@ -197,7 +197,119 @@
     return true;
   }
 
-  const PastaTimeline = { statusClass, playheadStep, fold, isShown, statusAt, titleAt, parentAt };
+  // --- Metro layout: trunks for root pages, a branch per page that merges back on finish ------
+  const TRACK_PITCH = 17;
+  const LAYOUT_PAD = 20;
+  const TRUNK_SPACING = 24;
+  const TRACK_RELEASE = 30 * 60000;
+
+  // isShown only changes where the page's or one of its ever-ancestors' parent or archived flag does,
+  // so evaluating it at those instants gives the exact intervals.
+  function shownIntervals(m, p) {
+    const instants = new Set([p.born]);
+    if (p.endedAt !== null) instants.add(p.endedAt);
+    const visited = new Set();
+    const pending = [p];
+    while (pending.length) {
+      const q = pending.pop();
+      if (visited.has(q.id)) continue;
+      visited.add(q.id);
+      instants.add(q.born);
+      for (const segment of q.archived) instants.add(segment.t);
+      for (const segment of q.parents) {
+        instants.add(segment.t);
+        const parent = segment.v === null ? undefined : m.byId.get(segment.v);
+        if (parent) pending.push(parent);
+      }
+    }
+    const sorted = Array.from(instants).filter(t => t >= p.born).sort((a, b) => a - b);
+    const intervals = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (!isShown(m, p, sorted[i])) continue;
+      const to = i + 1 < sorted.length ? sorted[i + 1] : Infinity;
+      const last = intervals[intervals.length - 1];
+      if (last && last[1] === sorted[i]) last[1] = to; else intervals.push([sorted[i], to]);
+    }
+    return intervals;
+  }
+
+  // The row a page is drawn on at t: its own track until it finishes, then wherever its parent is.
+  function rowAt(m, p, t, depth) {
+    if (!p || depth > 64) return null;
+    if (p.trunk) return p.track;
+    if (p.track !== null && (p.finishT === null || t < p.finishT)) return p.track;
+    const parentId = parentAt(p, t);
+    const row = rowAt(m, parentId === null ? undefined : m.byId.get(parentId), t, depth + 1);
+    return row !== null ? row : p.track;
+  }
+
+  function layoutMetro(m) {
+    const t1 = m.t1 === null ? Infinity : m.t1;
+    const trunkRows = new Set();
+    const freeFrom = new Map();
+    let trunkCount = 0;
+    for (const p of m.pages) {
+      p.shown = shownIntervals(m, p);
+      p.trunk = false; p.track = null; p.lane0 = null; p.lane1 = null;
+      if (p.shown.length === 0) continue;
+      const lastShownEnd = p.shown[p.shown.length - 1][1];
+      const parentId = parentAt(p, p.born);
+      const parent = parentId === null ? undefined : m.byId.get(parentId);
+      if (!parent) {
+        const k = trunkCount++;
+        p.trunk = true;
+        p.track = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * TRUNK_SPACING;
+        trunkRows.add(p.track);
+        p.lane0 = p.born;
+        p.lane1 = lastShownEnd === Infinity ? t1 : lastShownEnd;
+        continue;
+      }
+      if (p.present && p.finishT === p.born) continue;   // settled from the moment it is first seen
+      const parentRow = rowAt(m, parent, p.born, 0);
+      const from = parentRow === null ? 0 : parentRow;
+      const side = p.kidIndex % 2 ? -1 : 1;
+      let track = null;
+      for (let k = 1; track === null; k++) {
+        const candidate = from + (k % 2 ? side : -side) * Math.ceil(k / 2);
+        if (trunkRows.has(candidate)) continue;
+        const free = freeFrom.get(candidate);
+        if (free === undefined || free <= p.born) track = candidate;
+      }
+      p.track = track;
+      p.lane0 = p.born;
+      p.lane1 = p.finishT !== null ? p.finishT : (lastShownEnd === Infinity ? t1 : lastShownEnd);
+      freeFrom.set(track, p.lane1 < t1 ? p.lane1 + TRACK_RELEASE : Infinity);
+    }
+
+    let minRow = 0, maxRow = 0;
+    for (const p of m.pages) {
+      if (p.track === null) continue;
+      minRow = Math.min(minRow, p.track);
+      maxRow = Math.max(maxRow, p.track);
+    }
+    const rowY = row => row === null ? null : (row - minRow) * TRACK_PITCH + LAYOUT_PAD;
+    const pageRowY = (p, t) => rowY(rowAt(m, p, t, 0));
+    for (const p of m.pages) {
+      p.y = rowY(p.track);
+      const parentId = parentAt(p, p.born);
+      const parent = parentId === null ? undefined : m.byId.get(parentId);
+      p.branchY = parent ? pageRowY(parent, p.born) : null;
+      if (p.finishT !== null) {
+        const finishParentId = parentAt(p, p.finishT);
+        const finishParent = finishParentId === null ? undefined : m.byId.get(finishParentId);
+        p.settleY = finishParent ? pageRowY(finishParent, p.finishT) : null;
+      } else p.settleY = null;
+      for (const mark of p.marks) mark.y = mark.k === 'ship' && p.track !== null ? p.y : pageRowY(p, mark.t);
+      for (const act of p.acts) act.y = pageRowY(p, act.t);
+    }
+    for (const link of m.links) {
+      link.ya = pageRowY(m.byId.get(link.a), link.t);
+      link.yb = pageRowY(m.byId.get(link.b), link.t);
+    }
+    return { height: (maxRow - minRow) * TRACK_PITCH + 2 * LAYOUT_PAD };
+  }
+
+  const PastaTimeline = { statusClass, playheadStep, fold, isShown, statusAt, titleAt, parentAt, layoutMetro };
   root.PastaTimeline = PastaTimeline;
   if (typeof module !== 'undefined' && module.exports) module.exports = PastaTimeline;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
