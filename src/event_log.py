@@ -12,7 +12,7 @@ import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from .model import Page, Workspace
+from .model import JSONValue, Page, Workspace
 
 LOG_SUFFIX = ".events.jsonl"
 EVENT_KINDS = ("created", "status", "archived", "unarchived")
@@ -69,9 +69,9 @@ def parse_jsonl(text: str) -> list[Event]:
         if not line.strip():
             continue
         try:
-            value = json.loads(line)
+            value: JSONValue = json.loads(line)
         except json.JSONDecodeError:
             continue
         if isinstance(value, dict) and all(isinstance(value.get(key), str) for key in _REQUIRED):
-            events.append(value)
+            events.append({key: field for key, field in value.items() if isinstance(field, str)})
     return events
