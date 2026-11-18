@@ -11,9 +11,9 @@
         <link rel="stylesheet" as="style" href="/static/styles.css" />
         <title>{% block title %}{% endblock %} - Pasta</title>
         {% endblock %}
-        <script>
+        {% block reloader %}<script>
 {% include '_reloader.js' %}
-        </script>
+        </script>{% endblock %}
     </head>
     <body class="{% block bodyclass %}{% endblock %} light" style="display:none; visibility:hidden">
         <div id="theme" style="float:right">

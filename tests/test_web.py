@@ -465,3 +465,48 @@ def test_the_server_store_installs_the_committed_backfill():
 def test_timeline_assets_are_served(client):
     assert client.get("/static/timeline/timeline.js").status_code == 200
     assert client.get("/static/timeline/timeline.css").status_code == 200
+
+
+def test_the_tree_page_links_the_timeline(client):
+    workspace = server.STORE.create_workspace("demo")
+    assert f'href="/{workspace.id}/timeline"' in client.get(f"/{workspace.id}").text
+
+
+def test_the_timeline_page_points_the_player_at_its_json(client):
+    workspace = server.STORE.create_workspace("demo")
+    response = client.get(f"/{workspace.id}/timeline")
+    assert response.status_code == 200
+    html = response.text
+    assert f'data-src="/{workspace.id}/timeline.json"' in html
+    for element in ('id="tl-play"', 'id="tl-follow"', 'id="tl-future"', 'id="tl-chips"', 'id="tl-stage"',
+                    'id="tl-tip"', 'id="tl-overview"'):
+        assert element in html, element
+    assert [speed for speed in re.findall(r'data-speed="([^"]+)"', html)] == ["0.25", "1", "4", "16"]
+    assert '/static/timeline/timeline.css' in html and '/static/timeline/timeline.js' in html
+    assert "PastaTimeline.mount(" in html
+    assert re.search(r'<body class="[^"]*\btimeline\b', html)
+    assert "<title>demo - Timeline - Pasta</title>" in html
+
+
+def test_the_timeline_page_does_not_reload_on_writes_while_other_views_do(client):
+    workspace = server.STORE.create_workspace("demo")
+    assert "/ws/reloader" not in client.get(f"/{workspace.id}/timeline").text
+    assert "/ws/reloader" in client.get(f"/{workspace.id}").text
+
+
+def test_the_only_timeline_routes_are_the_two_reads():
+    routes = {(route.path, frozenset(route.methods)) for route in server.app.routes
+              if "timeline" in getattr(route, "path", "") and hasattr(route, "methods")}
+    assert routes == {("/ws:{workspaceIdPart}/timeline", frozenset({"GET"})),
+                      ("/ws:{workspaceIdPart}/timeline.json", frozenset({"GET"}))}
+
+
+def test_reading_both_timeline_routes_changes_no_file(tmp_path):
+    workspace_id, document = _pre_ship_workspace(tmp_path)
+    server.STORE = Store(tmp_path, backfill_dir=_backfill_dir(tmp_path, workspace_id))
+    before = document.read_bytes()
+    with TestClient(server.app) as client:
+        assert client.get(f"/{workspace_id}/timeline").status_code == 200
+        assert client.get(f"/{workspace_id}/timeline.json").status_code == 200
+    assert document.read_bytes() == before
+    assert not (tmp_path / "events").exists()

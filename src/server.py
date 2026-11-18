@@ -203,6 +203,23 @@ async def route_tree(request: Request, workspaceIdPart: str, archived: str | Non
         )
 
 
+# The timeline view replays the workspace's lifecycle log in the browser from the JSON below.
+@app.get("/ws:{workspaceIdPart}/timeline", response_class=HTMLResponse)
+async def route_timeline(request: Request, workspaceIdPart: str):
+    with _guard_http():
+        workspace_id = f"ws:{workspaceIdPart}"
+        workspace = STORE.load_workspace(workspace_id)
+        return templates.TemplateResponse(
+            request=request,
+            name="timeline.html",
+            context={
+                "workspace_id": workspace_id,
+                "workspace_name": workspace.name,
+                "data_url": f"/ws:{workspaceIdPart}/timeline.json",
+            }
+        )
+
+
 # The replay JSON of a workspace's lifecycle log. Only reads: a read never starts the log, so a
 # workspace that has not been written since recording shipped answers with no events.
 @app.get("/ws:{workspaceIdPart}/timeline.json")
