@@ -1,0 +1,75 @@
+/* The timeline view: a full-viewport canvas player. Scoped to body.timeline so no other view changes,
+   and every colour is a custom property both themes define, which the canvas reads too. */
+body.light {
+  --tl-idle: #8b95a7;
+  --tl-active: #2b6df0;
+  --tl-review: #e0961a;
+  --tl-done: #1c9a60;
+  --tl-warn: #d84343;
+  --tl-archived: #9aa1ad;
+  --tl-gate: #8a4fd6;
+  --tl-link: #7a5af8;
+  --tl-accent: #e5484d;
+}
+body.dark {
+  --tl-idle: #7d889c;
+  --tl-active: #5b8cff;
+  --tl-review: #f2b53f;
+  --tl-done: #3fcf8e;
+  --tl-warn: #ff6b6b;
+  --tl-archived: #5d6676;
+  --tl-gate: #b08cf5;
+  --tl-link: #9a86ff;
+  --tl-accent: #ff5d62;
+}
+
+body.timeline {
+  max-width: none; margin: 0; padding: 0; height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+body.timeline #theme { position: absolute; top: 0.55rem; right: 0.75rem; font-size: 0.85rem; }
+body.timeline #content { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+body.timeline #content > h1 { margin: 0; padding: 0.5rem 0.75rem 0.4rem; font-size: 1.05rem; }
+body.timeline #content > hr, body.timeline #footer, body.timeline #to-top { display: none; }
+
+#timeline {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) 56px;
+  border-top: 1px solid var(--border);
+}
+#timeline .tl-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+  padding: 0.35rem 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.8rem;
+}
+#timeline .tl-controls button {
+  margin: 0; padding: 0.15rem 0.6rem; font-size: 0.8rem; line-height: 1.4;
+  color: var(--text-main); background: var(--background);
+  border: 1px solid var(--border); border-radius: 4px;
+}
+#timeline .tl-controls button.on { border-color: var(--text-main); }
+#timeline #tl-play { min-width: 4.6rem; font-weight: 600; }
+
+#tl-chips { margin-left: auto; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+#tl-chips .tl-chip { margin-left: 0.7rem; white-space: nowrap; }
+#tl-chips i, #tl-tip i {
+  display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.25rem; border-radius: 50%;
+}
+#timeline i.tl-idle { background: var(--tl-idle); }
+#timeline i.tl-active { background: var(--tl-active); }
+#timeline i.tl-review { background: var(--tl-review); }
+#timeline i.tl-done { background: var(--tl-done); }
+#timeline i.tl-warn { background: var(--tl-warn); }
+
+#timeline .tl-stage { position: relative; min-height: 0; }
+#tl-stage { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#tl-overview {
+  display: block; width: 100%; height: 56px; cursor: ew-resize; touch-action: none;
+  border-top: 1px solid var(--border);
+}
+#tl-tip {
+  position: absolute; display: none; pointer-events: none; max-width: 300px;
+  padding: 0.45rem 0.6rem; font-size: 0.78rem; line-height: 1.45;
+  color: var(--text-main); background: var(--background-body);
+  border: 1px solid var(--border); border-radius: 6px;
+}
+#tl-tip .tl-muted { color: var(--text-muted); }

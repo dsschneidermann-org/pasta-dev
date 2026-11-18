@@ -15,6 +15,9 @@ from src import lifecycle_log
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "src" / "static" / "timeline" / "timeline.js"
 NODE_CHECK = ROOT / "tests" / "timeline" / "check_timeline.js"
+STYLESHEET = ROOT / "src" / "static" / "timeline" / "timeline.css"
+TIMELINE_PROPERTIES = ("--tl-idle", "--tl-active", "--tl-review", "--tl-done", "--tl-warn", "--tl-archived",
+                       "--tl-gate", "--tl-link", "--tl-accent")
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not on PATH")
@@ -40,3 +43,17 @@ def test_the_script_hard_codes_no_colour():
     source = SCRIPT.read_text(encoding="utf-8")
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", source)
     assert not re.search(r"\b(?:rgba?|hsla?)\(", source)
+
+
+def test_the_stylesheet_has_no_shadow_or_filter():
+    css = STYLESHEET.read_text(encoding="utf-8")
+    for construct in ("box-shadow", "text-shadow", "filter:", "backdrop-filter"):
+        assert construct not in css, construct
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_stylesheet_defines_every_timeline_colour_for_each_theme(theme):
+    css = STYLESHEET.read_text(encoding="utf-8")
+    rules = "".join(re.findall(rf"body\.{theme}\s*\{{([^}}]*)\}}", css))
+    for name in TIMELINE_PROPERTIES:
+        assert re.search(rf"{name}\s*:\s*#[0-9a-fA-F]{{6}}\s*;", rules), (theme, name)

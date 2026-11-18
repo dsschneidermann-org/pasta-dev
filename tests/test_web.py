@@ -460,3 +460,8 @@ def test_reading_the_timeline_never_starts_the_log(tmp_path):
 def test_the_server_store_installs_the_committed_backfill():
     source = Path(server.__file__).read_text(encoding="utf-8")
     assert 'STORE = Store(DATA_DIR, backfill_dir=Path("backfill"))' in source
+
+
+def test_timeline_assets_are_served(client):
+    assert client.get("/static/timeline/timeline.js").status_code == 200
+    assert client.get("/static/timeline/timeline.css").status_code == 200
