@@ -20,10 +20,16 @@ li:has(> button), li:has(> input), li:has(> select), li:has(> textarea) {
 body.light {
   --text-error: #b00020;
   --text-on-error: #fff;
+  --line-feature-brief: #2a78d6;
+  --line-bug-report: #eb6834;
+  --line-simple-change: #1baf7a;
 }
 body.dark {
   --text-error: #cf6679;
   --text-on-error: #000;
+  --line-feature-brief: #3987e5;
+  --line-bug-report: #d95926;
+  --line-simple-change: #199e70;
 }
 
 /* Floating back-to-top link in the page shell, on every view. */
