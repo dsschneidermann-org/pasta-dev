@@ -1,6 +1,6 @@
-// Draws and replays the timeline payload (src/timeline.py). Every layout decision - lanes, playback
-// positions, the playback clock, the order stations are narrated in - arrives in the payload; this
-// script only draws it once and moves the playhead.
+// Draws and replays the timeline payload. Every layout decision - lanes, playback positions, the
+// playback clock, the order stations are narrated in - arrives in the payload; this script only
+// draws it once and moves the playhead.
 function main() {
   const dataNode = document.getElementById("timeline-data");
   if (!dataNode) return;

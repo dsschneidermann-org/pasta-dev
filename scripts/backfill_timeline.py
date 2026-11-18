@@ -4,8 +4,8 @@
 
 Every feature-brief, bug-report and simple-change found in the workspace's backups and live file
 gets its creation and its latest status, dated from the pull request it links to, else the first
-commit's dated feature list, else the usual hour or two (see src/backfill.py). The pull requests
-are read from the snapshot in scripts/timeline_backfill/pull_requests.json, taken from GitHub.
+commit's dated feature list, else the usual hour or two. The pull requests are read from the
+snapshot in scripts/timeline_backfill/pull_requests.json, taken from GitHub.
 
 Re-running replaces the earlier backfill and leaves live events alone. The log is rewritten from
 this process, which takes none of the server's locks, so run it while the server is not writing.

@@ -7,7 +7,7 @@ and the dated feature list of the repository's first commit. Every page gets its
 it moved on from draft, one transition to its latest status - dated by its pull request, else by
 its listed feature, else by the usual hour or two a change takes, kept consistent with the backups.
 Intermediate stations are not reconstructed: the backups are days apart, so any time given to them
-would be invented. The script in scripts/backfill_timeline.py gathers the inputs and writes the log.
+would be invented.
 """
 
 from __future__ import annotations

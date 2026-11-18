@@ -65,7 +65,7 @@ NON_SEARCH_CHARS = "`*_'\"‘’“”"
 # "*.json" non-recursively, so a backup there would be listed as a duplicate workspace.
 BACKUP_DIRNAME = "backups"
 
-# Uvicorn's status logger, as the cleanup sweep uses, so a failed log append shows beside its output.
+# Uvicorn's status logger, so a failed log append shows beside the server's own output.
 logger = logging.getLogger("uvicorn.error")
 
 
@@ -202,7 +202,7 @@ class Store:
 
     # --- lifecycle event log -------------------------------------------------
     def events_path(self, workspace_id: str) -> Path:
-        # Beside the workspace file; the '.jsonl' suffix keeps it out of list_workspaces' glob.
+        # Beside the workspace file; the '.jsonl' suffix keeps the listing from taking it for a workspace.
         return self.root / f"{workspace_id.replace(':', '_')}{LOG_SUFFIX}"
 
     def read_events(self, workspace_id: str) -> list[Event]:
