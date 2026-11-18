@@ -8,13 +8,16 @@ type (architecture): the toggle points at that page type's generated Sphinx doc,
 production types are documentable - a fixture has no doc to link to.
 """
 
+import json
 import re
+import shutil
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 import src.server as server
+from src import lifecycle_log
 from src.errors import ValidationError
 from src.source_link import SourceLink, read_remote_url, to_source_link
 from src.store import Store
@@ -372,3 +375,88 @@ def test_footer_without_a_source_link_shows_only_the_note(client, monkeypatch):
 def test_server_publishes_the_checkouts_source_link():
     src_dir = Path(server.__file__).resolve().parent
     assert server.templates.env.globals["source_link"] == to_source_link(read_remote_url(src_dir))
+
+
+# --- Timeline ------------------------------------------------------------------
+# The replay JSON is built from the lifecycle log alone, and both timeline routes only read.
+
+def _log_lines(store: Store, workspace_id: str) -> list[dict]:
+    path = store.root / "events" / f"{workspace_id.replace(':', '_')}.jsonl"
+    return lifecycle_log.serve_lines(path.read_bytes().decode("utf-8"))
+
+
+def _pre_ship_workspace(root: Path) -> tuple[str, Path]:
+    """A workspace document with pages written before recording shipped: event_seq 0 and no log."""
+    store = Store(root)
+    workspace = store.create_workspace("demo")
+    store.create_page(workspace.id, "test-fields", "Page title")
+    shutil.rmtree(root / "events")
+    document = root / f"{workspace.id.replace(':', '_')}.json"
+    data = json.loads(document.read_text(encoding="utf-8"))
+    data["event_seq"] = 0
+    document.write_text(json.dumps(data), encoding="utf-8")
+    return workspace.id, document
+
+
+def _backfill_dir(root: Path, workspace_id: str) -> Path:
+    folder = root / "backfill"
+    folder.mkdir()
+    line = {"seq": 1, "ts": 1784540400000, "page": "toc:t1", "kind": "created", "type": "toc",
+            "title": "Features", "parent": None, "status": "active"}
+    (folder / f"{workspace_id.replace(':', '_')}.jsonl").write_text(lifecycle_log.encode(line), encoding="utf-8")
+    return folder
+
+
+def test_timeline_json_serves_the_log_with_the_types_table(client):
+    workspace = server.STORE.create_workspace("demo")
+    server.STORE.create_page(workspace.id, "test-fields", "Page title")
+    response = client.get(f"/{workspace.id}/timeline.json")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/json"
+    body = response.json()
+    events = _log_lines(server.STORE, workspace.id)
+    assert body["workspace"] == {"id": workspace.id, "name": "demo"}
+    assert body["events"] == events and events
+    assert body["t0"] == events[0]["ts"] and body["t1"] == events[-1]["ts"]
+    assert body["types"] == lifecycle_log.timeline_types()
+
+
+def test_timeline_json_never_rewrites_earlier_history(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "First").page
+    server.STORE.rename_page(workspace.id, page.id, "Second")
+    before = client.get(f"/{workspace.id}/timeline.json").json()["events"]
+    server.STORE.rename_page(workspace.id, page.id, "Third")
+    after = client.get(f"/{workspace.id}/timeline.json").json()["events"]
+    assert [event["kind"] for event in before] == ["created", "renamed"]
+    assert after[:len(before)] == before
+    assert json.dumps(after[:len(before)]) == json.dumps(before)
+    assert after[-1]["kind"] == "renamed" and after[-1]["title"] == "Third"
+
+
+def test_timeline_json_of_a_workspace_never_written_is_empty(client):
+    workspace = server.STORE.create_workspace("demo")
+    body = client.get(f"/{workspace.id}/timeline.json").json()
+    assert body["events"] == [] and body["t0"] is None and body["t1"] is None
+
+
+def test_timeline_json_of_a_missing_workspace_is_404(client):
+    response = client.get("/ws:nope/timeline.json")
+    assert response.status_code == 404
+    assert response.headers["content-type"] == "application/json"
+    assert response.json() == {"detail": "Workspace 'ws:nope' not found."}
+
+
+def test_reading_the_timeline_never_starts_the_log(tmp_path):
+    workspace_id, document = _pre_ship_workspace(tmp_path)
+    server.STORE = Store(tmp_path, backfill_dir=_backfill_dir(tmp_path, workspace_id))
+    before = document.read_bytes()
+    with TestClient(server.app) as client:
+        assert client.get(f"/{workspace_id}/timeline.json").json()["events"] == []
+    assert document.read_bytes() == before
+    assert not (tmp_path / "events").exists()
+
+
+def test_the_server_store_installs_the_committed_backfill():
+    source = Path(server.__file__).read_text(encoding="utf-8")
+    assert 'STORE = Store(DATA_DIR, backfill_dir=Path("backfill"))' in source

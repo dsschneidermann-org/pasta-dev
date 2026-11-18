@@ -12,7 +12,7 @@ import traceback
 from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
@@ -23,9 +23,9 @@ import mcp.types as mt
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
-from . import cleanup
+from . import cleanup, lifecycle_log
 from .describe import describe_mutations, describe_page_type
-from .errors import PastaError
+from .errors import NotFoundError, PastaError
 from .event_cache import page_events
 from .hmr_live_refresh import reload_failure, ws_reloader
 from .instructions import render_instructions
@@ -48,7 +48,7 @@ from .store import Store
 validate_registry()
 
 DATA_DIR = os.environ.get("PASTA_DATA_DIR", ".pasta-data")
-STORE = Store(DATA_DIR)
+STORE = Store(DATA_DIR, backfill_dir=Path("backfill"))
 
 # The event behind a write's full `next`, and how long one full delivery stays fresh.
 GUIDANCE_EMITTED = "guidanceEmitted"
@@ -201,6 +201,20 @@ async def route_tree(request: Request, workspaceIdPart: str, archived: str | Non
                 "body": body,
             }
         )
+
+
+# The replay JSON of a workspace's lifecycle log. Only reads: a read never starts the log, so a
+# workspace that has not been written since recording shipped answers with no events.
+@app.get("/ws:{workspaceIdPart}/timeline.json")
+async def route_timeline_json(workspaceIdPart: str):
+    with _guard_http():
+        workspace_id = f"ws:{workspaceIdPart}"
+        try:
+            workspace = STORE.load_workspace(workspace_id)
+            events = STORE.read_lifecycle_log(workspace_id)
+        except NotFoundError as exc:
+            return JSONResponse({"detail": str(exc)}, status_code=404)
+        return JSONResponse(lifecycle_log.timeline_payload(workspace_id, workspace.name, events))
 
 
 @app.get("/ws:{workspaceIdPart}/page/{pageId}", response_class=HTMLResponse)
