@@ -4,7 +4,8 @@
 const fs = require("fs");
 
 // The elements timeline.html gives the renderer by id.
-const PAGE_IDS = ["tl-stage", "tl-minimap", "tl-scrub", "tl-play", "tl-clock", "tl-counts", "tl-feed"];
+const PAGE_IDS = ["tl-stage", "tl-minimap", "tl-scrub", "tl-play", "tl-clock", "tl-counts", "tl-feed",
+  "tl-live", "tl-empty"];
 
 function makeElement(tag, created) {
   const element = {
@@ -36,31 +37,43 @@ function makeElement(tag, created) {
   return element;
 }
 
-// Runs the renderer at `scriptPath` on the payload at `payloadPath`, up to the point the page has
-// loaded: drawn, paused at the start, with its autoplay waiting in `runTimers`.
-function loadTimeline(payloadPath, scriptPath) {
+// Runs the renderer at `scriptPath` on the payload at `payloadPath` (or `options.payloadText`), up
+// to the point the page has loaded: drawn, resting at its end, its events socket open. The page
+// says it was rendered from `options.eventCount` log events (3 by default), and the viewer prefers
+// reduced motion when `options.reducedMotion` is set.
+function loadTimeline(payloadPath, scriptPath, options = {}) {
   const created = [];
   const ids = {};
   for (const id of PAGE_IDS) ids[id] = makeElement(id, created);
   ids["tl-play"].textContent = "Play";                       // as timeline.html renders the button
-  const payloadText = fs.readFileSync(payloadPath, "utf8");
+  const payloadText = options.payloadText ?? fs.readFileSync(payloadPath, "utf8");
   ids["timeline-data"] = Object.assign(makeElement("script", created), {
-    textContent: payloadText, dataset: { workspace: "ws:check" },
+    textContent: payloadText, dataset: { workspace: "ws:check", events: String(options.eventCount ?? 3) },
   });
 
   let onReady = null;
   const frames = [];
   const timers = [];
+  const sockets = [];
   global.document = {
     getElementById: (id) => ids[id] ?? null,
     createElementNS: (_namespace, tag) => makeElement(tag, created),
     createElement: (tag) => makeElement(tag, created),
     addEventListener(type, listener) { if (type === "DOMContentLoaded") onReady = listener; },
   };
-  global.window = { matchMedia: () => ({ matches: false }), addEventListener() {} };
+  global.window = { matchMedia: () => ({ matches: Boolean(options.reducedMotion) }), addEventListener() {} };
   global.requestAnimationFrame = (callback) => frames.push(callback);
   global.cancelAnimationFrame = () => { frames.length = 0; };
   global.setTimeout = (callback) => timers.push(callback);
+  // Records each socket the renderer opens; a check delivers messages through `push`.
+  global.WebSocket = class {
+    constructor(url) {
+      this.url = url;
+      this.closed = false;
+      sockets.push(this);
+    }
+    close() { this.closed = true; }
+  };
 
   (0, eval)(fs.readFileSync(scriptPath, "utf8"));           // global scope, as an inline <script>
   if (onReady === null) throw new Error("the renderer did not wait for DOMContentLoaded");
@@ -68,17 +81,30 @@ function loadTimeline(payloadPath, scriptPath) {
 
   let now = 0;
   const stage = ids["tl-stage"];
+  const hasClass = (element, name) => String(element.attrs?.class ?? "").split(" ").includes(name);
+  // What a redraw left on the stage, without the elements it replaced.
+  function onStage(name, node = stage) {
+    return (node.children ?? []).flatMap((child) => [...(hasClass(child, name) ? [child] : []), ...onStage(name, child)]);
+  }
   return {
     data: JSON.parse(payloadText),
     ids,
     created,
-    classed: (name) => created.filter((element) => String(element.attrs.class ?? "").split(" ").includes(name)),
+    sockets,
+    classed: (name) => created.filter((element) => hasClass(element, name)),
+    onStage,
     playhead: () => parseFloat(ids["tl-scrub"].value),
     pendingFrames: () => frames.length,
+    pendingTimers: () => timers.length,
     runTimers() { timers.splice(0).forEach((callback) => callback()); },
+    // Delivers a server message on the latest socket, as the browser would.
+    push(message) { sockets.at(-1).onmessage({ data: JSON.stringify(message) }); },
+    closeSocket() { sockets.at(-1).onclose({ reason: "check" }); },
     runFrames(count) {
       for (let i = 0; i < count && frames.length; i++) frames.shift()((now += 16.7));
     },
+    // Makes the next frame arrive `ms` late, as when the browser is busy painting.
+    stall(ms) { now += ms; },
     scrubTo(p) {
       ids["tl-scrub"].value = String(p);
       ids["tl-scrub"].listeners.input();

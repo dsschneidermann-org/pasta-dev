@@ -1,10 +1,11 @@
 // Draws and replays the timeline payload. Every layout decision - lanes, playback positions, the
 // playback clock, the order stations are narrated in - arrives in the payload; this script only
-// draws it once and moves the playhead.
+// draws each payload it is given - the page's, then every live one its events socket streams -
+// and moves the playhead.
 function main() {
   const dataNode = document.getElementById("timeline-data");
   if (!dataNode) return;
-  const data = JSON.parse(dataNode.textContent);
+  let data = JSON.parse(dataNode.textContent);
   const workspaceId = dataNode.dataset.workspace;
 
   const PX = 120;          // pixels per playback second
@@ -14,6 +15,7 @@ function main() {
   const HEAD = 0.7;        // how far across the stage the playhead rides
   const FRESH = 0.6;       // playback seconds a station stays highlighted after the playhead passes
   const SPEAK = 1.5;       // playback seconds a transition's status label stays up after it is passed
+  const MAX_STEP = 0.1;    // most playback seconds one frame advances, so a stalled frame never skips the replay ahead
   const FEED_SIZE = 6;
   const SVG = "http://www.w3.org/2000/svg";
 
@@ -24,9 +26,11 @@ function main() {
   const clock = document.getElementById("tl-clock");
   const counts = document.getElementById("tl-counts");
   const feedList = document.getElementById("tl-feed");
+  const live = document.getElementById("tl-live");
+  const empty = document.getElementById("tl-empty");
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const segments = data.segments.map(([t0, t1, p0, p1]) => ({ t0, t1, p0, p1 }));
-  const height = AXIS_H + data.lanes * LANE_H + LANE_H / 2;
+  let segments = [];
   const x = (p) => X0 + p * PX;
   const y = (lane) => AXIS_H + lane * LANE_H + LANE_H / 2;
   const pagePath = (pageId) => `/${workspaceId}/page/${pageId}`;
@@ -63,33 +67,71 @@ function main() {
     return s.p0 + u * (s.p1 - s.p0);
   }
 
-  // --- the stage, drawn once and then only clipped and panned ---
-  stage.setAttribute("height", height);
-  const clip = el("clipPath", { id: "tl-clip" }, el("defs", {}, stage));
-  const clipRect = el("rect", { x: -X0, y: 0, width: 0, height }, clip);
-  const world = el("g", {}, stage);
-  const axis = el("g", {}, world);
-  const linesGroup = el("g", {}, world);
-  const playhead = el("line", { class: "tl-playhead", y1: 0, y2: height }, world);
+  // --- the stage, drawn per payload and between payloads only clipped and panned ---
+  let clipRect = null;
+  let world = null;
+  let playhead = null;
+  let lineNodes = [];
 
-  const firstDay = new Date(data.start * 1000);
-  firstDay.setHours(24, 0, 0, 0);
-  let lastTickX = -Infinity;
-  for (const day = firstDay; day.getTime() / 1000 <= data.end; day.setDate(day.getDate() + 1)) {
-    const tickX = x(playbackAt(day.getTime() / 1000));
-    if (tickX - lastTickX < 72) continue;
-    lastTickX = tickX;
-    const tick = el("g", { class: "tl-tick" }, axis);
-    el("line", { x1: tickX, x2: tickX, y1: 16, y2: height }, tick);
-    el("text", { x: tickX + 3, y: 12 }, tick).textContent =
-      day.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-  }
-  for (const s of segments) {
-    const days = (s.t1 - s.t0) / 86400;
-    const squeezed = s.p1 - s.p0 < (s.t1 - s.t0) / data.baseRate * 0.99;
-    if (days < 1 || !squeezed) continue;
-    el("text", { x: x((s.p0 + s.p1) / 2), y: 28, "text-anchor": "middle" }, el("g", { class: "tl-gap" }, axis))
-      .textContent = `${Math.round(days)} d`;
+  function draw() {
+    segments = data.segments.map(([t0, t1, p0, p1]) => ({ t0, t1, p0, p1 }));
+    const height = AXIS_H + data.lanes * LANE_H + LANE_H / 2;
+    stage.replaceChildren();
+    stage.setAttribute("height", height);
+    const clip = el("clipPath", { id: "tl-clip" }, el("defs", {}, stage));
+    clipRect = el("rect", { x: -X0, y: 0, width: 0, height }, clip);
+    world = el("g", {}, stage);
+    const axis = el("g", {}, world);
+    const linesGroup = el("g", {}, world);
+    playhead = el("line", { class: "tl-playhead", y1: 0, y2: height }, world);
+
+    const firstDay = new Date(data.start * 1000);
+    firstDay.setHours(24, 0, 0, 0);
+    let lastTickX = -Infinity;
+    for (const day = firstDay; day.getTime() / 1000 <= data.end; day.setDate(day.getDate() + 1)) {
+      const tickX = x(playbackAt(day.getTime() / 1000));
+      if (tickX - lastTickX < 72) continue;
+      lastTickX = tickX;
+      const tick = el("g", { class: "tl-tick" }, axis);
+      el("line", { x1: tickX, x2: tickX, y1: 16, y2: height }, tick);
+      el("text", { x: tickX + 3, y: 12 }, tick).textContent =
+        day.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    }
+    for (const s of segments) {
+      const days = (s.t1 - s.t0) / 86400;
+      const squeezed = s.p1 - s.p0 < (s.t1 - s.t0) / data.baseRate * 0.99;
+      if (days < 1 || !squeezed) continue;
+      el("text", { x: x((s.p0 + s.p1) / 2), y: 28, "text-anchor": "middle" }, el("g", { class: "tl-gap" }, axis))
+        .textContent = `${Math.round(days)} d`;
+    }
+
+    lineNodes = data.lines.map((line) => {
+      const group = el("g", { class: "tl-line" }, el("a", { href: pagePath(line.id) }, linesGroup));
+      group.style.setProperty("--c", `var(--line-${line.type})`);
+      el("title", {}, group).textContent = line.title;
+      const lineY = y(line.lane);
+      // Ahead of the playhead only the grey copy shows; the coloured copy is revealed as it passes.
+      drawShapes(line, lineY, el("g", { class: "tl-ghost" }, group));
+      const stops = drawShapes(line, lineY, el("g", { "clip-path": "url(#tl-clip)" }, group));
+      // Station names sit outside the clip, so one reaching past the playhead is not cut off.
+      const labelGroup = el("g", {}, group);
+      const labels = line.stops.map((stop) => {
+        const labelX = x(stop.p) + 3;
+        const labelY = lineY - 7;
+        const label = el("text", {
+          class: "tl-label", x: labelX, y: labelY, transform: `rotate(-40 ${labelX} ${labelY})`,
+        }, labelGroup);
+        label.textContent = statusLabel(stop);
+        return label;
+      });
+      const unset = () => line.stops.map(() => false);
+      return { group, stops, labels, past: false, fresh: unset(), speaking: unset() };
+    });
+
+    slider.max = data.duration;
+    passed = -1;                // the feed is rebuilt on the next frame
+    live.hidden = !data.lines.length;
+    empty.hidden = Boolean(data.lines.length);
   }
 
   // A line's track, stations and end mark; drawn once in grey and once in colour.
@@ -112,29 +154,6 @@ function main() {
     }
     return stops;
   }
-
-  const lineNodes = data.lines.map((line) => {
-    const group = el("g", { class: "tl-line" }, el("a", { href: pagePath(line.id) }, linesGroup));
-    group.style.setProperty("--c", `var(--line-${line.type})`);
-    el("title", {}, group).textContent = line.title;
-    const lineY = y(line.lane);
-    // Ahead of the playhead only the grey copy shows; the coloured copy is revealed as it passes.
-    drawShapes(line, lineY, el("g", { class: "tl-ghost" }, group));
-    const stops = drawShapes(line, lineY, el("g", { "clip-path": "url(#tl-clip)" }, group));
-    // Station names sit outside the clip, so one reaching past the playhead is not cut off.
-    const labelGroup = el("g", {}, group);
-    const labels = line.stops.map((stop) => {
-      const labelX = x(stop.p) + 3;
-      const labelY = lineY - 7;
-      const label = el("text", {
-        class: "tl-label", x: labelX, y: labelY, transform: `rotate(-40 ${labelX} ${labelY})`,
-      }, labelGroup);
-      label.textContent = statusLabel(stop);
-      return label;
-    });
-    const unset = () => line.stops.map(() => false);
-    return { group, stops, labels, past: false, fresh: unset(), speaking: unset() };
-  });
 
   // --- the minimap under the scrubber: every line at once, and the window the stage shows ---
   let windowRect = null;
@@ -282,7 +301,7 @@ function main() {
   }
 
   function tick(now) {
-    if (lastNow !== null) p = Math.min(data.duration, p + (now - lastNow) / 1000);
+    if (lastNow !== null) p = Math.min(data.duration, p + Math.min(MAX_STEP, (now - lastNow) / 1000));
     lastNow = now;
     frame();
     if (p >= data.duration) {
@@ -362,14 +381,55 @@ function main() {
   });
   window.addEventListener("resize", layout);
 
-  layout();
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    p = data.duration;      // show the whole map at rest; the scrubber still replays it
-    frame();
-    updateButton();
-  } else {
-    setTimeout(() => setPlaying(true), 600);
+  // A live payload: redraw it, and play on to its new end if the viewer was resting at the old one.
+  // A paused viewer is looking at something, so they are left where they are. A viewer who prefers
+  // reduced motion is taken to the new end at rest.
+  function show(timeline) {
+    const resting = !playing && !press?.dragging && p >= data.duration;   // the Replay state
+    data = timeline;
+    draw();
+    layout();
+    if (!resting || p >= data.duration) return updateButton();
+    if (reducedMotion) {
+      p = data.duration;
+      frame();
+      updateButton();
+    } else {
+      setPlaying(true);
+    }
   }
+
+  // --- live events: each write's new log events, with the timeline rebuilt to include them ---
+  let since = Number(dataNode.dataset.events);   // the log events this page has; a reconnect resumes there
+
+  function connect() {
+    const socket = new WebSocket(`/ws/events/${workspaceId}?since=${since}`);
+
+    socket.onmessage = function(event) {
+      const message = JSON.parse(event.data);
+      if (!message.events.length) return;    // the heartbeat
+      since += message.events.length;
+      show(message.timeline);
+    };
+
+    socket.onclose = function(e) {
+      console.log("Events socket is closed. Reconnect will be attempted in 1 second.", e.reason);
+      setTimeout(function() {
+        connect();
+      }, 1000);
+    };
+
+    socket.onerror = function(err) {
+      socket.close();
+    };
+  }
+
+  // The page opens at rest at the end of the history, in the Replay state; Replay plays it from the start.
+  draw();
+  p = data.duration;
+  layout();
+  updateButton();
+  connect();
 }
 
 // The page shell keeps <body> hidden until its theme script has run, and the stage can only be

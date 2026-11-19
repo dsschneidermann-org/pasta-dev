@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import asyncio
+import logging
 from contextlib import contextmanager, asynccontextmanager
 from typing import Annotated, Any, override
 from collections.abc import Generator
@@ -27,7 +28,7 @@ from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .event_cache import page_events
-from .hmr_live_refresh import reload_failure, ws_reloader
+from .hmr_live_refresh import reload_failure, ws_events, ws_reloader
 from .instructions import render_instructions
 from .pagetypes._registry import (
     declaration_errors,
@@ -42,6 +43,8 @@ from .serialize import page_to_dict
 from .source_link import read_remote_url, to_source_link
 from .store import Store
 from .timeline import build_timeline
+
+logger = logging.getLogger("uvicorn.error")
 
 # Fail fast: validate every page type once at load. This runs on a cold start and re-runs on
 # every HMR reload (this module re-executes then), so a misconfigured type surfaces every error
@@ -158,6 +161,43 @@ async def fastapi_reloader(websocket: WebSocket):
         _ = task.cancel()
 
 
+# --- Websocket events --------------------------------------------------------
+# The timeline tabs' connection manager (`ws_events`) lives in src.hmr_live_refresh beside the
+# reloader's, so its live connections survive hot reloads. The writes below that log lifecycle
+# events publish them to it, each with the timeline rebuilt to include them.
+
+async def publish_events(workspace_id: str) -> None:
+    """Stream the log events a write appended to the timeline tabs watching its workspace, with the
+    timeline rebuilt to include them. The write has already committed, so a failure is logged, never raised."""
+    if not ws_events.watching(workspace_id):
+        return
+    try:
+        events = STORE.read_events(workspace_id)
+        timeline = build_timeline(events, STORE.load_workspace(workspace_id), time.time())
+        await ws_events.publish(workspace_id, events, timeline)
+    except Exception:
+        logger.warning("[events] could not stream the %s event log", workspace_id, exc_info=True)
+
+
+@app.websocket("/ws/events/{workspace_id}")
+async def fastapi_events(websocket: WebSocket, workspace_id: str, since: int = 0):
+    await ws_events.connect(websocket, workspace_id, since)
+    await publish_events(workspace_id)   # catch up on what was logged since the page was rendered
+
+    async def send_updates():
+        while True:
+            await websocket.send_text('{"events": []}')
+            await asyncio.sleep(5)
+
+    task = asyncio.create_task(send_updates())
+    try:
+        while True:
+            _ = await websocket.receive_text()  # receive and do nothing
+    except WebSocketDisconnect:
+        _ = task.cancel()
+        ws_events.disconnect(websocket)
+
+
 # --- FastAPI routes ----------------------------------------------------------
 @contextmanager
 def _guard_http() -> Generator[None]:
@@ -211,7 +251,8 @@ async def route_timeline(request: Request, workspaceIdPart: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
-        payload = build_timeline(STORE.read_events(workspace_id), workspace, time.time())
+        events = STORE.read_events(workspace_id)
+        payload = build_timeline(events, workspace, time.time())
         return templates.TemplateResponse(
             request=request,
             name="timeline.html",
@@ -219,6 +260,8 @@ async def route_timeline(request: Request, workspaceIdPart: str):
                 "workspace_id": workspace_id,
                 "workspace_name": workspace.name,
                 "payload": payload,
+                # Where the page's events socket resumes the log from.
+                "event_count": len(events),
             },
         )
 
@@ -281,14 +324,15 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
 
 # Archive/unarchive a page from its web view. These mirror the archivePage / unarchivePage MCP
 # tools (a browser can't call MCP), so the wiki's Archive/Unarchive button POSTs here. Each fires
-# the live-reload refresh like the MCP tools do, then 303-redirects back to the page (GET) so a
-# reload/back-button doesn't re-POST the mutation.
+# the live-reload refresh and streams its events to timeline tabs like the MCP tools do, then
+# 303-redirects back to the page (GET) so a reload/back-button doesn't re-POST the mutation.
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/archive", response_class=PlainTextResponse)
 async def route_archive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.archive_page(workspace_id, pageId)
         await ws_reloader.refresh()
+        await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
 
@@ -298,6 +342,7 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unarchive_page(workspace_id, pageId)
         await ws_reloader.refresh()
+        await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
 
@@ -311,6 +356,7 @@ async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.schedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
+        await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
 
@@ -320,6 +366,7 @@ async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.refresh()
+        await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
 
@@ -333,6 +380,7 @@ async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annot
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.set_page_status(workspace_id, pageId, status)
         await ws_reloader.refresh()
+        await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
 
@@ -549,6 +597,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         next_actions = STORE.next_actions(workspaceId, page.id)
         _record_guidance_emitted(workspaceId, page.id)
         await ws_reloader.refresh()
+        await publish_events(workspaceId)
         return {
             "id": page.id,
             "type": page.type,
@@ -591,6 +640,7 @@ async def mutatePageBatch(
         if emit_in_full:
             _record_guidance_emitted(workspaceId, pageId)
         await ws_reloader.refresh()
+        await publish_events(workspaceId)
         return {
             "pageId": page.id,
             "status": page.status,
@@ -652,6 +702,7 @@ async def archivePage(workspaceId: str, pageId: str) -> dict[str, Any]:
     with _guard_tool():
         page = STORE.archive_page(workspaceId, pageId)
         await ws_reloader.refresh()
+        await publish_events(workspaceId)
         return {"id": page.id, "archived": page.archived}
 
 
@@ -661,6 +712,7 @@ async def unarchivePage(workspaceId: str, pageId: str) -> dict[str, Any]:
     with _guard_tool():
         page = STORE.unarchive_page(workspaceId, pageId)
         await ws_reloader.refresh()
+        await publish_events(workspaceId)
         return {"id": page.id, "archived": page.archived}
 
 

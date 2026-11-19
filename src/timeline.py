@@ -166,7 +166,8 @@ def _round(value: float) -> float:
 
 def build_timeline(events: Sequence[Event], workspace: Workspace, now: float) -> dict[str, Any]:
     """The replay of a workspace's log as plain JSON for the timeline view: the playback clock,
-    one line per tracked page packed into lanes, and every station in the order it is narrated."""
+    one line per tracked page packed into lanes, and every station in the order it is narrated.
+    The replay ends on its last station, so no time is spent on a stretch where nothing happened."""
     by_page: dict[str, list[Event]] = {}
     for event in sorted(events, key=lambda event: _seconds(event["at"])):
         if event.get("type") in LINE_TYPES:
@@ -177,7 +178,7 @@ def build_timeline(events: Sequence[Event], workspace: Workspace, now: float) ->
 
     lines = [_line(page_id, page_events, workspace) for page_id, page_events in by_page.items()]
     stop_times = [stop.at for line in lines for stop in line.stops]
-    start, end = min(stop_times), max(now, *stop_times)
+    start, end = min(stop_times), max(stop_times)
     segments = playback_segments(stop_times, start, end)
     duration = segments[-1].p1 if segments else 0.0
 

@@ -133,7 +133,21 @@ def test_a_shipped_feature_ends_delivered_at_its_ship_station():
     assert [stop["status"] for stop in line["stops"]] == ["draft", "grounding", "shipped"]
     assert [stop["kind"] for stop in line["stops"]] == ["created", "status", "status"]
     assert line["p1"] == line["stops"][-1]["p"]
-    assert line["p1"] < payload["duration"]
+    assert line["p1"] == payload["duration"]          # the ship station is the last event, so it ends the replay
+
+
+def test_the_timeline_ends_on_its_last_event_not_at_now():
+    page = _id("feature-brief", T0)
+    events = [
+        _event(T0, "created", page, "draft"),
+        _event(T0 + HOUR, "status", page, "grounding", "draft"),
+    ]
+    payload = build_timeline(events, _workspace(_page(page, "grounding")), T0 + 10 * DAY)
+    line = _only_line(payload)
+    assert line["end"] == "open"
+    assert payload["end"] == T0 + HOUR
+    assert line["p1"] == line["stops"][-1]["p"] == payload["duration"]
+    assert payload["segments"][-1][1] == T0 + HOUR
 
 
 def test_an_abandoned_feature_ends_dropped():
@@ -239,6 +253,30 @@ def test_overlapping_lines_take_separate_lanes_and_a_later_line_reuses_a_freed_o
     assert payload["lanes"] == 2
     by_id = {line["id"]: line for line in payload["lines"]}
     assert by_id[third]["p0"] >= by_id[first]["p1"] + LANE_GAP
+
+
+def test_appending_a_later_event_keeps_every_earlier_position():
+    # The live timeline redraws from a payload rebuilt per write; that reads as growth at the end
+    # only because a later event moves nothing already drawn.
+    shipped, open_, later = _id("feature-brief", T0), _id("feature-brief", T0 + HOUR), _id("bug-report", T0 + 3 * DAY)
+    events = [
+        _event(T0, "created", shipped, "draft"),
+        _event(T0 + HOUR, "created", open_, "draft"),
+        _event(T0 + 2 * HOUR, "status", open_, "grounding", "draft"),
+        _event(T0 + DAY, "status", shipped, "shipped", "done"),
+    ]
+    workspace = _workspace(_page(shipped, "shipped"), _page(open_, "grounding"), _page(later, "draft"))
+    before = build_timeline(events, workspace, T0 + DAY)
+    after = build_timeline([*events, _event(T0 + 3 * DAY, "created", later, "draft")], workspace, T0 + 3 * DAY)
+
+    assert after["start"] == before["start"]
+    assert after["duration"] > before["duration"]
+    by_id = {line["id"]: line for line in after["lines"]}
+    for line in before["lines"]:
+        grown = by_id[line["id"]]
+        assert (grown["lane"], grown["p0"]) == (line["lane"], line["p0"])
+        assert [stop["p"] for stop in grown["stops"]] == [stop["p"] for stop in line["stops"]]
+    assert after["lines"][-1]["id"] == later
 
 
 def test_the_feed_lists_every_station_in_playback_order():
