@@ -145,7 +145,7 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
             continue
         stops.append(_Stop(at, kind, status))
 
-    # A page archived for good, or deleted, shows only its work: the line stops at its last status.
+    # A page still archived, or deleted, shows only its work: the line stops at its last status.
     put_away = archived or page_id not in workspace.pages
     if put_away:
         stops = [stop for stop in stops if stop.kind not in ("archived", "unarchived")]
