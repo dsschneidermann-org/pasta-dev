@@ -1,7 +1,7 @@
 """The timeline model: a workspace's event log laid out as a replayable metro map.
 
-Each feature-brief, bug-report and simple-change is a line that starts when its page was created,
-stops at a station for every logged event, and ends delivered, dropped, or still open. The
+Each feature-brief, bug-report and simple-change is a line that starts at its first logged event,
+stops at a station for every one after it, and ends delivered, dropped, or still open. The
 replay runs on a playback clock rather than the wall clock: stretches near an event play at a
 quarter of a day per second, and the idle time between them is squeezed, so a project months long
 replays in minutes and the drawing gives its space to the moments something happened. Every
@@ -17,7 +17,6 @@ from datetime import datetime
 from typing import Any
 
 from .event_log import Event
-from .ids import id_time
 from .model import Workspace
 
 LINE_TYPES = ("feature-brief", "bug-report", "simple-change")   # also the colour slot order
@@ -117,8 +116,7 @@ def _seconds(at: str) -> float:
 def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
     """One page's line from its events, already in time order."""
     times = [_seconds(event["at"]) for event in events]
-    born = id_time(page_id)
-    start = min(times[0], born) if born is not None else times[0]
+    start = times[0]
     page_type = events[0]["type"]
 
     created = next((event for event in events if event["event"] == "created"), None)

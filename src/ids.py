@@ -37,16 +37,6 @@ def new_id(prefix: str) -> str:
     return f"{prefix}:{new_token()}"
 
 
-def id_time(identifier: str) -> float | None:
-    """Epoch seconds encoded in an id or token made by `new_id` / `new_token`, or None when the
-    token does not start with base-36 millis."""
-    token = identifier.rsplit(":", 1)[-1]
-    millis = token.split("-", 1)[0]
-    if not millis or any(ch not in _ALPHABET for ch in millis):
-        return None
-    return int(millis, 36) / 1000
-
-
 def new_revision_token() -> str:
     """A short 6-digit optimistic-concurrency stamp for a page's status, e.g. `042917`."""
     return f"{secrets.randbelow(1_000_000):06d}"

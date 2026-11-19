@@ -12,8 +12,7 @@ clock, lines, lanes and feed order - is tested in `tests/test_timeline.py`, and 
 
 - `uv`, as for the rest of the project.
 - Node.js on `PATH` (checked with Node 24).
-- A data dir holding a workspace whose event log has timeline events. For pasta's own workspace,
-  run `uv run python scripts/backfill_timeline.py` once first if its `.events.jsonl` is missing.
+- A data dir holding a workspace whose event log (`ws_<id>.events.jsonl`) has timeline events.
 
 ## Running them
 

@@ -196,21 +196,21 @@ def test_the_current_workspace_title_wins_over_the_logged_one():
     assert line["end"] == "open"
 
 
-def test_a_page_first_seen_at_a_transition_starts_at_its_id_time_in_the_status_it_left():
+def test_a_page_first_seen_at_a_transition_starts_there_in_the_status_it_left():
     page = _id("feature-brief", T0)
     events = [_event(T0 + 3 * HOUR, "status", page, "grounding", "draft")]
     payload = build_timeline(events, _workspace(_page(page, "grounding")), T0 + DAY)
     line = _only_line(payload)
-    assert line["stops"][0]["at"] == T0
+    assert line["stops"][0]["at"] == T0 + 3 * HOUR
     assert line["stops"][0]["status"] == "draft"
     assert line["stops"][0]["kind"] == "created"
-    assert payload["start"] == T0
+    assert payload["start"] == T0 + 3 * HOUR
     assert [stop["status"] for stop in line["stops"]] == ["draft", "grounding"]
 
 
 def test_the_created_event_is_the_first_station_and_never_a_second_one():
     page = _id("feature-brief", T0)
-    events = [_event(T0 + 0.004, "created", page, "draft")]    # logged a few ms after the id time
+    events = [_event(T0 + 0.004, "created", page, "draft")]
     line = _only_line(build_timeline(events, _workspace(_page(page, "draft")), T0 + DAY))
     assert len(line["stops"]) == 1
 
