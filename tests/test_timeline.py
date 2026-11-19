@@ -133,7 +133,21 @@ def test_a_shipped_feature_ends_delivered_at_its_ship_station():
     assert [stop["status"] for stop in line["stops"]] == ["draft", "grounding", "shipped"]
     assert [stop["kind"] for stop in line["stops"]] == ["created", "status", "status"]
     assert line["p1"] == line["stops"][-1]["p"]
-    assert line["p1"] < payload["duration"]
+    assert line["p1"] == payload["duration"]          # the ship station is the last event, so it ends the replay
+
+
+def test_the_timeline_ends_on_its_last_event_not_at_now():
+    page = _id("feature-brief", T0)
+    events = [
+        _event(T0, "created", page, "draft"),
+        _event(T0 + HOUR, "status", page, "grounding", "draft"),
+    ]
+    payload = build_timeline(events, _workspace(_page(page, "grounding")), T0 + 10 * DAY)
+    line = _only_line(payload)
+    assert line["end"] == "open"
+    assert payload["end"] == T0 + HOUR
+    assert line["p1"] == line["stops"][-1]["p"] == payload["duration"]
+    assert payload["segments"][-1][1] == T0 + HOUR
 
 
 def test_an_abandoned_feature_ends_dropped():
