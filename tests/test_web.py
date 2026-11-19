@@ -402,6 +402,18 @@ def test_timeline_replays_the_workspace_log_without_the_live_reload_socket(clien
     assert "No page events are recorded yet" not in response.text
 
 
+def test_timeline_times_sit_on_the_page_background_and_the_legend_checks_delivered(client):
+    workspace = server.STORE.create_workspace("demo")
+    page_id = "bug-report:mrw7chrt-def44a"
+    server.STORE.events_path(workspace.id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "bug-report", "title": "A bug", "status": "draft"},
+    ]), encoding="utf-8")
+    html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
+    assert ".timeline time { background: var(--background-body); }" in html
+    assert re.search(r'<li><svg[^>]*><circle class="tl-delivered"[^>]*/><path class="tl-check"', html)
+
+
 def test_timeline_of_a_workspace_with_no_log_says_so(client):
     workspace = server.STORE.create_workspace("demo")
     part = workspace.id.removeprefix("ws:")
