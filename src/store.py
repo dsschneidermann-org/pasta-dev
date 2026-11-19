@@ -1169,9 +1169,9 @@ class Store:
 
     @staticmethod
     def _link_guard_failure(workspace: Workspace, page: Page, command: CommandSpec) -> str | None:
-        """The message of the first LINK guard `command` fails on `page`, or None.
+        """The message of the first link guard `command` fails on `page`, or None.
 
-        Looks ACROSS at the pages `page` links to. Like a child-guard failure it says work it waits
+        Looks across at the pages `page` links to. Like a child-guard failure it says work it waits
         on is not finished, and adding the link on this page clears it, so it never suppresses a
         field setter. Only a live target of the guarded type counts.
         """
