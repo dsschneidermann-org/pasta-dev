@@ -1,5 +1,6 @@
 """Unit tests for the dev server (src.hmr_server): what a reload re-imports and how it rolls back,
-reload-failure reporting, and the framework internals the reload swap relies on.
+reload-failure reporting, what the dev console shows of a websocket, and the framework internals the
+reload swap relies on.
 
 The watch loop as a whole needs a live uvicorn process, a file watcher and a real edit, so it is
 exercised by hand against the running dev server rather than in this suite. What is pinned here is
@@ -21,6 +22,10 @@ from types import SimpleNamespace
 import pytest
 from fastmcp import FastMCP
 from mcp.server.connection import Connection
+from websockets.datastructures import Headers
+from websockets.frames import Close
+from websockets.http11 import Request
+from websockets.server import ServerProtocol
 
 import src.hmr_server as hmr_server
 from src.hmr_live_refresh import reload_failure, set_reload_failure
@@ -199,6 +204,55 @@ def test_the_traceback_is_handed_to_the_excepthook_that_tees_the_reload_log(repo
     error = ValueError("boom")
     _, hooked = report(error)
     assert hooked == [error]
+
+
+# --- What the dev console shows of a websocket -------------------------------------------
+# uvicorn hands websockets its own status logger, so the library's lines reach the dev console.
+# They are driven through the library's real handshake, so a line reworded upstream fails here
+# rather than quietly coming back to the console.
+@pytest.fixture
+def console(caplog, monkeypatch):
+    """The dev console's INFO lines, with its logger set up as run_dev_server leaves it."""
+    monkeypatch.setattr(hmr_server.logger, "filters", [])
+    monkeypatch.setattr(hmr_server, "build_dev_app", lambda: None)
+    monkeypatch.setattr(hmr_server, "uvicorn", SimpleNamespace(run=lambda *_args, **_kwargs: None))
+    hmr_server.run_dev_server()
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        yield caplog
+
+
+def _open_websocket() -> ServerProtocol:
+    server = ServerProtocol(logger=logging.getLogger("uvicorn.error"))
+    request = Request("/ws/reloader", Headers({
+        "Host": "localhost", "Upgrade": "websocket", "Connection": "Upgrade",
+        "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==", "Sec-WebSocket-Version": "13"}))
+    server.send_response(server.accept(request))
+    return server
+
+
+def _close_websocket(server: ServerProtocol) -> None:
+    server.send_close(1001)
+    # The client's answering close frame, masked as every client frame must be.
+    payload = Close(1001, "").serialize()
+    server.receive_data(bytes([0x88, 0x80 | len(payload)]) + b"\x00\x00\x00\x00" + payload)
+    server.receive_eof()
+
+
+def test_an_accepted_websocket_logs_no_connection_open_line(console):
+    _open_websocket()
+    assert "connection open" not in console.text
+
+
+def test_a_closed_websocket_logs_no_connection_closed_line(console):
+    _close_websocket(_open_websocket())
+    assert "connection closed" not in console.text
+
+
+def test_the_console_still_shows_uvicorns_accept_line_and_the_reload_lines(console):
+    hmr_server.logger.info('%s - "WebSocket %s" [accepted]', "127.0.0.1:58681", "/ws/reloader")
+    hmr_server.logger.info("[HMR] FastAPI app reloaded (src.server.app)")
+    assert '"WebSocket /ws/reloader" [accepted]' in console.text
+    assert "[HMR] FastAPI app reloaded" in console.text
 
 
 # --- Re-importing a package, all or nothing ----------------------------------------------
