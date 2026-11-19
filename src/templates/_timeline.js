@@ -13,6 +13,7 @@ function main() {
   const X0 = 16;           // left margin, so the first station is not cut in half
   const HEAD = 0.7;        // how far across the stage the playhead rides
   const FRESH = 0.6;       // playback seconds a station stays highlighted after the playhead passes
+  const SPEAK = 1.5;       // playback seconds a transition's status label stays up after it is passed
   const FEED_SIZE = 6;
   const SVG = "http://www.w3.org/2000/svg";
 
@@ -69,9 +70,10 @@ function main() {
     return (s.t1 - s.t0) / (s.p1 - s.p0) / 86400;
   }
 
+  // Only a speed-up is worth reading; the base rate goes without saying.
   function rateText(days) {
-    if (Math.abs(days - 0.25) < 0.01) return "¼ day per second";
-    if (days < 1) return `${days.toFixed(2)} day per second`;
+    if (Math.abs(days - 0.25) < 0.0025) return "";
+    if (days < 1) return `${days.toFixed(2)} day per second »`;
     return `${days < 10 ? days.toFixed(1) : Math.round(days)} days per second »`;
   }
 
@@ -81,7 +83,7 @@ function main() {
   const clipRect = el("rect", { x: -X0, y: 0, width: 0, height }, clip);
   const world = el("g", {}, stage);
   const axis = el("g", {}, world);
-  const linesGroup = el("g", { "clip-path": "url(#tl-clip)" }, world);
+  const linesGroup = el("g", {}, world);
   const playhead = el("line", { class: "tl-playhead", y1: 0, y2: height }, world);
 
   const firstDay = new Date(data.start * 1000);
@@ -104,22 +106,47 @@ function main() {
       .textContent = `${Math.round(days)} d`;
   }
 
+  // A line's track, stations and end mark; drawn once in grey and once in colour.
+  function drawShapes(line, lineY, parent) {
+    el("line", { class: "tl-track", x1: x(line.p0), x2: x(line.p1), y1: lineY, y2: lineY }, parent);
+    const stops = line.stops.map((stop, index) => {
+      const cx = x(stop.p);
+      if (line.end === "delivered" && index === line.stops.length - 1) {
+        const mark = el("circle", { class: "tl-stop tl-delivered", cx, cy: lineY, r: 6 }, parent);
+        el("path", {
+          class: "tl-check", d: `M${cx - 2.8} ${lineY + 0.2} L${cx - 0.8} ${lineY + 2.2} L${cx + 2.8} ${lineY - 1.8}`,
+        }, parent);
+        return mark;
+      }
+      return el("circle", { class: "tl-stop", cx, cy: lineY, r: 3.5 }, parent);
+    });
+    if (line.end === "dropped") {
+      el("line", { class: "tl-dropped", x1: x(line.p1), x2: x(line.p1), y1: lineY - 6, y2: lineY + 6 }, parent);
+    }
+    return stops;
+  }
+
   const lineNodes = data.lines.map((line) => {
     const group = el("g", { class: "tl-line" }, el("a", { href: pagePath(line.id) }, linesGroup));
     group.style.setProperty("--c", `var(--line-${line.type})`);
     el("title", {}, group).textContent = line.title;
     const lineY = y(line.lane);
-    el("line", { class: "tl-track", x1: x(line.p0), x2: x(line.p1), y1: lineY, y2: lineY }, group);
-    const stops = line.stops.map((stop, index) => {
-      const delivers = line.end === "delivered" && index === line.stops.length - 1;
-      return el("circle", {
-        class: delivers ? "tl-stop tl-delivered" : "tl-stop", cx: x(stop.p), cy: lineY, r: delivers ? 5 : 3.5,
-      }, group);
+    // Ahead of the playhead only the grey copy shows; the coloured copy is revealed as it passes.
+    drawShapes(line, lineY, el("g", { class: "tl-ghost" }, group));
+    const stops = drawShapes(line, lineY, el("g", { "clip-path": "url(#tl-clip)" }, group));
+    // Station names sit outside the clip, so one reaching past the playhead is not cut off.
+    const labelGroup = el("g", {}, group);
+    const labels = line.stops.map((stop) => {
+      const labelX = x(stop.p) + 3;
+      const labelY = lineY - 7;
+      const label = el("text", {
+        class: "tl-label", x: labelX, y: labelY, transform: `rotate(-40 ${labelX} ${labelY})`,
+      }, labelGroup);
+      label.textContent = statusLabel(stop);
+      return label;
     });
-    if (line.end === "dropped") {
-      el("line", { class: "tl-dropped", x1: x(line.p1), x2: x(line.p1), y1: lineY - 6, y2: lineY + 6 }, group);
-    }
-    return { group, stops, past: false, fresh: line.stops.map(() => false) };
+    const unset = () => line.stops.map(() => false);
+    return { group, stops, labels, past: false, fresh: unset(), speaking: unset() };
   });
 
   // --- the minimap under the scrubber: every line at once, and the window the stage shows ---
@@ -150,6 +177,10 @@ function main() {
 
   function stationLabel(stop) {
     return stop.kind === "status" ? stop.status : stop.kind;
+  }
+
+  function statusLabel(stop) {
+    return stop.kind === "archived" || stop.kind === "unarchived" ? stop.kind : stop.status;
   }
 
   function feedItem(entry) {
@@ -216,16 +247,23 @@ function main() {
         else if (line.end === "delivered") delivered++;
         else dropped++;
       }
-      const past = line.end !== "open" && line.p1 + FRESH < p;
+      const past = line.end !== "open" && line.p1 + SPEAK < p;
       if (past !== node.past) {
         node.past = past;
         node.group.classList.toggle("past", past);
       }
       line.stops.forEach((stop, number) => {
-        const fresh = stop.p <= p && p - stop.p < FRESH;
+        const since = p - stop.p;
+        const fresh = since >= 0 && since < FRESH;
         if (fresh !== node.fresh[number]) {
           node.fresh[number] = fresh;
           node.stops[number].classList.toggle("fresh", fresh);
+        }
+        // The first station is the page's creation, not a transition, so it is not announced.
+        const speaking = number > 0 && since >= 0 && since < SPEAK;
+        if (speaking !== node.speaking[number]) {
+          node.speaking[number] = speaking;
+          node.labels[number].classList.toggle("speaking", speaking);
         }
       });
     });
