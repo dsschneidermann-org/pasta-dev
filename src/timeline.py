@@ -1,7 +1,8 @@
 """The timeline model: a workspace's event log laid out as a replayable metro map.
 
 Each feature-brief, bug-report and simple-change is a line that starts at its first logged event,
-stops at a station for every one after it, and ends delivered, dropped, or still open. The
+stops at a station for every one after it - an archived or deleted page's only up to its last
+status change - and ends delivered, dropped, or still open. The
 replay runs on a playback clock rather than the wall clock: stretches near an event play at a
 quarter of a day per second, and the idle time between them is squeezed, so a project months long
 replays in minutes and the drawing gives its space to the moments something happened. Every
@@ -131,25 +132,30 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
     # The created event is the first station; every other event adds one of its own.
     stops = [_Stop(start, "created", status)]
     archived = False
-    status_at = archive_at = None
+    status_at = None
     for event, at in zip(events, times):
         kind = event["event"]
         if kind == "status":
             status, status_at = event.get("status", status), at
         elif kind == "archived":
-            archived, archive_at = True, at
+            archived = True
         elif kind == "unarchived":
             archived = False
         else:
             continue
         stops.append(_Stop(at, kind, status))
 
+    # A page still archived, or deleted, shows only its work: the line stops at its last status.
+    put_away = archived or page_id not in workspace.pages
+    if put_away:
+        stops = [stop for stop in stops if stop.kind not in ("archived", "unarchived")]
+
     if status == DELIVERED.get(page_type):
         end, end_at = "delivered", status_at if status_at is not None else stops[-1].at
     elif status == DROPPED.get(page_type):
         end, end_at = "dropped", status_at if status_at is not None else stops[-1].at
-    elif archived:
-        end, end_at = "dropped", archive_at
+    elif put_away:
+        end, end_at = "dropped", stops[-1].at
     elif is_hidden(workspace, page_id):
         end, end_at = "dropped", max(times[-1], stops[-1].at)
     else:

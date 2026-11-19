@@ -163,13 +163,66 @@ def test_archiving_an_unfinished_page_ends_its_line_and_unarchiving_resumes_it()
     archived = [_event(T0, "created", page, "draft"), _event(T0 + HOUR, "archived", page, "draft")]
     line = _only_line(build_timeline(archived, _workspace(_page(page, "draft", archived=True)), T0 + DAY))
     assert line["end"] == "dropped"
+    assert [stop["kind"] for stop in line["stops"]] == ["created"]
     assert line["p1"] == line["stops"][-1]["p"]
 
     restored = archived + [_event(T0 + 2 * HOUR, "unarchived", page, "draft")]
     payload = build_timeline(restored, _workspace(_page(page, "draft")), T0 + DAY)
     line = _only_line(payload)
     assert line["end"] == "open"
+    assert [stop["kind"] for stop in line["stops"]] == ["created", "archived", "unarchived"]
     assert line["p1"] == payload["duration"]
+
+
+def test_an_archived_page_ends_at_its_last_status_without_any_archive_stations():
+    page = _id("feature-brief", T0)
+    events = [
+        _event(T0, "created", page, "draft"),
+        _event(T0 + HOUR, "status", page, "grounding", "draft"),
+        _event(T0 + 2 * HOUR, "archived", page, "grounding"),
+        _event(T0 + 3 * HOUR, "unarchived", page, "grounding"),
+        _event(T0 + 4 * HOUR, "status", page, "planning", "grounding"),
+        _event(T0 + 30 * DAY, "archived", page, "planning"),
+    ]
+    payload = build_timeline(events, _workspace(_page(page, "planning", archived=True)), T0 + 30 * DAY)
+    line = _only_line(payload)
+    assert [stop["kind"] for stop in line["stops"]] == ["created", "status", "status"]
+    assert line["end"] == "dropped"
+    assert line["p1"] == line["stops"][-1]["p"] == payload["duration"]
+    assert payload["end"] == T0 + 4 * HOUR            # the archive a month on is not activity
+    assert len(payload["feed"]) == 3
+
+
+def test_a_page_gone_from_the_workspace_shows_no_archive_stations():
+    page = _id("bug-report", T0)
+    events = [
+        _event(T0, "created", page, "draft"),
+        _event(T0 + HOUR, "archived", page, "draft"),
+        _event(T0 + 2 * HOUR, "unarchived", page, "draft"),
+        _event(T0 + 3 * HOUR, "status", page, "open", "draft"),
+        _event(T0 + 10 * DAY, "archived", page, "open"),
+    ]
+    payload = build_timeline(events, _workspace(), T0 + 20 * DAY)
+    line = _only_line(payload)
+    assert [stop["kind"] for stop in line["stops"]] == ["created", "status"]
+    assert line["end"] == "dropped"
+    assert line["p1"] == line["stops"][-1]["p"]
+    assert payload["end"] == T0 + 3 * HOUR
+
+
+def test_a_delivered_page_archived_later_ends_delivered_at_its_close_station():
+    page = _id("simple-change", T0)
+    events = [
+        _event(T0, "created", page, "draft"),
+        _event(T0 + HOUR, "status", page, "closed", "done"),
+        _event(T0 + 10 * DAY, "archived", page, "closed"),
+    ]
+    payload = build_timeline(events, _workspace(_page(page, "closed", archived=True)), T0 + 10 * DAY)
+    line = _only_line(payload)
+    assert [stop["kind"] for stop in line["stops"]] == ["created", "status"]
+    assert line["end"] == "delivered"
+    assert line["p1"] == line["stops"][-1]["p"] == payload["duration"]
+    assert payload["end"] == T0 + HOUR
 
 
 def test_a_closed_bug_report_that_reopened_is_open_again():
