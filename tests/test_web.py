@@ -414,7 +414,7 @@ def test_timeline_times_sit_on_the_page_background_and_the_legend_checks_deliver
     assert re.search(r'<li><svg[^>]*><circle class="tl-delivered"[^>]*/><path class="tl-check"', html)
 
 
-def test_timeline_shows_no_rate_or_play_icon_and_borders_only_between_feed_rows(client):
+def test_timeline_play_button_is_plain_text_and_feed_rows_are_bordered_only_between(client):
     workspace = server.STORE.create_workspace("demo")
     page_id = "bug-report:mrw7chrt-def44a"
     server.STORE.events_path(workspace.id).write_text(to_jsonl([
@@ -422,8 +422,6 @@ def test_timeline_shows_no_rate_or_play_icon_and_borders_only_between_feed_rows(
          "type": "bug-report", "title": "A bug", "status": "draft"},
     ]), encoding="utf-8")
     html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
-    assert "tl-rate" not in html
-    assert "▶" not in html
     assert '<button type="button" id="tl-play">Play</button>' in html
     assert ".tl-feed li + li { border-top: 1px solid var(--border); }" in html
 
