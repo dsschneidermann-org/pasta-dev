@@ -224,6 +224,57 @@ def test_reloader_websocket_sends_refresh(client):
         assert websocket.receive_json() == {"refresh": 0}   # heartbeat on connect
 
 
+def _shipped_feature_log(workspace_id: str) -> None:
+    page_id = "feature-brief:mrw7chrt-def44a"
+    server.STORE.events_path(workspace_id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "feature-brief", "title": "Anchored insert", "status": "draft"},
+        {"at": "2026-07-22T16:20:00+00:00", "event": "status", "pageId": page_id,
+         "type": "feature-brief", "title": "Anchored insert", "status": "shipped", "from": "draft"},
+    ]), encoding="utf-8")
+
+
+def test_events_socket_catches_up_on_connect(client):
+    workspace = server.STORE.create_workspace("demo")
+    _shipped_feature_log(workspace.id)
+    with client.websocket_connect(f"/ws/events/{workspace.id}?since=0") as websocket:
+        caught_up = websocket.receive_json()
+        assert [event["event"] for event in caught_up["events"]] == ["created", "status"]
+        assert len(caught_up["timeline"]["lines"]) == 1
+        assert websocket.receive_json() == {"events": []}    # then the heartbeat
+    assert server.ws_events.active == []                     # a closed tab stops watching
+
+
+def test_events_socket_sends_heartbeats_when_up_to_date(client):
+    workspace = server.STORE.create_workspace("demo")
+    _shipped_feature_log(workspace.id)
+    with client.websocket_connect(f"/ws/events/{workspace.id}?since=2") as websocket:
+        assert websocket.receive_json() == {"events": []}
+
+
+def test_events_socket_of_an_unknown_workspace_stays_open_on_heartbeats(client):
+    with client.websocket_connect("/ws/events/ws:nope-000000") as websocket:
+        assert websocket.receive_json() == {"events": []}
+
+
+def test_a_status_write_streams_its_event_to_a_watching_tab(client, monkeypatch):
+    monkeypatch.setenv("PASTA_CLEANUP", "0")     # entering the client runs the app's lifespan
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page title").page
+    seen = len(server.STORE.read_events(workspace.id))
+    part = workspace.id.removeprefix("ws:")
+    # Entered, the client shares one event loop between its requests and its sockets, so the
+    # POST publishes on the loop the socket lives on.
+    with TestClient(server.app) as live, \
+            live.websocket_connect(f"/ws/events/{workspace.id}?since={seen}") as websocket:
+        assert websocket.receive_json() == {"events": []}
+        assert live.post(f"/ws:{part}/page/{page.id}/status", data={"status": "open"}).status_code == 202
+        streamed = websocket.receive_json()
+    [event] = streamed["events"]
+    assert (event["event"], event["pageId"], event["from"], event["status"]) == ("status", page.id, "draft", "open")
+    assert streamed["timeline"]["lines"] == []          # a fixture type is logged but draws no line
+
+
 def test_responses_disable_caching(client):
     # No-cache is stamped by middleware, so it covers both HTML routes and - the real target -
     # the /static mount where image/asset files are served.

@@ -15,6 +15,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 import src.server as server
+from src.hmr_live_refresh import EventStream
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.store import Store
 
@@ -500,3 +501,27 @@ def test_instructions_lists_workspace_guidance_setup(mcp):
     assert "setWorkspaceGuidance" in text
     assert "buildTool" in text          # a fixture guidance field, in test mode
     assert '"name": "getWorkspaceGuidance"' in text   # named in the guidance section, so its schema is listed
+
+
+# --- writes stream their lifecycle events to a watching timeline tab ----------
+class _RecordingTab:
+    def __init__(self):
+        self.sent: list[dict] = []
+
+    async def send_json(self, data):
+        self.sent.append(data)
+
+
+def test_mcp_writes_stream_their_events_to_a_watching_tab(mcp):
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    tab = _RecordingTab()
+    server.ws_events.active.append(EventStream(tab, workspace_id, 0))  # pyright: ignore[reportArgumentType]
+    try:
+        page_id = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"})["id"]
+        _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id, "commands": [{"command": "open"}]})
+        call(mcp, "archivePage", {"workspaceId": workspace_id, "pageId": page_id})
+    finally:
+        server.ws_events.disconnect(tab)  # pyright: ignore[reportArgumentType]
+    assert [[event["event"] for event in message["events"]] for message in tab.sent] == \
+        [["created"], ["status"], ["archived"]]
+    assert all("timeline" in message for message in tab.sent)
