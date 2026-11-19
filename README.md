@@ -49,7 +49,7 @@ uv sync                      # Python 3.14
 uv run python main.py        # http://localhost:8000
 ```
 
-That serves the MCP endpoint at `/pasta/mcp` and the read-only web UI at `/` from one process. Leave a page open in the browser and it refreshes live as the agent writes.
+That serves the MCP endpoint at `/pasta/mcp` and the read-only web UI at `/` from one process. Leave a page open in the browser and it refreshes live as the agent writes. Each workspace also has a **Timeline** (`/ws:<id>/timeline`): its feature briefs, bug reports and simple changes drawn as metro lines from creation to shipped, closed or dropped, replayed at a quarter of a day per second with the quiet stretches skipped - play, pause and scrub.
 
 Point your MCP client at it:
 
@@ -61,7 +61,7 @@ Point your MCP client at it:
 }
 ```
 
-Workspaces are plain JSON files under `./.pasta-data` (override with `PASTA_DATA_DIR`). One file per workspace, backed up before the hourly cleanup sweep ever deletes anything.
+Workspaces are plain JSON files under `./.pasta-data` (override with `PASTA_DATA_DIR`). One file per workspace, backed up before the hourly cleanup sweep ever deletes anything. Beside each one, `ws_<id>.events.jsonl` is an append-only log of every page's creation, status transitions and archiving, which the timeline replays.
 
 ### Give your agent the habit
 

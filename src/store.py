@@ -19,9 +19,11 @@ Concurrency is in-process. Cross-process locking is a documented later step.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +31,7 @@ from typing import Any, final
 
 from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
+from .event_log import LOG_SUFFIX, Event, PageMark, lifecycle_events, page_marks, parse_jsonl, to_jsonl
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import JSONValue, Page, Workspace
 from .pagetypes.core.specs import BLOCK_ARRAY, LIST, RefCheck, WorkspaceGuidanceSpec, status_guidance
@@ -61,6 +64,9 @@ NON_SEARCH_CHARS = "`*_'\"‘’“”"
 # Subdirectory for pre-prune backups. Not beside the live files: list_workspaces globs
 # "*.json" non-recursively, so a backup there would be listed as a duplicate workspace.
 BACKUP_DIRNAME = "backups"
+
+# Uvicorn's status logger, so a failed log append shows beside the server's own output.
+logger = logging.getLogger("uvicorn.error")
 
 
 def _now() -> str:
@@ -184,9 +190,36 @@ class Store:
                 time.sleep(0.1)  # Permission error moving the tmp file can be retried.
                 os.replace(tmp, path)
 
-    def _touch_and_save(self, workspace: Workspace) -> None:
-        workspace.updated_at = _now()
+    def _touch_and_save(self, workspace: Workspace, before: Mapping[str, PageMark] | None = None) -> None:
+        """Save the workspace and, given the page marks it was loaded with, append the lifecycle
+        events the write produced - after the save and inside the caller's lock, so the log's
+        order is the commit order and a write that never saved logs nothing."""
+        at = _now()
+        workspace.updated_at = at
         self._write_file(self._path_for(workspace.id), workspace)
+        if before is not None:
+            self._append_events(workspace.id, lifecycle_events(before, workspace, at))
+
+    # --- lifecycle event log -------------------------------------------------
+    def events_path(self, workspace_id: str) -> Path:
+        # Beside the workspace file; the '.jsonl' suffix keeps the listing from taking it for a workspace.
+        return self.root / f"{workspace_id.replace(':', '_')}{LOG_SUFFIX}"
+
+    def read_events(self, workspace_id: str) -> list[Event]:
+        # Lines are only ever appended and a torn last line is skipped on parsing, so no lock is needed.
+        path = self.events_path(workspace_id)
+        return parse_jsonl(path.read_text(encoding="utf-8")) if path.exists() else []
+
+    def _append_events(self, workspace_id: str, events: list[Event]) -> None:
+        """Append to the log. The workspace file is already saved and is the source of truth, so a
+        log that cannot be written is reported rather than allowed to fail the write."""
+        if not events:
+            return
+        try:
+            with open(self.events_path(workspace_id), "a", encoding="utf-8") as handle:
+                _ = handle.write(to_jsonl(events))
+        except OSError:
+            logger.warning("[events] could not append to the %s event log", workspace_id, exc_info=True)
 
     def write_backup(self, workspace: Workspace, now: datetime) -> Path:
         """Write a full copy of `workspace` under `backups/` and return its path.
@@ -563,6 +596,7 @@ class Store:
             )
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
+            before = page_marks(workspace)
             if parent_id is not None and parent_id not in workspace.pages:
                 raise NotFoundError(f"Parent page '{parent_id}' not found in workspace '{workspace_id}'.")
             page = commands.create_page(page_type, title, parent_id, self._id_factory)
@@ -574,7 +608,7 @@ class Store:
                 workspace.pages[parent_id].child_ids.append(page.id)
             # Some types (feature-brief) create pinned children in the same commit.
             children = self._create_auto_children(workspace, page, page_type)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, before)
             return CreatePageResult(page=page, children=children)
 
     def mutate_page_batch(
@@ -594,6 +628,7 @@ class Store:
             raise ValidationError("mutatePageBatch requires at least one command.")
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
+            before = page_marks(workspace)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -649,7 +684,7 @@ class Store:
                     created_so_far.update(result.created_ids)
 
             workspace.pages[page_id] = working
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, before)
             return MutatePageResult(page=working, created_ids=created_ids,
                                     transitioned=working.status != page.status)
 
@@ -723,6 +758,7 @@ class Store:
         """
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
+            before = page_marks(workspace)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -744,7 +780,7 @@ class Store:
                 child = workspace.pages.get(child_id)
                 if child is not None and is_auto_child_type(parent_type, child.type):
                     apply(child)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, before)
             return page
 
     def archive_page(self, workspace_id: str, page_id: str) -> Page:
@@ -772,6 +808,7 @@ class Store:
         """
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
+            before = page_marks(workspace)
             page = workspace.get_page(page_id)
             if page is None:
                 raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
@@ -786,7 +823,7 @@ class Store:
             page.status = status
             # A direct status edit regenerates the stamp too, so an out-of-band move invalidates held tokens.
             page.status_revision_token = self._next_revision(page.status_revision_token)
-            self._touch_and_save(workspace)
+            self._touch_and_save(workspace, before)
             return page
 
     # --- page-tree structure (reparent / reorder / rename) ------------------

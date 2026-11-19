@@ -8,6 +8,7 @@ type (architecture): the toggle points at that page type's generated Sphinx doc,
 production types are documentable - a fixture has no doc to link to.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from fastapi.testclient import TestClient
 
 import src.server as server
 from src.errors import ValidationError
+from src.event_log import to_jsonl
 from src.source_link import SourceLink, read_remote_url, to_source_link
 from src.store import Store
 
@@ -372,3 +374,74 @@ def test_footer_without_a_source_link_shows_only_the_note(client, monkeypatch):
 def test_server_publishes_the_checkouts_source_link():
     src_dir = Path(server.__file__).resolve().parent
     assert server.templates.env.globals["source_link"] == to_source_link(read_remote_url(src_dir))
+
+
+# --- timeline view -----------------------------------------------------------------------------
+
+def _timeline_data(html: str) -> dict:
+    match = re.search(r'<script type="application/json" id="timeline-data"[^>]*>(.*?)</script>', html, re.S)
+    assert match is not None
+    return json.loads(match.group(1))
+
+
+def test_timeline_replays_the_workspace_log_without_the_live_reload_socket(client):
+    workspace = server.STORE.create_workspace("demo")
+    page_id = "feature-brief:mrw7chrt-def44a"
+    server.STORE.events_path(workspace.id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "feature-brief", "title": "Anchored insert", "status": "draft"},
+        {"at": "2026-07-22T16:20:00+00:00", "event": "status", "pageId": page_id,
+         "type": "feature-brief", "title": "Anchored insert", "status": "shipped", "from": "draft"},
+    ]), encoding="utf-8")
+    part = workspace.id.removeprefix("ws:")
+    response = client.get(f"/ws:{part}/timeline")
+    assert response.status_code == 200
+    [line] = _timeline_data(response.text)["lines"]
+    assert (line["id"], line["end"], line["title"]) == (page_id, "delivered", "Anchored insert")
+    assert "/ws/reloader" not in response.text
+    assert "No page events are recorded yet" not in response.text
+
+
+def test_timeline_times_sit_on_the_page_background_and_the_legend_checks_delivered(client):
+    workspace = server.STORE.create_workspace("demo")
+    page_id = "bug-report:mrw7chrt-def44a"
+    server.STORE.events_path(workspace.id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "bug-report", "title": "A bug", "status": "draft"},
+    ]), encoding="utf-8")
+    html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
+    assert ".timeline time { background: var(--background-body); }" in html
+    assert re.search(r'<li><svg[^>]*><circle class="tl-delivered"[^>]*/><path class="tl-check"', html)
+
+
+def test_timeline_play_button_is_plain_text_and_feed_rows_are_bordered_only_between(client):
+    workspace = server.STORE.create_workspace("demo")
+    page_id = "bug-report:mrw7chrt-def44a"
+    server.STORE.events_path(workspace.id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "bug-report", "title": "A bug", "status": "draft"},
+    ]), encoding="utf-8")
+    html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
+    assert '<button type="button" id="tl-play">Play</button>' in html
+    assert ".tl-feed li + li { border-top: 1px solid var(--border); }" in html
+
+
+def test_timeline_of_a_workspace_with_no_log_says_so(client):
+    workspace = server.STORE.create_workspace("demo")
+    part = workspace.id.removeprefix("ws:")
+    response = client.get(f"/ws:{part}/timeline")
+    assert response.status_code == 200
+    assert "No page events are recorded yet" in response.text
+    assert 'id="timeline-data"' not in response.text
+
+
+def test_workspace_tree_links_to_its_timeline(client):
+    workspace = server.STORE.create_workspace("demo")
+    response = client.get(f"/{workspace.id}")
+    assert f'href="/{workspace.id}/timeline"' in response.text
+    assert "/ws/reloader" in response.text                     # the other views keep live reload
+
+
+def test_timeline_of_an_unknown_workspace_is_an_error_page(client):
+    response = client.get("/ws:nope-000000/timeline")
+    assert response.status_code == 500
