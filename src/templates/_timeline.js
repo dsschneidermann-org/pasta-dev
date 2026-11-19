@@ -279,7 +279,7 @@ function main() {
   }
 
   function tick(now) {
-    if (lastNow !== null && !press) p = Math.min(data.duration, p + (now - lastNow) / 1000);
+    if (lastNow !== null) p = Math.min(data.duration, p + (now - lastNow) / 1000);
     lastNow = now;
     frame();
     if (p >= data.duration) {
@@ -306,13 +306,13 @@ function main() {
 
   playButton.addEventListener("click", () => setPlaying(!playing));
   slider.addEventListener("input", () => {
+    setPlaying(false);
     p = parseFloat(slider.value);
-    lastNow = null;
     frame();
     updateButton();
   });
-  // Dragging the stage moves the playhead with the pointer, like dragging a map. A playing replay
-  // holds still while pressed and carries on from wherever it is let go.
+  // Dragging the stage moves the playhead with the pointer, like dragging a map, and pauses the
+  // replay - as dragging the scrubber does - so it stays where the viewer took it.
   const DRAG_THRESHOLD = 4;   // pixels a press must move before it counts as a drag
   let press = null;
   let swallowClick = false;
@@ -328,6 +328,7 @@ function main() {
       if (Math.abs(dx) < DRAG_THRESHOLD) return;
       // Captured only once it is a drag, so a plain click still reaches the line's link.
       press.dragging = true;
+      setPlaying(false);
       stage.setPointerCapture(event.pointerId);
       stage.classList.add("dragging");
     }
