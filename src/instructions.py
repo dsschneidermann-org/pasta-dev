@@ -46,7 +46,7 @@ If calling `tree` reveals an empty workspace, no project overview doc or the `to
 
 - Project Overview + `architecture` and `document` pages go under the Documentation `toc` page.
 - `decision-record` pages go under the ADRs `toc` page.
-- `feature-brief`, `simple-change` and `epic` pages go under the Features `toc` page.
+- `feature-brief`, `simple-change`, `epic` and `spike` pages go under the Features `toc` page.
 - `bug-report` pages go under the Bug Reports `toc` page.
 
 ## Response shapes
@@ -88,7 +88,9 @@ feature-spec: The detailed product/UX specification for a feature, authored duri
 
 epic: The root of a major feature too large for one feature-brief - it decomposes into several child feature-briefs and is built by subagents, each dispatched from an agent-plan page of its own. Use it when the work splits into parts that each ship on their own; when it does not, use a feature-brief.
 
-agent-plan: One subagent an epic dispatches - its role, capability, exact task and worktree, linked to the feature-briefs it works on. Its page id is the agent's id and the page it reports back into as it starts and works. Created as a child of an epic.
+spike: Works out how to build an idea before anything is planned: subagents investigate a few solution directions on solution-investigation pages of its own, the user picks one, and it hands off a single feature-brief for another agent to plan. Use it when the approach is still open; when it is known, use a feature-brief.
+
+agent-plan: One subagent an epic or a spike dispatches - its role, capability, exact task and worktree, linked to the pages it works on, and the page it reports back into as it starts and works. Created as a child of that epic or spike.
 """
 
 

@@ -197,6 +197,20 @@ class ParentStateGuard:
 
 
 @dataclass(frozen=True)
+class LinkGuard:
+    """A cross-page transition guard over the page's own outgoing links, evaluated in the store.
+
+    It holds when the page has at least one link with `role` to a non-archived page of type
+    `target_type`. A link to an archived page or to a page of another type is not counted, so a
+    link whose target was dropped does not pass. Otherwise the transition is rejected with
+    `message`.
+    """
+    role: str
+    target_type: str
+    message: str
+
+
+@dataclass(frozen=True)
 class AutoChildSpec:
     """A page auto-created as a pinned, protected child when a page of the declaring type is made.
 

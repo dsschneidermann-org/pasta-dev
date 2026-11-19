@@ -205,6 +205,123 @@ its agents work from. Create each of them as a child of this epic, then schedule
   dispatches them in, consistent with the depends-on links between them.
 """
 
+# --- spike -------------------------------------------------------------------
+SPIKE_DRAFT = """
+draft - the spike exists and nothing has been looked at. This status is for capturing
+what the user wants and why, in their words, and the directions worth investigating,
+before anyone researches it. The work of it:
+
+- Write the summary as the outcome they want, not a solution.
+- If they have not said why, ask one open question in their terms with nothing to
+  pick from. Do not offer approaches yet: options offered now steer what they tell
+  you.
+- Record the why as they said it.
+- Draw out what success looks like, what is out of scope and what would make it a
+  failure even if it works, and record each as an outcome, telling the user which
+  ones you proposed. They are what the directions are judged against, so they are
+  written before any direction exists and cannot be fitted to one.
+- Then brainstorm the solution directions with them: two to four genuinely different
+  kinds of solution, asking for theirs first and saying which are yours. Give each a
+  scope saying what it would change or add and what it assumes, so the agent that
+  investigates it knows what to look for. Two directions that would send an
+  investigator to the same code with the same question are one.
+
+No code is read here. Recon belongs to the agents investigating each direction, so
+this page's context stays small. Begin research once the summary, the why, the
+outcomes and the directions are written.
+"""
+
+RESEARCHING = """
+researching - the intent and the directions are captured, and one investigator per
+direction is finding out what is true and what that direction would take, each on a
+solution-investigation page of its own. This status is for dispatching those agents
+and waiting, not for researching. The work of it:
+
+- Create one solution-investigation page under the spike per direction, titled with
+  the direction's name, and one investigator agent-plan page per investigation at
+  standard capability, linked works-on to it. Its task carries the summary, the why,
+  the outcomes, the direction's id and scope and any answered questions. Its worktree
+  is none, or a throwaway spike worktree of its own when testing the direction needs
+  code run; spike code is never integrated.
+- Dispatch the investigators together: they share nothing and can run at once.
+- Accept a run only from its page. A run that answers with a long reply instead of a
+  reported page has failed and is redispatched.
+- To drop a direction, archive its investigation page.
+
+Do not open an investigation page beyond its digest, its viability and its
+questions. Present the findings once every investigation page is reported.
+"""
+
+DECIDING = """
+deciding - the investigations are in, and this is the conversation that turns them
+into the user's choice. It is the one stage where the controller talks the work
+through with them. The work of it:
+
+- Read each investigation's digest, viability and questions. Where a test result is
+  not backed by its evidence, reopen research for that investigation rather than
+  carry it into the choice.
+- Ask each open question here, flagged needsHuman, and put them to the user one at a
+  time, building each on their last answer or on an investigation's fact and saying
+  what the answer changes. A proposal with your reason often beats a question.
+- Play back your understanding in short chunks and ask what is wrong or missing,
+  refining the outcomes as the conversation settles them.
+- Then, in a message of its own, lay out the directions with their trade-offs and
+  your recommendation, and ask which way to go. Each investigator argued for one
+  direction, so the comparison is yours. Record the pick as the chosen approach by
+  its investigation's page id, and the pick itself as an answered question.
+- If an answer rules out every direction or changes the ask, reopen research with
+  that answer - adding a direction or redispatching an investigation - rather than
+  hand off a stale pick.
+
+Nothing is specified, planned or created here. Choosing the approach is a human gate:
+drive up to it and stop.
+"""
+
+BRIEFING = """
+briefing - the user has picked a direction at the human gate, and only now is the
+feature-brief created. The spike hands the pick off as one feature-brief for another
+agent to specify, plan and build. The work of it:
+
+- Create one feature-brief under this spike's own parent, next to the spike and not
+  under it, titled with the outcome the user wants.
+- Write its summary from this spike's summary, why and outcomes, naming the chosen
+  direction in one sentence.
+- Add each answered question on this spike that bears on the build to the brief's
+  questions, and answer it there in the user's words - the approach pick among them -
+  so the brief's spec records them and they are not reopened.
+- Link the brief to this spike with role researched-in, so whoever plans it can open
+  the investigations, then link this spike to the brief with role created-feature.
+
+Do not ground, specify or plan the brief, and do not start an agent on it: it is left
+in draft for whoever plans it. Hand off once the created-feature link is in place.
+"""
+
+# --- solution-investigation --------------------------------------------------
+INVESTIGATING = """
+investigating - you are the investigator for one solution direction of the spike,
+handed its intent and that direction's scope and nothing else. This page is your
+whole output: the controller reads its digest, and nobody reads your reply. The work
+of it:
+
+- Add the direction you investigate by its id, then read the codebase from where it
+  would land, following callers and imports until its blast radius stops growing.
+- Sketch how the direction would be built here, naming the files it changes as real
+  paths you opened, and size its cost.
+- Test it: write what would show it wrong, then check that by reading or, when your
+  assignment names a spike worktree, by running code there. Spike code is never
+  integrated. Cite what you read or ran, outside sources included, in the evidence.
+- Make the strongest honest case for this direction, and call it not-viable when that
+  is what you found: a dead direction reported early is the cheapest result.
+- Turn what only the user can settle into questions; never ask what the code or the
+  spike already answers.
+- Write the digest last.
+
+Stay inside your direction: another direction is another agent's. Do not design the
+solution, change code outside your spike worktree, or run a command on the spike or on
+any agent-plan page. Report once a stranger could compare this direction with the
+others from this page alone.
+"""
+
 # --- simple-change and bug-report, shared ------------------------------------
 REVIEW = """
 review - the work is written, and this is the last stop before it is marked done and

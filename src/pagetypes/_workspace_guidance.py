@@ -32,3 +32,11 @@ GROUNDING_TOOL_DESC = (
     "grounding - for example, a knowledge-graph MCP server queried instead of grepping and "
     "loading whole files."
 )
+
+SUBAGENT_DISPATCH_FIELD = "subagentDispatch"
+SUBAGENT_DISPATCH_LABEL = "SUBAGENT DISPATCH GUIDANCE: "
+SUBAGENT_DISPATCH_DESC = (
+    "How this workspace defines and launches subagents - for example, which model each "
+    "capability tier maps to, the agent type or tool that launches them, whether they run in "
+    "parallel or in the background, and how a run is handed its agent-plan page id."
+)
