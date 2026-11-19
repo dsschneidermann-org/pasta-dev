@@ -84,7 +84,7 @@ class EventsConnectionManager:
             self.disconnect(stream.websocket)
 
 
-# Process-wide singleton, kept here beside ws_reloader for the same reason: it must survive hot reloads.
+# Process-wide singleton. Must survive hot reloads, so it lives in this (reload-excluded) module.
 ws_events = EventsConnectionManager()
 
 

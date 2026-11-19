@@ -396,8 +396,7 @@ function main() {
     }
   }
 
-  // --- live events: each write's new log events, with the timeline rebuilt to include them, over a
-  // socket shaped like the page shell's reloader ---
+  // --- live events: each write's new log events, with the timeline rebuilt to include them ---
   let since = Number(dataNode.dataset.events);   // the log events this page has; a reconnect resumes there
 
   function connect() {
