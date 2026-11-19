@@ -33,7 +33,7 @@ RENDERER = _REPO_ROOT / "src" / "templates" / "_timeline.js"
 def write_payload(data_dir: Path, workspace_id: str, path: Path) -> None:
     """The workspace's replay, as the timeline view would serve it now."""
     if not data_dir.is_dir():
-        raise SystemExit(f"Data dir {data_dir} does not exist.")   # never let the Store create one
+        raise SystemExit(f"Data dir {data_dir} does not exist.")   # a mistyped path must not leave one behind
     store = Store(data_dir)
     try:
         payload = build_timeline(store.read_events(workspace_id), store.load_workspace(workspace_id), time.time())

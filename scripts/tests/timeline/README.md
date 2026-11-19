@@ -35,12 +35,13 @@ failed.
 | `--payload FILE` | built from the data dir | Check against a saved payload instead. |
 | `--script FILE` | `src/templates/_timeline.js` | Check another copy of the renderer, e.g. an older version. |
 
-To see a check catch a regression, run it against an older renderer:
+To see a check catch a regression, run it against an older renderer - any commit from before the
+behaviour you want to see caught:
 
 ```bash
-git show 36e8b4c:src/templates/_timeline.js > /tmp/before_pause.js
-uv run python scripts/tests/timeline/run_checks.py --script /tmp/before_pause.js
-# FAIL check_drag.js - that version kept playing while dragged
+git show <older commit>:src/templates/_timeline.js > /tmp/old_timeline.js
+uv run python scripts/tests/timeline/run_checks.py --script /tmp/old_timeline.js
+# e.g. a renderer that kept playing while dragged fails check_drag.js and the runner exits 1
 ```
 
 A single check can also be run directly, given a payload file:
