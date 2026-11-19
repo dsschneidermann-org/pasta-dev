@@ -43,7 +43,24 @@ commit-workspace:
     fi
     git commit -m "Snapshot pasta's workspace and its event log" -- $files
 
-main:
+# Copy each workspace in the data dir's `snapshot/` back in when it has no live file of its own,
+# with its event log unless a live one exists. A live file is never replaced.
+restore-workspace:
+    #!/bin/bash
+    set -e
+    data="${PASTA_DATA_DIR:-.pasta-data}"
+    for snapshot in "$data"/snapshot/ws_*.json; do
+        [ -e "$snapshot" ] || continue
+        name="$(basename "$snapshot" .json)"
+        [ -e "$data/$name.json" ] && continue
+        cp "$snapshot" "$data/$name.json"
+        if [ -e "$data/snapshot/$name.events.jsonl" ] && [ ! -e "$data/$name.events.jsonl" ]; then
+            cp "$data/snapshot/$name.events.jsonl" "$data/$name.events.jsonl"
+        fi
+        echo "Restored $name from $data/snapshot/"
+    done
+
+main: restore-workspace
     uv run python main.py
 
 klaus:
