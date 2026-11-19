@@ -62,6 +62,7 @@ from .pagetypes.core.specs import (
     ChildStateGuard,
     ElementFSMSpec,
     FSMSpec,
+    LinkGuard,
     ParentStateGuard,
     RefCheck,
     WorkspaceGuidanceSpec,
@@ -186,7 +187,8 @@ TEST_BLOCKS = PageType(
 # `detail` accepts paragraph/code/list - beside an element FSM, so a checkbox, a title and blocks
 # render together. The two-state FSM whose `markReady` REQUIRES the list field is deliberate: it is
 # the only way to observe both the draft-only content lock on the element-scoped commands and their
-# absence from the self-direction `do` list.
+# absence from the self-direction `do` list. `markReady` also carries the fixtures' link guard: it
+# needs an `evidence` link to a live test-flow page.
 # ============================================================================
 TEST_ELEMENT_BLOCKS = PageType(
     tag="test-element-blocks",
@@ -211,7 +213,9 @@ TEST_ELEMENT_BLOCKS = PageType(
                              ("markItemTodo", "reopen", "reopen an item"))),
         *element_blocks_cmds("items", "snippet", legal_in=("draft",)),
         *element_blocks_cmds("items", "detail", legal_in=("draft",)),
-        transition_cmd("markReady", "draft -> ready", requires=(("items", "items"),)),
+        transition_cmd("markReady", "draft -> ready", requires=(("items", "items"),),
+                       link_guards=(LinkGuard("evidence", "test-flow",
+                                              "a test-flow page must be linked as evidence"),)),
         transition_cmd("reopen", "ready -> draft"),
         add_link_cmd(),
         set_title_cmd(),
