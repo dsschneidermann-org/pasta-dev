@@ -469,6 +469,14 @@ def test_guidance_lists_every_declared_field_with_its_description_and_text(clien
     assert response.text.count("Not set") == 2                # draftHint and reviewHint are unset
 
 
+def test_guidance_names_are_bold_descriptions_italic_and_values_spaced(client):
+    workspace = server.STORE.create_workspace("demo")
+    html = client.get(f"/{workspace.id}/guidance").text
+    assert "<strong>buildTool</strong> - <em>the build tool this workspace uses</em>" in html
+    assert "<code>" not in html
+    assert ".guidance dd { margin-top: 0.5rem; margin-bottom: 1.75rem; }" in html
+
+
 def test_guidance_shows_stored_text_of_an_undeclared_field(client):
     workspace = server.STORE.create_workspace("demo")
     stored = server.STORE.load_workspace(workspace.id)

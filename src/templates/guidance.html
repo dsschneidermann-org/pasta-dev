@@ -5,6 +5,7 @@
 {% block head %}
 {{ super() }}
 <style>
+    .guidance dd { margin-top: 0.5rem; margin-bottom: 1.75rem; }
     .guidance-text { white-space: pre-wrap; }
     .guidance-unset { color: var(--text-muted); }
 </style>
@@ -12,9 +13,9 @@
 
 {% block content %}
 <p><a href="/{{ workspace_id }}">← Workspace</a></p>
-<dl>
+<dl class="guidance">
     {% for field in fields %}
-    <dt><code>{{ field.field }}</code> - {{ field.description }}</dt>
+    <dt><strong>{{ field.field }}</strong> - <em>{{ field.description }}</em></dt>
     {% if field.text %}
     <dd class="guidance-text">{{ field.text }}</dd>
     {% else %}
@@ -24,9 +25,9 @@
 </dl>
 {% if undeclared %}
 <h2>No longer declared</h2>
-<dl>
+<dl class="guidance">
     {% for name, text in undeclared.items() %}
-    <dt><code>{{ name }}</code></dt>
+    <dt><strong>{{ name }}</strong></dt>
     <dd class="guidance-text">{{ text }}</dd>
     {% endfor %}
 </dl>
