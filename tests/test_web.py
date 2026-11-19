@@ -451,7 +451,15 @@ def test_timeline_replays_the_workspace_log_without_the_live_reload_socket(clien
     [line] = _timeline_data(response.text)["lines"]
     assert (line["id"], line["end"], line["title"]) == (page_id, "delivered", "Anchored insert")
     assert "/ws/reloader" not in response.text
-    assert "No page events are recorded yet" not in response.text
+    assert '<p class="tl-empty" id="tl-empty" hidden>' in response.text
+    assert '<div id="tl-live">' in response.text
+
+
+def test_timeline_page_carries_its_event_count_for_the_live_socket(client):
+    workspace = server.STORE.create_workspace("demo")
+    _shipped_feature_log(workspace.id)
+    html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
+    assert re.search(r'<script type="application/json" id="timeline-data"[^>]*data-events="2"', html)
 
 
 def test_timeline_times_sit_on_the_page_background_and_the_legend_checks_delivered(client):
@@ -478,13 +486,15 @@ def test_timeline_play_button_is_plain_text_and_feed_rows_are_bordered_only_betw
     assert ".tl-feed li + li { border-top: 1px solid var(--border); }" in html
 
 
-def test_timeline_of_a_workspace_with_no_log_says_so(client):
+def test_timeline_of_a_workspace_with_no_log_says_so_and_waits_for_its_first_event(client):
     workspace = server.STORE.create_workspace("demo")
     part = workspace.id.removeprefix("ws:")
     response = client.get(f"/ws:{part}/timeline")
     assert response.status_code == 200
-    assert "No page events are recorded yet" in response.text
-    assert 'id="timeline-data"' not in response.text
+    assert '<p class="tl-empty" id="tl-empty">No page events are recorded yet' in response.text
+    assert '<div id="tl-live" hidden>' in response.text
+    assert _timeline_data(response.text)["lines"] == []     # drawn by the script once events stream in
+    assert 'data-events="0"' in response.text
 
 
 def test_workspace_tree_links_to_its_timeline(client):

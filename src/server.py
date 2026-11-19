@@ -251,7 +251,8 @@ async def route_timeline(request: Request, workspaceIdPart: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
-        payload = build_timeline(STORE.read_events(workspace_id), workspace, time.time())
+        events = STORE.read_events(workspace_id)
+        payload = build_timeline(events, workspace, time.time())
         return templates.TemplateResponse(
             request=request,
             name="timeline.html",
@@ -259,6 +260,8 @@ async def route_timeline(request: Request, workspaceIdPart: str):
                 "workspace_id": workspace_id,
                 "workspace_name": workspace.name,
                 "payload": payload,
+                # Where the page's events socket resumes the log from.
+                "event_count": len(events),
             },
         )
 

@@ -2,7 +2,8 @@
 
 {% block title %}Timeline - {{ workspace_name }}{% endblock %}
 
-{# A replay is not restarted by live writes: this view leaves the reloader socket out. #}
+{# Live writes extend the replay over its own events socket, so this view leaves out the reloader,
+   whose refresh would restart it. #}
 {% block reloader %}{% endblock %}
 
 {% block head %}
@@ -86,7 +87,9 @@
 {% block content %}
 <div class="timeline">
     <p class="tl-back"><a href="/{{ workspace_id }}">← Workspace</a></p>
-    {% if payload.lines %}
+    {# The script shows one or the other, so the first streamed event can bring up the map. #}
+    <p class="tl-empty" id="tl-empty"{% if payload.lines %} hidden{% endif %}>No page events are recorded yet. The log starts with the next page created, transitioned or archived.</p>
+    <div id="tl-live"{% if not payload.lines %} hidden{% endif %}>
     <div class="tl-controls">
         <button type="button" id="tl-play">Play</button>
         <div class="tl-clock">
@@ -110,12 +113,10 @@
         <li><svg width="6" height="14" style="--c: var(--text-muted)"><line class="tl-dropped" x1="3" y1="1" x2="3" y2="13"/></svg>Dropped: abandoned or shelved</li>
     </ul>
     <ol class="tl-feed" id="tl-feed"></ol>
-    <script type="application/json" id="timeline-data" data-workspace="{{ workspace_id }}">{{ payload | tojson }}</script>
+    </div>
+    <script type="application/json" id="timeline-data" data-workspace="{{ workspace_id }}" data-events="{{ event_count }}">{{ payload | tojson }}</script>
     <script>
 {% include '_timeline.js' %}
     </script>
-    {% else %}
-    <p class="tl-empty">No page events are recorded yet. The log starts with the next page created, transitioned or archived.</p>
-    {% endif %}
 </div>
 {% endblock %}
