@@ -3,7 +3,8 @@ __pycache__/
 *.py[cod]
 .venv/
 
-# pasta local data store (runtime workspace files)
+# pasta local data store (runtime workspace files). Copies of pasta's own workspace and its event
+# log under `snapshot/` are force-added anyway, by hand with `just commit-workspace`.
 .pasta-data/
 
 # test / tooling caches
