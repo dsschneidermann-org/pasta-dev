@@ -1,8 +1,8 @@
 // Live updates: the page opens its events socket from the log count it was rendered with, ignores
-// heartbeats, and redraws each live payload - playing on from where the playhead stands to the new
-// end, unless a drag is held, or jumping there at rest for a viewer who prefers reduced motion.
-// It reconnects from the count it has reached, and an empty page brings up the map on its first
-// payload.
+// heartbeats, and redraws each live payload. A viewer resting at the end in the Replay state is
+// played on to the new end - or taken there at rest if they prefer reduced motion - while a viewer
+// paused in the history, or dragging, is left where they are. A stalled frame skips no playback. It
+// reconnects from the count it has reached, and an empty page brings up the map on its first payload.
 //
 //     node check_live.js <payload.json> <_timeline.js>
 "use strict";
@@ -72,16 +72,27 @@ timeline.runTimers();                                        // the 1 s reconnec
 assert.strictEqual(timeline.sockets.at(-1).url, "/ws/events/ws:check?since=41",
   "a reconnect resumes from the events received since");
 
-// Paused mid-history: a live update plays on from there.
+// Paused mid-history: the viewer is looking at something, so a live update redraws and leaves them there.
 timeline = loadTimeline(payloadPath, scriptPath);
 ({ ids } = timeline);
 timeline.scrubTo(10);
 timeline.push(live);
-assert.strictEqual(ids["tl-play"].textContent, "❚❚ Pause", "a live update mid-history starts playback");
+assert.strictEqual(timeline.onStage("tl-ghost").length, extended.lines.length, "redrawn mid-history");
+assert.strictEqual(timeline.pendingFrames(), 0, "a paused timeline stays paused");
+assertClose(timeline.playhead(), 10, "where the viewer paused it");
+assert.strictEqual(ids["tl-play"].textContent, "Play");
+
+// A stalled frame after a live redraw - the browser painting the rebuilt map - skips no playback.
+timeline = loadTimeline(payloadPath, scriptPath);
+timeline.push(live);
+timeline.runFrames(1);                                       // the first frame only starts the clock
+timeline.stall(500);
 timeline.runFrames(1);
-assertClose(timeline.playhead(), 10, "from where the playhead stood");
-timeline.runFrames(5);
-assert.ok(timeline.playhead() > 10, "and moves on");
+const advanced = timeline.playhead() - data.duration;
+assert.ok(advanced <= 0.1 + 1e-9, `a stalled frame advances at most 0.1 s, not ${advanced}`);
+assert.ok(timeline.playhead() < extended.duration, "so playback still has its way to go");
+playToEnd(timeline);
+assertClose(timeline.playhead(), extended.duration, "and runs on to the new end");
 
 // While a drag is held, a live update redraws but leaves the playhead to the pointer.
 timeline = loadTimeline(payloadPath, scriptPath);
@@ -122,5 +133,5 @@ playToEnd(timeline);
 assertClose(timeline.playhead(), data.duration);
 
 console.log(`ok - resumed from the rendered count, ignored heartbeats, grew ${data.lines.length} lines to `
-  + `${extended.lines.length} from rest, mid-history, mid-drag and with reduced motion, reconnected, `
-  + "and brought up an empty page");
+  + `${extended.lines.length} playing on from Replay, held still paused and mid-drag, jumped with reduced `
+  + "motion, capped a stalled frame, reconnected, and brought up an empty page");

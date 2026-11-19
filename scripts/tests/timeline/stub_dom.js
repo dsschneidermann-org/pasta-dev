@@ -103,6 +103,8 @@ function loadTimeline(payloadPath, scriptPath, options = {}) {
     runFrames(count) {
       for (let i = 0; i < count && frames.length; i++) frames.shift()((now += 16.7));
     },
+    // Makes the next frame arrive `ms` late, as when the browser is busy painting.
+    stall(ms) { now += ms; },
     scrubTo(p) {
       ids["tl-scrub"].value = String(p);
       ids["tl-scrub"].listeners.input();

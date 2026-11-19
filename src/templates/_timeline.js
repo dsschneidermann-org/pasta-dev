@@ -15,6 +15,7 @@ function main() {
   const HEAD = 0.7;        // how far across the stage the playhead rides
   const FRESH = 0.6;       // playback seconds a station stays highlighted after the playhead passes
   const SPEAK = 1.5;       // playback seconds a transition's status label stays up after it is passed
+  const MAX_STEP = 0.1;    // most playback seconds one frame advances, so a stalled frame never skips the replay ahead
   const FEED_SIZE = 6;
   const SVG = "http://www.w3.org/2000/svg";
 
@@ -300,7 +301,7 @@ function main() {
   }
 
   function tick(now) {
-    if (lastNow !== null) p = Math.min(data.duration, p + (now - lastNow) / 1000);
+    if (lastNow !== null) p = Math.min(data.duration, p + Math.min(MAX_STEP, (now - lastNow) / 1000));
     lastNow = now;
     frame();
     if (p >= data.duration) {
@@ -380,13 +381,15 @@ function main() {
   });
   window.addEventListener("resize", layout);
 
-  // A live payload: redraw it and play on to its new end - unless already playing there, or the
-  // viewer is holding a drag. A viewer who prefers reduced motion is taken there at rest.
+  // A live payload: redraw it, and play on to its new end if the viewer was resting at the old one.
+  // A paused viewer is looking at something, so they are left where they are. A viewer who prefers
+  // reduced motion is taken to the new end at rest.
   function show(timeline) {
+    const resting = !playing && !press?.dragging && p >= data.duration;   // the Replay state
     data = timeline;
     draw();
     layout();
-    if (p >= data.duration || playing || press?.dragging) return updateButton();
+    if (!resting || p >= data.duration) return updateButton();
     if (reducedMotion) {
       p = data.duration;
       frame();
