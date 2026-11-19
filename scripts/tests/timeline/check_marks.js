@@ -61,7 +61,7 @@ function assertSpeaking(p) {
   }
 }
 
-timeline.runTimers();
+timeline.ids["tl-play"].listeners.click();                   // the page opens at its end: Replay
 let mostSpeaking = 0;
 let frames = 0;
 while (timeline.pendingFrames() && frames < 100000) {

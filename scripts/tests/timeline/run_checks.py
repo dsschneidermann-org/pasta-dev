@@ -25,7 +25,7 @@ from src.errors import PastaError
 from src.store import Store
 from src.timeline import build_timeline
 
-CHECKS = ("check_replay.js", "check_marks.js", "check_drag.js")
+CHECKS = ("check_replay.js", "check_marks.js", "check_drag.js", "check_live.js")
 DEFAULT_WORKSPACE = "ws:mrteq0c5-238cf6"
 RENDERER = _REPO_ROOT / "src" / "templates" / "_timeline.js"
 

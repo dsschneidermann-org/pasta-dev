@@ -53,11 +53,12 @@ node scripts/tests/timeline/check_drag.js payload.json src/templates/_timeline.j
 
 | Check | Covers |
 |---|---|
-| `check_replay.js` | Autoplay starts, the replay runs to its end and offers Replay, the final counters (in flight / delivered / dropped) match the payload's line ends, the feed shows the latest six stations, and the clock reads the payload's start and end when scrubbed there. |
+| `check_replay.js` | The page opens at rest at the end of the history in the Replay state with nothing playing, Replay plays it from the start to its end, the final counters (in flight / delivered / dropped) match the payload's line ends, the feed shows the latest six stations, and the clock reads the payload's start and end when scrubbed there. |
 | `check_marks.js` | Every line is drawn as a grey copy and a clipped coloured copy, both copies of each delivered end carry a checkmark, status changes are filled while creations and (un)archivings stay hollow, each line links to its page with no query, every station has a label naming its status, and during playback and scrubbing a line announces only its latest transition, for 1.5 playback seconds, while a page's creation never is. |
 | `check_drag.js` | Dragging the chart moves time like a map (left is forward, 120 px per playback second), stops at both ends, counts as a drag only past 4 px, and swallows exactly the click that ends it; a plain press still clicks through; a drag on the chart or the minimap scrubber pauses the player, and Play resumes from there. |
+| `check_live.js` | The events socket opens from the log count the page was rendered with and reconnects from the count it has reached; a heartbeat changes nothing; a live payload (the real one grown by a line) is drawn and played into from where the playhead stands - from rest at the end or paused mid-history - but not while a drag is held, and with reduced motion the playhead jumps to the new end at rest; an empty page brings up the map on its first payload and plays it from the start. |
 
-`stub_dom.js` holds the stub DOM and the loader the checks share.
+`stub_dom.js` holds the stub DOM, a fake `WebSocket` and the loader the checks share.
 
 ## What they do not cover
 
