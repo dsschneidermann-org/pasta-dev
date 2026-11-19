@@ -206,7 +206,7 @@ class Store:
         return self.root / f"{workspace_id.replace(':', '_')}{LOG_SUFFIX}"
 
     def read_events(self, workspace_id: str) -> list[Event]:
-        # Lines are only ever appended, and parse_jsonl drops a torn last line, so no lock is needed.
+        # Lines are only ever appended and a torn last line is skipped on parsing, so no lock is needed.
         path = self.events_path(workspace_id)
         return parse_jsonl(path.read_text(encoding="utf-8")) if path.exists() else []
 

@@ -8,8 +8,7 @@
 {% block head %}
 {{ super() }}
 <style>
-    /* Every colour is a water.css custom property or a --line-* token from styles.css, both of
-       which are defined for the light and the dark theme. */
+    /* Every colour is a theme token, defined for both the light and the dark theme. */
     body.timeline-view { max-width: 1200px; }
     .timeline time { background: var(--background-body); }
     .tl-back { margin: 0 0 1rem; font-size: 0.9rem; }
