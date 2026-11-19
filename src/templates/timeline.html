@@ -39,6 +39,7 @@
     .tl-stop { fill: var(--background-body); stroke: var(--c); stroke-width: 2;
         transform-box: fill-box; transform-origin: center; transition: transform 0.3s ease-out; }
     .tl-stop.fresh { transform: scale(1.9); }
+    .tl-transition { fill: var(--c); }
     .tl-delivered { fill: var(--c); stroke: none; }
     .tl-check { fill: none; stroke: var(--background-body); stroke-width: 1.6; stroke-linecap: round;
         stroke-linejoin: round; }
@@ -104,7 +105,7 @@
         <li><span class="tl-swatch" style="--c: var(--line-feature-brief)"></span>Feature brief</li>
         <li><span class="tl-swatch" style="--c: var(--line-bug-report)"></span>Bug report</li>
         <li><span class="tl-swatch" style="--c: var(--line-simple-change)"></span>Simple change</li>
-        <li><svg width="10" height="10" style="--c: var(--text-muted)"><circle class="tl-stop" cx="5" cy="5" r="3.5"/></svg>Status change</li>
+        <li><svg width="10" height="10" style="--c: var(--text-muted)"><circle class="tl-stop tl-transition" cx="5" cy="5" r="3.5"/></svg>Status change</li>
         <li><svg width="12" height="12" style="--c: var(--text-muted)"><circle class="tl-delivered" cx="6" cy="6" r="6"/><path class="tl-check" d="M3.2 6.2 L5.2 8.2 L8.8 4.2"/></svg>Delivered: shipped or closed</li>
         <li><svg width="6" height="14" style="--c: var(--text-muted)"><line class="tl-dropped" x1="3" y1="1" x2="3" y2="13"/></svg>Dropped: abandoned or shelved</li>
     </ul>

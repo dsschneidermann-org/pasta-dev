@@ -29,7 +29,7 @@ function main() {
   const height = AXIS_H + data.lanes * LANE_H + LANE_H / 2;
   const x = (p) => X0 + p * PX;
   const y = (lane) => AXIS_H + lane * LANE_H + LANE_H / 2;
-  const pagePath = (pageId) => `/${workspaceId}/page/${pageId}?archived=true`;
+  const pagePath = (pageId) => `/${workspaceId}/page/${pageId}`;
 
   function el(name, attrs, parent) {
     const node = document.createElementNS(SVG, name);
@@ -104,7 +104,8 @@ function main() {
         }, parent);
         return mark;
       }
-      return el("circle", { class: "tl-stop", cx, cy: lineY, r: 3.5 }, parent);
+      const className = stop.kind === "status" ? "tl-stop tl-transition" : "tl-stop";
+      return el("circle", { class: className, cx, cy: lineY, r: 3.5 }, parent);
     });
     if (line.end === "dropped") {
       el("line", { class: "tl-dropped", x1: x(line.p1), x2: x(line.p1), y1: lineY - 6, y2: lineY + 6 }, parent);
@@ -237,6 +238,8 @@ function main() {
         node.past = past;
         node.group.classList.toggle("past", past);
       }
+      // Only the latest station passed is announced, so a burst of transitions does not stack labels.
+      const latest = line.stops.findLastIndex((stop) => stop.p <= p);
       line.stops.forEach((stop, number) => {
         const since = p - stop.p;
         const fresh = since >= 0 && since < FRESH;
@@ -245,7 +248,7 @@ function main() {
           node.stops[number].classList.toggle("fresh", fresh);
         }
         // The first station is the page's creation, not a transition, so it is not announced.
-        const speaking = number > 0 && since >= 0 && since < SPEAK;
+        const speaking = number > 0 && number === latest && since < SPEAK;
         if (speaking !== node.speaking[number]) {
           node.speaking[number] = speaking;
           node.labels[number].classList.toggle("speaking", speaking);
