@@ -29,11 +29,13 @@ from .core.specs import (
     FSMSpec,
     LinkGuard,
     ParentStateGuard,
+    RefCheck,
     WorkspaceGuidanceSpec,
 )
-from .core.args import _boolean, _text
+from .core.args import _boolean, _code_block, _paragraph_runs, _text
 from .core.commands import (
     add_link_cmd,
+    blocks_cmds,
     set_title_cmd,
     element_cmds,
     list_cmds,
@@ -42,7 +44,7 @@ from .core.commands import (
     set_scalar_cmd,
     transition_cmd,
 )
-from .core.fields import SectionSpec, _list, _prose, _scalar
+from .core.fields import SectionSpec, _blocks, _list, _prose, _scalar
 from .core.pagetype import PageType
 
 _QUESTION_FSM = ElementFSMSpec(
@@ -222,11 +224,12 @@ _SOLUTION_INVESTIGATION = PageType(
     ),
     sections=(
         SectionSpec("direction", "Direction", (
-            _scalar("directionId", description="""
-                The element id of the direction on the spike's directions list that this page
-                investigates, copied from your agent-plan task. One page investigates one direction;
-                an idea that is not a variant of it is a question for the user, not a second
-                direction here.
+            _list("items", element_fields=("directionId",), description="""
+                The direction this page investigates, added once by the element id of a direction on
+                the spike's directions list, copied from your agent-plan task; an id that names no
+                direction on this spike is refused. Several investigations may take the same
+                direction. An idea that is not a variant of it is a question for the user, not a
+                second direction here.
                 """),
         )),
         SectionSpec("sketch", "Sketch", (
@@ -245,7 +248,7 @@ _SOLUTION_INVESTIGATION = PageType(
                 """),
         )),
         SectionSpec("test", "Test", (
-            _scalar("falsifier", description="""
+            _prose("falsifier", description="""
                 The observation that would show this direction wrong for this codebase: a behaviour,
                 a measurement, a call path that does not exist. A direction nothing could falsify is
                 a preference, not a direction.
@@ -255,10 +258,11 @@ _SOLUTION_INVESTIGATION = PageType(
                 untested when neither reading nor a spike could check it. The evidence says which
                 and how.
                 """),
-            _prose("evidence", description="""
-                How the test was run: what you read, or what you ran in your spike worktree with its
-                command and output, naming the worktree and commit, and any outside source it rests
-                on. Spike code is never integrated; it exists only to make this observation.
+            _blocks("evidence", block_kinds=(_paragraph_runs(), _code_block()), description="""
+                How the test was run: what you read, or what you ran in your spike worktree, naming
+                the worktree and commit, and any outside source it rests on. Put each command and its
+                output in a code block and each file path in an inline code run. Spike code is never
+                integrated; it exists only to make this observation.
                 """),
         )),
         SectionSpec("conclusion", "Conclusion", (
@@ -270,12 +274,11 @@ _SOLUTION_INVESTIGATION = PageType(
                 """),
         )),
         SectionSpec("questions", "Questions for the user", (
-            _list("items", element_fields=("text", "why", "changes"), description="""
+            _list("items", element_fields=("text", "changes"), description="""
                 Each one question neither the spike nor the codebase answers and only the user can
-                settle, asked as a single decidable question in their terms. why is what you hope to
-                learn; changes names what the answer changes for this direction - whether it stays
-                viable, or what gets built. Anything you could settle by reading further is not a
-                question here.
+                settle, asked as a single decidable question in their terms. changes names what the
+                answer changes for this direction - whether it stays viable, or what gets built.
+                Anything you could settle by reading further is not a question here.
                 """),
         )),
         SectionSpec("digest", "Digest", (
@@ -289,18 +292,24 @@ _SOLUTION_INVESTIGATION = PageType(
         )),
     ),
     commands=(
-        set_scalar_cmd("direction", "directionId"),
+        # Checked against the parent spike's directions; nothing stops two investigations taking
+        # the same one.
+        *list_cmds("direction", add_args=(_text("directionId"),),
+                   ref_check=RefCheck(arg="directionId", scope="parent", section="directions", field="items")),
         set_prose_cmd("sketch"),
         set_scalar_cmd("assessment", "cost", choices=_COSTS),
-        set_scalar_cmd("test", "falsifier"),
+        set_prose_cmd("test", field="falsifier", name="setFalsifier", label="falsifier"),
         set_scalar_cmd("test", "result", choices=_TEST_RESULTS),
-        set_prose_cmd("test", field="evidence", name="setEvidence", label="evidence"),
+        *blocks_cmds("test", field="evidence", add_name="addEvidence",
+                     remove_name="removeEvidenceBlock", remove_desc="remove an evidence block",
+                     reorder_name="reorderEvidenceBlock",
+                     reorder_desc="move an evidence block to an anchored position (precedingId guards a stale read)"),
         set_scalar_cmd("conclusion", "viability", choices=_VIABILITY),
-        *list_cmds("questions", add_args=(_text(), _text("why"), _text("changes"))),
+        *list_cmds("questions", add_args=(_text(), _text("changes"))),
         set_prose_cmd("digest"),
         transition_cmd("begin", "waiting -> investigating", parent_guards=(_SPIKE_RESEARCHING,)),
         transition_cmd("report", "investigating -> reported", requires=(
-            ("direction", "directionId"),
+            ("direction", "items"),
             ("sketch", "body"),
             ("assessment", "cost"),
             ("test", "falsifier"),

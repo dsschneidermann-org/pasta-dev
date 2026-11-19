@@ -303,8 +303,8 @@ handed its intent and that direction's scope and nothing else. This page is your
 whole output: the controller reads its digest, and nobody reads your reply. The work
 of it:
 
-- Record the direction's id, then read the codebase from where this direction would
-  land, following callers and imports until its blast radius stops growing.
+- Add the direction you investigate by its id, then read the codebase from where it
+  would land, following callers and imports until its blast radius stops growing.
 - Sketch how the direction would be built here, naming the files it changes as real
   paths you opened, and size its cost.
 - Test it: write what would show it wrong, then check that by reading or, when your
