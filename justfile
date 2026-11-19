@@ -69,7 +69,7 @@ sphinx:
     --pre-build 'uv run python scripts/gen_page_type_docs.py'
 
 [parallel]
-dev: _restore-workspace main sphinx
+dev: main sphinx
 
 sync-wiki:
     gitnexus analyze --index-only --force
