@@ -90,7 +90,7 @@ epic: The root of a major feature too large for one feature-brief - it decompose
 
 spike: Works out how to build an idea before anything is planned: subagents investigate a few solution directions on solution-investigation pages of its own, the user picks one, and it hands off a single feature-brief for another agent to plan. Use it when the approach is still open; when it is known, use a feature-brief.
 
-agent-plan: One subagent an epic or a spike dispatches - its role, capability, exact task and worktree, linked to the pages it works on. Its page id is the agent's id and the page it reports back into as it starts and works. Created as a child of that epic or spike.
+agent-plan: One subagent an epic or a spike dispatches - its role, capability, exact task and worktree, linked to the pages it works on, and the page it reports back into as it starts and works. Created as a child of that epic or spike.
 """
 
 

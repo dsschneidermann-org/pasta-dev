@@ -53,15 +53,15 @@ _MODEL_TIERS = ("cheap", "standard", "capable")
 # Seeded into every agent-plan page as its first section and written by no command: who writes
 # this page.
 _AGENT_PLAN_NOTICE = """
-    This page is one dispatched agent's whole assignment, and its page id is the agent's id. The
-    controller - the session that created the epic or spike above it - writes the assignment, task
-    and reporting contract, links the pages the agent works on, and is the only one to run
-    markReady, reopen, accept or redispatch here. The dispatched agent creates the worktree named
-    here, if one is named, and works only in it, runs start on this page as its first command, adds
-    a report as each step lands, and ends with finish or block. It writes only this page and the
-    pages this page links to with works-on - the feature-briefs it builds with their child pages,
-    or the solution-investigation pages it investigates or judges - and never runs a command on the
-    epic or spike above it or on another agent's page.
+    This page is one dispatched agent's whole assignment. The controller - the session that created
+    the epic or spike above it - writes the assignment, task and reporting contract, links the pages
+    the agent works on, and is the only one to run markReady, reopen, accept or redispatch here. The
+    dispatched agent creates the worktree named here, if one is named, and works only in it, runs
+    start on this page as its first command, adds a report as each step lands, and ends with finish
+    or block. It writes only this page and the pages this page links to with works-on - the
+    feature-briefs it builds with their child pages, or the solution-investigation pages it
+    investigates or judges - and never runs a command on the epic or spike above it or on another
+    agent's page.
     """
 
 
@@ -71,9 +71,9 @@ _AGENT_PLAN = PageType(
     description=(
         "One subagent an epic or a spike dispatches: its role, capability, exact task and the "
         "worktree it creates, if any, linked to the pages it works on - the feature-briefs it "
-        "builds, or the investigation pages it investigates or judges. Its page id is the agent's "
-        "id, and the agent reports back onto this page as it starts and works. Created by the "
-        "controller as a direct child of its epic or spike."
+        "builds, or the investigation pages it investigates or judges. The agent reports back onto "
+        "this page as it starts and works. Created by the controller as a direct child of its epic "
+        "or spike."
     ),
     sections=(
         SectionSpec("notice", "Agent notice", (

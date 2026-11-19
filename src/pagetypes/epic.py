@@ -1,7 +1,6 @@
 """The `epic` page type.
 
-The agent-plan pages it dispatches are declared in agent_plan.py, since the spike dispatches them
-too.
+The agent-plan pages it dispatches are declared in agent_plan.py, since they are reusable.
 """
 
 from __future__ import annotations
@@ -44,11 +43,10 @@ _AGENT_PLANNED = ("ready", "working", "finished", "blocked", "accepted")
 _CONTROLLER_NOTICE = """
     This epic is the controller's page. Only the controlling agent - the session that created this
     epic and dispatches its agents - runs commands on it. Each dispatched agent is handed one
-    agent-plan page, a child of this epic whose page id is the agent's id; it works from that page,
-    reports back onto it, and writes only that page and the feature-briefs it links to, with their
-    child pages. It never edits this epic or another agent's page. The controller records here what
-    an agent raises: addFinding or editFinding for a problem, and editContract for a shared contract
-    it corrected.
+    agent-plan page, a child of this epic; it works from that page, reports back onto it, and writes
+    only that page and the feature-briefs it links to, with their child pages. It never edits this
+    epic or another agent's page. The controller records here what an agent raises: addFinding or
+    editFinding for a problem, and editContract for a shared contract it corrected.
     """
 
 

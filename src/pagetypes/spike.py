@@ -2,8 +2,8 @@
 
 They are declared together because they are designed against each other rather than on their
 own: the spike's gates read its investigations' statuses and the investigations' gates read the
-spike's. The agent-plan pages a spike also dispatches are declared in agent_plan.py, since an epic
-dispatches them too.
+spike's. The agent-plan pages a spike also dispatches are declared in agent_plan.py, since they
+are reusable.
 """
 
 from __future__ import annotations
@@ -67,12 +67,12 @@ _SAID_BY = ("user", "proposal")
 _CONTROLLER_NOTICE = """
     This spike is the controller's page. Only the controlling agent - the session that created this
     spike and dispatches its agents - runs commands on it. The research is done by dispatched
-    agents: each investigator and the judge is handed one agent-plan page, a child of this spike
-    whose page id is the agent's id, works from that page, reports back onto it, and writes only
-    that page and the solution-investigation pages it links to with works-on. It never edits this
-    spike or another agent's page. The controller reads the investigations' digests rather than the
-    whole pages. Nothing is designed, decomposed or built from this page: it ends by creating one
-    feature-brief next to it for another agent to plan.
+    agents: each investigator and the judge is handed one agent-plan page, a child of this spike,
+    works from that page, reports back onto it, and writes only that page and the
+    solution-investigation pages it links to with works-on. It never edits this spike or another
+    agent's page. The controller reads the investigations' digests rather than the whole pages.
+    Nothing is designed, decomposed or built from this page: it ends by creating one feature-brief
+    next to it for another agent to plan.
     """
 
 
