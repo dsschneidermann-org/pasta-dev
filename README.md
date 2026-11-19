@@ -49,7 +49,7 @@ uv sync                      # Python 3.14
 uv run python main.py        # http://localhost:8000
 ```
 
-That serves the MCP endpoint at `/pasta/mcp` and the read-only web UI at `/` from one process. Leave a page open in the browser and it refreshes live as the agent writes. Each workspace also has a **Timeline** (`/ws:<id>/timeline`): its feature briefs, bug reports and simple changes drawn as metro lines from creation to shipped, closed or dropped, replayed at a quarter of a day per second with the quiet stretches skipped - play, pause and scrub.
+That serves the MCP endpoint at `/pasta/mcp` and the read-only web UI at `/` from one process. Leave a page open in the browser and it refreshes live as the agent writes. Each workspace also has a **Timeline** (`/ws:<id>/timeline`): its feature briefs, bug reports and simple changes drawn as metro lines from creation to shipped, closed or dropped, replayed at a quarter of a day per second with the quiet stretches skipped - play, pause and scrub. Beside it, **Guidance** (`/ws:<id>/guidance`) shows the workspace's house rules set with `setWorkspaceGuidance`, and refreshes live when an agent changes them.
 
 Point your MCP client at it:
 

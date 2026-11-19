@@ -223,6 +223,26 @@ async def route_timeline(request: Request, workspaceIdPart: str):
         )
 
 
+# The workspace's guidance fields, read-only. It keeps the live-reload socket, so a guidance change
+# made over MCP lands in an open tab on its own.
+@app.get("/ws:{workspaceIdPart}/guidance", response_class=HTMLResponse)
+async def route_guidance(request: Request, workspaceIdPart: str):
+    with _guard_http():
+        workspace_id = f"ws:{workspaceIdPart}"
+        workspace = STORE.load_workspace(workspace_id)
+        guidance = STORE.get_workspace_guidance(workspace_id)
+        return templates.TemplateResponse(
+            request=request,
+            name="guidance.html",
+            context={
+                "workspace_id": workspace_id,
+                "workspace_name": workspace.name,
+                "fields": guidance["fields"],
+                "undeclared": guidance["undeclared"],
+            },
+        )
+
+
 @app.get("/ws:{workspaceIdPart}/page/{pageId}", response_class=HTMLResponse)
 async def route_page(request: Request, workspaceIdPart: str, pageId: str, archived: str | None = None, markdown: str | None = None):
     with _guard_http():

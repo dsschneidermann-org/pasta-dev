@@ -1,0 +1,35 @@
+{% extends "_base.html" %}
+
+{% block title %}Guidance - {{ workspace_name }}{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .guidance dd { margin-top: 0.5rem; margin-bottom: 1.75rem; }
+    .guidance-text { white-space: pre-wrap; }
+    .guidance-unset { color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<p><a href="/{{ workspace_id }}">← Workspace</a></p>
+<dl class="guidance">
+    {% for field in fields %}
+    <dt><strong>{{ field.field }}</strong> - <em>{{ field.description }}</em></dt>
+    {% if field.text %}
+    <dd class="guidance-text">{{ field.text }}</dd>
+    {% else %}
+    <dd class="guidance-unset">Not set</dd>
+    {% endif %}
+    {% endfor %}
+</dl>
+{% if undeclared %}
+<h2>No longer declared</h2>
+<dl class="guidance">
+    {% for name, text in undeclared.items() %}
+    <dt><strong>{{ name }}</strong></dt>
+    <dd class="guidance-text">{{ text }}</dd>
+    {% endfor %}
+</dl>
+{% endif %}
+{% endblock %}

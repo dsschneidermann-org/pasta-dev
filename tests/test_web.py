@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 import src.server as server
 from src.errors import ValidationError
 from src.event_log import to_jsonl
+from src.serialize import workspace_to_dict
 from src.source_link import SourceLink, read_remote_url, to_source_link
 from src.store import Store
 
@@ -444,4 +445,70 @@ def test_workspace_tree_links_to_its_timeline(client):
 
 def test_timeline_of_an_unknown_workspace_is_an_error_page(client):
     response = client.get("/ws:nope-000000/timeline")
+    assert response.status_code == 500
+
+
+# --- guidance view -----------------------------------------------------------------------------
+
+def test_workspace_tree_links_to_its_guidance_next_to_the_timeline(client):
+    workspace = server.STORE.create_workspace("demo")
+    response = client.get(f"/{workspace.id}")
+    assert re.search(rf'href="/{workspace.id}/timeline">Timeline</a>\s*·\s*'
+                     rf'<a href="/{workspace.id}/guidance">Guidance</a>', response.text)
+
+
+def test_guidance_lists_every_declared_field_with_its_description_and_text(client):
+    workspace = server.STORE.create_workspace("demo")
+    server.STORE.set_workspace_guidance(workspace.id, "buildTool", "use pytest")
+    response = client.get(f"/{workspace.id}/guidance")
+    assert response.status_code == 200
+    for field in server.STORE.get_workspace_guidance(workspace.id)["fields"]:
+        assert field["field"] in response.text
+        assert field["description"] in response.text
+    assert "use pytest" in response.text
+    assert response.text.count("Not set") == 2                # draftHint and reviewHint are unset
+
+
+def test_guidance_names_are_bold_descriptions_italic_and_values_spaced(client):
+    workspace = server.STORE.create_workspace("demo")
+    html = client.get(f"/{workspace.id}/guidance").text
+    assert "<strong>buildTool</strong> - <em>the build tool this workspace uses</em>" in html
+    assert "<code>" not in html
+    assert ".guidance dd { margin-top: 0.5rem; margin-bottom: 1.75rem; }" in html
+
+
+def test_guidance_shows_stored_text_of_an_undeclared_field(client):
+    workspace = server.STORE.create_workspace("demo")
+    stored = server.STORE.load_workspace(workspace.id)
+    stored.guidance_config["retiredField"] = "old rule"
+    server.STORE._touch_and_save(stored)
+    response = client.get(f"/{workspace.id}/guidance")
+    assert "retiredField" in response.text
+    assert "old rule" in response.text
+
+
+def test_guidance_text_is_escaped(client):
+    workspace = server.STORE.create_workspace("demo")
+    server.STORE.set_workspace_guidance(workspace.id, "buildTool", "<script>alert(1)</script>")
+    response = client.get(f"/{workspace.id}/guidance")
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in response.text
+    assert "<script>alert(1)</script>" not in response.text
+
+
+def test_guidance_keeps_the_live_reload_socket(client):
+    workspace = server.STORE.create_workspace("demo")
+    response = client.get(f"/{workspace.id}/guidance")
+    assert "/ws/reloader" in response.text
+
+
+def test_guidance_view_does_not_write(client):
+    workspace = server.STORE.create_workspace("demo")
+    server.STORE.set_workspace_guidance(workspace.id, "buildTool", "use pytest")
+    before = workspace_to_dict(server.STORE.load_workspace(workspace.id))
+    _ = client.get(f"/{workspace.id}/guidance")
+    assert workspace_to_dict(server.STORE.load_workspace(workspace.id)) == before
+
+
+def test_guidance_of_an_unknown_workspace_is_an_error_page(client):
+    response = client.get("/ws:nope-000000/guidance")
     assert response.status_code == 500

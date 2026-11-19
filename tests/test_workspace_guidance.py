@@ -394,6 +394,19 @@ def test_create_page_response_carries_workspace_guidance(mcp):
     assert created["next"]["guidance_draftHint"] == "DRAFT HINT GUIDANCE: drafting"
 
 
+def test_set_workspace_guidance_refreshes_open_browser_tabs(mcp, monkeypatch):
+    refreshes = []
+
+    async def record_refresh():
+        refreshes.append(True)
+
+    monkeypatch.setattr(server.ws_reloader, "refresh", record_refresh)
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    refreshes.clear()
+    call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "draftHint", "text": "drafting"})
+    assert refreshes == [True]
+
+
 def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     with pytest.raises(ToolError, match="not a workspace guidance field"):
