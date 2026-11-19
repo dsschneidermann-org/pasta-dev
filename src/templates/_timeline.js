@@ -383,10 +383,12 @@ function main() {
 
   // A live payload: redraw it, and play on to its new end if the viewer was resting at the old one.
   // A paused viewer is looking at something, so they are left where they are. A viewer who prefers
-  // reduced motion is taken to the new end at rest.
+  // reduced motion is taken to the new end at rest. A payload can also end earlier than the last one,
+  // and a viewer past its end is brought back to it.
   function show(timeline) {
     const resting = !playing && !press?.dragging && p >= data.duration;   // the Replay state
     data = timeline;
+    p = Math.min(p, data.duration);
     draw();
     layout();
     if (!resting || p >= data.duration) return updateButton();

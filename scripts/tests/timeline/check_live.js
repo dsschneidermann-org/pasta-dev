@@ -1,8 +1,9 @@
 // Live updates: the page opens its events socket from the log count it was rendered with, ignores
 // heartbeats, and redraws each live payload. A viewer resting at the end in the Replay state is
 // played on to the new end - or taken there at rest if they prefer reduced motion - while a viewer
-// paused in the history, or dragging, is left where they are. A stalled frame skips no playback. It
-// reconnects from the count it has reached, and an empty page brings up the map on its first payload.
+// paused in the history, or dragging, is left where they are. A payload that ends earlier brings a
+// viewer past its end back to it. A stalled frame skips no playback. It reconnects from the count it
+// has reached, and an empty page brings up the map on its first payload.
 //
 //     node check_live.js <payload.json> <_timeline.js>
 "use strict";
@@ -117,6 +118,15 @@ assertClose(timeline.playhead(), extended.duration, "reduced motion jumps to the
 assert.strictEqual(timeline.pendingFrames(), 0, "without playing");
 assert.strictEqual(ids["tl-play"].textContent, "↺ Replay");
 
+// Archiving the page behind the latest stations ends the replay earlier: a viewer resting past the
+// new end is brought back to it, still at rest.
+timeline = loadTimeline(payloadPath, scriptPath, { payloadText: JSON.stringify(extended) });
+({ ids } = timeline);
+timeline.push({ events: [{ ...liveEvent, event: "archived" }], timeline: data });
+assertClose(timeline.playhead(), data.duration, "a shorter replay brings the playhead back to its end");
+assert.strictEqual(timeline.pendingFrames(), 0, "without playing");
+assert.strictEqual(ids["tl-play"].textContent, "↺ Replay");
+
 // An empty page brings the map up on its first payload and plays it from the start.
 const empty = { start: data.start, end: data.start, duration: 0, baseRate: data.baseRate,
   segments: [], lanes: 0, lines: [], feed: [] };
@@ -134,4 +144,5 @@ assertClose(timeline.playhead(), data.duration);
 
 console.log(`ok - resumed from the rendered count, ignored heartbeats, grew ${data.lines.length} lines to `
   + `${extended.lines.length} playing on from Replay, held still paused and mid-drag, jumped with reduced `
-  + "motion, capped a stalled frame, reconnected, and brought up an empty page");
+  + "motion, came back to a shorter replay's end, capped a stalled frame, reconnected, and brought up an "
+  + "empty page");
