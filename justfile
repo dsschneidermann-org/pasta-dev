@@ -45,7 +45,7 @@ commit-workspace:
 
 # Copy each workspace in the data dir's `snapshot/` back in when it has no live file of its own,
 # with its event log unless a live one exists. A live file is never replaced.
-restore-workspace:
+_restore-workspace:
     #!/bin/bash
     set -e
     data="${PASTA_DATA_DIR:-.pasta-data}"
@@ -60,11 +60,8 @@ restore-workspace:
         echo "Restored $name from $data/snapshot/"
     done
 
-main: restore-workspace
+main: _restore-workspace
     uv run python main.py
-
-klaus:
-    klaus --host 0.0.0.0 .
 
 sphinx:
     uv run sphinx-autobuild docsite -q -b html docsite/_build/html \
@@ -72,7 +69,7 @@ sphinx:
     --pre-build 'uv run python scripts/gen_page_type_docs.py'
 
 [parallel]
-dev: main sphinx
+dev: _restore-workspace main sphinx
 
 sync-wiki:
     gitnexus analyze --index-only --force
