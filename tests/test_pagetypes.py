@@ -117,6 +117,7 @@ from src.pagetypes.feature import (
     _TESTING_PLAN,
 )
 from src.pagetypes.simple_change import _SIMPLE_CHANGE
+from src.pagetypes.spike import _SOLUTION_INVESTIGATION, _SPIKE
 from src.pagetypes.toc import _TOC
 from src.testtypes import TEST_REGISTRY
 
@@ -135,7 +136,8 @@ def _kinds(*names: str) -> tuple[BlockKindSpec, ...]:
 # mode empties that map, and these invariants must keep covering production all the same.
 PRODUCTION_TYPES = {page_type.tag: page_type for page_type in (
     _ARCHITECTURE, _DECISION_RECORD, _BUG_REPORT, _SIMPLE_CHANGE, _FEATURE_BRIEF, _FEATURE_SPEC,
-    _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _DOCUMENT, _TOC,
+    _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _SPIKE, _SOLUTION_INVESTIGATION,
+    _DOCUMENT, _TOC,
 )}
 
 # Structural invariants must hold for EVERY page type - production and hand-authored fixture alike.
