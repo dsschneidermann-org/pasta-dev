@@ -28,6 +28,19 @@ types:
 validate:
     uv run python scripts/validate_workspace.py
 
+# Commit the current state of pasta's own workspace and its event log. `.pasta-data/` stays
+# gitignored, so these two files only reach git through here. Commits on the current branch.
+commit-workspace:
+    #!/bin/bash
+    set -e
+    files=".pasta-data/ws_mrteq0c5-238cf6.json .pasta-data/ws_mrteq0c5-238cf6.events.jsonl"
+    git add -f $files
+    if git diff --cached --quiet -- $files; then
+        echo "pasta's workspace is unchanged since its last commit."
+        exit 0
+    fi
+    git commit -m "Snapshot pasta's workspace and its event log" -- $files
+
 main:
     uv run python main.py
 
