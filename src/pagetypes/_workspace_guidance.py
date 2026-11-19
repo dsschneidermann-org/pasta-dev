@@ -33,20 +33,6 @@ GROUNDING_TOOL_DESC = (
     "loading whole files."
 )
 
-RESEARCH_SOURCES_FIELD = "researchSources"
-RESEARCH_SOURCES_LABEL = "RESEARCH SOURCES GUIDANCE: "
-RESEARCH_SOURCES_DESC = (
-    "The outside sources an investigator may read for prior art - for example, named "
-    "documentation MCP servers or URLs - and whether web search is allowed."
-)
-
-HUMAN_REACH_FIELD = "humanReach"
-HUMAN_REACH_LABEL = "HUMAN REACH GUIDANCE: "
-HUMAN_REACH_DESC = (
-    "How to reach the human when the work stops at a human gate or a question waits on them - "
-    "for example, a push notification, then one question at a time in the terminal."
-)
-
 SUBAGENT_DISPATCH_FIELD = "subagentDispatch"
 SUBAGENT_DISPATCH_LABEL = "SUBAGENT DISPATCH GUIDANCE: "
 SUBAGENT_DISPATCH_DESC = (

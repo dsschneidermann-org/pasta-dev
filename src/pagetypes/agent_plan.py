@@ -59,9 +59,9 @@ _AGENT_PLAN_NOTICE = """
     dispatched agent creates the worktree named here, if one is named, and works only in it, runs
     start on this page as its first command, adds a report as each step lands, and ends with finish
     or block. It writes only this page and the pages this page links to with works-on - the
-    feature-briefs it builds with their child pages, or the solution-investigation pages it
-    investigates or judges - and never runs a command on the epic or spike above it or on another
-    agent's page.
+    feature-briefs it builds with their child pages, or the solution-investigation page it
+    investigates - and never runs a command on the epic or spike above it or on another agent's
+    page.
     """
 
 
@@ -71,7 +71,7 @@ _AGENT_PLAN = PageType(
     description=(
         "One subagent an epic or a spike dispatches: its role, capability, exact task and the "
         "worktree it creates, if any, linked to the pages it works on - the feature-briefs it "
-        "builds, or the investigation pages it investigates or judges. The agent reports back onto "
+        "builds, or the investigation page it investigates. The agent reports back onto "
         "this page as it starts and works. Created by the controller as a direct child of its epic "
         "or spike."
     ),
@@ -82,23 +82,22 @@ _AGENT_PLAN = PageType(
         SectionSpec("assignment", "Assignment", (
             _scalar("role", description="""
                 What this agent is, named as a role a reader recognises - implementer, test writer,
-                integration reviewer, investigator, investigation judge. One agent-plan page is one
-                dispatch, so the role describes this run rather than a definition shared with other
-                agents.
+                integration reviewer, investigator. One agent-plan page is one dispatch, so the role
+                describes this run rather than a definition shared with other agents.
                 """),
             _scalar("capability", choices=_MODEL_TIERS, description="""
                 The model tier this agent is dispatched on. Name it on every agent: an omitted tier
                 silently inherits the session's most capable and most expensive model. Use cheap for
                 mechanical single-file work whose content is already written down, standard for
                 research, multi-file integration and judgement, and capable for architecture and
-                final review. A judge runs at the tier of the work it checks.
+                final review.
                 """),
             _scalar("worktree", description="""
                 The git worktree this agent creates and works in, by name. Give every agent that
                 edits code a different one: two agents in one checkout overwrite each other's edits.
-                An agent that only reads code, such as a judge, names none. An investigator names
-                none, or a throwaway spike worktree of its own when its test needs code run; spike
-                code is never integrated.
+                An agent that only reads code names none. An investigator names none, or a throwaway
+                spike worktree of its own when its test needs code run; spike code is never
+                integrated.
                 """),
         )),
         SectionSpec("task", "Task", (
@@ -108,10 +107,9 @@ _AGENT_PLAN = PageType(
                 epic or spike it owns and what done looks like, name the shared contracts it touches
                 by their id on the epic where there are any, and add only the decisions it needs that
                 the pages it works on cannot tell it. Link each page it works on with addLink role
-                works-on - each feature-brief it builds, the solution-investigation page it
-                investigates, or every investigation a judge checks - and each agent-plan page that
-                must be accepted before it starts with role depends-on. Point at large artifacts by
-                file path rather than pasting them.
+                works-on - each feature-brief it builds, or the solution-investigation page it
+                investigates - and each agent-plan page that must be accepted before it starts with
+                role depends-on. Point at large artifacts by file path rather than pasting them.
                 """),
         )),
         SectionSpec("reporting", "Reporting contract", (
