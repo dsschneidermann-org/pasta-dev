@@ -491,9 +491,8 @@ def transition_on_add_cmd(name: str, t_description: str, *, legal_in: tuple[str,
     sources = tuple(legal_in) if legal_in is not None else (before.strip(),)
     return CompoundCommand(
         name=name, description=f"{description} ({t_description})", event=event or name, dest=words[0],
-        legal_in=sources, agency=agency,
-        args=add_args, requires=requires, guards=guards, parent_guards=parent_guards,
-        link_guards=link_guards,
+        legal_in=sources, agency=agency, args=add_args, requires=requires, guards=guards,
+        parent_guards=parent_guards, link_guards=link_guards,
         steps=(AddElementCommand(name=f"_{name}Add", section=section, field=field, args=add_args,
                                  element_map=_same_named(add_args)),),
     )

@@ -77,9 +77,7 @@ optionally the statuses it is allowed in. Names follow the field they write:
 
 - **Pinned children** are declared on the parent and created in the same step as the
   parent (a feature brief creates its spec, implementation plan and testing plan).
-- **Ordinary children** are created later, as the work needs them (an epic's feature
-  briefs, a spike's solution investigations, and one agent-plan page per agent either
-  of them dispatches).
+- **Ordinary children** are created later, as the work needs them.
 - A **child guard** holds a parent's transition until its direct children of a given type
   are in an accepted set of states (ship waits until every plan step is done or skipped
   and every test case has passed or been skipped). It ignores archived children and
@@ -88,8 +86,8 @@ optionally the statuses it is allowed in. Names follow the field they write:
 - A **parent guard** keeps a child locked until its parent reaches a given status (no plan
   steps can be written until the brief is in planning).
 - A **link guard** holds a transition until the page links, with a given role, to a live
-  page of a given type (a spike hands off only once it links the feature brief it
-  created). A link to an archived page or to a page of another type does not count.
+  page of a given type. A link to an archived page or to a page of another type does not
+  count.
 - There is no gate on the states of elements on the same page. To require "every step
   is done", put the steps on a child page and give the parent a child guard.
 - To make one sibling child wait for another, add a status to the parent. Never order
