@@ -241,6 +241,30 @@ def test_overlapping_lines_take_separate_lanes_and_a_later_line_reuses_a_freed_o
     assert by_id[third]["p0"] >= by_id[first]["p1"] + LANE_GAP
 
 
+def test_appending_a_later_event_keeps_every_earlier_position():
+    # The live timeline redraws from a payload rebuilt per write; that reads as growth at the end
+    # only because a later event moves nothing already drawn.
+    shipped, open_, later = _id("feature-brief", T0), _id("feature-brief", T0 + HOUR), _id("bug-report", T0 + 3 * DAY)
+    events = [
+        _event(T0, "created", shipped, "draft"),
+        _event(T0 + HOUR, "created", open_, "draft"),
+        _event(T0 + 2 * HOUR, "status", open_, "grounding", "draft"),
+        _event(T0 + DAY, "status", shipped, "shipped", "done"),
+    ]
+    workspace = _workspace(_page(shipped, "shipped"), _page(open_, "grounding"), _page(later, "draft"))
+    before = build_timeline(events, workspace, T0 + DAY)
+    after = build_timeline([*events, _event(T0 + 3 * DAY, "created", later, "draft")], workspace, T0 + 3 * DAY)
+
+    assert after["start"] == before["start"]
+    assert after["duration"] > before["duration"]
+    by_id = {line["id"]: line for line in after["lines"]}
+    for line in before["lines"]:
+        grown = by_id[line["id"]]
+        assert (grown["lane"], grown["p0"]) == (line["lane"], line["p0"])
+        assert [stop["p"] for stop in grown["stops"]] == [stop["p"] for stop in line["stops"]]
+    assert after["lines"][-1]["id"] == later
+
+
 def test_the_feed_lists_every_station_in_playback_order():
     first, second = _id("feature-brief", T0), _id("bug-report", T0 + HOUR)
     events = [

@@ -3,13 +3,17 @@ last reload failure.
 
 This module is deliberately kept OUT of the hot-reload set: `src/hmr_server.py` never
 re-imports it. It holds live browser WebSocket connections as in-process state
-(`ws_reloader.active`); if it were re-executed on every source change, that state would be
-dropped and browser auto-refresh would silently stop working. It is imported by both the
-reloaded `src.server` (routes, mutation refreshes, refusal gates) and the stable
-`src.hmr_server` (file-change refreshes, reload outcomes), so a single instance survives reloads.
+(`ws_reloader.active`, and the timeline tabs' `ws_events.active`); if it were re-executed on
+every source change, that state would be dropped and browser auto-refresh and the live timeline
+would silently stop working. It is imported by both the reloaded `src.server` (routes, mutation
+refreshes, event streaming, refusal gates) and the stable `src.hmr_server` (file-change
+refreshes, reload outcomes), so a single instance survives reloads.
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
 
 from fastapi import WebSocket
 
@@ -39,6 +43,49 @@ class ReloaderConnectionManager:
 # Process-wide singleton. Must survive hot reloads, so it lives in this
 # (reload-excluded) module rather than in the reloaded server module.
 ws_reloader = ReloaderConnectionManager()
+
+
+@dataclass
+class EventStream:
+    """One timeline tab: the workspace it watches and how many of that workspace's log events it has."""
+    websocket: WebSocket
+    workspace_id: str
+    seen: int
+
+
+class EventsConnectionManager:
+    def __init__(self):
+        self.active: list[EventStream] = []
+
+    async def connect(self, websocket: WebSocket, workspace_id: str, seen: int):
+        await websocket.accept()
+        self.active.append(EventStream(websocket, workspace_id, seen))
+
+    def disconnect(self, websocket: WebSocket):
+        # Idempotent: a stream already dropped by a failed send is simply gone.
+        self.active = [stream for stream in self.active if stream.websocket is not websocket]
+
+    def watching(self, workspace_id: str) -> bool:
+        return any(stream.workspace_id == workspace_id for stream in self.active)
+
+    async def publish(self, workspace_id: str, events: list[dict[str, str]], timeline: dict[str, Any]):
+        """Send each tab watching the workspace the events it has not seen, with the timeline."""
+        dead: list[EventStream] = []
+        for stream in list(self.active):
+            if stream.workspace_id != workspace_id or stream.seen >= len(events):
+                continue
+            # Counted before the send is awaited, so an overlapping publish never repeats an event.
+            unseen, stream.seen = events[stream.seen:], len(events)
+            try:
+                await stream.websocket.send_json({"events": unseen, "timeline": timeline})
+            except Exception:
+                dead.append(stream)
+        for stream in dead:
+            self.disconnect(stream.websocket)
+
+
+# Process-wide singleton, kept here beside ws_reloader for the same reason: it must survive hot reloads.
+ws_events = EventsConnectionManager()
 
 
 # Kept here so the gates of a rolled-back build still see it.
