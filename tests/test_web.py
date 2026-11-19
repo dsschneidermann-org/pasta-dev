@@ -414,6 +414,20 @@ def test_timeline_times_sit_on_the_page_background_and_the_legend_checks_deliver
     assert re.search(r'<li><svg[^>]*><circle class="tl-delivered"[^>]*/><path class="tl-check"', html)
 
 
+def test_timeline_shows_no_rate_or_play_icon_and_borders_only_between_feed_rows(client):
+    workspace = server.STORE.create_workspace("demo")
+    page_id = "bug-report:mrw7chrt-def44a"
+    server.STORE.events_path(workspace.id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "bug-report", "title": "A bug", "status": "draft"},
+    ]), encoding="utf-8")
+    html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
+    assert "tl-rate" not in html
+    assert "▶" not in html
+    assert '<button type="button" id="tl-play">Play</button>' in html
+    assert ".tl-feed li + li { border-top: 1px solid var(--border); }" in html
+
+
 def test_timeline_of_a_workspace_with_no_log_says_so(client):
     workspace = server.STORE.create_workspace("demo")
     part = workspace.id.removeprefix("ws:")

@@ -22,7 +22,6 @@ function main() {
   const slider = document.getElementById("tl-scrub");
   const playButton = document.getElementById("tl-play");
   const clock = document.getElementById("tl-clock");
-  const rateLabel = document.getElementById("tl-rate");
   const counts = document.getElementById("tl-counts");
   const feedList = document.getElementById("tl-feed");
 
@@ -62,19 +61,6 @@ function main() {
     const s = segmentAt(t, "t0");
     const u = Math.min(1, Math.max(0, (t - s.t0) / (s.t1 - s.t0)));
     return s.p0 + u * (s.p1 - s.p0);
-  }
-
-  function daysPerSecond(p) {
-    if (!segments.length) return data.baseRate / 86400;
-    const s = segmentAt(p, "p0");
-    return (s.t1 - s.t0) / (s.p1 - s.p0) / 86400;
-  }
-
-  // Only a speed-up is worth reading; the base rate goes without saying.
-  function rateText(days) {
-    if (Math.abs(days - 0.25) < 0.0025) return "";
-    if (days < 1) return `${days.toFixed(2)} day per second »`;
-    return `${days < 10 ? days.toFixed(1) : Math.round(days)} days per second »`;
   }
 
   // --- the stage, drawn once and then only clipped and panned ---
@@ -234,7 +220,6 @@ function main() {
     clock.textContent = now.toLocaleString(undefined, {
       weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
     });
-    rateLabel.textContent = rateText(daysPerSecond(p));
 
     let inFlight = 0;
     let delivered = 0;
@@ -290,11 +275,11 @@ function main() {
   let frameRequest = 0;
 
   function updateButton() {
-    playButton.textContent = playing ? "❚❚ Pause" : p >= data.duration ? "↺ Replay" : "▶ Play";
+    playButton.textContent = playing ? "❚❚ Pause" : p >= data.duration ? "↺ Replay" : "Play";
   }
 
   function tick(now) {
-    if (lastNow !== null) p = Math.min(data.duration, p + (now - lastNow) / 1000);
+    if (lastNow !== null && !press) p = Math.min(data.duration, p + (now - lastNow) / 1000);
     lastNow = now;
     frame();
     if (p >= data.duration) {
@@ -326,6 +311,46 @@ function main() {
     frame();
     updateButton();
   });
+  // Dragging the stage moves the playhead with the pointer, like dragging a map. A playing replay
+  // holds still while pressed and carries on from wherever it is let go.
+  const DRAG_THRESHOLD = 4;   // pixels a press must move before it counts as a drag
+  let press = null;
+  let swallowClick = false;
+  stage.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    press = { pointerId: event.pointerId, x: event.clientX, p, dragging: false };
+    swallowClick = false;
+  });
+  stage.addEventListener("pointermove", (event) => {
+    if (!press || event.pointerId !== press.pointerId) return;
+    const dx = event.clientX - press.x;
+    if (!press.dragging) {
+      if (Math.abs(dx) < DRAG_THRESHOLD) return;
+      // Captured only once it is a drag, so a plain click still reaches the line's link.
+      press.dragging = true;
+      stage.setPointerCapture(event.pointerId);
+      stage.classList.add("dragging");
+    }
+    p = Math.min(data.duration, Math.max(0, press.p - dx / PX));
+    frame();
+    updateButton();
+  });
+  function release(event) {
+    if (!press || event.pointerId !== press.pointerId) return;
+    swallowClick = press.dragging;
+    press = null;
+    stage.classList.remove("dragging");
+    if (stage.hasPointerCapture(event.pointerId)) stage.releasePointerCapture(event.pointerId);
+  }
+  stage.addEventListener("pointerup", release);
+  stage.addEventListener("pointercancel", release);
+  stage.addEventListener("click", (event) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+
   document.addEventListener("keydown", (event) => {
     if (event.key !== " " || event.target.closest("button, a, textarea, select, input:not([type=range])")) return;
     event.preventDefault();
