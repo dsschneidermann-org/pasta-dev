@@ -24,7 +24,8 @@ from .feature import (
     _IMPLEMENTATION_PLAN,
     _TESTING_PLAN,
 )
-from .epic import _AGENT_PLAN, _EPIC
+from .agent_plan import _AGENT_PLAN
+from .epic import _EPIC
 from .document import _DOCUMENT
 from .toc import _TOC
 

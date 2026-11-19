@@ -1,7 +1,7 @@
-"""The `epic` page type, and the `agent-plan` pages created under it.
+"""The `epic` page type.
 
-The two are declared together because they are designed against each other rather than
-on their own, and reading one without the other would hide the coupling.
+The agent-plan pages it dispatches are declared in agent_plan.py, since the spike dispatches them
+too.
 """
 
 from __future__ import annotations
@@ -11,7 +11,6 @@ from .core.specs import (
     ChildStateGuard,
     ElementFSMSpec,
     FSMSpec,
-    ParentStateGuard,
 )
 from .core.args import _boolean, _text
 from .core.commands import (
@@ -23,7 +22,6 @@ from .core.commands import (
     set_prose_cmd,
     set_scalar_cmd,
     transition_cmd,
-    transition_on_add_cmd,
 )
 from .core.fields import SectionSpec, _list, _prose, _scalar
 from .core.pagetype import PageType
@@ -243,134 +241,5 @@ _EPIC = PageType(
                 "executing", "review", "shipped", "abandoned"),
         terminal_states=("shipped", "abandoned"),
         status_guidance=(("decomposition", DECOMPOSITION),),
-    ),
-)
-
-
-# An agent-plan page may only be marked ready once its epic has reached `decomposition` or later -
-# not while it is still in `draft` or `grounding` (the base is still being established), nor once
-# `abandoned`. Enforced in the store.
-_EPIC_IN_DECOMPOSITION_OR_LATER = ParentStateGuard(
-    parent_type="epic",
-    required_statuses=("decomposition", "planReview", "executing", "review", "shipped"),
-    message="the epic must be in decomposition or later",
-)
-
-
-# Tiers rather than model ids: an id rots between releases, and a stale enum rejects valid input.
-_MODEL_TIERS = ("cheap", "standard", "capable")
-
-
-# Seeded into every agent-plan page as its first section and written by no command: who writes
-# this page.
-_AGENT_PLAN_NOTICE = """
-    This page is one dispatched agent's whole assignment, and its page id is the agent's id. The
-    controller - the session that created the epic above it - writes the assignment, task and
-    reporting contract, links the feature-briefs the agent works on, and is the only one to run
-    markReady, reopen, accept or redispatch here. The dispatched agent creates the worktree named
-    here and works only in it, runs start on this page as its first command, adds a report as each
-    step lands, and ends with finish or block. It writes only this page and the feature-briefs this
-    page links to, with their child pages, and never runs a command on the epic or on another
-    agent's page.
-    """
-
-
-_AGENT_PLAN = PageType(
-    tag="agent-plan",
-    name="Agent plan",
-    description=(
-        "One subagent an epic dispatches: its role, capability, exact task and the worktree it "
-        "creates, linked to the feature-briefs it works on. Its page id is the agent's id, and the "
-        "agent reports back onto this page as it starts and works. Created by the controller as a "
-        "direct child of its epic."
-    ),
-    sections=(
-        SectionSpec("notice", "Agent notice", (
-            _prose("body", description="Agent notice fixed text.", fixed=_AGENT_PLAN_NOTICE),
-        )),
-        SectionSpec("assignment", "Assignment", (
-            _scalar("role", description="""
-                What this agent is, named as a role a reader recognises - implementer, test writer,
-                integration reviewer. One agent-plan page is one dispatch, so the role describes this
-                run rather than a definition shared with other agents.
-                """),
-            _scalar("capability", choices=_MODEL_TIERS, description="""
-                The model tier this agent is dispatched on. Name it on every agent: an omitted tier
-                silently inherits the session's most capable and most expensive model. Use cheap for
-                mechanical single-file work whose content is already written down, standard for
-                multi-file integration and judgement, and capable for architecture and final review.
-                """),
-            _scalar("worktree", description="""
-                The git worktree this agent creates and works in, by name. Give every agent a
-                different one: two agents in one checkout overwrite each other's edits.
-                """),
-        )),
-        SectionSpec("task", "Task", (
-            _prose("body", description="""
-                The exact work this agent does, written for a fresh agent with no history: it is
-                handed this page id and nothing of the controller's context. Say which slice of the
-                epic it owns and what done looks like, name the shared contracts it touches by their
-                id on the epic, and add only the decisions it needs that its feature-briefs cannot
-                tell it. Link each feature-brief it works on with addLink role works-on, and each
-                agent-plan page that must be accepted before it starts with role depends-on. Point
-                at large artifacts by file path rather than pasting them.
-                """),
-        )),
-        SectionSpec("reporting", "Reporting contract", (
-            _prose("body", description="""
-                What this agent must leave behind before it runs finish, written as a checklist the
-                controller verifies before accepting: which commands it must have run on its linked
-                feature-briefs, what status each brief and its plans must be left in, and what its
-                finish report must say. An agent reports by driving its briefs and this page, not by
-                handing prose back, so name the page status you expect rather than the summary you
-                want to read.
-                """),
-        )),
-        SectionSpec("reports", "Reports", (
-            _list("items", element_fields=("text",), description="""
-                Each one report written back onto this page while the agent works: start records
-                that it began and the worktree it created, a report records each step as it lands,
-                and finish or block records the outcome or what stopped it. The controller adds one
-                when it redispatches, saying what the next round must fix, so the list is the record
-                of every attempt this agent made.
-                """),
-        )),
-    ),
-    commands=(
-        # The controller's fields are draft-only, so the dispatched agent is never offered them;
-        # reopen unlocks them again.
-        set_scalar_cmd("assignment", "role", legal_in=("draft",)),
-        set_scalar_cmd("assignment", "capability", choices=_MODEL_TIERS, legal_in=("draft",)),
-        set_scalar_cmd("assignment", "worktree", legal_in=("draft",)),
-        set_prose_cmd("task", legal_in=("draft",)),
-        set_prose_cmd("reporting", label="reporting contract", legal_in=("draft",)),
-        # The reports are the record of every attempt: they can be reordered, never removed.
-        *list_cmds("reports", remove=False, add_args=(_text(),), legal_in=("working",)),
-        transition_cmd("markReady", "draft -> ready",
-                       requires=(("assignment", "role"), ("assignment", "capability"),
-                                 ("assignment", "worktree"), ("task", "body"), ("reporting", "body")),
-                       parent_guards=(_EPIC_IN_DECOMPOSITION_OR_LATER,)),
-        transition_cmd("reopen", "ready -> draft (unlocks the assignment, task and reporting contract)"),
-        # Each status change past ready writes its reason as a report in the same command.
-        transition_on_add_cmd("start", "ready -> working", section="reports", field="items",
-                              description="report that the agent has started, with the worktree it created",
-                              add_args=(_text(),)),
-        transition_on_add_cmd("finish", "working -> finished", section="reports", field="items",
-                              description="report the outcome AND finish", add_args=(_text(),)),
-        transition_on_add_cmd("block", "working -> blocked", section="reports", field="items",
-                              description="report what stopped the work AND block", add_args=(_text(),)),
-        transition_cmd("accept", "finished -> accepted"),
-        transition_on_add_cmd("redispatch", "finished or blocked -> ready", legal_in=("finished", "blocked"),
-                              section="reports", field="items",
-                              description="report what the next round must fix AND send the agent back",
-                              add_args=(_text(),)),
-        add_link_cmd(),
-        set_title_cmd(),
-    ),
-    fsm=FSMSpec(
-        name="AgentPlan",
-        initial="draft",
-        states=("draft", "ready", "working", "finished", "blocked", "accepted"),
-        terminal_states=("accepted",),
     ),
 )

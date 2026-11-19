@@ -104,11 +104,12 @@ from src.pagetypes.core.validation import (
 )
 from src.pagetypes._registry import get_page_type
 from src.pagetypes import _stage_guidance
+from src.pagetypes.agent_plan import _AGENT_PLAN
 from src.pagetypes.architecture import _ARCHITECTURE
 from src.pagetypes.bug_report import _BUG_REPORT
 from src.pagetypes.decision_record import _DECISION_RECORD
 from src.pagetypes.document import _DOCUMENT
-from src.pagetypes.epic import _AGENT_PLAN, _EPIC
+from src.pagetypes.epic import _EPIC
 from src.pagetypes.feature import (
     _FEATURE_BRIEF,
     _FEATURE_SPEC,
