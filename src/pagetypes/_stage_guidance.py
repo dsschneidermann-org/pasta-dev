@@ -254,8 +254,8 @@ questions. Present the findings once every investigation page is reported.
 
 DECIDING = """
 deciding - the investigations are in, and this is the conversation that turns them
-into the user's choice and hands it off. It is the one stage where the controller
-talks the work through with them. The work of it:
+into the user's choice. It is the one stage where the controller talks the work
+through with them. The work of it:
 
 - Read each investigation's digest, viability and questions. Where a test result is
   not backed by its evidence, reopen research for that investigation rather than
@@ -269,20 +269,31 @@ talks the work through with them. The work of it:
   your recommendation, and ask which way to go. Each investigator argued for one
   direction, so the comparison is yours. Record the pick as the chosen approach by
   its investigation's page id, and the pick itself as an answered question.
-- Create one feature-brief under this spike's own parent, next to the spike and not
-  under it, titled with the outcome the user wants. Write its summary from this
-  spike's summary, why and outcomes, naming the chosen direction in one sentence, and
-  add each answered question that bears on the build to its questions, answered there
-  in the user's words. Leave it in draft for whoever plans it.
-- Link the brief to this spike with role researched-in, and this spike to the brief
-  with role created-feature.
 - If an answer rules out every direction or changes the ask, reopen research with
   that answer - adding a direction or redispatching an investigation - rather than
-  hand off a stale pick. If the user changes the pick at the gate, archive the brief
-  and create another.
+  hand off a stale pick.
 
-Nothing is specified or planned here. Choosing the approach hands the spike off and
-is a human gate: drive up to it and stop.
+Nothing is specified, planned or created here. Choosing the approach is a human gate:
+drive up to it and stop.
+"""
+
+BRIEFING = """
+briefing - the user has picked a direction at the human gate, and only now is the
+feature-brief created. The spike hands the pick off as one feature-brief for another
+agent to specify, plan and build. The work of it:
+
+- Create one feature-brief under this spike's own parent, next to the spike and not
+  under it, titled with the outcome the user wants.
+- Write its summary from this spike's summary, why and outcomes, naming the chosen
+  direction in one sentence.
+- Add each answered question on this spike that bears on the build to the brief's
+  questions, and answer it there in the user's words - the approach pick among them -
+  so the brief's spec records them and they are not reopened.
+- Link the brief to this spike with role researched-in, so whoever plans it can open
+  the investigations, then link this spike to the brief with role created-feature.
+
+Do not ground, specify or plan the brief, and do not start an agent on it: it is left
+in draft for whoever plans it. Hand off once the created-feature link is in place.
 """
 
 # --- solution-investigation --------------------------------------------------

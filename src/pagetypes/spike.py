@@ -9,6 +9,7 @@ are reusable.
 from __future__ import annotations
 
 from ._stage_guidance import (
+    BRIEFING,
     DECIDING,
     INVESTIGATING,
     RESEARCHING,
@@ -59,7 +60,8 @@ _CONTROLLER_NOTICE = """
     page, reports back onto it, and writes only that page and the solution-investigation page it
     links to with works-on. It never edits this spike or another agent's page. The controller reads
     the investigations' digests rather than the whole pages. Nothing is designed, decomposed or built
-    from this page: it ends by creating one feature-brief next to it for another agent to plan.
+    from this page: once the user has picked, it ends by creating one feature-brief next to it for
+    another agent to plan.
     """
 
 
@@ -160,27 +162,30 @@ _SPIKE = PageType(
         transition_cmd("presentFindings", "researching -> deciding", guards=(
             ChildStateGuard("solution-investigation", ("reported",), "every investigation must be reported"),)),
         transition_cmd("reopenResearch", "deciding -> researching", agency="either"),
-        # A human picks the approach, which also hands the spike off: the agent records the pick,
-        # creates and links the feature-brief, then stops here. The link guard holds the gate until
-        # that brief is linked, live and a feature-brief.
-        transition_cmd("chooseApproach", "deciding -> handedOff (human gate)", agency="human",
-                       requires=(("decision", "chosen"), ("questions", "items")), link_guards=(
+        # A human picks the approach; the agent records it, then stops here. No feature-brief is
+        # created before this gate.
+        transition_cmd("chooseApproach", "deciding -> briefing (human gate)", agency="human",
+                       requires=(("decision", "chosen"), ("questions", "items"))),
+        # The spike hands off only once the feature-brief it created is linked, live and a
+        # feature-brief (a link guard, checked in the store).
+        transition_cmd("handOff", "briefing -> handedOff", link_guards=(
             LinkGuard("created-feature", "feature-brief",
                       "the feature-brief this spike created must be linked with role created-feature"),)),
         transition_cmd("abandon", "drop the work -> abandoned", agency="human",
-                       legal_in=("draft", "researching", "deciding")),
+                       legal_in=("draft", "researching", "deciding", "briefing")),
         add_link_cmd(),
         set_title_cmd(),
     ),
     fsm=FSMSpec(
         name="Spike",
         initial="draft",
-        states=("draft", "researching", "deciding", "handedOff", "abandoned"),
+        states=("draft", "researching", "deciding", "briefing", "handedOff", "abandoned"),
         terminal_states=("handedOff", "abandoned"),
         status_guidance=(
             ("draft", SPIKE_DRAFT),
             ("researching", RESEARCHING),
             ("deciding", DECIDING),
+            ("briefing", BRIEFING),
         ),
     ),
     # The stage in which the controller creates agent-plan pages and launches the agents.
