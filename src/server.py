@@ -9,11 +9,12 @@ from collections.abc import Generator
 from pathlib import Path
 import time
 import traceback
+from urllib.parse import unquote, urlsplit
 
 from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
@@ -322,67 +323,85 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
         )
 
 
+def page_view_after_action(workspace_id_part: str, page_id: str, referer: str | None) -> str:
+    """Where a page action sends the browser: the page view it was posted from, query kept, when
+    the Referer is that page's own view; otherwise the page's plain view."""
+    page_path = f"/ws:{workspace_id_part}/page/{page_id}"
+    if referer:
+        sent_from = urlsplit(referer)
+        if unquote(sent_from.path) == page_path:
+            return f"{page_path}?{sent_from.query}" if sent_from.query else page_path
+    return page_path
+
+
 # Archive/unarchive a page from its web view. These mirror the archivePage / unarchivePage MCP
 # tools (a browser can't call MCP), so the wiki's Archive/Unarchive button POSTs here. Each sends
-# the in-place update and streams its events to timeline tabs like the MCP tools do, then answers
-# 204 No Content: the browser stays on the page, and the update brings the change into this and
-# every other open tab.
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/archive", response_class=PlainTextResponse)
-async def route_archive_page(workspaceIdPart: str, pageId: str):
+# the in-place update and streams its events to timeline tabs like the MCP tools do, then
+# redirects back to the page it was posted from (303), so the posting tab loads it again with a
+# GET and a reload or back button never re-POSTs the change.
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/archive", response_class=RedirectResponse)
+async def route_archive_page(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.archive_page(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=204)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/unarchive", response_class=PlainTextResponse)
-async def route_unarchive_page(workspaceIdPart: str, pageId: str):
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/unarchive", response_class=RedirectResponse)
+async def route_unarchive_page(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unarchive_page(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=204)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
 # Schedule or cancel a page's deletion from its web view, behind the button beside the archive
 # control. Scheduling also archives, so a page queued for deletion is never left in a live view,
 # and the sweep destroys it only once its grace period has passed. Deciding this is a human act in
 # the browser, so there is no MCP counterpart.
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/schedule-delete", response_class=PlainTextResponse)
-async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/schedule-delete", response_class=RedirectResponse)
+async def route_schedule_page_deletion(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.schedule_page_deletion(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=204)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/unschedule-delete", response_class=PlainTextResponse)
-async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/unschedule-delete", response_class=RedirectResponse)
+async def route_unschedule_page_deletion(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=204)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
 # Directly set a page's lifecycle status from its web view. Backs the status dropdown + Apply button
 # next to the Archive control (see page.html): a deliberate FSM-bypassing admin override, so a human
 # can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
-# routes it sends the in-place update and answers 204 (no MCP equivalent - a browser can't call MCP).
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
-async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annotated[str, Form()]):
+# routes it sends the in-place update and redirects back to the page (no MCP equivalent - a browser
+# can't call MCP).
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=RedirectResponse)
+async def route_set_page_status(request: Request, workspaceIdPart: str, pageId: str,
+                                status: Annotated[str, Form()]):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.set_page_status(workspace_id, pageId, status)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=204)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
 # --- FastAPI exception handlers ----------------------------------------------
