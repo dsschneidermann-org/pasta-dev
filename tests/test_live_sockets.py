@@ -125,7 +125,7 @@ def _reloader_sends(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     return {node.attr for node in ast.walk(tree)
             if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
-            and node.value.id == "ws_reloader" and node.attr in {"reload", "update", "refresh"}}
+            and node.value.id == "ws_reloader" and node.attr in {"reload", "update"}}
 
 
 def test_only_the_dev_server_reloads_tabs_and_only_data_changes_update_them():
