@@ -109,10 +109,30 @@ def test_archive_route_archives_and_flips_button(client):
     page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
     part = workspace.id.removeprefix("ws:")
 
-    # POST the Archive button -> 303 redirect -> archived view (TestClient follows the redirect).
+    # POST the Archive button -> 204, so the browser stays on the page and the update brings it in.
     response = client.post(f"/ws:{part}/page/{page.id}/archive")
-    assert response.status_code == 202
+    assert response.status_code == 204
     assert server.STORE.get_page(workspace.id, page.id).archived is True
+
+
+def test_a_page_action_post_leaves_the_browser_in_place_and_updates_open_tabs(client, monkeypatch):
+    sent = []
+
+    async def record_update():
+        sent.append("update")
+
+    async def record_reload():
+        sent.append("reload")
+
+    monkeypatch.setattr(server.ws_reloader, "update", record_update)
+    monkeypatch.setattr(server.ws_reloader, "reload", record_reload)
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    part = workspace.id.removeprefix("ws:")
+    response = client.post(f"/ws:{part}/page/{page.id}/archive")
+    assert response.status_code == 204
+    assert response.content == b""
+    assert sent == ["update"]
 
 
 def test_unarchive_route_restores_page(client):
@@ -122,7 +142,7 @@ def test_unarchive_route_restores_page(client):
     part = workspace.id.removeprefix("ws:")
 
     response = client.post(f"/ws:{part}/page/{page.id}/unarchive")
-    assert response.status_code == 202
+    assert response.status_code == 204
     assert server.STORE.get_page(workspace.id, page.id).archived is False
 
 
@@ -157,7 +177,7 @@ def test_schedule_delete_route_schedules_and_archives(client):
     part = workspace.id.removeprefix("ws:")
 
     response = client.post(f"/ws:{part}/page/{page.id}/schedule-delete")
-    assert response.status_code == 202
+    assert response.status_code == 204
     stored = server.STORE.get_page(workspace.id, page.id)
     assert stored.delete_scheduled is True
     assert stored.archived is True
@@ -170,7 +190,7 @@ def test_unschedule_delete_route_cancels_but_keeps_the_page_archived(client):
     server.STORE.schedule_page_deletion(workspace.id, page.id)
 
     response = client.post(f"/ws:{part}/page/{page.id}/unschedule-delete")
-    assert response.status_code == 202
+    assert response.status_code == 204
     stored = server.STORE.get_page(workspace.id, page.id)
     assert stored.delete_scheduled is False
     assert stored.archived is True
@@ -208,7 +228,7 @@ def test_status_route_sets_state_bypassing_fsm(client):
     part = workspace.id.removeprefix("ws:")
 
     response = client.post(f"/ws:{part}/page/{page.id}/status", data={"status": "closed"})
-    assert response.status_code == 202
+    assert response.status_code == 204
     assert server.STORE.get_page(workspace.id, page.id).status == "closed"
 
 
@@ -268,7 +288,7 @@ def test_a_status_write_streams_its_event_to_a_watching_tab(client, monkeypatch)
     with TestClient(server.app) as live, \
             live.websocket_connect(f"/ws/events/{workspace.id}?since={seen}") as websocket:
         assert websocket.receive_json() == {"events": []}
-        assert live.post(f"/ws:{part}/page/{page.id}/status", data={"status": "open"}).status_code == 202
+        assert live.post(f"/ws:{part}/page/{page.id}/status", data={"status": "open"}).status_code == 204
         streamed = websocket.receive_json()
     [event] = streamed["events"]
     assert (event["event"], event["pageId"], event["from"], event["status"]) == ("status", page.id, "draft", "open")

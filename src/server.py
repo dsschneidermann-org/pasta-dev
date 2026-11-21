@@ -323,9 +323,10 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
 
 
 # Archive/unarchive a page from its web view. These mirror the archivePage / unarchivePage MCP
-# tools (a browser can't call MCP), so the wiki's Archive/Unarchive button POSTs here. Each fires
-# the live-reload refresh and streams its events to timeline tabs like the MCP tools do, then
-# 303-redirects back to the page (GET) so a reload/back-button doesn't re-POST the mutation.
+# tools (a browser can't call MCP), so the wiki's Archive/Unarchive button POSTs here. Each sends
+# the in-place update and streams its events to timeline tabs like the MCP tools do, then answers
+# 204 No Content: the browser stays on the page, and the update brings the change into this and
+# every other open tab.
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/archive", response_class=PlainTextResponse)
 async def route_archive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
@@ -333,7 +334,7 @@ async def route_archive_page(workspaceIdPart: str, pageId: str):
         _ = STORE.archive_page(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return PlainTextResponse(status_code=204)
 
 
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/unarchive", response_class=PlainTextResponse)
@@ -343,7 +344,7 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
         _ = STORE.unarchive_page(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return PlainTextResponse(status_code=204)
 
 
 # Schedule or cancel a page's deletion from its web view, behind the button beside the archive
@@ -357,7 +358,7 @@ async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
         _ = STORE.schedule_page_deletion(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return PlainTextResponse(status_code=204)
 
 
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/unschedule-delete", response_class=PlainTextResponse)
@@ -367,13 +368,13 @@ async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
         _ = STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return PlainTextResponse(status_code=204)
 
 
 # Directly set a page's lifecycle status from its web view. Backs the status dropdown + Apply button
 # next to the Archive control (see page.html): a deliberate FSM-bypassing admin override, so a human
 # can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
-# routes it fires the live-reload refresh and 202s (no MCP equivalent - a browser can't call MCP).
+# routes it sends the in-place update and answers 204 (no MCP equivalent - a browser can't call MCP).
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
 async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annotated[str, Form()]):
     with _guard_http():
@@ -381,7 +382,7 @@ async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annot
         _ = STORE.set_page_status(workspace_id, pageId, status)
         await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return PlainTextResponse(status_code=204)
 
 
 # --- FastAPI exception handlers ----------------------------------------------
