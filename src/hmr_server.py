@@ -4,9 +4,10 @@ Runs one uvicorn server and one file watcher that serve both surfaces of `src.se
 with in-process hot reload - no process respawn:
 
 * FastMCP tools  -> a stable proxy (`base_app`). The reloaded `src.server.mcp`
-  is mounted under it; on a source change the old mount is swapped for the reloaded
-  one and connected MCP client sessions are sent tools/list_changed, so sessions
-  SURVIVE the reload instead of dropping.
+  is mounted under it, and each tool call is run on it directly; on a source
+  change the old mount is swapped for the reloaded one and connected MCP client
+  sessions are sent tools/list_changed, so sessions survive the reload instead
+  of dropping.
 
 * FastAPI HTML   -> a dispatcher that forwards every request to the freshly
   reloaded `src.server.app`. On a source change connected browsers are told to
@@ -23,7 +24,9 @@ refuse until a reload succeeds.
 Two brittleness notes (dev-only tool):
 * It reaches into a few private fastmcp/mcp internals (`base_app.providers` /
   `FastMCPProvider` for mount/unmount, the constructor of `mcp.server.connection.Connection`
-  for connection capture). These changed across fastmcp versions; revisit on a fastmcp upgrade.
+  for connection capture), and relies on a proxy middleware answering tools/call itself, so the
+  proxy's own tool-call path never runs. These changed across fastmcp versions; revisit on a
+  fastmcp upgrade.
 * `src.hmr_server` and `src.live_sockets` are never re-imported, so an edit to
   either needs a restart.
 """
@@ -42,11 +45,14 @@ from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, override
 from weakref import WeakSet
 
+import mcp.types as mt
 import uvicorn
 from fastmcp import FastMCP
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
+from fastmcp.tools import ToolResult
 from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.connection import Connection
 from starlette.applications import Starlette
@@ -206,7 +212,7 @@ async def _notify_list_changed() -> None:
                 await send()
 
 
-# Mounting forwards live calls to `mcp`; each mount appends one FastMCPProvider to
+# Mounting lists `mcp`'s tools on the proxy; each mount appends one FastMCPProvider to
 # base_app.providers, an internal we pop to unmount on the next reload.
 def _mount(base_app: FastMCP, mcp: FastMCP) -> Callable[[], None]:
     """Mount `mcp` under the proxy; return the function that unmounts it again."""
@@ -220,14 +226,50 @@ def _mount(base_app: FastMCP, mcp: FastMCP) -> Callable[[], None]:
     return unmount
 
 
+class _ForwardToolCalls(Middleware):
+    """Run each tool call on the server being served now, so a failure is logged once, by the
+    server that ran it."""
+
+    def __init__(self, served: Callable[[], FastMCP]) -> None:
+        self._served: Callable[[], FastMCP] = served
+
+    @override
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        return await self._served().call_tool(context.message.name, context.message.arguments or {})
+
+
+def _build_proxy(served: Callable[[], FastMCP], identity: FastMCP) -> FastMCP:
+    """The stable MCP proxy: it presents itself to clients as `identity`, lists the tools mounted
+    under it and runs each call on `served()`."""
+    proxy = FastMCP(
+        name=identity.name,
+        instructions=identity.instructions,
+        version=identity.version,
+        website_url=identity.website_url,
+        icons=identity.icons or None,
+    )
+    proxy.add_middleware(_ForwardToolCalls(served))
+    return proxy
+
+
 def build_dev_app() -> Starlette:
     """Build the stable outer ASGI app: /pasta/mcp -> proxy, everything else -> reloaded FastAPI."""
 
-    # The proxy is built ONCE and never rebuilt; only what is mounted under it swaps.
-    base_app: FastMCP = FastMCP(name="pasta-hmr-proxy")
-
     # The src.server module serving now; a reload that imports cleanly replaces it.
     serving: ModuleType | None = None
+
+    def served_mcp() -> FastMCP:
+        assert serving is not None
+        return serving.mcp
+
+    # The proxy is built once and never rebuilt; only what is mounted under it swaps. It takes the
+    # first build's identity, imported here, so a cold start that cannot import fails before uvicorn
+    # binds the port.
+    base_app = _build_proxy(served_mcp, import_module(SCOPE.entry).mcp)
 
     # Only one mount is live at a time; a reload tears the old one down before mounting new.
     mount_lock = Lock()
@@ -299,7 +341,7 @@ def build_dev_app() -> Starlette:
         restore_connection_init = _capture_connections()
         async with TaskGroup() as tg:
             task_group = tg
-            # A cold start that cannot import raises out of here, before uvicorn binds the port.
+            # The build imported when the proxy was built.
             server = import_module(SCOPE.entry)
             await swap_in(server)
             server.cleanup.start_scheduler(server.STORE)

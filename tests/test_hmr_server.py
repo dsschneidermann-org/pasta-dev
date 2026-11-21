@@ -20,7 +20,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from fastmcp import FastMCP
+from fastmcp import Client, FastMCP
+from fastmcp.client.client import CallToolResult
 from mcp.server.connection import Connection
 from websockets.datastructures import Headers
 from websockets.frames import Close
@@ -29,8 +30,8 @@ from websockets.server import ServerProtocol
 
 import src.hmr_server as hmr_server
 from src.live_sockets import reload_failure, set_reload_failure
-from src.hmr_server import (ReloadScope, _mount, _normalise, _report_reload_failure, modules_to_drop,
-                            needs_reimport, reimport, reload_failure_summary)
+from src.hmr_server import (ReloadScope, _build_proxy, _mount, _normalise, _report_reload_failure,
+                            modules_to_drop, needs_reimport, reimport, reload_failure_summary)
 
 
 def test_a_mounted_server_is_served_through_the_proxy_until_unmounted():
@@ -50,6 +51,98 @@ def test_a_mounted_server_is_served_through_the_proxy_until_unmounted():
     assert "ping" in asyncio.run(tool_names())
     unmount()
     assert "ping" not in asyncio.run(tool_names())
+
+
+# The proxy lists the mounted tools but runs every call on the served server itself, so a failure is
+# logged once, by the server that ran it. An upgrade that stops a middleware answering a call on its
+# own shows up here as a line logged twice.
+
+def _served() -> FastMCP:
+    served = FastMCP("served")
+
+    @served.tool
+    def echo(n: int) -> int:
+        return n
+
+    @served.tool
+    def boom() -> int:
+        raise KeyError("missing")
+
+    return served
+
+
+def _proxy_for(served: FastMCP) -> FastMCP:
+    proxy = _build_proxy(lambda: served, served)
+    _ = _mount(proxy, served)
+    return proxy
+
+
+def _call(server: FastMCP, name: str, args: dict[str, object]) -> CallToolResult:
+    async def run() -> CallToolResult:
+        async with Client(server) as client:
+            return await client.call_tool(name, args, raise_on_error=False)
+
+    return asyncio.run(run())
+
+
+def test_a_call_through_the_proxy_returns_the_served_servers_result():
+    result = _call(_proxy_for(_served()), "echo", {"n": 3})
+    assert not result.is_error and result.data == 3
+
+
+def test_an_exception_inside_a_tool_is_logged_once_through_the_proxy(fastmcp_lines):
+    result = _call(_proxy_for(_served()), "boom", {})
+    assert result.is_error
+    assert [block.text for block in result.content] == ["Error calling tool 'boom': 'missing'"]
+    assert fastmcp_lines == ["Error calling tool 'boom'"]
+
+
+def test_invalid_arguments_are_logged_once_through_the_proxy(fastmcp_lines):
+    served = _served()
+    direct = _call(served, "echo", {"n": "not a number"})
+    fastmcp_lines.clear()
+    proxied = _call(_proxy_for(served), "echo", {"n": "not a number"})
+    assert proxied.is_error and proxied.content == direct.content
+    assert fastmcp_lines == [
+        "Invalid arguments for tool 'echo': {'error_count': 1, 'error_types': ['int_parsing']}"]
+
+
+def test_an_unknown_tool_through_the_proxy_is_reported_as_unknown():
+    result = _call(_proxy_for(_served()), "nope", {})
+    assert result.is_error
+    assert [block.text for block in result.content] == ["Unknown tool: 'nope'"]
+
+
+def test_the_proxy_runs_each_call_on_the_server_served_when_it_arrives():
+    first, second = _served(), _served()
+
+    @second.tool
+    def which() -> str:
+        return "second"
+
+    current = [first]
+    proxy = _build_proxy(lambda: current[0], first)
+    _ = _mount(proxy, first)
+    current[0] = second
+    assert _call(proxy, "which", {}).data == "second"
+
+
+SERVER_INFO = "io.modelcontextprotocol/serverInfo"
+
+
+def test_the_proxy_presents_the_served_servers_identity():
+    served = FastMCP("served", instructions="Read the guide first.", version="1.2.3",
+                     website_url="https://example.invalid/served")
+
+    @served.tool
+    def echo(n: int) -> int:
+        return n
+
+    proxy = _proxy_for(served)
+    proxied, direct = _call(proxy, "echo", {"n": 1}), _call(served, "echo", {"n": 1})
+    assert proxied.meta[SERVER_INFO] == direct.meta[SERVER_INFO]
+    assert proxied.meta[SERVER_INFO]["name"] == "served"
+    assert proxy.instructions == served.instructions
 
 
 class _RecordingOutbound:

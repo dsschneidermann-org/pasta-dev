@@ -14,6 +14,9 @@ process is the run. A test that needs the production types asks for the `product
 below.
 """
 
+import logging
+from typing import override
+
 import pytest
 
 from src.event_cache import set_cache_disabled
@@ -79,3 +82,23 @@ def failed_reload():
     set_reload_failure(summary)
     yield summary
     set_reload_failure(None)
+
+
+class _Collect(logging.Handler):
+    def __init__(self):
+        super().__init__(level=logging.INFO)
+        self.lines: list[str] = []
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        self.lines.append(record.getMessage())
+
+
+@pytest.fixture
+def fastmcp_lines():
+    """What FastMCP's own logger prints at its default level; it does not propagate to caplog."""
+    collect = _Collect()
+    fastmcp_logger = logging.getLogger("fastmcp")
+    fastmcp_logger.addHandler(collect)
+    yield collect.lines
+    fastmcp_logger.removeHandler(collect)
