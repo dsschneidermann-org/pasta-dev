@@ -4,9 +4,10 @@ Runs one uvicorn server and one file watcher that serve both surfaces of `src.se
 with in-process hot reload - no process respawn:
 
 * FastMCP tools  -> a stable proxy (`base_app`). The reloaded `src.server.mcp`
-  is mounted under it, and each tool call is run on it directly; on a source change the old mount is swapped for the reloaded
-  one and connected MCP client sessions are sent tools/list_changed, so sessions
-  SURVIVE the reload instead of dropping.
+  is mounted under it, and each tool call is run on it directly; on a source
+  change the old mount is swapped for the reloaded one and connected MCP client
+  sessions are sent tools/list_changed, so sessions SURVIVE the reload instead
+  of dropping.
 
 * FastAPI HTML   -> a dispatcher that forwards every request to the freshly
   reloaded `src.server.app`. On a source change connected browsers are told to
