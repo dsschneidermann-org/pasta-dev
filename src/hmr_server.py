@@ -42,11 +42,14 @@ from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, override
 from weakref import WeakSet
 
+import mcp.types as mt
 import uvicorn
 from fastmcp import FastMCP
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
+from fastmcp.tools import ToolResult
 from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.connection import Connection
 from starlette.applications import Starlette
@@ -220,10 +223,27 @@ def _mount(base_app: FastMCP, mcp: FastMCP) -> Callable[[], None]:
     return unmount
 
 
+class _ForwardToolCalls(Middleware):
+    """Run each tool call on the server being served now, so the proxy's own tool-call path never
+    runs: it would catch and log every failure again after the served server has logged it."""
+
+    def __init__(self, served: Callable[[], FastMCP]) -> None:
+        self._served: Callable[[], FastMCP] = served
+
+    @override
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        return await self._served().call_tool(context.message.name, context.message.arguments or {})
+
+
 def _build_proxy(served: Callable[[], FastMCP]) -> FastMCP:
     """The stable MCP proxy: it lists the tools mounted under it and runs each call on `served()`."""
-    _ = served
-    return FastMCP(name="pasta-hmr-proxy")
+    proxy = FastMCP(name="pasta-hmr-proxy")
+    proxy.add_middleware(_ForwardToolCalls(served))
+    return proxy
 
 
 def build_dev_app() -> Starlette:

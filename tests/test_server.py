@@ -12,11 +12,11 @@ import asyncio
 import logging
 
 import pytest
-from fastmcp import Client, FastMCP
+from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 import src.server as server
-from src.hmr_server import _mount
+from src.hmr_server import _build_proxy, _mount
 from src.live_sockets import EventStream
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.store import Store
@@ -394,7 +394,7 @@ def test_status_revision_surfaced_and_echoed_via_server(mcp):
 
 # --- Failed tool calls on the console ----------------------------------------
 # A failed call is told to its caller and logged once with the same reason. The dev server serves
-# this server mounted under a proxy, so a call there passes through two FastMCP servers.
+# this server behind a proxy.
 
 def _console_lines(caplog: pytest.LogCaptureFixture) -> list[str]:
     return [record.getMessage() for record in caplog.records if record.name == "uvicorn.error"]
@@ -413,11 +413,22 @@ def test_a_failed_tool_call_is_logged_once_with_its_reason(mcp, caplog, fastmcp_
 
 def test_a_failed_tool_call_through_the_dev_proxy_is_logged_once_with_its_reason(
         mcp, caplog, fastmcp_lines):
-    proxy = FastMCP("proxy")
+    proxy = _build_proxy(lambda: mcp)
     _ = _mount(proxy, mcp)
     with caplog.at_level(logging.INFO, logger="uvicorn.error"), pytest.raises(ToolError):
         call(proxy, "mutatePageBatch", EMPTY_BATCH)
     assert _console_lines(caplog) == [EMPTY_BATCH_LINE]
+    assert fastmcp_lines == []
+
+
+def test_a_refused_call_through_the_dev_proxy_is_logged_once_with_its_reason(
+        mcp, caplog, fastmcp_lines, failed_reload):
+    proxy = _build_proxy(lambda: mcp)
+    _ = _mount(proxy, mcp)
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"), pytest.raises(ToolError):
+        call(proxy, "listWorkspaces")
+    lines = _console_lines(caplog)
+    assert len(lines) == 1 and lines[0].startswith("[MCP] listWorkspaces failed: The last hot reload failed")
     assert fastmcp_lines == []
 
 
