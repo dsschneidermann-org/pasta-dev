@@ -411,11 +411,10 @@ app.mount("/pasta", mcp_app)  # MCP endpoint at /pasta/mcp
 
 
 class _PastaToolError(ToolError):
-    """An expected failure, told to the caller and logged once with its reason by `_LogToolFailures`.
+    """An expected failure: told to the caller, and logged once with its reason by middleware.
 
     FastMCP logs a raised tool error by the tool's name alone, at the error's own level, once for
-    every server the call passes through. Raised below the level FastMCP's logger prints, it leaves
-    the logging to the middleware, which has the reason.
+    every server the call passes through, so this one is raised below the level FastMCP prints.
     """
 
     def __init__(self, message: str) -> None:
@@ -424,7 +423,7 @@ class _PastaToolError(ToolError):
 
 class _LogToolFailures(Middleware):
     """Put each expected tool failure on the console once, naming the tool and the reason the caller
-    was given. Added first, so it is the outermost middleware and sees the refusals below too."""
+    was given. Added first, so failures raised by the other middleware reach it too."""
 
     @override
     async def on_call_tool(
