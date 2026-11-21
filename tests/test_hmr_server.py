@@ -127,6 +127,24 @@ def test_the_proxy_runs_each_call_on_the_server_served_when_it_arrives():
     assert _call(proxy, "which", {}).data == "second"
 
 
+SERVER_INFO = "io.modelcontextprotocol/serverInfo"
+
+
+def test_the_proxy_presents_the_served_servers_identity():
+    served = FastMCP("served", instructions="Read the guide first.", version="1.2.3",
+                     website_url="https://example.invalid/served")
+
+    @served.tool
+    def echo(n: int) -> int:
+        return n
+
+    proxy = _proxy_for(served)
+    proxied, direct = _call(proxy, "echo", {"n": 1}), _call(served, "echo", {"n": 1})
+    assert proxied.meta[SERVER_INFO] == direct.meta[SERVER_INFO]
+    assert proxied.meta[SERVER_INFO]["name"] == "served"
+    assert proxy.instructions == served.instructions
+
+
 class _RecordingOutbound:
     """Stands in for a client's standalone stream, recording each notification sent down it."""
 

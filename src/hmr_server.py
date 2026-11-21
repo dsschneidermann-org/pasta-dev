@@ -245,8 +245,13 @@ class _ForwardToolCalls(Middleware):
 def _build_proxy(served: Callable[[], FastMCP], identity: FastMCP) -> FastMCP:
     """The stable MCP proxy: it presents itself to clients as `identity`, lists the tools mounted
     under it and runs each call on `served()`."""
-    _ = identity
-    proxy = FastMCP(name="pasta-hmr-proxy")
+    proxy = FastMCP(
+        name=identity.name,
+        instructions=identity.instructions,
+        version=identity.version,
+        website_url=identity.website_url,
+        icons=identity.icons or None,
+    )
     proxy.add_middleware(_ForwardToolCalls(served))
     return proxy
 
