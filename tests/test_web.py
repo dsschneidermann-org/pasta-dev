@@ -262,6 +262,17 @@ def test_the_theme_choice_is_kept_out_of_the_morph(client):
     assert 'id="theme-dark" data-morph-keep="checked"' in text
 
 
+def test_the_view_toggle_state_is_kept_out_of_the_morph(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    text = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/page/{page.id}").text
+    assert 'id="show-page" data-morph-keep="aria-pressed"' in text
+    assert 'id="show-model" data-morph-keep="aria-pressed"' in text
+    assert 'id="view-body" data-morph-keep="class"' in text
+    assert 'id="model-view" data-morph-keep="src hidden"' in text
+    assert 'modelView.getAttribute("src") !== modelView.dataset.src' in text
+
+
 def _shipped_feature_log(workspace_id: str) -> None:
     page_id = "feature-brief:mrw7chrt-def44a"
     server.STORE.events_path(workspace_id).write_text(to_jsonl([

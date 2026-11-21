@@ -11,8 +11,9 @@ function initViewToggle() {
   }
 
   const showModel = function () {
-    // Lazy-load the page-type doc the first time Model is opened.
-    if (!modelView.src) {
+    // Load the page-type doc on open whenever it is not the one data-src names: the first open, or
+    // after the page's status changed in place.
+    if (modelView.getAttribute("src") !== modelView.dataset.src) {
       modelView.src = modelView.dataset.src;
     }
     viewBody.classList.add("model-active");
