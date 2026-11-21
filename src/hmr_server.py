@@ -242,8 +242,10 @@ class _ForwardToolCalls(Middleware):
         return await self._served().call_tool(context.message.name, context.message.arguments or {})
 
 
-def _build_proxy(served: Callable[[], FastMCP]) -> FastMCP:
-    """The stable MCP proxy: it lists the tools mounted under it and runs each call on `served()`."""
+def _build_proxy(served: Callable[[], FastMCP], identity: FastMCP) -> FastMCP:
+    """The stable MCP proxy: it presents itself to clients as `identity`, lists the tools mounted
+    under it and runs each call on `served()`."""
+    _ = identity
     proxy = FastMCP(name="pasta-hmr-proxy")
     proxy.add_middleware(_ForwardToolCalls(served))
     return proxy
@@ -259,8 +261,10 @@ def build_dev_app() -> Starlette:
         assert serving is not None
         return serving.mcp
 
-    # The proxy is built once and never rebuilt; only what is mounted under it swaps.
-    base_app = _build_proxy(served_mcp)
+    # The proxy is built once and never rebuilt; only what is mounted under it swaps. It takes the
+    # first build's identity, imported here, so a cold start that cannot import fails before uvicorn
+    # binds the port.
+    base_app = _build_proxy(served_mcp, import_module(SCOPE.entry).mcp)
 
     # Only one mount is live at a time; a reload tears the old one down before mounting new.
     mount_lock = Lock()
@@ -332,7 +336,7 @@ def build_dev_app() -> Starlette:
         restore_connection_init = _capture_connections()
         async with TaskGroup() as tg:
             task_group = tg
-            # A cold start that cannot import raises out of here, before uvicorn binds the port.
+            # The build imported when the proxy was built.
             server = import_module(SCOPE.entry)
             await swap_in(server)
             server.cleanup.start_scheduler(server.STORE)

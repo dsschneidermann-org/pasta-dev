@@ -72,7 +72,7 @@ def _served() -> FastMCP:
 
 
 def _proxy_for(served: FastMCP) -> FastMCP:
-    proxy = _build_proxy(lambda: served)
+    proxy = _build_proxy(lambda: served, served)
     _ = _mount(proxy, served)
     return proxy
 
@@ -121,7 +121,7 @@ def test_the_proxy_runs_each_call_on_the_server_served_when_it_arrives():
         return "second"
 
     current = [first]
-    proxy = _build_proxy(lambda: current[0])
+    proxy = _build_proxy(lambda: current[0], first)
     _ = _mount(proxy, first)
     current[0] = second
     assert _call(proxy, "which", {}).data == "second"

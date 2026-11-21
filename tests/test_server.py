@@ -413,7 +413,7 @@ def test_a_failed_tool_call_is_logged_once_with_its_reason(mcp, caplog, fastmcp_
 
 def test_a_failed_tool_call_through_the_dev_proxy_is_logged_once_with_its_reason(
         mcp, caplog, fastmcp_lines):
-    proxy = _build_proxy(lambda: mcp)
+    proxy = _build_proxy(lambda: mcp, mcp)
     _ = _mount(proxy, mcp)
     with caplog.at_level(logging.INFO, logger="uvicorn.error"), pytest.raises(ToolError):
         call(proxy, "mutatePageBatch", EMPTY_BATCH)
@@ -423,7 +423,7 @@ def test_a_failed_tool_call_through_the_dev_proxy_is_logged_once_with_its_reason
 
 def test_a_refused_call_through_the_dev_proxy_is_logged_once_with_its_reason(
         mcp, caplog, fastmcp_lines, failed_reload):
-    proxy = _build_proxy(lambda: mcp)
+    proxy = _build_proxy(lambda: mcp, mcp)
     _ = _mount(proxy, mcp)
     with caplog.at_level(logging.INFO, logger="uvicorn.error"), pytest.raises(ToolError):
         call(proxy, "listWorkspaces")
