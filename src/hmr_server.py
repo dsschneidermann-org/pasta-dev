@@ -4,7 +4,7 @@ Runs one uvicorn server and one file watcher that serve both surfaces of `src.se
 with in-process hot reload - no process respawn:
 
 * FastMCP tools  -> a stable proxy (`base_app`). The reloaded `src.server.mcp`
-  is mounted under it; on a source change the old mount is swapped for the reloaded
+  is mounted under it, and each tool call is run on it directly; on a source change the old mount is swapped for the reloaded
   one and connected MCP client sessions are sent tools/list_changed, so sessions
   SURVIVE the reload instead of dropping.
 
@@ -23,7 +23,9 @@ refuse until a reload succeeds.
 Two brittleness notes (dev-only tool):
 * It reaches into a few private fastmcp/mcp internals (`base_app.providers` /
   `FastMCPProvider` for mount/unmount, the constructor of `mcp.server.connection.Connection`
-  for connection capture). These changed across fastmcp versions; revisit on a fastmcp upgrade.
+  for connection capture), and relies on a proxy middleware answering tools/call itself, so the
+  proxy's own tool-call path never runs. These changed across fastmcp versions; revisit on a
+  fastmcp upgrade.
 * `src.hmr_server` and `src.live_sockets` are never re-imported, so an edit to
   either needs a restart.
 """
@@ -209,7 +211,7 @@ async def _notify_list_changed() -> None:
                 await send()
 
 
-# Mounting forwards live calls to `mcp`; each mount appends one FastMCPProvider to
+# Mounting lists `mcp`'s tools on the proxy; each mount appends one FastMCPProvider to
 # base_app.providers, an internal we pop to unmount on the next reload.
 def _mount(base_app: FastMCP, mcp: FastMCP) -> Callable[[], None]:
     """Mount `mcp` under the proxy; return the function that unmounts it again."""
