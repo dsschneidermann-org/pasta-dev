@@ -28,7 +28,7 @@ from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .event_cache import page_events
-from .hmr_live_refresh import reload_failure, ws_events, ws_reloader
+from .live_sockets import reload_failure, ws_events, ws_reloader
 from .instructions import render_instructions
 from .pagetypes._registry import (
     declaration_errors,
@@ -140,7 +140,7 @@ async def add_no_cache_headers(request: Request, call_next: RequestResponseEndpo
 
 
 # --- Websocket reloader ------------------------------------------------------
-# The browser-facing connection manager (`ws_reloader`) lives in src.hmr_live_refresh so its
+# The browser-facing connection manager (`ws_reloader`) lives in src.live_sockets so its
 # live connections survive hot reloads. Under hot-module-reload (src.hmr_server) the
 # refresh is fired on file changes; the mutation tools below also fire it on data changes.
 
@@ -162,7 +162,7 @@ async def fastapi_reloader(websocket: WebSocket):
 
 
 # --- Websocket events --------------------------------------------------------
-# The timeline tabs' connection manager (`ws_events`) lives in src.hmr_live_refresh beside the
+# The timeline tabs' connection manager (`ws_events`) lives in src.live_sockets beside the
 # reloader's, so its live connections survive hot reloads. The writes below that log lifecycle
 # events publish them to it, each with the timeline rebuilt to include them.
 

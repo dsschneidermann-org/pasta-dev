@@ -17,8 +17,8 @@ from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
 
 import src.server as server
-from src.hmr_live_refresh import EventStream
 from src.hmr_server import _mount
+from src.live_sockets import EventStream
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.store import Store
 
@@ -500,7 +500,7 @@ def test_the_reload_refusal_names_the_error_and_the_reload_log(mcp, failed_reloa
 
 
 def test_tool_calls_run_again_once_a_reload_succeeds(mcp, failed_reload):
-    from src.hmr_live_refresh import set_reload_failure
+    from src.live_sockets import set_reload_failure
     set_reload_failure(None)
     assert call(mcp, "listWorkspaces") == []
 

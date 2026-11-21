@@ -1,9 +1,9 @@
-"""Unit tests for the timeline's events connection manager (src.hmr_live_refresh): which tabs a
+"""Unit tests for the timeline's events connection manager (src.live_sockets): which tabs a
 publish reaches, which events each is sent, and how a dead or closed tab leaves."""
 
 import asyncio
 
-from src.hmr_live_refresh import EventsConnectionManager
+from src.live_sockets import EventsConnectionManager
 
 TIMELINE = {"duration": 1.0, "lines": []}
 

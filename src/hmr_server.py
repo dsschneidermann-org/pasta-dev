@@ -24,7 +24,7 @@ Two brittleness notes (dev-only tool):
 * It reaches into a few private fastmcp/mcp internals (`base_app.providers` /
   `FastMCPProvider` for mount/unmount, the constructor of `mcp.server.connection.Connection`
   for connection capture). These changed across fastmcp versions; revisit on a fastmcp upgrade.
-* `src.hmr_server` and `src.hmr_live_refresh` are never re-imported, so an edit to
+* `src.hmr_server` and `src.live_sockets` are never re-imported, so an edit to
   either needs a restart.
 """
 
@@ -54,7 +54,7 @@ from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
 from watchfiles import awatch  # pyright: ignore[reportUnknownVariableType]
 
-from .hmr_live_refresh import set_reload_failure, ws_reloader
+from .live_sockets import set_reload_failure, ws_reloader
 
 # The module a reload imports through; it pulls in the rest of the package.
 TARGET_MODULE = "src.server"
@@ -96,7 +96,7 @@ class ReloadScope:
 SCOPE = ReloadScope(
     package="src",
     entry=TARGET_MODULE,
-    always_kept=frozenset({"src.hmr_server", "src.hmr_live_refresh"}),
+    always_kept=frozenset({"src.hmr_server", "src.live_sockets"}),
     kept_unless_changed=frozenset({"src.event_cache", "src._hmr_debug"}),
 )
 

@@ -28,7 +28,7 @@ from websockets.http11 import Request
 from websockets.server import ServerProtocol
 
 import src.hmr_server as hmr_server
-from src.hmr_live_refresh import reload_failure, set_reload_failure
+from src.live_sockets import reload_failure, set_reload_failure
 from src.hmr_server import (ReloadScope, _mount, _normalise, _report_reload_failure, modules_to_drop,
                             needs_reimport, reimport, reload_failure_summary)
 

@@ -74,7 +74,7 @@ def invalid_declarations(monkeypatch):
 def failed_reload():
     """Record a failed hot reload the way the dev server does, and clear it afterwards. Returns the
     summary the refusals must quote."""
-    from src.hmr_live_refresh import set_reload_failure
+    from src.live_sockets import set_reload_failure
     summary = "ImportError: cannot import name 'DECOMPOSITION' from 'src.pagetypes._stage_guidance'"
     set_reload_failure(summary)
     yield summary
