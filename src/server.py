@@ -410,6 +410,35 @@ async def http_exception_handler(request: Request, exc: InternalError):
 app.mount("/pasta", mcp_app)  # MCP endpoint at /pasta/mcp
 
 
+class _PastaToolError(ToolError):
+    """An expected failure, told to the caller and logged once with its reason by `_LogToolFailures`.
+
+    FastMCP logs a raised tool error by the tool's name alone, at the error's own level, once for
+    every server the call passes through. Raised below the level FastMCP's logger prints, it leaves
+    the logging to the middleware, which has the reason.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, log_level=logging.DEBUG)
+
+
+class _LogToolFailures(Middleware):
+    """Put each expected tool failure on the console once, naming the tool and the reason the caller
+    was given. Added first, so it is the outermost middleware and sees the refusals below too."""
+
+    @override
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        try:
+            return await call_next(context)
+        except _PastaToolError as exc:
+            logger.warning("[MCP] %s failed: %s", context.message.name, exc)
+            raise
+
+
 class _RefuseInvalidDeclarations(Middleware):
     """The tool-call half of the declaration quarantine above.
 
@@ -434,18 +463,19 @@ class _RefuseInvalidDeclarations(Middleware):
         # traceback behind these errors, which the aggregated message deliberately does not carry.
         from ._hmr_debug import LOG_PATH
         if failure is not None:
-            raise ToolError(
+            raise _PastaToolError(
                 "The last hot reload failed, so this server is refusing to serve out of the build " +
                 f"loaded before it:\n{failure}\n" +
                 f"The full reload traceback is at {LOG_PATH}.\n" +
                 "Fix the error and save; the next reload that succeeds restores the tools.")
-        raise ToolError(
+        raise _PastaToolError(
             "The page-type declarations are invalid, so this server is refusing to serve rather " +
             f"than answer out of them:\n{errors}\n" +
             f"The full reload traceback is at {LOG_PATH}.\n" +
             "Fix the declaration and save; the reload restores the tools.")
 
 
+mcp.add_middleware(_LogToolFailures())
 mcp.add_middleware(_RefuseInvalidDeclarations())
 
 
@@ -455,7 +485,7 @@ def _guard_tool() -> Generator[None]:
     try:
         yield
     except PastaError as exc:
-        raise ToolError(str(exc)) from exc
+        raise _PastaToolError(str(exc)) from exc
 
 
 # --- Reads -------------------------------------------------------------------
@@ -499,7 +529,7 @@ async def describePageType(type: str) -> dict[str, Any]:
     with _guard_tool():
         page_type = get_page_type(type)
         if page_type is None:
-            raise ToolError(
+            raise _PastaToolError(
                 f"Unknown page type '{type}'. Registered: {', '.join(registered_pagetypes())}.")
         return describe_page_type(page_type)
 
@@ -518,7 +548,7 @@ async def describeMutations(workspaceId: str, pageId: str) -> dict[str, Any]:
         page = STORE.get_page(workspaceId, pageId)
         page_type = get_page_type(page.type)
         if page_type is None:
-            raise ToolError(f"Page '{pageId}' has unregistered type '{page.type}'.")
+            raise _PastaToolError(f"Page '{pageId}' has unregistered type '{page.type}'.")
         return {
             "pageId": page.id,
             "type": page.type,

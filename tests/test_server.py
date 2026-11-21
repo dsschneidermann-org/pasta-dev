@@ -9,13 +9,16 @@ advertised surface a real client sees, since the fixtures are hidden from discov
 """
 
 import asyncio
+import logging
+from typing import override
 
 import pytest
-from fastmcp import Client
+from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
 
 import src.server as server
 from src.hmr_live_refresh import EventStream
+from src.hmr_server import _mount
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.store import Store
 
@@ -388,6 +391,55 @@ def test_status_revision_surfaced_and_echoed_via_server(mcp):
         call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": created["id"],
                                       "commands": [{"command": "close",
                                                     "args": {"statusRevisionToken": "nope", "sha": "a", "message": "m"}}]})
+
+
+# --- Failed tool calls on the console ----------------------------------------
+# A failed call is told to its caller and logged once with the same reason. The dev server serves
+# this server mounted under a proxy, so a call there passes through two FastMCP servers.
+
+class _Collect(logging.Handler):
+    def __init__(self):
+        super().__init__(level=logging.INFO)
+        self.lines: list[str] = []
+
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
+        self.lines.append(record.getMessage())
+
+
+@pytest.fixture
+def fastmcp_lines():
+    """What FastMCP's own logger prints at its default level; it does not propagate to caplog."""
+    collect = _Collect()
+    fastmcp_logger = logging.getLogger("fastmcp")
+    fastmcp_logger.addHandler(collect)
+    yield collect.lines
+    fastmcp_logger.removeHandler(collect)
+
+
+def _console_lines(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [record.getMessage() for record in caplog.records if record.name == "uvicorn.error"]
+
+
+EMPTY_BATCH = {"workspaceId": "ws:none", "pageId": "p", "commands": []}
+EMPTY_BATCH_LINE = "[MCP] mutatePageBatch failed: mutatePageBatch requires at least one command."
+
+
+def test_a_failed_tool_call_is_logged_once_with_its_reason(mcp, caplog, fastmcp_lines):
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"), pytest.raises(ToolError):
+        call(mcp, "mutatePageBatch", EMPTY_BATCH)
+    assert _console_lines(caplog) == [EMPTY_BATCH_LINE]
+    assert fastmcp_lines == []
+
+
+def test_a_failed_tool_call_through_the_dev_proxy_is_logged_once_with_its_reason(
+        mcp, caplog, fastmcp_lines):
+    proxy = FastMCP("proxy")
+    _ = _mount(proxy, mcp)
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"), pytest.raises(ToolError):
+        call(proxy, "mutatePageBatch", EMPTY_BATCH)
+    assert _console_lines(caplog) == [EMPTY_BATCH_LINE]
+    assert fastmcp_lines == []
 
 
 # --- Declaration quarantine --------------------------------------------------
