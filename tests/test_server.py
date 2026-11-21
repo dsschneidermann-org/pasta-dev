@@ -10,7 +10,6 @@ advertised surface a real client sees, since the fixtures are hidden from discov
 
 import asyncio
 import logging
-from typing import override
 
 import pytest
 from fastmcp import Client, FastMCP
@@ -396,26 +395,6 @@ def test_status_revision_surfaced_and_echoed_via_server(mcp):
 # --- Failed tool calls on the console ----------------------------------------
 # A failed call is told to its caller and logged once with the same reason. The dev server serves
 # this server mounted under a proxy, so a call there passes through two FastMCP servers.
-
-class _Collect(logging.Handler):
-    def __init__(self):
-        super().__init__(level=logging.INFO)
-        self.lines: list[str] = []
-
-    @override
-    def emit(self, record: logging.LogRecord) -> None:
-        self.lines.append(record.getMessage())
-
-
-@pytest.fixture
-def fastmcp_lines():
-    """What FastMCP's own logger prints at its default level; it does not propagate to caplog."""
-    collect = _Collect()
-    fastmcp_logger = logging.getLogger("fastmcp")
-    fastmcp_logger.addHandler(collect)
-    yield collect.lines
-    fastmcp_logger.removeHandler(collect)
-
 
 def _console_lines(caplog: pytest.LogCaptureFixture) -> list[str]:
     return [record.getMessage() for record in caplog.records if record.name == "uvicorn.error"]
