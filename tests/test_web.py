@@ -244,6 +244,12 @@ def test_reloader_websocket_sends_refresh(client):
         assert websocket.receive_json() == {"refresh": 0}   # heartbeat on connect
 
 
+def test_the_vendored_morph_library_is_served_locally(client):
+    response = client.get("/static/idiomorph/idiomorph.min.js")
+    assert response.status_code == 200
+    assert "Idiomorph" in response.text
+
+
 def _shipped_feature_log(workspace_id: str) -> None:
     page_id = "feature-brief:mrw7chrt-def44a"
     server.STORE.events_path(workspace_id).write_text(to_jsonl([
