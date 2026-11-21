@@ -57,7 +57,7 @@ function main() {
       } else if (data.update === 1) {
         update();
       } else if (data.heartbeat !== 1) {
-        console.error(`Reloader not handling data: '${data}'`);
+        console.error(`Reloader not handling data: '${event.data}'`);
       }
     }
 
