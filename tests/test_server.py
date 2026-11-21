@@ -577,3 +577,19 @@ def test_mcp_writes_stream_their_events_to_a_watching_tab(mcp):
     assert [[event["event"] for event in message["events"]] for message in tab.sent] == \
         [["created"], ["status"], ["archived"]]
     assert all("timeline" in message for message in tab.sent)
+
+
+def test_an_mcp_write_updates_open_tabs_in_place_and_never_reloads_them(mcp, monkeypatch):
+    sent = []
+
+    async def record_update():
+        sent.append("update")
+
+    async def record_reload():
+        sent.append("reload")
+
+    monkeypatch.setattr(server.ws_reloader, "update", record_update)
+    monkeypatch.setattr(server.ws_reloader, "reload", record_reload)
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-fields", "title": "A page"})
+    assert sent == ["update", "update"]

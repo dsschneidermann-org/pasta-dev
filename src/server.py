@@ -141,8 +141,8 @@ async def add_no_cache_headers(request: Request, call_next: RequestResponseEndpo
 
 # --- Websocket reloader ------------------------------------------------------
 # The browser-facing connection manager (`ws_reloader`) lives in src.live_sockets so its
-# live connections survive hot reloads. Under hot-module-reload (src.hmr_server) the
-# refresh is fired on file changes; the mutation tools below also fire it on data changes.
+# live connections survive hot reloads. Under hot-module-reload (src.hmr_server) a file change
+# makes every tab reload itself; the mutation tools below make every tab update in place instead.
 
 @app.websocket("/ws/reloader")
 async def fastapi_reloader(websocket: WebSocket):
@@ -331,7 +331,7 @@ async def route_archive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.archive_page(workspace_id, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
@@ -341,7 +341,7 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unarchive_page(workspace_id, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
@@ -355,7 +355,7 @@ async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.schedule_page_deletion(workspace_id, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
@@ -365,7 +365,7 @@ async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unschedule_page_deletion(workspace_id, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
@@ -379,7 +379,7 @@ async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annot
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.set_page_status(workspace_id, pageId, status)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
         return PlainTextResponse(status_code=202)
 
@@ -609,7 +609,7 @@ async def createWorkspace(name: str) -> dict[str, str]:
     """Create a new workspace and return its id."""
     with _guard_tool():
         workspace = STORE.create_workspace(name)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": workspace.id, "name": workspace.name, "status": workspace.status}
 
 
@@ -625,7 +625,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         page = result.page
         next_actions = STORE.next_actions(workspaceId, page.id)
         _record_guidance_emitted(workspaceId, page.id)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspaceId)
         return {
             "id": page.id,
@@ -668,7 +668,7 @@ async def mutatePageBatch(
             omit_stage_guidance=not emit_in_full)
         if emit_in_full:
             _record_guidance_emitted(workspaceId, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspaceId)
         return {
             "pageId": page.id,
@@ -700,7 +700,7 @@ async def setWorkspaceGuidance(workspaceId: str, field: str, text: str) -> dict[
     """
     with _guard_tool():
         workspace = STORE.set_workspace_guidance(workspaceId, field, text)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"workspaceId": workspace.id, "field": field,
                 "guidanceConfig": dict(workspace.guidance_config)}
 
@@ -711,7 +711,7 @@ async def archiveWorkspace(workspaceId: str) -> dict[str, str]:
     """Archive a whole workspace - mark it archived in listings. Reversible; pages preserved."""
     with _guard_tool():
         workspace = STORE.archive_workspace(workspaceId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": workspace.id, "name": workspace.name, "status": workspace.status}
 
 
@@ -720,7 +720,7 @@ async def unarchiveWorkspace(workspaceId: str) -> dict[str, str]:
     """Unarchive a previously archived workspace - restore it to active. Runnable while archived."""
     with _guard_tool():
         workspace = STORE.unarchive_workspace(workspaceId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": workspace.id, "name": workspace.name, "status": workspace.status}
 
 
@@ -730,7 +730,7 @@ async def archivePage(workspaceId: str, pageId: str) -> dict[str, Any]:
     while archived (unarchive first). Reversible."""
     with _guard_tool():
         page = STORE.archive_page(workspaceId, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspaceId)
         return {"id": page.id, "archived": page.archived}
 
@@ -740,7 +740,7 @@ async def unarchivePage(workspaceId: str, pageId: str) -> dict[str, Any]:
     """Unarchive a page - restore it to default tree views. Lifecycle status is unchanged."""
     with _guard_tool():
         page = STORE.unarchive_page(workspaceId, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspaceId)
         return {"id": page.id, "archived": page.archived}
 
@@ -755,7 +755,7 @@ async def reparentPage(
     the page or one of its descendants). Sibling titles are not reserved."""
     with _guard_tool():
         page, sibling_ids = STORE.reparent_page(workspaceId, pageId, newParentId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "parentId": page.parent_id, "siblingIds": sibling_ids}
 
 
@@ -768,7 +768,7 @@ async def reorderPage(
     the front). A drifted index or a mismatched precedingId is rejected as a stale read."""
     with _guard_tool():
         page, sibling_ids = STORE.reorder_page(workspaceId, pageId, toIndex, precedingId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "parentId": page.parent_id, "siblingIds": sibling_ids}
 
 
@@ -779,7 +779,7 @@ async def renamePage(workspaceId: str, pageId: str, title: str) -> dict[str, Any
     pages. Rejects a blank title."""
     with _guard_tool():
         page = STORE.rename_page(workspaceId, pageId, title)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "title": page.title}
 
 
@@ -792,7 +792,7 @@ async def link(workspaceId: str, fromId: str, toId: str, role: str) -> dict[str,
     (toId, role) edge."""
     with _guard_tool():
         page, links = STORE.link_page(workspaceId, fromId, toId, role)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "links": links}
 
 
@@ -802,7 +802,7 @@ async def unlink(workspaceId: str, fromId: str, toId: str, role: str) -> dict[st
     archived source, or an edge that isn't present."""
     with _guard_tool():
         page, links = STORE.unlink_page(workspaceId, fromId, toId, role)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "links": links}
 
 

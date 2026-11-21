@@ -10,7 +10,7 @@ with in-process hot reload - no process respawn:
 
 * FastAPI HTML   -> a dispatcher that forwards every request to the freshly
   reloaded `src.server.app`. On a source change connected browsers are told to
-  reload over the existing /ws/reloader WebSocket (`ws_reloader.refresh`).
+  reload over the existing /ws/reloader WebSocket (`ws_reloader.reload`).
 
 This merges the two reference patterns - uvicorn-hmr (serve a reloaded ASGI app +
 browser refresh) and mcp-hmr (stable proxy + session-preserving tool swap) - into
@@ -287,7 +287,7 @@ def build_dev_app() -> Starlette:
                 except Exception as error:  # a failed swap must not end the watcher
                     set_reload_failure(reload_failure_summary(error))
                     _report_reload_failure(error)
-            await ws_reloader.refresh()
+            await ws_reloader.reload()
 
     # /pasta/mcp is served by the stable proxy's ASGI app (built once). Its session manager is
     # started by mcp_asgi.lifespan; the reloader lifespan drives module reloads + mounts.

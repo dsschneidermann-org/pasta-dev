@@ -2,7 +2,9 @@
 which tabs a timeline publish reaches, which events each is sent, and how a dead or closed tab
 leaves."""
 
+import ast
 import asyncio
+from pathlib import Path
 
 from src.live_sockets import EventsConnectionManager, ReloaderConnectionManager
 
@@ -114,3 +116,18 @@ def test_a_tab_that_is_gone_is_dropped_and_the_others_still_hear():
     asyncio.run(manager.reload())
     assert manager.active == [live]
     assert live.sent == ['{"refresh": 2}', '{"refresh": 1}']
+
+
+SRC = Path(__file__).resolve().parent.parent / "src"
+
+
+def _reloader_sends(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {node.attr for node in ast.walk(tree)
+            if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+            and node.value.id == "ws_reloader" and node.attr in {"reload", "update", "refresh"}}
+
+
+def test_only_the_dev_server_reloads_tabs_and_only_data_changes_update_them():
+    senders = {path.name: sends for path in SRC.rglob("*.py") if (sends := _reloader_sends(path))}
+    assert senders == {"hmr_server.py": {"reload"}, "server.py": {"update"}}
