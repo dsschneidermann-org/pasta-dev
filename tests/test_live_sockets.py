@@ -1,9 +1,10 @@
-"""Unit tests for the timeline's events connection manager (src.live_sockets): which tabs a
-publish reaches, which events each is sent, and how a dead or closed tab leaves."""
+"""Unit tests for the live browser sockets (src.live_sockets): what the reloader tells every tab,
+which tabs a timeline publish reaches, which events each is sent, and how a dead or closed tab
+leaves."""
 
 import asyncio
 
-from src.live_sockets import EventsConnectionManager
+from src.live_sockets import EventsConnectionManager, ReloaderConnectionManager
 
 TIMELINE = {"duration": 1.0, "lines": []}
 
@@ -71,3 +72,45 @@ def test_disconnect_removes_a_tab_and_is_idempotent():
     manager.disconnect(socket)  # pyright: ignore[reportArgumentType]
     assert manager.active == []
     assert not manager.watching("ws:a")
+
+
+class TextSocket:
+    def __init__(self, dead: bool = False):
+        self.dead = dead
+        self.sent: list[str] = []
+
+    async def accept(self):
+        pass
+
+    async def send_text(self, data: str):
+        if self.dead:
+            raise RuntimeError("the tab is gone")
+        self.sent.append(data)
+
+
+def _reloader_with(*sockets: TextSocket) -> ReloaderConnectionManager:
+    manager = ReloaderConnectionManager()
+    for socket in sockets:
+        asyncio.run(manager.connect(socket))  # pyright: ignore[reportArgumentType]
+    return manager
+
+
+def test_reload_tells_every_tab_to_reload_itself():
+    first, second = TextSocket(), TextSocket()
+    asyncio.run(_reloader_with(first, second).reload())
+    assert first.sent == second.sent == ['{"refresh": 1}']
+
+
+def test_update_tells_every_tab_to_update_in_place():
+    first, second = TextSocket(), TextSocket()
+    asyncio.run(_reloader_with(first, second).update())
+    assert first.sent == second.sent == ['{"refresh": 2}']
+
+
+def test_a_tab_that_is_gone_is_dropped_and_the_others_still_hear():
+    gone, live = TextSocket(dead=True), TextSocket()
+    manager = _reloader_with(gone, live)
+    asyncio.run(manager.update())
+    asyncio.run(manager.reload())
+    assert manager.active == [live]
+    assert live.sent == ['{"refresh": 2}', '{"refresh": 1}']

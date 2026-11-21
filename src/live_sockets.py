@@ -30,10 +30,21 @@ class ReloaderConnectionManager:
         self.active.remove(websocket)
 
     async def refresh(self):
+        await self.reload()
+
+    async def reload(self) -> None:
+        """Make every open tab reload itself: the source changed under it."""
+        await self._send('{"refresh": 1}')
+
+    async def update(self) -> None:
+        """Make every open tab fetch its page again and morph it in place: the data changed."""
+        await self._send('{"refresh": 2}')
+
+    async def _send(self, message: str) -> None:
         dead: list[WebSocket] = []
         for conn in self.active:
             try:
-                await conn.send_text('{"refresh": 1}')
+                await conn.send_text(message)
             except Exception:
                 dead.append(conn)
         for conn in dead:
