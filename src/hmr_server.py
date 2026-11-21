@@ -220,14 +220,24 @@ def _mount(base_app: FastMCP, mcp: FastMCP) -> Callable[[], None]:
     return unmount
 
 
+def _build_proxy(served: Callable[[], FastMCP]) -> FastMCP:
+    """The stable MCP proxy: it lists the tools mounted under it and runs each call on `served()`."""
+    _ = served
+    return FastMCP(name="pasta-hmr-proxy")
+
+
 def build_dev_app() -> Starlette:
     """Build the stable outer ASGI app: /pasta/mcp -> proxy, everything else -> reloaded FastAPI."""
 
-    # The proxy is built ONCE and never rebuilt; only what is mounted under it swaps.
-    base_app: FastMCP = FastMCP(name="pasta-hmr-proxy")
-
     # The src.server module serving now; a reload that imports cleanly replaces it.
     serving: ModuleType | None = None
+
+    def served_mcp() -> FastMCP:
+        assert serving is not None
+        return serving.mcp
+
+    # The proxy is built ONCE and never rebuilt; only what is mounted under it swaps.
+    base_app = _build_proxy(served_mcp)
 
     # Only one mount is live at a time; a reload tears the old one down before mounting new.
     mount_lock = Lock()
