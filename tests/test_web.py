@@ -250,6 +250,15 @@ def test_the_vendored_morph_library_is_served_locally(client):
     assert "Idiomorph" in response.text
 
 
+def test_the_reloader_updates_in_place_on_a_data_change(client):
+    text = client.get("/").text
+    assert "case 2:" in text
+    assert "fetch(location.href" in text
+    assert "Idiomorph.morph(document.body, fetched.body.childNodes" in text
+    assert 'morphStyle: "innerHTML"' in text
+    assert "beforeAttributeUpdated" in text
+
+
 def test_a_live_view_loads_the_morph_library_before_the_reloader(client):
     text = client.get("/").text
     assert '<script src="/static/idiomorph/idiomorph.min.js"></script>' in text

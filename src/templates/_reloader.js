@@ -1,5 +1,49 @@
 function main() {
   var reloading = false
+  var updating = false;   // a fetch-and-morph is running
+  var stale = false;      // an update arrived while it ran
+
+  // A page script owns the attributes an element lists in data-morph-keep, so the morph leaves them.
+  function keepsAttribute(element, name) {
+    return (element.getAttribute("data-morph-keep") || "").split(" ").includes(name);
+  }
+
+  function reloadPage() {
+    reloading = true;
+    location.reload(true);
+  }
+
+  // One fetch in flight: updates arriving meanwhile collapse into one more fetch after it.
+  async function update() {
+    if (updating) {
+      stale = true;
+      return;
+    }
+    updating = true;
+    try {
+      do {
+        stale = false;
+        const response = await fetch(location.href, {cache: "no-store"});
+        if (reloading) return;
+        if (!response.ok || response.redirected) {
+          reloadPage();
+          return;
+        }
+        const fetched = new DOMParser().parseFromString(await response.text(), "text/html");
+        if (reloading) return;
+        // innerHTML leaves the body element's own attributes and the head to the page's scripts.
+        Idiomorph.morph(document.body, fetched.body.childNodes, {
+          morphStyle: "innerHTML",
+          callbacks: {beforeAttributeUpdated: (name, element) => !keepsAttribute(element, name)},
+        });
+      } while (stale);
+    } catch (error) {
+      console.error("In-place update failed, reloading the page instead.", error);
+      reloadPage();
+    } finally {
+      updating = false;
+    }
+  }
 
   function connect() {
     const socket = new WebSocket("/ws/reloader");
@@ -10,8 +54,10 @@ function main() {
         case 1:
           // 1000 = "Normal closure" and the second parameter is a human-readable reason.
           socket.close(1000, "Reloading page after receiving refresh");
-          reloading = true;
-          location.reload(true);
+          reloadPage();
+          break;
+        case 2:
+          update();
           break;
         case 0:
           break;
