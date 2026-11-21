@@ -6,7 +6,7 @@ with in-process hot reload - no process respawn:
 * FastMCP tools  -> a stable proxy (`base_app`). The reloaded `src.server.mcp`
   is mounted under it, and each tool call is run on it directly; on a source
   change the old mount is swapped for the reloaded one and connected MCP client
-  sessions are sent tools/list_changed, so sessions SURVIVE the reload instead
+  sessions are sent tools/list_changed, so sessions survive the reload instead
   of dropping.
 
 * FastAPI HTML   -> a dispatcher that forwards every request to the freshly
@@ -227,8 +227,8 @@ def _mount(base_app: FastMCP, mcp: FastMCP) -> Callable[[], None]:
 
 
 class _ForwardToolCalls(Middleware):
-    """Run each tool call on the server being served now, so the proxy's own tool-call path never
-    runs: it would catch and log every failure again after the served server has logged it."""
+    """Run each tool call on the server being served now, so a failure is logged once, by the
+    server that ran it."""
 
     def __init__(self, served: Callable[[], FastMCP]) -> None:
         self._served: Callable[[], FastMCP] = served
@@ -259,7 +259,7 @@ def build_dev_app() -> Starlette:
         assert serving is not None
         return serving.mcp
 
-    # The proxy is built ONCE and never rebuilt; only what is mounted under it swaps.
+    # The proxy is built once and never rebuilt; only what is mounted under it swaps.
     base_app = _build_proxy(served_mcp)
 
     # Only one mount is live at a time; a reload tears the old one down before mounting new.
