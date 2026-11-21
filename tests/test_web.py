@@ -250,6 +250,18 @@ def test_the_vendored_morph_library_is_served_locally(client):
     assert "Idiomorph" in response.text
 
 
+def test_a_live_view_loads_the_morph_library_before_the_reloader(client):
+    text = client.get("/").text
+    assert '<script src="/static/idiomorph/idiomorph.min.js"></script>' in text
+    assert text.index("/static/idiomorph/idiomorph.min.js") < text.index("/ws/reloader")
+
+
+def test_the_theme_choice_is_kept_out_of_the_morph(client):
+    text = client.get("/").text
+    assert 'id="theme-light" data-morph-keep="checked"' in text
+    assert 'id="theme-dark" data-morph-keep="checked"' in text
+
+
 def _shipped_feature_log(workspace_id: str) -> None:
     page_id = "feature-brief:mrw7chrt-def44a"
     server.STORE.events_path(workspace_id).write_text(to_jsonl([
@@ -477,6 +489,7 @@ def test_timeline_replays_the_workspace_log_without_the_live_reload_socket(clien
     [line] = _timeline_data(response.text)["lines"]
     assert (line["id"], line["end"], line["title"]) == (page_id, "delivered", "Anchored insert")
     assert "/ws/reloader" not in response.text
+    assert "idiomorph" not in response.text
     assert '<p class="tl-empty" id="tl-empty" hidden>' in response.text
     assert '<div id="tl-live">' in response.text
 

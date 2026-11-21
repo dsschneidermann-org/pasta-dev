@@ -12,6 +12,7 @@
         <title>{% block title %}{% endblock %} - Pasta</title>
         {% endblock %}
         {% block reloader %}
+        <script src="/static/idiomorph/idiomorph.min.js"></script>
         <script>
 {% include '_reloader.js' %}
         </script>
@@ -20,8 +21,8 @@
     <body class="{% block bodyclass %}{% endblock %} light" style="display:none; visibility:hidden">
         <div id="theme" style="float:right">
             <form id="theme-form">
-                <input id="theme-light" style="display:none; visibility:hidden" type="radio" value="light" name="theme" checked>
-                <input id="theme-dark" style="display:none; visibility:hidden" type="radio" value="dark" name="theme">
+                <input id="theme-light" data-morph-keep="checked" style="display:none; visibility:hidden" type="radio" value="light" name="theme" checked>
+                <input id="theme-dark" data-morph-keep="checked" style="display:none; visibility:hidden" type="radio" value="dark" name="theme">
                 <label for="theme-light">Light ☀ /</label><label style="padding-left: 0.3rem" for="theme-dark">Dark 🌙</label>
             </form>
         </div>
