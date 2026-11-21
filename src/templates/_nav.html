@@ -40,14 +40,14 @@
     </nav>
     <main id="main">
         <div id="view-toggle" role="group" aria-label="View">
-            <button type="button" id="show-page" aria-pressed="true">Page</button>
-            <button type="button" id="show-model" aria-pressed="false">Model</button>
+            <button type="button" id="show-page" data-morph-keep="aria-pressed" aria-pressed="true">Page</button>
+            <button type="button" id="show-model" data-morph-keep="aria-pressed" aria-pressed="false">Model</button>
         </div>
-        <div id="view-body">
+        <div id="view-body" data-morph-keep="class">
             <div id="page-view">
                 {% block main %}{% endblock %}
             </div>
-            <iframe id="model-view" title="Page-type model"
+            <iframe id="model-view" data-morph-keep="src hidden" title="Page-type model"
                     data-src="/sphinx/page-types/{{ page_type_doc }}.html" hidden></iframe>
         </div>
     </main>

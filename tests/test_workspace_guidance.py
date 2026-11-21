@@ -394,17 +394,17 @@ def test_create_page_response_carries_workspace_guidance(mcp):
     assert created["next"]["guidance_draftHint"] == "DRAFT HINT GUIDANCE: drafting"
 
 
-def test_set_workspace_guidance_refreshes_open_browser_tabs(mcp, monkeypatch):
-    refreshes = []
+def test_set_workspace_guidance_updates_open_browser_tabs(mcp, monkeypatch):
+    updates = []
 
-    async def record_refresh():
-        refreshes.append(True)
+    async def record_update():
+        updates.append(True)
 
-    monkeypatch.setattr(server.ws_reloader, "refresh", record_refresh)
+    monkeypatch.setattr(server.ws_reloader, "update", record_update)
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
-    refreshes.clear()
+    updates.clear()
     call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "draftHint", "text": "drafting"})
-    assert refreshes == [True]
+    assert updates == [True]
 
 
 def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):

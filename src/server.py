@@ -9,11 +9,12 @@ from collections.abc import Generator
 from pathlib import Path
 import time
 import traceback
+from urllib.parse import unquote, urlsplit
 
 from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
@@ -28,7 +29,7 @@ from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .event_cache import page_events
-from .hmr_live_refresh import reload_failure, ws_events, ws_reloader
+from .live_sockets import reload_failure, ws_events, ws_reloader
 from .instructions import render_instructions
 from .pagetypes._registry import (
     declaration_errors,
@@ -140,9 +141,9 @@ async def add_no_cache_headers(request: Request, call_next: RequestResponseEndpo
 
 
 # --- Websocket reloader ------------------------------------------------------
-# The browser-facing connection manager (`ws_reloader`) lives in src.hmr_live_refresh so its
-# live connections survive hot reloads. Under hot-module-reload (src.hmr_server) the
-# refresh is fired on file changes; the mutation tools below also fire it on data changes.
+# The browser-facing connection manager (`ws_reloader`) lives in src.live_sockets so its
+# live connections survive hot reloads. Under hot-module-reload (src.hmr_server) a file change
+# makes every tab reload itself; the mutation tools below make every tab update in place instead.
 
 @app.websocket("/ws/reloader")
 async def fastapi_reloader(websocket: WebSocket):
@@ -150,7 +151,7 @@ async def fastapi_reloader(websocket: WebSocket):
 
     async def send_updates():
         while True:
-            await websocket.send_text('{"refresh": 0}')
+            await websocket.send_text('{"heartbeat": 1}')
             await asyncio.sleep(5)
 
     task = asyncio.create_task(send_updates())
@@ -162,7 +163,7 @@ async def fastapi_reloader(websocket: WebSocket):
 
 
 # --- Websocket events --------------------------------------------------------
-# The timeline tabs' connection manager (`ws_events`) lives in src.hmr_live_refresh beside the
+# The timeline tabs' connection manager (`ws_events`) lives in src.live_sockets beside the
 # reloader's, so its live connections survive hot reloads. The writes below that log lifecycle
 # events publish them to it, each with the timeline rebuilt to include them.
 
@@ -322,66 +323,85 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
         )
 
 
+def page_view_after_action(workspace_id_part: str, page_id: str, referer: str | None) -> str:
+    """Where a page action sends the browser: the page view it was posted from, query kept, when
+    the Referer is that page's own view; otherwise the page's plain view."""
+    page_path = f"/ws:{workspace_id_part}/page/{page_id}"
+    if referer:
+        sent_from = urlsplit(referer)
+        if unquote(sent_from.path) == page_path:
+            return f"{page_path}?{sent_from.query}" if sent_from.query else page_path
+    return page_path
+
+
 # Archive/unarchive a page from its web view. These mirror the archivePage / unarchivePage MCP
-# tools (a browser can't call MCP), so the wiki's Archive/Unarchive button POSTs here. Each fires
-# the live-reload refresh and streams its events to timeline tabs like the MCP tools do, then
-# 303-redirects back to the page (GET) so a reload/back-button doesn't re-POST the mutation.
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/archive", response_class=PlainTextResponse)
-async def route_archive_page(workspaceIdPart: str, pageId: str):
+# tools (a browser can't call MCP), so the wiki's Archive/Unarchive button POSTs here. Each sends
+# the in-place update and streams its events to timeline tabs like the MCP tools do, then
+# redirects back to the page it was posted from (303), so the posting tab loads it again with a
+# GET and a reload or back button never re-POSTs the change.
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/archive", response_class=RedirectResponse)
+async def route_archive_page(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.archive_page(workspace_id, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/unarchive", response_class=PlainTextResponse)
-async def route_unarchive_page(workspaceIdPart: str, pageId: str):
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/unarchive", response_class=RedirectResponse)
+async def route_unarchive_page(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unarchive_page(workspace_id, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
 # Schedule or cancel a page's deletion from its web view, behind the button beside the archive
 # control. Scheduling also archives, so a page queued for deletion is never left in a live view,
 # and the sweep destroys it only once its grace period has passed. Deciding this is a human act in
 # the browser, so there is no MCP counterpart.
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/schedule-delete", response_class=PlainTextResponse)
-async def route_schedule_page_deletion(workspaceIdPart: str, pageId: str):
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/schedule-delete", response_class=RedirectResponse)
+async def route_schedule_page_deletion(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.schedule_page_deletion(workspace_id, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/unschedule-delete", response_class=PlainTextResponse)
-async def route_unschedule_page_deletion(workspaceIdPart: str, pageId: str):
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/unschedule-delete", response_class=RedirectResponse)
+async def route_unschedule_page_deletion(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unschedule_page_deletion(workspace_id, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
 # Directly set a page's lifecycle status from its web view. Backs the status dropdown + Apply button
 # next to the Archive control (see page.html): a deliberate FSM-bypassing admin override, so a human
 # can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
-# routes it fires the live-reload refresh and 202s (no MCP equivalent - a browser can't call MCP).
-@app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
-async def route_set_page_status(workspaceIdPart: str, pageId: str, status: Annotated[str, Form()]):
+# routes it sends the in-place update and redirects back to the page (no MCP equivalent - a browser
+# can't call MCP).
+@app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=RedirectResponse)
+async def route_set_page_status(request: Request, workspaceIdPart: str, pageId: str,
+                                status: Annotated[str, Form()]):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.set_page_status(workspace_id, pageId, status)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspace_id)
-        return PlainTextResponse(status_code=202)
+        return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
+                                status_code=303)
 
 
 # --- FastAPI exception handlers ----------------------------------------------
@@ -609,7 +629,7 @@ async def createWorkspace(name: str) -> dict[str, str]:
     """Create a new workspace and return its id."""
     with _guard_tool():
         workspace = STORE.create_workspace(name)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": workspace.id, "name": workspace.name, "status": workspace.status}
 
 
@@ -625,7 +645,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         page = result.page
         next_actions = STORE.next_actions(workspaceId, page.id)
         _record_guidance_emitted(workspaceId, page.id)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspaceId)
         return {
             "id": page.id,
@@ -668,7 +688,7 @@ async def mutatePageBatch(
             omit_stage_guidance=not emit_in_full)
         if emit_in_full:
             _record_guidance_emitted(workspaceId, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspaceId)
         return {
             "pageId": page.id,
@@ -700,7 +720,7 @@ async def setWorkspaceGuidance(workspaceId: str, field: str, text: str) -> dict[
     """
     with _guard_tool():
         workspace = STORE.set_workspace_guidance(workspaceId, field, text)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"workspaceId": workspace.id, "field": field,
                 "guidanceConfig": dict(workspace.guidance_config)}
 
@@ -711,7 +731,7 @@ async def archiveWorkspace(workspaceId: str) -> dict[str, str]:
     """Archive a whole workspace - mark it archived in listings. Reversible; pages preserved."""
     with _guard_tool():
         workspace = STORE.archive_workspace(workspaceId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": workspace.id, "name": workspace.name, "status": workspace.status}
 
 
@@ -720,7 +740,7 @@ async def unarchiveWorkspace(workspaceId: str) -> dict[str, str]:
     """Unarchive a previously archived workspace - restore it to active. Runnable while archived."""
     with _guard_tool():
         workspace = STORE.unarchive_workspace(workspaceId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": workspace.id, "name": workspace.name, "status": workspace.status}
 
 
@@ -730,7 +750,7 @@ async def archivePage(workspaceId: str, pageId: str) -> dict[str, Any]:
     while archived (unarchive first). Reversible."""
     with _guard_tool():
         page = STORE.archive_page(workspaceId, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspaceId)
         return {"id": page.id, "archived": page.archived}
 
@@ -740,7 +760,7 @@ async def unarchivePage(workspaceId: str, pageId: str) -> dict[str, Any]:
     """Unarchive a page - restore it to default tree views. Lifecycle status is unchanged."""
     with _guard_tool():
         page = STORE.unarchive_page(workspaceId, pageId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         await publish_events(workspaceId)
         return {"id": page.id, "archived": page.archived}
 
@@ -755,7 +775,7 @@ async def reparentPage(
     the page or one of its descendants). Sibling titles are not reserved."""
     with _guard_tool():
         page, sibling_ids = STORE.reparent_page(workspaceId, pageId, newParentId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "parentId": page.parent_id, "siblingIds": sibling_ids}
 
 
@@ -768,7 +788,7 @@ async def reorderPage(
     the front). A drifted index or a mismatched precedingId is rejected as a stale read."""
     with _guard_tool():
         page, sibling_ids = STORE.reorder_page(workspaceId, pageId, toIndex, precedingId)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "parentId": page.parent_id, "siblingIds": sibling_ids}
 
 
@@ -779,7 +799,7 @@ async def renamePage(workspaceId: str, pageId: str, title: str) -> dict[str, Any
     pages. Rejects a blank title."""
     with _guard_tool():
         page = STORE.rename_page(workspaceId, pageId, title)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "title": page.title}
 
 
@@ -792,7 +812,7 @@ async def link(workspaceId: str, fromId: str, toId: str, role: str) -> dict[str,
     (toId, role) edge."""
     with _guard_tool():
         page, links = STORE.link_page(workspaceId, fromId, toId, role)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "links": links}
 
 
@@ -802,7 +822,7 @@ async def unlink(workspaceId: str, fromId: str, toId: str, role: str) -> dict[st
     archived source, or an edge that isn't present."""
     with _guard_tool():
         page, links = STORE.unlink_page(workspaceId, fromId, toId, role)
-        await ws_reloader.refresh()
+        await ws_reloader.update()
         return {"id": page.id, "links": links}
 
 

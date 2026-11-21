@@ -10,7 +10,7 @@ with in-process hot reload - no process respawn:
 
 * FastAPI HTML   -> a dispatcher that forwards every request to the freshly
   reloaded `src.server.app`. On a source change connected browsers are told to
-  reload over the existing /ws/reloader WebSocket (`ws_reloader.refresh`).
+  reload over the existing /ws/reloader WebSocket (`ws_reloader.reload`).
 
 This merges the two reference patterns - uvicorn-hmr (serve a reloaded ASGI app +
 browser refresh) and mcp-hmr (stable proxy + session-preserving tool swap) - into
@@ -24,7 +24,7 @@ Two brittleness notes (dev-only tool):
 * It reaches into a few private fastmcp/mcp internals (`base_app.providers` /
   `FastMCPProvider` for mount/unmount, the constructor of `mcp.server.connection.Connection`
   for connection capture). These changed across fastmcp versions; revisit on a fastmcp upgrade.
-* `src.hmr_server` and `src.hmr_live_refresh` are never re-imported, so an edit to
+* `src.hmr_server` and `src.live_sockets` are never re-imported, so an edit to
   either needs a restart.
 """
 
@@ -54,7 +54,7 @@ from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
 from watchfiles import awatch  # pyright: ignore[reportUnknownVariableType]
 
-from .hmr_live_refresh import set_reload_failure, ws_reloader
+from .live_sockets import set_reload_failure, ws_reloader
 
 # The module a reload imports through; it pulls in the rest of the package.
 TARGET_MODULE = "src.server"
@@ -96,7 +96,7 @@ class ReloadScope:
 SCOPE = ReloadScope(
     package="src",
     entry=TARGET_MODULE,
-    always_kept=frozenset({"src.hmr_server", "src.hmr_live_refresh"}),
+    always_kept=frozenset({"src.hmr_server", "src.live_sockets"}),
     kept_unless_changed=frozenset({"src.event_cache", "src._hmr_debug"}),
 )
 
@@ -287,7 +287,7 @@ def build_dev_app() -> Starlette:
                 except Exception as error:  # a failed swap must not end the watcher
                     set_reload_failure(reload_failure_summary(error))
                     _report_reload_failure(error)
-            await ws_reloader.refresh()
+            await ws_reloader.reload()
 
     # /pasta/mcp is served by the stable proxy's ASGI app (built once). Its session manager is
     # started by mcp_asgi.lifespan; the reloader lifespan drives module reloads + mounts.

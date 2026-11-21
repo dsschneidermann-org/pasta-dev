@@ -17,8 +17,8 @@ from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
 
 import src.server as server
-from src.hmr_live_refresh import EventStream
 from src.hmr_server import _mount
+from src.live_sockets import EventStream
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.store import Store
 
@@ -500,7 +500,7 @@ def test_the_reload_refusal_names_the_error_and_the_reload_log(mcp, failed_reloa
 
 
 def test_tool_calls_run_again_once_a_reload_succeeds(mcp, failed_reload):
-    from src.hmr_live_refresh import set_reload_failure
+    from src.live_sockets import set_reload_failure
     set_reload_failure(None)
     assert call(mcp, "listWorkspaces") == []
 
@@ -577,3 +577,19 @@ def test_mcp_writes_stream_their_events_to_a_watching_tab(mcp):
     assert [[event["event"] for event in message["events"]] for message in tab.sent] == \
         [["created"], ["status"], ["archived"]]
     assert all("timeline" in message for message in tab.sent)
+
+
+def test_an_mcp_write_updates_open_tabs_in_place_and_never_reloads_them(mcp, monkeypatch):
+    sent = []
+
+    async def record_update():
+        sent.append("update")
+
+    async def record_reload():
+        sent.append("reload")
+
+    monkeypatch.setattr(server.ws_reloader, "update", record_update)
+    monkeypatch.setattr(server.ws_reloader, "reload", record_reload)
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-fields", "title": "A page"})
+    assert sent == ["update", "update"]
