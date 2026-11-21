@@ -150,7 +150,7 @@ async def fastapi_reloader(websocket: WebSocket):
 
     async def send_updates():
         while True:
-            await websocket.send_text('{"refresh": 0}')
+            await websocket.send_text('{"heartbeat": 1}')
             await asyncio.sleep(5)
 
     task = asyncio.create_task(send_updates())

@@ -31,11 +31,11 @@ class ReloaderConnectionManager:
 
     async def reload(self) -> None:
         """Make every open tab reload itself: the source changed under it."""
-        await self._send('{"refresh": 1}')
+        await self._send('{"reload": 1}')
 
     async def update(self) -> None:
         """Make every open tab fetch its page again and morph it in place: the data changed."""
-        await self._send('{"refresh": 2}')
+        await self._send('{"update": 1}')
 
     async def _send(self, message: str) -> None:
         dead: list[WebSocket] = []

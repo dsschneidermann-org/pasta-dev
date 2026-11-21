@@ -239,9 +239,9 @@ def test_set_page_status_rejects_unknown_state(client):
         server.STORE.set_page_status(workspace.id, page.id, "not-a-state")
 
 
-def test_reloader_websocket_sends_refresh(client):
+def test_reloader_websocket_sends_a_heartbeat(client):
     with client.websocket_connect("/ws/reloader") as websocket:
-        assert websocket.receive_json() == {"refresh": 0}   # heartbeat on connect
+        assert websocket.receive_json() == {"heartbeat": 1}   # on connect, then every 5 s
 
 
 def test_the_vendored_morph_library_is_served_locally(client):
@@ -252,7 +252,8 @@ def test_the_vendored_morph_library_is_served_locally(client):
 
 def test_the_reloader_updates_in_place_on_a_data_change(client):
     text = client.get("/").text
-    assert "case 2:" in text
+    assert "data.reload === 1" in text
+    assert "data.update === 1" in text
     assert "fetch(location.href" in text
     assert "Idiomorph.morph(document.body, fetched.body.childNodes" in text
     assert 'morphStyle: "innerHTML"' in text

@@ -50,20 +50,14 @@ function main() {
 
     socket.onmessage = function(event) {
       const data = JSON.parse(event.data);
-      switch(data.refresh) {
-        case 1:
-          // 1000 = "Normal closure" and the second parameter is a human-readable reason.
-          socket.close(1000, "Reloading page after receiving refresh");
-          reloadPage();
-          break;
-        case 2:
-          update();
-          break;
-        case 0:
-          break;
-        default:
-          console.error(`Reloader not handling data: '${data}'`);
-          break;
+      if (data.reload === 1) {
+        // 1000 = "Normal closure" and the second parameter is a human-readable reason.
+        socket.close(1000, "Reloading page after receiving refresh");
+        reloadPage();
+      } else if (data.update === 1) {
+        update();
+      } else if (data.heartbeat !== 1) {
+        console.error(`Reloader not handling data: '${data}'`);
       }
     }
 

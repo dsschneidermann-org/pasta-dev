@@ -100,13 +100,13 @@ def _reloader_with(*sockets: TextSocket) -> ReloaderConnectionManager:
 def test_reload_tells_every_tab_to_reload_itself():
     first, second = TextSocket(), TextSocket()
     asyncio.run(_reloader_with(first, second).reload())
-    assert first.sent == second.sent == ['{"refresh": 1}']
+    assert first.sent == second.sent == ['{"reload": 1}']
 
 
 def test_update_tells_every_tab_to_update_in_place():
     first, second = TextSocket(), TextSocket()
     asyncio.run(_reloader_with(first, second).update())
-    assert first.sent == second.sent == ['{"refresh": 2}']
+    assert first.sent == second.sent == ['{"update": 1}']
 
 
 def test_a_tab_that_is_gone_is_dropped_and_the_others_still_hear():
@@ -115,7 +115,7 @@ def test_a_tab_that_is_gone_is_dropped_and_the_others_still_hear():
     asyncio.run(manager.update())
     asyncio.run(manager.reload())
     assert manager.active == [live]
-    assert live.sent == ['{"refresh": 2}', '{"refresh": 1}']
+    assert live.sent == ['{"update": 1}', '{"reload": 1}']
 
 
 SRC = Path(__file__).resolve().parent.parent / "src"
