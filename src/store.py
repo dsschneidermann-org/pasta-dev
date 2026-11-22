@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, final
 
 from . import activity_log, cleanup, commands, fsm, render, render_html
-from .activity_log import ActivityEntry
+from .activity_log import ActivityEntry, page_additions
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .event_log import LOG_SUFFIX, Event, PageMark, lifecycle_events, page_marks, parse_jsonl, to_jsonl
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
@@ -747,6 +747,7 @@ class Store:
 
             workspace.pages[page_id] = working
             self._touch_and_save(workspace, before)
+            self.append_activity(workspace_id, page_additions(page, working, workspace.updated_at))
             return MutatePageResult(page=working, created_ids=created_ids,
                                     transitioned=working.status != page.status)
 
@@ -1038,8 +1039,10 @@ class Store:
             if source is None:
                 raise NotFoundError(f"Page '{from_id}' not found in workspace '{workspace_id}'.")
             role = self._validate_link(workspace, workspace_id, source, to_id, role)
+            before = source.copy()
             source.links.append({"to": to_id, "role": role})
             self._touch_and_save(workspace)
+            self.append_activity(workspace_id, page_additions(before, source, workspace.updated_at))
             return source, list(source.links)
 
     def unlink_page(
