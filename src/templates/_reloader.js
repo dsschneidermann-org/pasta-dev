@@ -34,7 +34,11 @@ function main() {
         // innerHTML leaves the body element's own attributes and the head to the page's scripts.
         Idiomorph.morph(document.body, fetched.body.childNodes, {
           morphStyle: "innerHTML",
-          callbacks: {beforeAttributeUpdated: (name, element) => !keepsAttribute(element, name)},
+          callbacks: {
+            beforeAttributeUpdated: (name, element) => !keepsAttribute(element, name),
+            // A page script owns everything inside an element marked data-morph-skip.
+            beforeNodeMorphed: (oldNode) => !(oldNode instanceof Element && oldNode.hasAttribute("data-morph-skip")),
+          },
         });
       } while (stale);
     } catch (error) {

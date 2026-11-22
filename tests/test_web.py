@@ -501,6 +501,13 @@ def test_the_activity_sits_at_the_top_and_out_of_the_in_place_update(client):
     assert tree_html.index(">Guidance</a>") < tree_html.index('id="activity"')
 
 
+def test_a_section_a_script_owns_is_left_out_of_the_in_place_update(client):
+    workspace = server.STORE.create_workspace("demo")
+    text = client.get(f"/{workspace.id}").text
+    assert ('beforeNodeMorphed: (oldNode) => !(oldNode instanceof Element && oldNode.hasAttribute("data-morph-skip"))'
+            in text)
+
+
 def test_a_scope_with_nothing_in_the_last_day_says_so(client):
     workspace = server.STORE.create_workspace("demo")          # no pages, so nothing was logged
     html = client.get(f"/{workspace.id}").text
