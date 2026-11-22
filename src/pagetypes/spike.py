@@ -102,8 +102,9 @@ _SPIKE = PageType(
                 as a success, in the user's terms. Write them before research begins: the directions
                 are compared against them, and outcomes written after the directions get fitted to
                 them. Write each so a reviewer could tell whether the built result meets it: the
-                feature-brief carries these on, and a vague one becomes a criterion nobody can
-                check. Refine one in place with editOutcome as the conversation settles it.
+                feature-brief carries each on as a sentence of its summary, and a vague one
+                becomes a criterion nobody can check. Refine one in place with editOutcome as the
+                conversation settles it.
                 """),
         )),
         SectionSpec("directions", "Solution directions", (

@@ -225,10 +225,14 @@ before anyone researches it. The work of it:
   scope saying what it would change or add and what it assumes, so the agent that
   investigates it knows what to look for. Two directions that would send an
   investigator to the same code with the same question are one.
+- Make one direction go past the obvious ones: one that would surprise them, still
+  serving the why but outside the scope they suggested.
+- Then play back the summary, the why, the outcomes and the directions in one short
+  message and ask what is wrong or missing: each direction costs an agent run.
 
 No code is read here. Recon belongs to the agents investigating each direction, so
 this page's context stays small. Begin research once the summary, the why, the
-outcomes and the directions are written.
+outcomes and the directions are written and the user has answered the playback.
 """
 
 RESEARCHING = """
@@ -268,7 +272,9 @@ through with them. The work of it:
 - Then, in a message of its own, lay out the directions with their trade-offs and
   your recommendation, and ask which way to go. Each investigator argued for one
   direction, so the comparison is yours. Record the pick as the chosen approach by
-  its investigation's page id, and the pick itself as an answered question.
+  its investigation's page id, and the pick itself as an answered question whose
+  answer names the direction chosen and, for each direction not taken, the one
+  reason it lost, so whoever plans the brief does not reopen the choice.
 - If an answer rules out every direction or changes the ask, reopen research with
   that answer - adding a direction or redispatching an investigation - rather than
   hand off a stale pick.
@@ -284,8 +290,10 @@ agent to specify, plan and build. The work of it:
 
 - Create one feature-brief under this spike's own parent, next to the spike and not
   under it, titled with the outcome the user wants.
-- Write its summary from this spike's summary, why and outcomes, naming the chosen
-  direction in one sentence.
+- Write its summary from this spike's summary and why, naming the chosen direction
+  in one sentence, then each outcome as a sentence of its own that says whether it
+  must hold, is out of scope or must never happen, so the testing plan can turn each
+  into a case.
 - Add each answered question on this spike that bears on the build to the brief's
   questions, and answer it there in the user's words - the approach pick among them -
   so the brief's spec records them and they are not reopened.
