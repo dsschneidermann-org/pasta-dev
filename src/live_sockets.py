@@ -5,9 +5,10 @@ This module is deliberately kept OUT of the hot-reload set: `src/hmr_server.py` 
 re-imports it. It holds live browser WebSocket connections as in-process state
 (`ws_reloader.active`, the timeline tabs' `ws_events.active` and the activity timeline tabs'
 `ws_activity.active`); if it were re-executed on every source change, that state would be dropped
-and browser auto-refresh and the live timelines would silently stop working. It is imported by both the reloaded `src.server` (routes, in-place
-updates on data changes, event streaming, refusal gates) and the stable `src.hmr_server` (full
-reloads on file changes, reload outcomes), so a single instance survives reloads.
+and browser auto-refresh and the live timelines would silently stop working. It is imported by
+both the reloaded `src.server` (routes, in-place updates on data changes, event streaming, refusal
+gates) and the stable `src.hmr_server` (full reloads on file changes, reload outcomes), so a single
+instance survives reloads.
 """
 
 from __future__ import annotations

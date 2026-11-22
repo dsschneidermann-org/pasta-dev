@@ -1,7 +1,7 @@
 // Draws and replays the activity timeline: the last day of a page's (and every page beneath it) or a
 // workspace's activity, the workspace timeline zoomed in. Every layout decision arrives in the payload;
 // this script only draws each payload it is given - the page's, then every live one its activity
-// socket streams - and moves the playhead. One closure, so it adds no global name beside the reloader's.
+// socket streams - and moves the playhead. It runs in one closure, so it adds no global names.
 (function () {
   if (window.__activity_loaded) return;
   window.__activity_loaded = true;

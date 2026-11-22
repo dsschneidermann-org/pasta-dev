@@ -581,8 +581,8 @@ class _RefuseInvalidDeclarations(Middleware):
 
 
 class _RecordActivity(Middleware):
-    """Record each tool call that ran for the activity timeline, once it has returned. Added last, so
-    a call refused by the middleware before it, or failing in its tool, records nothing."""
+    """Record each tool call for the activity timeline once it has returned, so a call that is refused
+    or fails records nothing."""
 
     @override
     async def on_call_tool(
