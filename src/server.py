@@ -4,6 +4,7 @@ import os
 import asyncio
 import logging
 from contextlib import contextmanager, asynccontextmanager
+from datetime import datetime, timezone
 from typing import Annotated, Any, override
 from collections.abc import Generator
 from pathlib import Path
@@ -26,6 +27,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from . import cleanup
+from .activity_log import call_entry
 from .activity_timeline import build_activity_timeline
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
@@ -568,8 +570,39 @@ class _RefuseInvalidDeclarations(Middleware):
             "Fix the declaration and save; the reload restores the tools.")
 
 
+class _RecordActivity(Middleware):
+    """Record each tool call that ran for the activity timeline, once it has returned. Added last, so
+    a call refused by the middleware before it, or failing in its tool, records nothing."""
+
+    @override
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        result = await call_next(context)
+        _record_call(context.message.name, context.message.arguments or {}, result)
+        return result
+
+
+def _record_call(tool: str, arguments: dict[str, Any], result: ToolResult) -> None:
+    """The call has already run, so a recording that fails is logged, never raised."""
+    try:
+        returned = sum(len(block.text.encode("utf-8")) for block in result.content
+                       if isinstance(block, mt.TextContent))
+        recorded = call_entry(tool, arguments, returned, datetime.now(timezone.utc).isoformat())
+        if recorded is None:
+            return
+        workspace_id, entry = recorded
+        STORE.append_activity(workspace_id, [entry])
+        schedule_activity_publish(workspace_id)
+    except Exception:
+        logger.warning("[activity] could not record the %s call", tool, exc_info=True)
+
+
 mcp.add_middleware(_LogToolFailures())
 mcp.add_middleware(_RefuseInvalidDeclarations())
+mcp.add_middleware(_RecordActivity())
 
 
 @contextmanager

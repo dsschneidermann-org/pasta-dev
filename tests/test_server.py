@@ -16,6 +16,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 import src.server as server
+from src.activity_log import sent_bytes
 from src.hmr_server import _build_proxy, _mount
 from src.live_sockets import EventStream
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
@@ -583,3 +584,56 @@ def test_an_mcp_write_updates_open_tabs_in_place_and_never_reloads_them(mcp, mon
     workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-fields", "title": "A page"})
     assert sent == ["update", "update"]
+
+
+def _call_result(mcp, name, args):
+    async def _run():
+        async with Client(mcp) as client:
+            return await client.call_tool(name, args)
+    return asyncio.run(_run())
+
+
+def test_every_call_naming_a_workspace_is_recorded_with_its_bytes(mcp):
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]        # names no workspace
+    create_args = {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"}
+    page_id = call(mcp, "createPage", create_args)["id"]
+    result = _call_result(mcp, "getPage", {"workspaceId": workspace_id, "pageId": page_id})
+    call(mcp, "tree", {"workspaceId": workspace_id})
+    entries = server.STORE.read_activity(workspace_id)
+    assert [(entry["tool"], entry["pageId"], entry["write"]) for entry in entries] == [
+        ("createPage", None, True), ("getPage", page_id, False), ("tree", None, False)]
+    assert entries[0]["bytes"] == sent_bytes(create_args)
+    assert entries[1]["bytes"] == sum(len(block.text.encode("utf-8")) for block in result.content)
+
+
+def test_a_failed_call_records_nothing(mcp):
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    with pytest.raises(ToolError):
+        call(mcp, "getPage", {"workspaceId": workspace_id, "pageId": "test-flow:nope"})
+    assert server.STORE.read_activity(workspace_id) == []
+
+
+def test_a_call_refused_by_the_quarantine_records_nothing(mcp, invalid_declarations):
+    workspace = server.STORE.create_workspace("demo")
+    with pytest.raises(ToolError):
+        call(mcp, "tree", {"workspaceId": workspace.id})
+    assert server.STORE.read_activity(workspace.id) == []
+
+
+def test_a_recording_that_fails_never_fails_the_call(mcp, monkeypatch, caplog):
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("disk gone")
+    monkeypatch.setattr(server.STORE, "append_activity", broken)
+    with caplog.at_level(logging.WARNING, logger="uvicorn.error"):
+        assert call(mcp, "tree", {"workspaceId": workspace_id})["workspaceId"] == workspace_id
+    assert "[activity] could not record the tree call" in caplog.text
+
+
+def test_a_recorded_call_asks_for_a_live_publish_of_its_workspace(mcp, monkeypatch):
+    asked = []
+    monkeypatch.setattr(server, "schedule_activity_publish", asked.append)
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    call(mcp, "tree", {"workspaceId": workspace_id})
+    assert asked == [workspace_id]
