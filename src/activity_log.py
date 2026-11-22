@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Mapping
 from datetime import datetime
+from typing import cast
 
 from .model import JSONValue, Page
 
@@ -60,7 +61,7 @@ def page_ref_ids(value: object) -> list[str]:
     anywhere inside `value`, each once, first seen first."""
     found: dict[str, None] = {}
 
-    def walk(node: object) -> None:
+    def walk(node: JSONValue) -> None:
         if isinstance(node, dict):
             if len(node) == 1 and isinstance(ref := node.get("ref"), str):
                 _ = found.setdefault(ref)
@@ -71,7 +72,8 @@ def page_ref_ids(value: object) -> list[str]:
             for child in node:
                 walk(child)
 
-    walk(value)
+    # A page's sections are JSON as stored, typed looser only because the model leaves their shape to page types.
+    walk(cast(JSONValue, value))
     return list(found)
 
 
@@ -83,6 +85,53 @@ def page_additions(before: Page, after: Page, at: str) -> list[ActivityEntry]:
         {"at": at, "kind": "link", "pageId": after.id, "to": link["to"], "role": link["role"]}
         for link in after.links if (link.get("to"), link.get("role")) not in old_links]
     old_refs = set(page_ref_ids(before.sections))
-    entries += [{"at": at, "kind": "ref", "pageId": after.id, "to": ref}
-                for ref in page_ref_ids(after.sections) if ref not in old_refs]
+    refs: list[ActivityEntry] = [{"at": at, "kind": "ref", "pageId": after.id, "to": ref}
+                                 for ref in page_ref_ids(after.sections) if ref not in old_refs]
+    return entries + refs
+
+
+def to_jsonl(entries: Iterable[ActivityEntry]) -> str:
+    return "".join(json.dumps(entry, ensure_ascii=False) + "\n" for entry in entries)
+
+
+def _usable(value: dict[str, JSONValue]) -> bool:
+    """A line no reader can place in time, or tell the kind of, is not an entry."""
+    at = value.get("at")
+    if not isinstance(at, str) or not isinstance(value.get("kind"), str):
+        return False
+    try:
+        _ = datetime.fromisoformat(at)
+    except ValueError:
+        return False
+    return True
+
+
+def parse_jsonl(text: str) -> list[ActivityEntry]:
+    """Every usable line in file order, so a last line torn by an append in progress cannot break a read."""
+    entries: list[ActivityEntry] = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            value: JSONValue = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict) and _usable(value):
+            entries.append(value)
     return entries
+
+
+def entry_seconds(entry: ActivityEntry) -> float:
+    return datetime.fromisoformat(str(entry["at"])).timestamp()
+
+
+def within_window(entries: Iterable[ActivityEntry], now: float) -> list[ActivityEntry]:
+    """The entries no older than the window, in their order."""
+    since = now - WINDOW_SECONDS
+    return [entry for entry in entries if entry_seconds(entry) >= since]
+
+
+def needs_prune(first_line: str, now: float) -> bool:
+    """Whether a file whose oldest line is `first_line` holds activity well past the window."""
+    parsed = parse_jsonl(first_line)
+    return bool(parsed) and entry_seconds(parsed[0]) < now - WINDOW_SECONDS - PRUNE_SLACK_SECONDS

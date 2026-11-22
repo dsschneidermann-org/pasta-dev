@@ -3,12 +3,30 @@ call belongs to and its bytes, what a write newly added to a page, and the JSONL
 24-hour window."""
 
 import ast
+from datetime import datetime, timezone
 from pathlib import Path
 
-from src.activity_log import WRITE_TOOLS, call_entry, named_page, page_additions, page_ref_ids, sent_bytes
+from src.activity_log import (
+    WRITE_TOOLS,
+    call_entry,
+    entry_seconds,
+    named_page,
+    needs_prune,
+    page_additions,
+    page_ref_ids,
+    parse_jsonl,
+    sent_bytes,
+    to_jsonl,
+    within_window,
+)
 from src.model import Page
 
 AT = "2026-11-22T18:45:03.120456+00:00"
+NOON = datetime(2026, 11, 22, 12, tzinfo=timezone.utc).timestamp()
+
+
+def _hours_ago(hours: float) -> str:
+    return datetime.fromtimestamp(NOON - hours * 3600, timezone.utc).isoformat()
 
 
 def test_a_call_belongs_to_its_page_then_its_link_source_then_its_parent():
@@ -91,3 +109,31 @@ def test_rewriting_text_that_already_held_a_ref_adds_nothing():
     before = _page(sections={"body": {"body": [{"kind": "paragraph", "inlines": ["a ", {"ref": "kept"}]}]}})
     after = _page(sections={"body": {"body": [{"kind": "paragraph", "inlines": ["b ", {"ref": "kept"}]}]}})
     assert page_additions(before, after, AT) == []
+
+
+def test_entries_round_trip_through_jsonl():
+    entries = [{"at": AT, "kind": "call", "pageId": None, "tool": "search", "write": False, "bytes": 3},
+               {"at": AT, "kind": "ref", "pageId": "p", "to": "é"}]
+    assert parse_jsonl(to_jsonl(entries)) == entries
+
+
+def test_parse_skips_torn_and_unusable_lines():
+    good = {"at": AT, "kind": "call", "pageId": "p", "tool": "getPage", "write": False, "bytes": 1}
+    text = (to_jsonl([good]) + "[1, 2]\n" + '{"at": "yesterday", "kind": "call"}\n'
+            + '{"at": "' + AT + '"}\n' + '{"at": "' + AT + '", "kind": "ca')
+    assert parse_jsonl(text) == [good]
+
+
+def test_within_window_keeps_the_last_24_hours_in_order():
+    old, edge, fresh = ({"at": _hours_ago(hours), "kind": "call"} for hours in (24.001, 24, 1))
+    assert within_window([old, edge, fresh], NOON) == [edge, fresh]
+    assert entry_seconds(fresh) == NOON - 3600
+
+
+def test_a_file_needs_pruning_only_once_its_oldest_line_is_an_hour_past_the_window():
+    def line(hours: float) -> str:
+        return to_jsonl([{"at": _hours_ago(hours), "kind": "call"}])
+    assert not needs_prune(line(24.5), NOON)
+    assert needs_prune(line(25.01), NOON)
+    assert not needs_prune("", NOON)
+    assert not needs_prune("garbage\n", NOON)
