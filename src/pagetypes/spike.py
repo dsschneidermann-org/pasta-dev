@@ -74,9 +74,10 @@ _SPIKE = PageType(
         "Works out how to build an idea before anything is planned: one investigator subagent per "
         "solution direction works it out on a solution-investigation page of its own, the user "
         "picks a direction, and the spike hands off a single feature-brief created next to it for "
-        "another agent to specify, plan and build. Use it when the approach is still open; when it "
-        "is known, create a feature-brief, and for work that splits into parts that each ship on "
-        "their own, an epic."
+        "another agent to specify, plan and build. Pick it whenever the user is unsure about the "
+        "outcome - what it should be, or which way gets there - without waiting for them to ask "
+        "for research; when they know both, create a feature-brief, and for work that splits into "
+        "parts that each ship on their own, an epic."
     ),
     sections=(
         SectionSpec("notice", "Controller notice", (
