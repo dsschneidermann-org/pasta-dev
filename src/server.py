@@ -26,10 +26,11 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from . import cleanup
+from .activity_timeline import build_activity_timeline
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .event_cache import page_events
-from .live_sockets import reload_failure, ws_events, ws_reloader
+from .live_sockets import reload_failure, ws_activity, ws_events, ws_reloader
 from .instructions import render_instructions
 from .pagetypes._registry import (
     declaration_errors,
@@ -199,6 +200,74 @@ async def fastapi_events(websocket: WebSocket, workspace_id: str, since: int = 0
         ws_events.disconnect(websocket)
 
 
+# --- Websocket activity -------------------------------------------------------
+# The activity timeline tabs' manager (`ws_activity`) lives in src.live_sockets beside the others.
+# Every recorded call asks for a publish. A rebuild loads the whole workspace, so it runs off the
+# caller's path, in a thread, and once more at most for however many calls land while it runs.
+_activity_running: set[str] = set()
+_activity_stale: set[str] = set()
+_activity_tasks: set[asyncio.Task[None]] = set()   # strong references until each task finishes
+
+
+def schedule_activity_publish(workspace_id: str) -> None:
+    """Rebuild and send the activity timelines of the tabs watching the workspace, without waiting."""
+    if not ws_activity.watching(workspace_id):
+        return
+    if workspace_id in _activity_running:
+        _activity_stale.add(workspace_id)
+        return
+    _activity_running.add(workspace_id)
+    task = asyncio.get_running_loop().create_task(_publish_activity(workspace_id))
+    _activity_tasks.add(task)
+    task.add_done_callback(_activity_tasks.discard)
+
+
+async def _publish_activity(workspace_id: str) -> None:
+    """Publishing follows a call that has already returned, so a failure is logged, never raised."""
+    try:
+        while True:
+            _activity_stale.discard(workspace_id)
+            scopes = ws_activity.scopes(workspace_id)
+            if not scopes:
+                return
+            payloads = await asyncio.to_thread(_activity_payloads, workspace_id, scopes)
+            for scope, payload in payloads.items():
+                await ws_activity.publish(workspace_id, scope, payload)
+            if workspace_id not in _activity_stale:
+                return
+    except Exception:
+        logger.warning("[activity] could not stream the %s activity", workspace_id, exc_info=True)
+    finally:
+        _activity_running.discard(workspace_id)
+
+
+def _activity_payloads(workspace_id: str, scopes: list[str | None]) -> dict[str | None, dict[str, Any]]:
+    workspace = STORE.load_workspace(workspace_id)
+    events = STORE.read_events(workspace_id)
+    entries = STORE.read_activity(workspace_id)
+    now = time.time()
+    return {scope: build_activity_timeline(entries, events, workspace, scope, now) for scope in scopes}
+
+
+@app.websocket("/ws/activity/{workspace_id}")
+async def fastapi_activity(websocket: WebSocket, workspace_id: str, page: str | None = None):
+    await ws_activity.connect(websocket, workspace_id, page or None)
+    schedule_activity_publish(workspace_id)   # catch up on what landed since the page was rendered
+
+    async def send_updates():
+        while True:
+            await websocket.send_text('{"heartbeat": 1}')
+            await asyncio.sleep(5)
+
+    task = asyncio.create_task(send_updates())
+    try:
+        while True:
+            _ = await websocket.receive_text()  # receive and do nothing
+    except WebSocketDisconnect:
+        _ = task.cancel()
+        ws_activity.disconnect(websocket)
+
+
 # --- FastAPI routes ----------------------------------------------------------
 @contextmanager
 def _guard_http() -> Generator[None]:
@@ -336,7 +405,7 @@ def page_view_after_action(workspace_id_part: str, page_id: str, referer: str | 
 
 # Archive/unarchive a page from its web view. These mirror the archivePage / unarchivePage MCP
 # tools (a browser can't call MCP), so the wiki's Archive/Unarchive button POSTs here. Each sends
-# the in-place update and streams its events to timeline tabs like the MCP tools do, then
+# the in-place update and streams its events to timeline and activity tabs like the MCP tools do, then
 # redirects back to the page it was posted from (303), so the posting tab loads it again with a
 # GET and a reload or back button never re-POSTs the change.
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/archive", response_class=RedirectResponse)
@@ -346,6 +415,7 @@ async def route_archive_page(request: Request, workspaceIdPart: str, pageId: str
         _ = STORE.archive_page(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
+        schedule_activity_publish(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -357,6 +427,7 @@ async def route_unarchive_page(request: Request, workspaceIdPart: str, pageId: s
         _ = STORE.unarchive_page(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
+        schedule_activity_publish(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -372,6 +443,7 @@ async def route_schedule_page_deletion(request: Request, workspaceIdPart: str, p
         _ = STORE.schedule_page_deletion(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
+        schedule_activity_publish(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -383,6 +455,7 @@ async def route_unschedule_page_deletion(request: Request, workspaceIdPart: str,
         _ = STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.update()
         await publish_events(workspace_id)
+        schedule_activity_publish(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -400,6 +473,7 @@ async def route_set_page_status(request: Request, workspaceIdPart: str, pageId: 
         _ = STORE.set_page_status(workspace_id, pageId, status)
         await ws_reloader.update()
         await publish_events(workspace_id)
+        schedule_activity_publish(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
