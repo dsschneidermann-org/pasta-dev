@@ -53,3 +53,36 @@ def call_entry(tool: str, arguments: Mapping[str, JSONValue], returned_bytes: in
     write = tool in WRITE_TOOLS
     return workspace_id, {"at": at, "kind": "call", "pageId": named_page(arguments), "tool": tool,
                           "write": write, "bytes": sent_bytes(arguments) if write else returned_bytes}
+
+
+def page_ref_ids(value: object) -> list[str]:
+    """Every page id held by an inline ref run - a dict whose only key is "ref", with a string value -
+    anywhere inside `value`, each once, first seen first."""
+    found: dict[str, None] = {}
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            if len(node) == 1 and isinstance(ref := node.get("ref"), str):
+                _ = found.setdefault(ref)
+                return
+            for child in node.values():
+                walk(child)
+        elif isinstance(node, list):
+            for child in node:
+                walk(child)
+
+    walk(value)
+    return list(found)
+
+
+def page_additions(before: Page, after: Page, at: str) -> list[ActivityEntry]:
+    """What one write newly added to a page: each link whose (to, role) pair it did not have, then each
+    page ref none of its text held before."""
+    old_links = {(link.get("to"), link.get("role")) for link in before.links}
+    entries: list[ActivityEntry] = [
+        {"at": at, "kind": "link", "pageId": after.id, "to": link["to"], "role": link["role"]}
+        for link in after.links if (link.get("to"), link.get("role")) not in old_links]
+    old_refs = set(page_ref_ids(before.sections))
+    entries += [{"at": at, "kind": "ref", "pageId": after.id, "to": ref}
+                for ref in page_ref_ids(after.sections) if ref not in old_refs]
+    return entries

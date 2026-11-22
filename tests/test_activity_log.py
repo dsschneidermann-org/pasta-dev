@@ -5,7 +5,8 @@ call belongs to and its bytes, what a write newly added to a page, and the JSONL
 import ast
 from pathlib import Path
 
-from src.activity_log import WRITE_TOOLS, call_entry, named_page, sent_bytes
+from src.activity_log import WRITE_TOOLS, call_entry, named_page, page_additions, page_ref_ids, sent_bytes
+from src.model import Page
 
 AT = "2026-11-22T18:45:03.120456+00:00"
 
@@ -54,3 +55,39 @@ def _tools_sending_update() -> set[str]:
 
 def test_the_writes_are_exactly_the_tools_that_change_data():
     assert WRITE_TOOLS == _tools_sending_update()
+
+
+def _page(links=(), sections=None):
+    return Page(id="doc", type="test-blocks", title="Doc", status="draft",
+                links=[dict(link) for link in links], sections=sections or {})
+
+
+def test_page_ref_ids_finds_every_ref_run_once_in_first_seen_order():
+    sections = {"body": {"body": [
+        {"kind": "paragraph", "inlines": ["see ", {"ref": "b"}, " and ", {"ref": "a"}]},
+        {"kind": "list", "items": [[{"ref": "a"}], [{"text": "x", "bold": True}, {"ref": "c"}]]},
+    ]}, "summary": {"text": "plain"}}
+    assert page_ref_ids(sections) == ["b", "a", "c"]
+
+
+def test_a_dict_with_more_than_a_string_ref_is_not_a_ref_run():
+    assert page_ref_ids([{"ref": "a", "role": "x"}, {"ref": 3}, {"to": "b"}]) == []
+
+
+def test_additions_name_new_links_then_first_mentioned_refs():
+    before = _page(links=[{"to": "old", "role": "relates-to"}],
+                   sections={"body": {"body": [{"kind": "paragraph", "inlines": [{"ref": "kept"}]}]}})
+    after = _page(links=[{"to": "old", "role": "relates-to"}, {"to": "old", "role": "depends-on"},
+                         {"to": "new", "role": "relates-to"}],
+                  sections={"body": {"body": [{"kind": "paragraph", "inlines": [{"ref": "kept"}, {"ref": "fresh"}]}]}})
+    assert page_additions(before, after, AT) == [
+        {"at": AT, "kind": "link", "pageId": "doc", "to": "old", "role": "depends-on"},
+        {"at": AT, "kind": "link", "pageId": "doc", "to": "new", "role": "relates-to"},
+        {"at": AT, "kind": "ref", "pageId": "doc", "to": "fresh"},
+    ]
+
+
+def test_rewriting_text_that_already_held_a_ref_adds_nothing():
+    before = _page(sections={"body": {"body": [{"kind": "paragraph", "inlines": ["a ", {"ref": "kept"}]}]}})
+    after = _page(sections={"body": {"body": [{"kind": "paragraph", "inlines": ["b ", {"ref": "kept"}]}]}})
+    assert page_additions(before, after, AT) == []
