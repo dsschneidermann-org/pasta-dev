@@ -68,6 +68,15 @@ def test_no_times_or_an_empty_span_gives_no_segments(times, start, end):
     assert playback_segments(times, start, end) == []
 
 
+def test_a_caller_can_play_at_its_own_rate_and_window():
+    # 20 workspace seconds per playback second, 30 s either side of a time: 10 s of activity is 0.5 s
+    assert playback_segments([100.0, 110.0], 100.0, 110.0, base_rate=20.0, active_window=30.0) == [
+        Segment(100.0, 110.0, 0.0, 0.5)]
+    # an idle stretch between two windows is still squeezed to at most a second
+    assert playback_segments([0.0, 1000.0], 0.0, 1000.0, base_rate=20.0, active_window=30.0) == [
+        Segment(0.0, 30.0, 0.0, 1.5), Segment(30.0, 970.0, 1.5, 2.5), Segment(970.0, 1000.0, 2.5, 4.0)]
+
+
 def test_to_playback_clamps_interpolates_and_never_runs_backwards():
     start, end = 0.0, 10 * DAY
     segments = playback_segments([2 * DAY, 7 * DAY], start, end)
