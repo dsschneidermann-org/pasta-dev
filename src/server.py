@@ -304,6 +304,8 @@ async def route_tree(request: Request, workspaceIdPart: str, archived: str | Non
         show_archived = True if archived == "true" else False
         pages_tree = STORE.tree(workspace_id, show_archived)
         body = md2html.render(render_workspace_links(pages_tree, show_archived, show_meta=True, escape_plain_text=True))
+        activity = build_activity_timeline(STORE.read_activity(workspace_id), STORE.read_events(workspace_id),
+                                           workspace, None, time.time())
         return templates.TemplateResponse(
             request=request,
             name="tree.html",
@@ -312,6 +314,9 @@ async def route_tree(request: Request, workspaceIdPart: str, archived: str | Non
                 "workspace_name": workspace.name,
                 "show_archived": show_archived,
                 "body": body,
+                # The whole workspace's last day of activity, drawn at the top of the index.
+                "activity": activity,
+                "activity_scope": "",
             }
         )
 
@@ -370,6 +375,8 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
         body = STORE.render_html(workspace_id, pageId, show_archived)
         if markdown == "true":
             body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived, escape_plain_text=True))
+        activity = build_activity_timeline(STORE.read_activity(workspace_id), STORE.read_events(workspace_id),
+                                           workspace, page.id, time.time())
         return templates.TemplateResponse(
             request=request,
             name="page.html",
@@ -390,6 +397,9 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 "status": page.status,
                 # The Model overlay loads the docsite page for the page's type AND current status.
                 "page_type_doc": f"{page.type}-{page.status}",
+                # The last day of activity of this page and every page beneath it, drawn above the body.
+                "activity": activity,
+                "activity_scope": page.id,
             },
         )
 

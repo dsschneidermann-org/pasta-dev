@@ -462,6 +462,62 @@ def test_nothing_is_rebuilt_while_no_tab_watches(monkeypatch):
     assert asyncio.run(run()) == set()
 
 
+def _activity(html: str) -> tuple[dict, str]:
+    match = re.search(r'<script type="application/json" id="activity-data" data-workspace="[^"]*" '
+                      r'data-page="([^"]*)">(.*?)</script>', html, re.S)
+    assert match is not None
+    return json.loads(match.group(2)), match.group(1)
+
+
+def test_a_page_view_shows_the_activity_of_the_page_and_every_page_beneath_it(client):
+    workspace = server.STORE.create_workspace("demo")
+    parent = server.STORE.create_page(workspace.id, "test-flow", "Parent").page
+    child = server.STORE.create_page(workspace.id, "test-flow", "Child", parent.id).page
+    sibling = server.STORE.create_page(workspace.id, "test-flow", "Sibling").page
+    server.STORE.append_activity(workspace.id, [_recent_call(child.id), _recent_call(sibling.id),
+                                                _recent_call(None, "tree")])
+    data, scope = _activity(client.get(f"/{workspace.id}/page/{parent.id}").text)
+    assert scope == parent.id
+    assert sorted(line["id"] for line in data["lines"]) == sorted([parent.id, child.id])
+
+
+def test_the_workspace_index_shows_every_page_and_the_calls_that_name_none(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    server.STORE.append_activity(workspace.id, [_recent_call(None, "search")])
+    data, scope = _activity(client.get(f"/{workspace.id}").text)
+    assert scope == ""
+    assert {line["id"]: line["colour"] for line in data["lines"]} == {page.id: "page", workspace.id: "workspace"}
+
+
+def test_the_activity_sits_at_the_top_and_out_of_the_in_place_update(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    page_html = client.get(f"/{workspace.id}/page/{page.id}").text
+    tree_html = client.get(f"/{workspace.id}").text
+    for html in (page_html, tree_html):
+        assert '<section id="activity" class="activity" data-morph-skip' in html
+    assert page_html.index('id="page-view"') < page_html.index('id="activity"') < page_html.index('id="page-actions"')
+    assert tree_html.index(">Guidance</a>") < tree_html.index('id="activity"')
+
+
+def test_a_scope_with_nothing_in_the_last_day_says_so(client):
+    workspace = server.STORE.create_workspace("demo")          # no pages, so nothing was logged
+    html = client.get(f"/{workspace.id}").text
+    assert '<p class="ac-empty" id="ac-empty">No activity in the last 24 hours.</p>' in html
+    assert '<div id="ac-live" hidden>' in html
+
+
+def test_activity_colours_are_theme_tokens_defined_for_both_themes():
+    css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
+    for theme in ("body.light {", "body.dark {"):
+        block = css[css.index(theme):]
+        block = block[:block.index("}")]
+        assert "--line-page:" in block and "--line-workspace:" in block
+    section = css[css.index("/* Activity timeline"):]
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b", section)
+
+
 def test_responses_disable_caching(client):
     # No-cache is stamped by middleware, so it covers both HTML routes and - the real target -
     # the /static mount where image/asset files are served.
