@@ -188,6 +188,7 @@ def run_once(store: Any, now: datetime | None = None) -> list[SweepReport]:
         workspace_id = entry["id"]
         try:
             report = store.cleanup_workspace(workspace_id, now)
+            store.prune_activity(workspace_id, now.timestamp())
         except Exception as exc:               # one bad workspace must not end the pass
             logger.exception("[cleanup] %s failed", workspace_id)
             report = SweepReport(workspace_id, 0, 0, [], None, str(exc))
