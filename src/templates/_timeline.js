@@ -402,16 +402,16 @@ function main() {
     }
   }
 
-  // --- live events: each write's new log events, with the timeline rebuilt to include them ---
-  let since = Number(dataNode.dataset.events);   // the log events this page has; a reconnect resumes there
+  // --- live updates: the timeline rebuilt whenever its log changes ---
+  let digest = dataNode.dataset.digest;   // the items the drawing was built from; a reconnect hands back the latest
 
   function connect() {
-    const socket = new WebSocket(`/ws/events/${workspaceId}?since=${since}`);
+    const socket = new WebSocket(`/ws/events/${workspaceId}?digest=${digest}`);
 
     socket.onmessage = function(event) {
       const message = JSON.parse(event.data);
-      if (!message.events.length) return;    // the heartbeat
-      since += message.events.length;
+      if (!message.timeline) return;    // the heartbeat
+      digest = message.digest;
       show(message.timeline);
     };
 

@@ -39,8 +39,8 @@ function makeElement(tag, created) {
 
 // Runs the renderer at `scriptPath` on the payload at `payloadPath` (or `options.payloadText`), up
 // to the point the page has loaded: drawn, resting at its end, its events socket open. The page
-// says it was rendered from `options.eventCount` log events (3 by default), and the viewer prefers
-// reduced motion when `options.reducedMotion` is set.
+// says it was drawn from the items of digest `options.digest` ("rendered" by default), and the viewer
+// prefers reduced motion when `options.reducedMotion` is set.
 function loadTimeline(payloadPath, scriptPath, options = {}) {
   const created = [];
   const ids = {};
@@ -48,7 +48,7 @@ function loadTimeline(payloadPath, scriptPath, options = {}) {
   ids["tl-play"].textContent = "Play";                       // as timeline.html renders the button
   const payloadText = options.payloadText ?? fs.readFileSync(payloadPath, "utf8");
   ids["timeline-data"] = Object.assign(makeElement("script", created), {
-    textContent: payloadText, dataset: { workspace: "ws:check", events: String(options.eventCount ?? 3) },
+    textContent: payloadText, dataset: { workspace: "ws:check", digest: options.digest ?? "rendered" },
   });
 
   let onReady = null;

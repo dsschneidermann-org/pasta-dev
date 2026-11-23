@@ -55,49 +55,6 @@ ws_reloader = ReloaderConnectionManager()
 
 
 @dataclass
-class EventStream:
-    """One timeline tab: the workspace it watches and how many of that workspace's log events it has."""
-    websocket: WebSocket
-    workspace_id: str
-    seen: int
-
-
-class EventsConnectionManager:
-    def __init__(self):
-        self.active: list[EventStream] = []
-
-    async def connect(self, websocket: WebSocket, workspace_id: str, seen: int):
-        await websocket.accept()
-        self.active.append(EventStream(websocket, workspace_id, seen))
-
-    def disconnect(self, websocket: WebSocket):
-        # Idempotent: a stream already dropped by a failed send is simply gone.
-        self.active = [stream for stream in self.active if stream.websocket is not websocket]
-
-    def watching(self, workspace_id: str) -> bool:
-        return any(stream.workspace_id == workspace_id for stream in self.active)
-
-    async def publish(self, workspace_id: str, events: list[dict[str, str]], timeline: dict[str, Any]):
-        """Send each tab watching the workspace the events it has not seen, with the timeline."""
-        dead: list[EventStream] = []
-        for stream in list(self.active):
-            if stream.workspace_id != workspace_id or stream.seen >= len(events):
-                continue
-            # Counted before the send is awaited, so an overlapping publish never repeats an event.
-            unseen, stream.seen = events[stream.seen:], len(events)
-            try:
-                await stream.websocket.send_json({"events": unseen, "timeline": timeline})
-            except Exception:
-                dead.append(stream)
-        for stream in dead:
-            self.disconnect(stream.websocket)
-
-
-# Process-wide singleton. Must survive hot reloads, so it lives in this (reload-excluded) module.
-ws_events = EventsConnectionManager()
-
-
-@dataclass
 class ActivityStream:
     """One activity timeline tab: the workspace it watches and the page it shows, None for the whole workspace."""
     websocket: WebSocket
@@ -189,6 +146,10 @@ class LiveConnectionManager:
                 dead.append(stream)
         for stream in dead:
             self.disconnect(stream.websocket)
+
+
+# Process-wide singletons. They must survive hot reloads, so they live in this (reload-excluded) module.
+ws_events = LiveConnectionManager()     # Timeline page tabs; their scope is always None
 
 
 # Kept here so the gates of a rolled-back build still see it.
