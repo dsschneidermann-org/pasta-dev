@@ -6,7 +6,8 @@ import ast
 import asyncio
 from pathlib import Path
 
-from src.live_sockets import ActivityConnectionManager, EventsConnectionManager, ReloaderConnectionManager
+from src.live_sockets import (ActivityConnectionManager, EventsConnectionManager, LiveConnectionManager,
+                              ReloaderConnectionManager)
 
 TIMELINE = {"duration": 1.0, "lines": []}
 
@@ -109,6 +110,47 @@ def test_an_activity_tab_whose_send_fails_is_dropped_and_disconnect_is_idempoten
     manager.disconnect(gone)  # pyright: ignore[reportArgumentType]
     manager.disconnect(kept)  # pyright: ignore[reportArgumentType]
     assert manager.active == []
+
+
+def _live(manager: LiveConnectionManager, workspace_id: str, scope: str | None, digest: str) -> FakeSocket:
+    socket = FakeSocket()
+    asyncio.run(manager.connect(socket, workspace_id, scope, digest))  # pyright: ignore[reportArgumentType]
+    assert socket.accepted
+    return socket
+
+
+def test_a_live_publish_reaches_only_the_tabs_of_that_scope_not_drawn_from_its_items():
+    manager = LiveConnectionManager()
+    behind, current = _live(manager, "ws:a", "p", "old"), _live(manager, "ws:a", "p", "new")
+    index_tab, other = _live(manager, "ws:a", None, "old"), _live(manager, "ws:b", "p", "old")
+    asyncio.run(manager.publish("ws:a", "p", "new", TIMELINE))
+    assert behind.sent == [{"timeline": TIMELINE, "digest": "new"}]
+    assert current.sent == [] and index_tab.sent == [] and other.sent == []
+
+    asyncio.run(manager.publish("ws:a", "p", "new", TIMELINE))     # the tab is drawn from these items now
+    assert len(behind.sent) == 1
+
+
+def test_stale_scopes_are_each_scope_with_a_tab_behind_once_in_connect_order():
+    manager = LiveConnectionManager()
+    for scope, digest in (("p", "old"), (None, "old"), ("p", "old"), ("q", "new"), ("r", "")):
+        _ = _live(manager, "ws:a", scope, digest)
+    _ = _live(manager, "ws:b", "s", "old")
+    assert manager.stale_scopes("ws:a", "new") == ["p", None, "r"]
+    assert manager.stale_scopes("ws:c", "new") == []
+    assert manager.watching("ws:a") and not manager.watching("ws:c")
+
+
+def test_a_live_tab_whose_send_fails_is_dropped_and_disconnect_is_idempotent():
+    manager = LiveConnectionManager()
+    gone, kept = _live(manager, "ws:a", None, "old"), _live(manager, "ws:a", None, "old")
+    gone.dead = True
+    asyncio.run(manager.publish("ws:a", None, "new", TIMELINE))
+    assert [stream.websocket for stream in manager.active] == [kept]
+    manager.disconnect(gone)  # pyright: ignore[reportArgumentType]
+    manager.disconnect(kept)  # pyright: ignore[reportArgumentType]
+    manager.disconnect(kept)  # pyright: ignore[reportArgumentType]
+    assert manager.active == [] and not manager.watching("ws:a")
 
 
 class TextSocket:

@@ -142,6 +142,55 @@ class ActivityConnectionManager:
 ws_activity = ActivityConnectionManager()
 
 
+type Scope = str | None   # the page a tab shows with every page beneath it; None for the whole workspace
+
+
+@dataclass
+class LiveStream:
+    """One tab of a live view: the workspace it watches, the scope it shows, and the digest of the items
+    its drawing was built from."""
+    websocket: WebSocket
+    workspace_id: str
+    scope: Scope
+    digest: str
+
+
+class LiveConnectionManager:
+    def __init__(self):
+        self.active: list[LiveStream] = []
+
+    async def connect(self, websocket: WebSocket, workspace_id: str, scope: Scope, digest: str):
+        await websocket.accept()
+        self.active.append(LiveStream(websocket, workspace_id, scope, digest))
+
+    def disconnect(self, websocket: WebSocket):
+        # Idempotent: a stream already dropped by a failed send is simply gone.
+        self.active = [stream for stream in self.active if stream.websocket is not websocket]
+
+    def watching(self, workspace_id: str) -> bool:
+        return any(stream.workspace_id == workspace_id for stream in self.active)
+
+    def stale_scopes(self, workspace_id: str, digest: str) -> list[Scope]:
+        """Each scope of the workspace with a tab not drawn from the items of this digest, once, in connect order."""
+        return list(dict.fromkeys(stream.scope for stream in self.active
+                                  if stream.workspace_id == workspace_id and stream.digest != digest))
+
+    async def publish(self, workspace_id: str, scope: Scope, digest: str, timeline: dict[str, Any]):
+        """Send a payload built from the items of this digest to each tab of that scope not yet drawn from them."""
+        dead: list[LiveStream] = []
+        for stream in list(self.active):
+            if stream.workspace_id != workspace_id or stream.scope != scope or stream.digest == digest:
+                continue
+            # Set before the send is awaited, so an overlapping publish never sends it twice.
+            stream.digest = digest
+            try:
+                await stream.websocket.send_json({"timeline": timeline, "digest": digest})
+            except Exception:
+                dead.append(stream)
+        for stream in dead:
+            self.disconnect(stream.websocket)
+
+
 # Kept here so the gates of a rolled-back build still see it.
 _reload_failure: str | None = None
 
