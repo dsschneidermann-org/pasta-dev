@@ -46,8 +46,8 @@ function payload(times) {
   const marks = times.map((at, index) => ({ p: (at - t0) / RATE, at, kind: "call",
     tool: index % 2 ? "getPage" : "mutatePageBatch", write: index % 2 === 0, bytes: 2048 }));
   return { start: t0, end: t1, duration, baseRate: RATE, segments: [[t0, t1, 0, duration]], lanes: 1,
-    lines: [{ id: "feature-brief:p", title: "Page", colour: "feature-brief", href: "/ws:check/page/feature-brief:p",
-      lane: 0, p0: 0, p1: duration, marks }],
+    lines: [{ id: "feature-brief:p", title: "Page", colour: "feature-brief", path: ["Features", "Feature", "Page"],
+      href: "/ws:check/page/feature-brief:p", lane: 0, p0: 0, p1: duration, marks }],
     feed: marks.map((mark, index) => ({ p: mark.p, line: 0, mark: index })) };
 }
 const EMPTY = { start: 990, end: 990, duration: 0, baseRate: RATE, segments: [], lanes: 0, lines: [], feed: [] };
@@ -107,6 +107,12 @@ const checks = {
     page.ids["ac-play"].listeners.click();           // Replay from the start
     page.runFrames(200);
     assert.ok(!page.created.some((element) => element.classList.set.has("fresh")));
+  },
+  "hovering a line or its feed link names its whole path"(script) {
+    const page = load(script, BEFORE);
+    const path = "Features › Feature › Page";
+    assert.ok(page.created.some((element) => element.tag === "title" && element.textContent === path));
+    assert.ok(page.created.some((element) => element.tag === "a" && element.title === path));
   },
   "a heartbeat changes nothing"(script) {
     const page = load(script, BEFORE);

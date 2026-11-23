@@ -117,7 +117,7 @@
       lineNodes = data.lines.map((line) => {
         const group = el("g", { class: "ac-line" }, el("a", { href: line.href }, linesGroup));
         group.style.setProperty("--c", `var(--line-${line.colour})`);
-        el("title", {}, group).textContent = line.title;
+        el("title", {}, group).textContent = line.path.join(" › ");
         const lineY = y(line.lane);
         // Ahead of the playhead only the grey copy shows; the coloured copy is revealed as it passes.
         drawShapes(line, lineY, el("g", { class: "ac-ghost" }, group));
@@ -225,7 +225,7 @@
       if (mark.kind === "link") what.title = mark.role;
       const link = document.createElement("a");
       link.href = line.href;
-      link.title = line.title;
+      link.title = line.path.join(" › ");
       link.textContent = line.title;
       item.append(time, dot, what, link);
       return item;
