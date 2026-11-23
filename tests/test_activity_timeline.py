@@ -52,13 +52,14 @@ def test_a_page_missing_from_the_workspace_shows_only_its_own_activity():
     assert payload["lines"][0]["title"] == "gone"
 
 
-def test_a_page_timeline_leaves_out_calls_that_name_no_page_and_the_index_draws_them_on_the_workspace_line():
+def test_every_timeline_draws_the_calls_that_name_no_page_on_the_workspace_line_at_the_bottom():
     entries = [_call(None, 20, tool="search"), _call("feat", 10)]
-    assert _ids(build_activity_timeline(entries, [], _workspace(), "feat", NOW)) == ["feat"]
-    payload = build_activity_timeline(entries, [], _workspace(), None, NOW)
-    [workspace_line] = [line for line in payload["lines"] if line["id"] == "ws:w"]
-    assert (workspace_line["title"], workspace_line["colour"], workspace_line["href"]) == ("Demo", "workspace", "/ws:w")
-    assert workspace_line["marks"][0]["tool"] == "search"
+    for scope in ("feat", None):
+        lines = build_activity_timeline(entries, [], _workspace(), scope, NOW)["lines"]
+        assert [line["id"] for line in lines] == ["feat", "ws:w"]
+        workspace_line = lines[-1]
+        assert (workspace_line["title"], workspace_line["colour"], workspace_line["href"]) == ("Demo", "workspace", "/ws:w")
+        assert workspace_line["marks"][0]["tool"] == "search"
 
 
 def test_only_the_last_24_hours_are_shown_status_changes_included():
@@ -126,10 +127,10 @@ def test_lines_follow_the_page_hierarchy_each_on_its_own_lane():
     assert [(line["id"], line["lane"]) for line in lines] == [("feat", 0), ("plan", 1), ("other", 2)]
 
 
-def test_the_workspace_line_comes_first_and_pages_outside_the_tree_last():
+def test_pages_outside_the_tree_come_after_it_and_the_workspace_line_last():
     entries = [_call("gone-b", 40), _call("gone-a", 30), _call("plan", 20), _call(None, 10, tool="search")]
     payload = build_activity_timeline(entries, [], _workspace(), None, NOW)
-    assert [line["id"] for line in payload["lines"]] == ["ws:w", "plan", "gone-b", "gone-a"]
+    assert [line["id"] for line in payload["lines"]] == ["plan", "gone-b", "gone-a", "ws:w"]
     assert payload["lanes"] == 4
 
 

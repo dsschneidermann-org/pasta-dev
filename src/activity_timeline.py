@@ -99,7 +99,7 @@ def build_activity_timeline(entries: Sequence[ActivityEntry], events: Sequence[E
         at, page_id, mark = entry_seconds(entry), entry.get("pageId"), _entry_mark(entry, workspace)
         if at < since or mark is None:
             continue
-        if page_id is None and members is None:
+        if page_id is None:
             marks.append((at, 1, order, workspace.id, mark, None))
         elif isinstance(page_id, str) and (members is None or page_id in members):
             marks.append((at, 1, order, page_id, mark, None))
@@ -124,11 +124,11 @@ def build_activity_timeline(entries: Sequence[ActivityEntry], events: Sequence[E
     position = _tree_order(workspace)
 
     def line_order(line_id: str) -> tuple[int, int, float, str]:
-        if line_id == workspace.id:
-            return (0, 0, 0.0, "")
         if line_id in position:
-            return (1, position[line_id], 0.0, "")
-        return (2, 0, by_line[line_id][0][0], line_id)       # outside the tree: by first activity
+            return (0, position[line_id], 0.0, "")
+        if line_id == workspace.id:
+            return (2, 0, 0.0, "")                           # the server activity, under every page
+        return (1, 0, by_line[line_id][0][0], line_id)       # outside the tree: by first activity
 
     lines: list[dict[str, Any]] = [
         {**_line_meta(workspace, line_id, logged.get(line_id)), "lane": lane,

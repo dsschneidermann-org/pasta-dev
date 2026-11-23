@@ -478,7 +478,7 @@ def test_a_page_view_shows_the_activity_of_the_page_and_every_page_beneath_it(cl
                                                 _recent_call(None, "tree")])
     data, scope = _activity(client.get(f"/{workspace.id}/page/{parent.id}").text)
     assert scope == parent.id
-    assert sorted(line["id"] for line in data["lines"]) == sorted([parent.id, child.id])
+    assert [line["id"] for line in data["lines"]] == [parent.id, child.id, workspace.id]
 
 
 def test_the_workspace_index_shows_every_page_and_the_calls_that_name_none(client):
