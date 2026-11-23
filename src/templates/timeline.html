@@ -114,7 +114,7 @@
     </ul>
     <ol class="tl-feed" id="tl-feed"></ol>
     </div>
-    <script type="application/json" id="timeline-data" data-workspace="{{ workspace_id }}" data-events="{{ event_count }}">{{ payload | tojson }}</script>
+    <script type="application/json" id="timeline-data" data-workspace="{{ workspace_id }}" data-digest="{{ digest }}">{{ payload | tojson }}</script>
     <script>
 {% include '_timeline.js' %}
     </script>

@@ -16,8 +16,10 @@
     const PX = 120;          // pixels per playback second
     const LANE_H = 18;
     const AXIS_H = 34;
-    const X0 = 16;           // left margin, so the first mark is not cut in half
+    const MIN_H = 130;       // fewest pixels the stage is tall, however few lines it holds
+    const X0 = 16;          // left margin, so the first mark is not cut in half
     const HEAD = 0.7;        // how far across the stage the playhead rides
+    const FRESH = 0.6;       // playback seconds a mark stays highlighted after the playhead passes
     const SPEAK = 1.5;       // playback seconds a mark's label stays up after it is passed
     const MAX_STEP = 0.1;    // most playback seconds one frame advances, so a stalled frame never skips the replay ahead
     const FEED_SIZE = 6;
@@ -103,7 +105,7 @@
 
     function draw() {
       segments = data.segments.map(([t0, t1, p0, p1]) => ({ t0, t1, p0, p1 }));
-      const height = AXIS_H + data.lanes * LANE_H + LANE_H / 2;
+      const height = Math.max(MIN_H, AXIS_H + data.lanes * LANE_H + LANE_H / 2);
       stage.replaceChildren();
       stage.setAttribute("height", height);
       const clip = el("clipPath", { id: "ac-clip" }, el("defs", {}, stage));
@@ -121,7 +123,7 @@
         const lineY = y(line.lane);
         // Ahead of the playhead only the grey copy shows; the coloured copy is revealed as it passes.
         drawShapes(line, lineY, el("g", { class: "ac-ghost" }, group));
-        drawShapes(line, lineY, el("g", { "clip-path": "url(#ac-clip)" }, group));
+        const marks = drawShapes(line, lineY, el("g", { "clip-path": "url(#ac-clip)" }, group));
         // Labels sit outside the clip, so one reaching past the playhead is not cut off.
         const labelGroup = el("g", {}, group);
         const labels = line.marks.map((mark) => {
@@ -133,7 +135,8 @@
           label.textContent = markLabel(mark);
           return label;
         });
-        return { labels, speaking: line.marks.map(() => false) };
+        const unset = () => line.marks.map(() => false);
+        return { marks, labels, fresh: unset(), speaking: unset() };
       });
 
       slider.max = data.duration;
@@ -168,19 +171,19 @@
     // A line's track and marks; drawn once in grey and once in colour.
     function drawShapes(line, lineY, parent) {
       el("line", { class: "ac-track", x1: x(line.p0), x2: x(line.p1), y1: lineY, y2: lineY }, parent);
-      for (const mark of line.marks) {
+      return line.marks.map((mark) => {
         const cx = x(mark.p);
         if (mark.kind === "call") {
-          el("line", { class: "ac-call", x1: cx, x2: cx, y1: lineY - 6, y2: lineY + 6 }, parent);
-        } else if (mark.kind === "link" || mark.kind === "ref") {
-          el("path", {
-            class: mark.kind === "link" ? "ac-link" : "ac-ref",
+          return el("line", { class: "ac-call", x1: cx, x2: cx, y1: lineY - 6, y2: lineY + 6 }, parent);
+        }
+        if (mark.kind === "link" || mark.kind === "ref") {
+          return el("path", {
+            class: "ac-link",
             d: `M${cx} ${lineY - 3.5} L${cx + 3.5} ${lineY} L${cx} ${lineY + 3.5} L${cx - 3.5} ${lineY} Z`,
           }, parent);
-        } else {
-          el("circle", { class: mark.kind === "status" ? "ac-stop ac-transition" : "ac-stop", cx, cy: lineY, r: 3.5 }, parent);
         }
-      }
+        return el("circle", { class: mark.kind === "status" ? "ac-stop ac-transition" : "ac-stop", cx, cy: lineY, r: 3.5 }, parent);
+      });
     }
 
     // --- the minimap under the scrubber: every line at once, and the window the stage shows ---
@@ -258,13 +261,18 @@
         hourCycle: "h23",
       });
 
-      // A line announces only its latest mark passed, and never a page's creation, so a burst of
-      // calls does not stack its labels.
+      // A line announces only its latest mark passed, so a burst of calls does not stack its labels.
       data.lines.forEach((line, index) => {
         const node = lineNodes[index];
         const latest = line.marks.findLastIndex((mark) => mark.p <= p);
         line.marks.forEach((mark, number) => {
-          const speaking = number === latest && mark.kind !== "created" && p - mark.p < SPEAK;
+          const since = p - mark.p;
+          const fresh = since >= 0 && since < FRESH;
+          if (fresh !== node.fresh[number]) {
+            node.fresh[number] = fresh;
+            node.marks[number].classList.toggle("fresh", fresh);
+          }
+          const speaking = number === latest && since < SPEAK;
           if (speaking !== node.speaking[number]) {
             node.speaking[number] = speaking;
             node.labels[number].classList.toggle("speaking", speaking);
@@ -413,14 +421,18 @@
       }
     }
 
-    // --- live activity: each recorded call, with the timeline rebuilt to include it ---
+    // --- live activity: the timeline rebuilt whenever its items change ---
+    let digest = dataNode.dataset.digest;   // the items the drawing was built from; a reconnect hands back the latest
+
     function connect() {
-      const query = pageId ? `?page=${encodeURIComponent(pageId)}` : "";
-      const socket = new WebSocket(`/ws/activity/${workspaceId}${query}`);
+      const page = pageId ? `page=${encodeURIComponent(pageId)}&` : "";
+      const socket = new WebSocket(`/ws/activity/${workspaceId}?${page}digest=${digest}`);
 
       socket.onmessage = function(event) {
         const message = JSON.parse(event.data);
-        if (message.timeline) show(message.timeline);      // anything else is the heartbeat
+        if (!message.timeline) return;      // the heartbeat
+        digest = message.digest;
+        show(message.timeline);
       };
 
       socket.onclose = function(e) {

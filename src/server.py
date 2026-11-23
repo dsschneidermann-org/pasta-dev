@@ -27,12 +27,16 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from . import cleanup
-from .activity_log import call_entry
+from .activity_log import ActivityEntry, call_entry
 from .activity_timeline import build_activity_timeline
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .event_cache import page_events
-from .live_sockets import reload_failure, ws_activity, ws_events, ws_reloader
+from .event_log import Event
+from .event_timeline import build_event_timeline
+from .live_digest import items_digest
+from .live_publish import LivePublisher
+from .live_sockets import LiveConnectionManager, Scope, reload_failure, ws_activity, ws_events, ws_reloader
 from .instructions import render_instructions
 from .pagetypes._registry import (
     declaration_errors,
@@ -46,7 +50,6 @@ from .render_html import md2html
 from .serialize import page_to_dict
 from .source_link import read_remote_url, to_source_link
 from .store import Store
-from .timeline import build_timeline
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -165,109 +168,69 @@ async def fastapi_reloader(websocket: WebSocket):
         _ = task.cancel()
 
 
-# --- Websocket events --------------------------------------------------------
-# The timeline tabs' connection manager (`ws_events`) lives in src.live_sockets beside the
-# reloader's, so its live connections survive hot reloads. The writes below that log lifecycle
-# events publish them to it, each with the timeline rebuilt to include them.
+# --- Live views ---------------------------------------------------------------
+# The Timeline page and the activity timeline each keep their tabs current over a socket of their own.
+# A page embeds the digest of the items it was drawn from and its tab hands it back on connect; the
+# view's publisher sends a rebuilt payload only to the tabs not drawn from the current items, from a
+# background round that never holds up the call that asked for it.
 
-async def publish_events(workspace_id: str) -> None:
-    """Stream the log events a write appended to the timeline tabs watching its workspace, with the
-    timeline rebuilt to include them. The write has already committed, so a failure is logged, never raised."""
-    if not ws_events.watching(workspace_id):
-        return
-    try:
-        events = STORE.read_events(workspace_id)
-        timeline = build_timeline(events, STORE.load_workspace(workspace_id), time.time())
-        await ws_events.publish(workspace_id, events, timeline)
-    except Exception:
-        logger.warning("[events] could not stream the %s event log", workspace_id, exc_info=True)
+async def _serve_live_tab(websocket: WebSocket, manager: LiveConnectionManager, publisher: LivePublisher[Any],
+                          workspace_id: str, scope: Scope, digest: str) -> None:
+    await manager.connect(websocket, workspace_id, scope, digest)
+    publisher.schedule(workspace_id)   # catch up, if anything changed since the page was drawn
 
-
-@app.websocket("/ws/events/{workspace_id}")
-async def fastapi_events(websocket: WebSocket, workspace_id: str, since: int = 0):
-    await ws_events.connect(websocket, workspace_id, since)
-    await publish_events(workspace_id)   # catch up on what was logged since the page was rendered
-
-    async def send_updates():
-        while True:
-            await websocket.send_text('{"events": []}')
-            await asyncio.sleep(5)
-
-    task = asyncio.create_task(send_updates())
-    try:
-        while True:
-            _ = await websocket.receive_text()  # receive and do nothing
-    except WebSocketDisconnect:
-        _ = task.cancel()
-        ws_events.disconnect(websocket)
-
-
-# --- Websocket activity -------------------------------------------------------
-# The activity timeline tabs' manager (`ws_activity`) lives in src.live_sockets beside the others.
-# Every recorded call asks for a publish. A rebuild loads the whole workspace, so it runs off the
-# caller's path, in a thread, and once more at most for however many calls land while it runs.
-_activity_running: set[str] = set()
-_activity_stale: set[str] = set()
-_activity_tasks: set[asyncio.Task[None]] = set()   # strong references until each task finishes
-
-
-def schedule_activity_publish(workspace_id: str) -> None:
-    """Rebuild and send the activity timelines of the tabs watching the workspace, without waiting."""
-    if not ws_activity.watching(workspace_id):
-        return
-    if workspace_id in _activity_running:
-        _activity_stale.add(workspace_id)
-        return
-    _activity_running.add(workspace_id)
-    task = asyncio.get_running_loop().create_task(_publish_activity(workspace_id))
-    _activity_tasks.add(task)
-    task.add_done_callback(_activity_tasks.discard)
-
-
-async def _publish_activity(workspace_id: str) -> None:
-    """Publishing follows a call that has already returned, so a failure is logged, never raised."""
-    try:
-        while True:
-            _activity_stale.discard(workspace_id)
-            scopes = ws_activity.scopes(workspace_id)
-            if not scopes:
-                return
-            payloads = await asyncio.to_thread(_activity_payloads, workspace_id, scopes)
-            for scope, payload in payloads.items():
-                await ws_activity.publish(workspace_id, scope, payload)
-            if workspace_id not in _activity_stale:
-                return
-    except Exception:
-        logger.warning("[activity] could not stream the %s activity", workspace_id, exc_info=True)
-    finally:
-        _activity_running.discard(workspace_id)
-
-
-def _activity_payloads(workspace_id: str, scopes: list[str | None]) -> dict[str | None, dict[str, Any]]:
-    workspace = STORE.load_workspace(workspace_id)
-    events = STORE.read_events(workspace_id)
-    entries = STORE.read_activity(workspace_id)
-    now = time.time()
-    return {scope: build_activity_timeline(entries, events, workspace, scope, now) for scope in scopes}
-
-
-@app.websocket("/ws/activity/{workspace_id}")
-async def fastapi_activity(websocket: WebSocket, workspace_id: str, page: str | None = None):
-    await ws_activity.connect(websocket, workspace_id, page or None)
-    schedule_activity_publish(workspace_id)   # catch up on what landed since the page was rendered
-
-    async def send_updates():
+    async def send_heartbeats():
         while True:
             await websocket.send_text('{"heartbeat": 1}')
             await asyncio.sleep(5)
 
-    task = asyncio.create_task(send_updates())
+    task = asyncio.create_task(send_heartbeats())
     try:
         while True:
             _ = await websocket.receive_text()  # receive and do nothing
     except WebSocketDisconnect:
         _ = task.cancel()
-        ws_activity.disconnect(websocket)
+        manager.disconnect(websocket)
+
+
+def _timeline_items(workspace_id: str) -> tuple[str, list[Event]]:
+    events = STORE.read_events(workspace_id)
+    return items_digest(events), events
+
+
+def _timeline_payloads(workspace_id: str, events: list[Event], scopes: list[Scope]) -> dict[Scope, dict[str, Any]]:
+    workspace = STORE.load_workspace(workspace_id)
+    now = time.time()
+    return {scope: build_event_timeline(events, workspace, now) for scope in scopes}
+
+
+events_publisher = LivePublisher("events", ws_events, _timeline_items, _timeline_payloads)
+
+
+@app.websocket("/ws/events/{workspace_id}")
+async def fastapi_events(websocket: WebSocket, workspace_id: str, digest: str = ""):
+    await _serve_live_tab(websocket, ws_events, events_publisher, workspace_id, None, digest)
+
+
+def _activity_items(workspace_id: str) -> tuple[str, tuple[list[ActivityEntry], list[Event]]]:
+    entries, events = STORE.read_activity(workspace_id), STORE.read_events(workspace_id)
+    return items_digest([entries, events]), (entries, events)
+
+
+def _activity_payloads(workspace_id: str, items: tuple[list[ActivityEntry], list[Event]],
+                       scopes: list[Scope]) -> dict[Scope, dict[str, Any]]:
+    entries, events = items
+    workspace = STORE.load_workspace(workspace_id)
+    now = time.time()
+    return {scope: build_activity_timeline(entries, events, workspace, scope, now) for scope in scopes}
+
+
+activity_publisher = LivePublisher("activity", ws_activity, _activity_items, _activity_payloads)
+
+
+@app.websocket("/ws/activity/{workspace_id}")
+async def fastapi_activity(websocket: WebSocket, workspace_id: str, page: str | None = None, digest: str = ""):
+    await _serve_live_tab(websocket, ws_activity, activity_publisher, workspace_id, page or None, digest)
 
 
 # --- FastAPI routes ----------------------------------------------------------
@@ -304,8 +267,8 @@ async def route_tree(request: Request, workspaceIdPart: str, archived: str | Non
         show_archived = True if archived == "true" else False
         pages_tree = STORE.tree(workspace_id, show_archived)
         body = md2html.render(render_workspace_links(pages_tree, show_archived, show_meta=True, escape_plain_text=True))
-        activity = build_activity_timeline(STORE.read_activity(workspace_id), STORE.read_events(workspace_id),
-                                           workspace, None, time.time())
+        activity_digest, (entries, events) = _activity_items(workspace_id)
+        activity = build_activity_timeline(entries, events, workspace, None, time.time())
         return templates.TemplateResponse(
             request=request,
             name="tree.html",
@@ -317,6 +280,7 @@ async def route_tree(request: Request, workspaceIdPart: str, archived: str | Non
                 # The whole workspace's last day of activity, drawn at the top of the index.
                 "activity": activity,
                 "activity_scope": "",
+                "activity_digest": activity_digest,
             }
         )
 
@@ -328,8 +292,8 @@ async def route_timeline(request: Request, workspaceIdPart: str):
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
-        events = STORE.read_events(workspace_id)
-        payload = build_timeline(events, workspace, time.time())
+        digest, events = _timeline_items(workspace_id)
+        payload = build_event_timeline(events, workspace, time.time())
         return templates.TemplateResponse(
             request=request,
             name="timeline.html",
@@ -337,8 +301,8 @@ async def route_timeline(request: Request, workspaceIdPart: str):
                 "workspace_id": workspace_id,
                 "workspace_name": workspace.name,
                 "payload": payload,
-                # Where the page's events socket resumes the log from.
-                "event_count": len(events),
+                # What the page was drawn from; its events socket hands it back on connect.
+                "digest": digest,
             },
         )
 
@@ -375,8 +339,8 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
         body = STORE.render_html(workspace_id, pageId, show_archived)
         if markdown == "true":
             body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived, escape_plain_text=True))
-        activity = build_activity_timeline(STORE.read_activity(workspace_id), STORE.read_events(workspace_id),
-                                           workspace, page.id, time.time())
+        activity_digest, (entries, events) = _activity_items(workspace_id)
+        activity = build_activity_timeline(entries, events, workspace, page.id, time.time())
         return templates.TemplateResponse(
             request=request,
             name="page.html",
@@ -400,6 +364,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 # The last day of activity of this page and every page beneath it, drawn above the body.
                 "activity": activity,
                 "activity_scope": page.id,
+                "activity_digest": activity_digest,
             },
         )
 
@@ -426,8 +391,8 @@ async def route_archive_page(request: Request, workspaceIdPart: str, pageId: str
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.archive_page(workspace_id, pageId)
         await ws_reloader.update()
-        await publish_events(workspace_id)
-        schedule_activity_publish(workspace_id)
+        events_publisher.schedule(workspace_id)
+        activity_publisher.schedule(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -438,8 +403,8 @@ async def route_unarchive_page(request: Request, workspaceIdPart: str, pageId: s
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unarchive_page(workspace_id, pageId)
         await ws_reloader.update()
-        await publish_events(workspace_id)
-        schedule_activity_publish(workspace_id)
+        events_publisher.schedule(workspace_id)
+        activity_publisher.schedule(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -454,8 +419,8 @@ async def route_schedule_page_deletion(request: Request, workspaceIdPart: str, p
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.schedule_page_deletion(workspace_id, pageId)
         await ws_reloader.update()
-        await publish_events(workspace_id)
-        schedule_activity_publish(workspace_id)
+        events_publisher.schedule(workspace_id)
+        activity_publisher.schedule(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -466,8 +431,8 @@ async def route_unschedule_page_deletion(request: Request, workspaceIdPart: str,
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.unschedule_page_deletion(workspace_id, pageId)
         await ws_reloader.update()
-        await publish_events(workspace_id)
-        schedule_activity_publish(workspace_id)
+        events_publisher.schedule(workspace_id)
+        activity_publisher.schedule(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -484,8 +449,8 @@ async def route_set_page_status(request: Request, workspaceIdPart: str, pageId: 
         workspace_id = f"ws:{workspaceIdPart}"
         _ = STORE.set_page_status(workspace_id, pageId, status)
         await ws_reloader.update()
-        await publish_events(workspace_id)
-        schedule_activity_publish(workspace_id)
+        events_publisher.schedule(workspace_id)
+        activity_publisher.schedule(workspace_id)
         return RedirectResponse(page_view_after_action(workspaceIdPart, pageId, request.headers.get("referer")),
                                 status_code=303)
 
@@ -605,7 +570,7 @@ def _record_call(tool: str, arguments: dict[str, Any], result: ToolResult) -> No
             return
         workspace_id, entry = recorded
         STORE.append_activity(workspace_id, [entry])
-        schedule_activity_publish(workspace_id)
+        activity_publisher.schedule(workspace_id)
     except Exception:
         logger.warning("[activity] could not record the %s call", tool, exc_info=True)
 
@@ -763,7 +728,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         next_actions = STORE.next_actions(workspaceId, page.id)
         _record_guidance_emitted(workspaceId, page.id)
         await ws_reloader.update()
-        await publish_events(workspaceId)
+        events_publisher.schedule(workspaceId)
         return {
             "id": page.id,
             "type": page.type,
@@ -806,7 +771,7 @@ async def mutatePageBatch(
         if emit_in_full:
             _record_guidance_emitted(workspaceId, pageId)
         await ws_reloader.update()
-        await publish_events(workspaceId)
+        events_publisher.schedule(workspaceId)
         return {
             "pageId": page.id,
             "status": page.status,
@@ -868,7 +833,7 @@ async def archivePage(workspaceId: str, pageId: str) -> dict[str, Any]:
     with _guard_tool():
         page = STORE.archive_page(workspaceId, pageId)
         await ws_reloader.update()
-        await publish_events(workspaceId)
+        events_publisher.schedule(workspaceId)
         return {"id": page.id, "archived": page.archived}
 
 
@@ -878,7 +843,7 @@ async def unarchivePage(workspaceId: str, pageId: str) -> dict[str, Any]:
     with _guard_tool():
         page = STORE.unarchive_page(workspaceId, pageId)
         await ws_reloader.update()
-        await publish_events(workspaceId)
+        events_publisher.schedule(workspaceId)
         return {"id": page.id, "archived": page.archived}
 
 

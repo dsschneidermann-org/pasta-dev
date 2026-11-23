@@ -1,7 +1,7 @@
 // The map's marks: every line in a grey copy and a clipped coloured copy, a checkmark in both copies
 // of each delivered end, status changes filled, links free of queries, a status label for every
-// station, and the label of a line's latest transition - never of a page's creation - announced as
-// the playhead passes it.
+// station, and the label of a line's latest station - whatever its kind, a page's creation included -
+// announced as the playhead passes it, while every station passed is highlighted.
 //
 //     node check_marks.js <payload.json> <_timeline.js>
 "use strict";
@@ -35,6 +35,17 @@ const lineLinks = links.filter((link) => link.attrs.href !== undefined).map((lin
 assert.deepStrictEqual(lineLinks, data.lines.map((line) => `/ws:check/page/${line.id}`), "a line links to its page");
 links.forEach((link) => assert.ok(!(link.attrs.href ?? link.href).includes("?"), "a link carries no query"));
 
+// A line's hover title and its feed link's title name its whole page-hierarchy path; the link reads its title.
+const hoverTitles = created.filter((element) => element.tag === "title").map((element) => element.textContent);
+assert.deepStrictEqual(hoverTitles, data.lines.map((line) => line.path.join(" › ")), "a line's hover title is its path");
+const feedLinks = links.filter((link) => link.attrs.href === undefined);
+assert.ok(feedLinks.length > 0, "the feed lists the latest stations");
+feedLinks.forEach((link) => {
+  const line = data.lines.find((candidate) => link.href === `/ws:check/page/${candidate.id}`);
+  assert.strictEqual(link.title, line.path.join(" › "), "a feed link's title is its line's path");
+  assert.strictEqual(link.textContent, line.title, "a feed link reads its line's title");
+});
+
 // Labels are created line by line, station by station, so the nth label belongs to the nth station.
 const labels = timeline.classed("tl-label");
 assert.strictEqual(labels.length, stations.length, "one label per station");
@@ -54,7 +65,7 @@ function assertSpeaking(p) {
   for (const line of data.lines) {
     const latest = latestPassed(line, p);
     line.stops.forEach((stop, number) => {
-      const expected = number > 0 && number === latest && p - stop.p < SPEAK;
+      const expected = number === latest && p - stop.p < SPEAK;
       assert.strictEqual(speaking[index++], expected,
         `at ${p}, station ${number} of ${line.id} ${expected ? "speaks" : "is silent"}`);
     });
@@ -67,10 +78,6 @@ let frames = 0;
 while (timeline.pendingFrames() && frames < 100000) {
   timeline.runFrames(1);
   frames++;
-  labels.forEach((label, index) => {
-    if (!label.classList.set.has("speaking")) return;
-    assert.notStrictEqual(stations[index].number, 0, "a page's creation is never announced");
-  });
   assertSpeaking(timeline.playhead());
   mostSpeaking = Math.max(mostSpeaking, speakingNow().filter(Boolean).length);
 }
@@ -100,6 +107,28 @@ if (close) {
   assert.ok(speakingNow()[close.first] && !speakingNow()[close.second], "scrubbed back, the earlier speaks again");
 }
 
+// Every kind of station behaves the same as the playhead passes it: highlighted, and announced as
+// its line's latest - a creation with the status it was created in, an (un)archiving by its kind.
+const KINDS = [["created", "draft", "draft"], ["status", "open", "open"], ["archived", "open", "archived"],
+  ["unarchived", "open", "unarchived"]];
+const kindStops = KINDS.map(([kind, status], index) => ({ p: 1 + 3 * index, at: data.start + 3 * index, kind, status }));
+const kindLine = { id: "bug-report:kinds", type: "bug-report", title: "Label check", path: ["Bug Reports", "Label check"],
+  lane: 0, p0: 1, p1: 10, end: "open", stops: kindStops };
+const kindPayload = { start: data.start, end: data.start + 9, duration: 10, baseRate: data.baseRate,
+  segments: [[data.start, data.start + 9, 1, 10]], lanes: 1, lines: [kindLine],
+  feed: kindStops.map((stop, index) => ({ p: stop.p, line: 0, stop: index })) };
+const kinds = loadTimeline(payloadPath, scriptPath, { payloadText: JSON.stringify(kindPayload) });
+const kindLabels = kinds.classed("tl-label");
+const kindMarks = kinds.classed("tl-stop").slice(KINDS.length);   // the clipped copy, drawn after the grey one
+KINDS.forEach(([kind, , text], index) => {
+  kinds.scrubTo(kindStops[index].p + 0.1);
+  assert.strictEqual(kindLabels[index].textContent, text, `a ${kind} station is labelled ${text}`);
+  assert.deepStrictEqual(kindLabels.map((label) => label.classList.set.has("speaking")),
+    KINDS.map((_kind, other) => other === index), `passing a ${kind} station announces it alone`);
+  assert.ok(kindMarks[index].classList.set.has("fresh"), `passing a ${kind} station highlights it`);
+});
+
 console.log(`ok - ${data.lines.length} lines in two copies, ${delivered} checked ends, ${transitions} filled `
   + `status changes, ${labels.length} labels, up to ${mostSpeaking} announced at once, `
-  + (close ? `close transitions on ${close.line.id} scrubbed` : "no close transitions to scrub"));
+  + (close ? `close transitions on ${close.line.id} scrubbed` : "no close transitions to scrub")
+  + `, and a creation, status change, archiving and unarchiving each highlighted and announced alike`);

@@ -136,8 +136,10 @@ body.dark {
 .ac-stop { fill: var(--background-body); stroke: var(--c); stroke-width: 2; }
 .ac-transition { fill: var(--c); }
 .ac-call { stroke: var(--c); stroke-width: 3; }
-.ac-link { fill: var(--c); stroke: var(--c); stroke-width: 1; }
-.ac-ref { fill: var(--background-body); stroke: var(--c); stroke-width: 1.5; }
+.ac-link { fill: var(--background-body); stroke: var(--c); stroke-width: 1.5; }
+.ac-stop, .ac-call, .ac-link { transform-box: fill-box; transform-origin: center;
+    transition: transform 0.3s ease-out; }
+.ac-stop.fresh, .ac-call.fresh, .ac-link.fresh { transform: scale(1.9); }
 .ac-label { font-size: 10px; fill: var(--text-main); stroke: var(--background-body); stroke-width: 3px;
     paint-order: stroke; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
 .ac-label.speaking, .activity a:hover .ac-label, .activity a:focus-visible .ac-label { opacity: 1; }

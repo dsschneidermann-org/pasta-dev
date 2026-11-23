@@ -54,21 +54,26 @@ class ReloaderConnectionManager:
 ws_reloader = ReloaderConnectionManager()
 
 
+type Scope = str | None   # the page a tab shows with every page beneath it; None for the whole workspace
+
+
 @dataclass
-class EventStream:
-    """One timeline tab: the workspace it watches and how many of that workspace's log events it has."""
+class LiveStream:
+    """One tab of a live view: the workspace it watches, the scope it shows, and the digest of the items
+    its drawing was built from."""
     websocket: WebSocket
     workspace_id: str
-    seen: int
+    scope: Scope
+    digest: str
 
 
-class EventsConnectionManager:
+class LiveConnectionManager:
     def __init__(self):
-        self.active: list[EventStream] = []
+        self.active: list[LiveStream] = []
 
-    async def connect(self, websocket: WebSocket, workspace_id: str, seen: int):
+    async def connect(self, websocket: WebSocket, workspace_id: str, scope: Scope, digest: str):
         await websocket.accept()
-        self.active.append(EventStream(websocket, workspace_id, seen))
+        self.active.append(LiveStream(websocket, workspace_id, scope, digest))
 
     def disconnect(self, websocket: WebSocket):
         # Idempotent: a stream already dropped by a failed send is simply gone.
@@ -77,69 +82,30 @@ class EventsConnectionManager:
     def watching(self, workspace_id: str) -> bool:
         return any(stream.workspace_id == workspace_id for stream in self.active)
 
-    async def publish(self, workspace_id: str, events: list[dict[str, str]], timeline: dict[str, Any]):
-        """Send each tab watching the workspace the events it has not seen, with the timeline."""
-        dead: list[EventStream] = []
+    def stale_scopes(self, workspace_id: str, digest: str) -> list[Scope]:
+        """Each scope of the workspace with a tab not drawn from the items of this digest, once, in connect order."""
+        return list(dict.fromkeys(stream.scope for stream in self.active
+                                  if stream.workspace_id == workspace_id and stream.digest != digest))
+
+    async def publish(self, workspace_id: str, scope: Scope, digest: str, timeline: dict[str, Any]):
+        """Send a payload built from the items of this digest to each tab of that scope not yet drawn from them."""
+        dead: list[LiveStream] = []
         for stream in list(self.active):
-            if stream.workspace_id != workspace_id or stream.seen >= len(events):
+            if stream.workspace_id != workspace_id or stream.scope != scope or stream.digest == digest:
                 continue
-            # Counted before the send is awaited, so an overlapping publish never repeats an event.
-            unseen, stream.seen = events[stream.seen:], len(events)
+            # Set before the send is awaited, so an overlapping publish never sends it twice.
+            stream.digest = digest
             try:
-                await stream.websocket.send_json({"events": unseen, "timeline": timeline})
+                await stream.websocket.send_json({"timeline": timeline, "digest": digest})
             except Exception:
                 dead.append(stream)
         for stream in dead:
             self.disconnect(stream.websocket)
 
 
-# Process-wide singleton. Must survive hot reloads, so it lives in this (reload-excluded) module.
-ws_events = EventsConnectionManager()
-
-
-@dataclass
-class ActivityStream:
-    """One activity timeline tab: the workspace it watches and the page it shows, None for the whole workspace."""
-    websocket: WebSocket
-    workspace_id: str
-    page_id: str | None
-
-
-class ActivityConnectionManager:
-    def __init__(self):
-        self.active: list[ActivityStream] = []
-
-    async def connect(self, websocket: WebSocket, workspace_id: str, page_id: str | None):
-        await websocket.accept()
-        self.active.append(ActivityStream(websocket, workspace_id, page_id))
-
-    def disconnect(self, websocket: WebSocket):
-        # Idempotent: a stream already dropped by a failed send is simply gone.
-        self.active = [stream for stream in self.active if stream.websocket is not websocket]
-
-    def watching(self, workspace_id: str) -> bool:
-        return any(stream.workspace_id == workspace_id for stream in self.active)
-
-    def scopes(self, workspace_id: str) -> list[str | None]:
-        """Each page watched in the workspace once, None for the whole workspace, in connect order."""
-        return list(dict.fromkeys(stream.page_id for stream in self.active if stream.workspace_id == workspace_id))
-
-    async def publish(self, workspace_id: str, page_id: str | None, timeline: dict[str, Any]):
-        """Send the rebuilt activity timeline to each tab showing that page of the workspace."""
-        dead: list[ActivityStream] = []
-        for stream in list(self.active):
-            if stream.workspace_id != workspace_id or stream.page_id != page_id:
-                continue
-            try:
-                await stream.websocket.send_json({"timeline": timeline})
-            except Exception:
-                dead.append(stream)
-        for stream in dead:
-            self.disconnect(stream.websocket)
-
-
-# Process-wide singleton. Must survive hot reloads, so it lives in this (reload-excluded) module.
-ws_activity = ActivityConnectionManager()
+# Process-wide singletons. They must survive hot reloads, so they live in this (reload-excluded) module.
+ws_events = LiveConnectionManager()     # Timeline page tabs; their scope is always None
+ws_activity = LiveConnectionManager()   # activity timeline tabs
 
 
 # Kept here so the gates of a rolled-back build still see it.

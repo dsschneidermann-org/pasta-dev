@@ -18,7 +18,6 @@ from fastmcp.exceptions import ToolError
 import src.server as server
 from src.activity_log import sent_bytes
 from src.hmr_server import _build_proxy, _mount
-from src.live_sockets import EventStream
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.store import Store
 
@@ -546,28 +545,16 @@ def test_instructions_lists_workspace_guidance_setup(mcp):
     assert '"name": "getWorkspaceGuidance"' in text   # named in the guidance section, so its schema is listed
 
 
-# --- writes stream their lifecycle events to a watching timeline tab ----------
-class _RecordingTab:
-    def __init__(self):
-        self.sent: list[dict] = []
-
-    async def send_json(self, data):
-        self.sent.append(data)
-
-
-def test_mcp_writes_stream_their_events_to_a_watching_tab(mcp):
+# --- writes that log lifecycle events ask for a Timeline page publish --------
+def test_mcp_writes_that_log_events_ask_for_a_timeline_publish_of_their_workspace(mcp, monkeypatch):
+    asked = []
+    monkeypatch.setattr(server.events_publisher, "schedule", asked.append)
     workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
-    tab = _RecordingTab()
-    server.ws_events.active.append(EventStream(tab, workspace_id, 0))  # pyright: ignore[reportArgumentType]
-    try:
-        page_id = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"})["id"]
-        _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id, "commands": [{"command": "open"}]})
-        call(mcp, "archivePage", {"workspaceId": workspace_id, "pageId": page_id})
-    finally:
-        server.ws_events.disconnect(tab)  # pyright: ignore[reportArgumentType]
-    assert [[event["event"] for event in message["events"]] for message in tab.sent] == \
-        [["created"], ["status"], ["archived"]]
-    assert all("timeline" in message for message in tab.sent)
+    page_id = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"})["id"]
+    _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id, "commands": [{"command": "open"}]})
+    call(mcp, "archivePage", {"workspaceId": workspace_id, "pageId": page_id})
+    call(mcp, "unarchivePage", {"workspaceId": workspace_id, "pageId": page_id})
+    assert asked == [workspace_id] * 4
 
 
 def test_an_mcp_write_updates_open_tabs_in_place_and_never_reloads_them(mcp, monkeypatch):
@@ -634,7 +621,7 @@ def test_a_recording_that_fails_never_fails_the_call(mcp, monkeypatch, caplog):
 
 def test_a_recorded_call_asks_for_a_live_publish_of_its_workspace(mcp, monkeypatch):
     asked = []
-    monkeypatch.setattr(server, "schedule_activity_publish", asked.append)
+    monkeypatch.setattr(server.activity_publisher, "schedule", asked.append)
     workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     call(mcp, "tree", {"workspaceId": workspace_id})
     assert asked == [workspace_id]

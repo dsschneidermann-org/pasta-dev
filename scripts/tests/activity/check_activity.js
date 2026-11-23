@@ -71,7 +71,8 @@ function load(script, data, options = {}) {
   ids["ac-feed-toggle"].textContent = "▸";
   ids["ac-body"].hidden = true;
   ids["activity-data"] = Object.assign(makeElement("script", created), {
-    textContent: JSON.stringify(data), dataset: { workspace: "ws:check", page: options.page ?? "feature-brief:p" } });
+    textContent: JSON.stringify(data), dataset: { workspace: "ws:check", page: options.page ?? "feature-brief:p",
+      digest: options.digest ?? "rendered" } });
   global.document = {
     getElementById: (id) => ids[id] ?? null,
     createElementNS: (_namespace, tag) => makeElement(tag, created),
@@ -109,18 +110,56 @@ const checks = {
     const page = load(script, BEFORE);
     close(page.playhead(), 1.5, "the playhead rests at the end");
     assert.ok(!page.playing() && page.button().includes("Replay"));
-    assert.strictEqual(page.sockets[0].url, "/ws/activity/ws:check?page=feature-brief%3Ap");
-    assert.strictEqual(load(script, BEFORE, { page: "" }).sockets[0].url, "/ws/activity/ws:check");
+    assert.strictEqual(page.sockets[0].url, "/ws/activity/ws:check?page=feature-brief%3Ap&digest=rendered");
+    assert.strictEqual(load(script, BEFORE, { page: "" }).sockets[0].url, "/ws/activity/ws:check?digest=rendered");
   },
-  "draws every call, read or write, as the same thick tick, labelled, and never scales a passed mark"(script) {
+  "keeps its stage at least 130 px tall, the playhead and minute ticks reaching its bottom"(script) {
+    const short = load(script, BEFORE);                // one lane needs 34 + 18 + 9 = 61 px
+    assert.strictEqual(Number(short.ids["ac-stage"].attrs.height), 130, "a one-lane stage is held at 130 px");
+    const playheads = short.classed("ac-playhead");
+    assert.ok(playheads.length && playheads.every((line) => Number(line.attrs.y2) === 130), "the playhead reaches the bottom");
+    const ticks = short.created.filter((element) => element.tag === "line" && element.attrs.y1 === 16);
+    assert.ok(ticks.length && ticks.every((tick) => Number(tick.attrs.y2) === 130), "the minute ticks reach the bottom");
+    assert.ok(short.classed("ac-track").every((track) => track.attrs.y1 === 43), "the line keeps its place from the top");
+    const tall = load(script, { ...BEFORE, lanes: 10 });
+    assert.strictEqual(Number(tall.ids["ac-stage"].attrs.height), 34 + 10 * 18 + 9, "a taller stage keeps its own height");
+  },
+  "draws a link and a page ref as the same diamond, each labelled with its target"(script) {
+    const data = payload([1000, 1010]);
+    const line = data.lines[0];
+    line.marks = [
+      { p: line.marks[0].p, at: 1000, kind: "link", to: "feature-brief:q", title: "Other", role: "relates-to" },
+      { p: line.marks[1].p, at: 1010, kind: "ref", to: "feature-brief:q", title: "Other" }];
+    const page = load(script, data);
+    assert.strictEqual(page.classed("ac-link").length, 4, "both marks, in the grey and the coloured copy");
+    assert.deepStrictEqual(page.classed("ac-label").map((label) => label.textContent), ["→ Other", "→ Other"]);
+  },
+  "draws every call, read or write, as the same thick tick, labelled"(script) {
     const page = load(script, BEFORE);
     const ticks = page.classed("ac-call");
     assert.ok(ticks.length >= 8 && ticks.every((tick) => tick.attrs.y2 - tick.attrs.y1 === 12));
     assert.strictEqual(page.classed("ac-write").length, 0);
     assert.ok(page.classed("ac-label").some((label) => label.textContent === "mutatePageBatch 2.0 KB"));
-    page.ids["ac-play"].listeners.click();           // Replay from the start
-    page.runFrames(200);
-    assert.ok(!page.created.some((element) => element.classList.set.has("fresh")));
+  },
+  "highlights and announces every kind of mark alike as it is passed, a page's creation included"(script) {
+    const kinds = [
+      [{ kind: "created", status: "draft" }, "draft"], [{ kind: "status", status: "open" }, "open"],
+      [{ kind: "archived", status: "open" }, "archived"], [{ kind: "unarchived", status: "open" }, "unarchived"],
+      [{ kind: "call", tool: "getPage", write: false, bytes: 2048 }, "getPage 2.0 KB"]];
+    const data = payload(kinds.map((_kind, index) => 1000 + 10 * index));
+    const line = data.lines[0];
+    line.marks = line.marks.map((mark, index) => ({ p: mark.p, at: mark.at, ...kinds[index][0] }));
+    const page = load(script, data);
+    const labels = page.classed("ac-label");
+    const drawn = page.created.filter((element) => /\bac-(stop|call|link|ref)\b/.test(String(element.attrs?.class ?? "")));
+    const marks = drawn.slice(kinds.length);         // the clipped copy, drawn after the grey one
+    kinds.forEach(([mark, text], index) => {
+      page.scrubTo(line.marks[index].p + 0.1);
+      assert.strictEqual(labels[index].textContent, text, `a ${mark.kind} mark is labelled ${text}`);
+      assert.deepStrictEqual(labels.map((label) => label.classList.set.has("speaking")),
+        kinds.map((_kind, other) => other === index), `passing a ${mark.kind} mark announces it alone`);
+      assert.ok(marks[index].classList.set.has("fresh"), `passing a ${mark.kind} mark highlights it`);
+    });
   },
   "hovering a line or its feed link names its whole path"(script) {
     const page = load(script, BEFORE);
@@ -168,7 +207,7 @@ const checks = {
   },
   "a live payload is played into from the moment the viewer rested at"(script) {
     const page = load(script, BEFORE);
-    page.push({ timeline: SLID });
+    page.push({ timeline: SLID, digest: "slid" });
     close(page.playhead(), 1.0, "1030 s sits at 1.0 s on the slid clock");
     assert.ok(page.playing(), "time moves ahead to the new mark");
     page.runFrames(200);
@@ -177,32 +216,34 @@ const checks = {
   },
   "with reduced motion a live payload is jumped to at rest"(script) {
     const page = load(script, BEFORE, { reducedMotion: true });
-    page.push({ timeline: SLID });
+    page.push({ timeline: SLID, digest: "slid" });
     close(page.playhead(), 1.5, "at the new end");
     assert.ok(!page.playing());
   },
   "a paused viewer keeps the moment they were looking at"(script) {
     const page = load(script, BEFORE);
     page.scrubTo(0.75);                               // 1015 s
-    page.push({ timeline: SLID });
+    page.push({ timeline: SLID, digest: "slid" });
     close(page.playhead(), 0.25, "1015 s sits at 0.25 s on the slid clock");
     assert.ok(!page.playing());
   },
   "an empty timeline brings up the map on its first payload and plays it"(script) {
     const page = load(script, EMPTY);
     assert.ok(page.ids["ac-live"].hidden && !page.ids["ac-empty"].hidden);
-    page.push({ timeline: BEFORE });
+    page.push({ timeline: BEFORE, digest: "before" });
     assert.ok(!page.ids["ac-live"].hidden && page.ids["ac-empty"].hidden);
     close(page.playhead(), 0, "it starts from the first mark");
     assert.ok(page.playing());
   },
-  "takes no Space shortcut, declares no global main, and reconnects a second after a close"(script) {
+  "takes no Space shortcut, declares no global main, and reconnects a second after a close with the latest digest"(script) {
     const page = load(script, BEFORE);
     assert.ok(!("keydown" in page.documentListeners));
     assert.strictEqual(typeof global.main, "undefined");
+    page.push({ timeline: SLID, digest: "slid" });
     page.sockets[0].onclose({ reason: "check" });
     page.runTimers();
     assert.strictEqual(page.sockets.length, 2);
+    assert.strictEqual(page.sockets[1].url, "/ws/activity/ws:check?page=feature-brief%3Ap&digest=slid");
   },
 };
 
