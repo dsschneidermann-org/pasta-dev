@@ -593,17 +593,18 @@ def _call_result(mcp, name, args):
     return asyncio.run(_run())
 
 
-def test_every_call_naming_a_workspace_is_recorded_with_its_bytes(mcp):
+def test_every_call_naming_a_workspace_is_recorded_with_its_bytes_but_create_page(mcp):
     workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]        # names no workspace
-    create_args = {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"}
-    page_id = call(mcp, "createPage", create_args)["id"]
+    page_id = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"})["id"]
     result = _call_result(mcp, "getPage", {"workspaceId": workspace_id, "pageId": page_id})
     call(mcp, "tree", {"workspaceId": workspace_id})
+    rename_args = {"workspaceId": workspace_id, "pageId": page_id, "title": "Renamed"}
+    call(mcp, "renamePage", rename_args)
     entries = server.STORE.read_activity(workspace_id)
     assert [(entry["tool"], entry["pageId"], entry["write"]) for entry in entries] == [
-        ("createPage", None, True), ("getPage", page_id, False), ("tree", None, False)]
-    assert entries[0]["bytes"] == sent_bytes(create_args)
-    assert entries[1]["bytes"] == sum(len(block.text.encode("utf-8")) for block in result.content)
+        ("getPage", page_id, False), ("tree", None, False), ("renamePage", page_id, True)]
+    assert entries[0]["bytes"] == sum(len(block.text.encode("utf-8")) for block in result.content)
+    assert entries[2]["bytes"] == sent_bytes(rename_args)
 
 
 def test_a_failed_call_records_nothing(mcp):

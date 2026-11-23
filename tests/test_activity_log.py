@@ -56,6 +56,11 @@ def test_a_workspace_wide_call_names_no_page():
         "ws:a", {"at": AT, "kind": "call", "pageId": None, "tool": "search", "write": False, "bytes": 12})
 
 
+def test_a_create_page_call_is_not_recorded_though_it_is_a_write():
+    assert call_entry("createPage", {"workspaceId": "ws:a", "type": "x", "title": "T", "parentId": "p"}, 10, AT) is None
+    assert "createPage" in WRITE_TOOLS
+
+
 def test_a_call_naming_no_workspace_is_not_recorded():
     assert call_entry("listWorkspaces", {}, 40, AT) is None
     assert call_entry("describePageType", {"type": "x"}, 40, AT) is None

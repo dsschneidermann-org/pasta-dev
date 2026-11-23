@@ -24,6 +24,7 @@ WRITE_TOOLS = frozenset({
     "archiveWorkspace", "unarchiveWorkspace", "archivePage", "unarchivePage",
     "reparentPage", "reorderPage", "renamePage", "link", "unlink",
 })
+UNRECORDED_TOOLS = frozenset({"createPage"})   # a new page shows through its created station instead
 PAGE_ARGS = ("pageId", "fromId", "parentId")   # the argument naming a call's page; the first present wins
 
 # One line of the log: at, kind, pageId, then a call's tool, write and bytes, or a link's to and role, or a ref's to.
@@ -47,9 +48,9 @@ def sent_bytes(arguments: Mapping[str, JSONValue]) -> int:
 def call_entry(tool: str, arguments: Mapping[str, JSONValue], returned_bytes: int,
                at: str) -> tuple[str, ActivityEntry] | None:
     """The workspace a call named and its entry: a write carries the bytes it sent, a read the bytes
-    returned to it. A call naming no workspace is not recorded."""
+    returned to it. A call naming no workspace, or one in UNRECORDED_TOOLS, is not recorded."""
     workspace_id = arguments.get("workspaceId")
-    if not isinstance(workspace_id, str) or not workspace_id:
+    if not isinstance(workspace_id, str) or not workspace_id or tool in UNRECORDED_TOOLS:
         return None
     write = tool in WRITE_TOOLS
     return workspace_id, {"at": at, "kind": "call", "pageId": named_page(arguments), "tool": tool,
