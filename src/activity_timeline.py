@@ -39,14 +39,28 @@ def _entry_mark(entry: ActivityEntry, workspace: Workspace) -> dict[str, Any] | 
     return None
 
 
+def _path(workspace: Workspace, page_id: str) -> list[str]:
+    """The titles from the page's root page down to it, following parent_id; a cycle stops the walk."""
+    titles: list[str] = []
+    seen: set[str] = set()
+    page = workspace.pages.get(page_id)
+    while page is not None and page.id not in seen:
+        seen.add(page.id)
+        titles.append(page.title)
+        page = workspace.pages.get(page.parent_id) if page.parent_id else None
+    return titles[::-1]
+
+
 def _line_meta(workspace: Workspace, line_id: str, logged: Event | None) -> dict[str, Any]:
     if line_id == workspace.id:
-        return {"id": line_id, "title": workspace.name, "colour": "workspace", "href": f"/{workspace.id}"}
+        return {"id": line_id, "title": workspace.name, "colour": "workspace", "path": [workspace.name],
+                "href": f"/{workspace.id}"}
     page = workspace.pages.get(line_id)
     logged = logged or {}
     title = page.title if page is not None else logged.get("title", line_id)
     page_type = page.type if page is not None else logged.get("type")
     return {"id": line_id, "title": title, "colour": page_type if page_type in LINE_TYPES else "page",
+            "path": _path(workspace, line_id) if page is not None else [title],
             "href": f"/{workspace.id}/page/{line_id}"}
 
 

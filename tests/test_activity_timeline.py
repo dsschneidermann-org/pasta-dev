@@ -106,6 +106,14 @@ def test_an_idle_hour_plays_in_at_most_a_second():
     assert payload["duration"] <= 30 / ACTIVITY_RATE * 2 + 1.0
 
 
+def test_each_line_carries_its_whole_hierarchy_path():
+    entries = [_call("plan", 30), _call(None, 20, tool="tree")]
+    events = [_status("gone", 10, "closed", page_type="bug-report", title="Deleted bug")]
+    lines = build_activity_timeline(entries, events, _workspace(), None, NOW)["lines"]
+    assert {line["id"]: line["path"] for line in lines} == {
+        "ws:w": ["Demo"], "plan": ["Features", "Feature", "Plan"], "gone": ["Deleted bug"]}
+
+
 def test_a_create_page_call_recorded_before_is_never_shown():
     payload = build_activity_timeline([_call("toc", 10, tool="createPage", write=True)], [], _workspace(), None, NOW)
     assert payload["lines"] == []
