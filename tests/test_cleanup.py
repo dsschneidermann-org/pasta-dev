@@ -6,11 +6,12 @@ is covered in test_store.py.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from src import cleanup
+from src.activity_log import to_jsonl
 from src.model import Page, Workspace
 from src.store import Store
 
@@ -207,6 +208,21 @@ def test_run_once_sweeps_every_workspace(tmp_path):
 
     assert len(reports) == 2
     assert all(report.stamped == 1 for report in reports)
+
+
+def test_run_once_drops_day_old_activity_from_every_workspace(tmp_path):
+    store = Store(tmp_path)
+    workspace = store.create_workspace("one")
+
+    def entry(hours_ago):
+        return {"at": (NOW - timedelta(hours=hours_ago)).isoformat(), "kind": "call", "pageId": None,
+                "tool": "tree", "write": False, "bytes": 1}
+    old, fresh = entry(30), entry(1)
+    store.activity_path(workspace.id).write_text(to_jsonl([old, fresh]), encoding="utf-8")
+
+    cleanup.run_once(store, now=NOW)
+
+    assert store.read_activity(workspace.id) == [fresh]
 
 
 def test_run_once_survives_one_bad_workspace(tmp_path, monkeypatch):

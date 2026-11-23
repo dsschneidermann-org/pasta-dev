@@ -196,7 +196,7 @@ function main() {
     const time = document.createElement("time");
     time.dateTime = new Date(stop.at * 1000).toISOString();
     time.textContent = new Date(stop.at * 1000).toLocaleString(undefined, {
-      day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+      day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
     });
     const dot = document.createElement("span");
     dot.className = "tl-dot";
@@ -239,6 +239,7 @@ function main() {
     clock.dateTime = now.toISOString();
     clock.textContent = now.toLocaleString(undefined, {
       weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+      hourCycle: "h23",
     });
 
     let inFlight = 0;

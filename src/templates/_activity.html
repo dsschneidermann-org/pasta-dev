@@ -1,0 +1,36 @@
+{# The last day of activity of this page and every page beneath it, or of the whole workspace on its
+   index, hidden until its open link is clicked. A page script draws it and keeps it
+   current over its own socket, so the in-place update leaves the whole section alone. #}
+<section id="activity" class="activity" data-morph-skip aria-label="Activity in the last 24 hours">
+    <div id="ac-body" hidden>
+    <div class="ac-controls">
+        <button type="button" id="ac-play">Play</button>
+        <time id="ac-clock"></time>
+        <span class="ac-caption">Activity, last 24 hours</span>
+        <button type="button" class="ac-symbol" id="ac-close" aria-expanded="true" aria-controls="ac-body" aria-label="Collapse the activity" title="Collapse">▾</button>
+    </div>
+    <p class="ac-empty" id="ac-empty"{% if activity.lines %} hidden{% endif %}>No activity in the last 24 hours.</p>
+    <div id="ac-live"{% if not activity.lines %} hidden{% endif %}>
+        <div class="ac-stage">
+            <svg id="ac-stage" role="img" aria-label="Activity of {% if activity_scope %}this page and the pages beneath it{% else %}the workspace{% endif %} over the last 24 hours"></svg>
+        </div>
+        <div class="ac-scrub">
+            <svg id="ac-minimap" aria-hidden="true"></svg>
+            <input type="range" id="ac-scrub" min="0" max="{{ activity.duration }}" step="0.01" value="0" aria-label="Playback position">
+        </div>
+        <ul class="ac-legend">
+            <li><svg width="10" height="10" style="--c: var(--text-muted)"><circle class="ac-stop ac-transition" cx="5" cy="5" r="3.5"/></svg>Status change</li>
+            <li><svg width="10" height="10" style="--c: var(--text-muted)"><circle class="ac-stop" cx="5" cy="5" r="3.5"/></svg>Created or archived</li>
+            <li><svg width="6" height="14" style="--c: var(--text-muted)"><line class="ac-call" x1="3" y1="1" x2="3" y2="13"/></svg>Call</li>
+            <li><svg width="10" height="10" style="--c: var(--text-muted)"><path class="ac-link" d="M5 1.5 L8.5 5 L5 8.5 L1.5 5 Z"/></svg>Link added</li>
+            <li><svg width="10" height="10" style="--c: var(--text-muted)"><path class="ac-ref" d="M5 1.5 L8.5 5 L5 8.5 L1.5 5 Z"/></svg>Page ref added</li>
+            <li class="ac-legend-toggle"><button type="button" class="ac-symbol" id="ac-feed-toggle" aria-expanded="false" aria-controls="ac-feed" aria-label="Show the latest changes" title="Latest changes">▸</button></li>
+        </ul>
+        <ol class="ac-feed" id="ac-feed" hidden></ol>
+    </div>
+    </div>
+    <script type="application/json" id="activity-data" data-workspace="{{ workspace_id }}" data-page="{{ activity_scope }}">{{ activity | tojson }}</script>
+    <script>
+{% include '_activity.js' %}
+    </script>
+</section>

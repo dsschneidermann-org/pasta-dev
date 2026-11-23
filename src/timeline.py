@@ -41,15 +41,16 @@ class Segment:
     p1: float
 
 
-def playback_segments(times: Sequence[float], start: float, end: float) -> list[Segment]:
+def playback_segments(times: Sequence[float], start: float, end: float, base_rate: float = BASE_RATE,
+                      active_window: float = ACTIVE_WINDOW, idle_playback: float = IDLE_PLAYBACK) -> list[Segment]:
     """The playback clock over [start, end]: contiguous segments from p 0, where time within
-    ACTIVE_WINDOW of any of `times` plays at BASE_RATE and each idle gap plays in at most
-    IDLE_PLAYBACK seconds - never slower than the base rate."""
+    active_window of any of `times` plays at base_rate and each idle gap plays in at most
+    idle_playback seconds - never slower than the base rate."""
     if not times or end <= start:
         return []
     windows: list[list[float]] = []
     for t in sorted(times):
-        low, high = max(start, t - ACTIVE_WINDOW), min(end, t + ACTIVE_WINDOW)
+        low, high = max(start, t - active_window), min(end, t + active_window)
         if windows and low <= windows[-1][1]:
             windows[-1][1] = max(windows[-1][1], high)
         else:
@@ -65,9 +66,9 @@ def playback_segments(times: Sequence[float], start: float, end: float) -> list[
             cursor, p = t1, p + playback
 
     for low, high in windows:
-        add(low, min((low - cursor) / BASE_RATE, IDLE_PLAYBACK))
-        add(high, (high - cursor) / BASE_RATE)
-    add(end, min((end - cursor) / BASE_RATE, IDLE_PLAYBACK))
+        add(low, min((low - cursor) / base_rate, idle_playback))
+        add(high, (high - cursor) / base_rate)
+    add(end, min((end - cursor) / base_rate, idle_playback))
     return segments
 
 

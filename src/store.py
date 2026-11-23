@@ -29,7 +29,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, final
 
-from . import cleanup, commands, fsm, render, render_html
+from . import activity_log, cleanup, commands, fsm, render, render_html
+from .activity_log import ActivityEntry, page_additions
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .event_log import LOG_SUFFIX, Event, PageMark, lifecycle_events, page_marks, parse_jsonl, to_jsonl
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
@@ -135,6 +136,7 @@ class Store:
         self._revision_factory = revision_factory
         self._transaction_locks: dict[str, threading.Lock] = {}
         self._rw_locks: dict[str, ReadWriteLock] = {}
+        self._activity_locks: dict[str, threading.Lock] = {}
         self._locks_guard = threading.Lock()
 
     def _next_revision(self, current: str | None) -> str:
@@ -175,6 +177,16 @@ class Store:
             if lock is None:
                 lock = ReadWriteLock()
                 self._rw_locks[workspace_id] = lock
+            return lock
+
+    def _activity_lock_for(self, workspace_id: str) -> threading.Lock:
+        """Serializes appends to and rewrites of one workspace's activity log. Taken inside the
+        transaction lock by writes, and never the other way round."""
+        with self._locks_guard:
+            lock = self._activity_locks.get(workspace_id)
+            if lock is None:
+                lock = threading.Lock()
+                self._activity_locks[workspace_id] = lock
             return lock
 
     # --- low-level persistence ----------------------------------------------
@@ -220,6 +232,56 @@ class Store:
                 _ = handle.write(to_jsonl(events))
         except OSError:
             logger.warning("[events] could not append to the %s event log", workspace_id, exc_info=True)
+
+    # --- activity log --------------------------------------------------------
+    def activity_path(self, workspace_id: str) -> Path:
+        # Beside the events log; the '.jsonl' suffix keeps the listing from taking it for a workspace.
+        return self.root / f"{workspace_id.replace(':', '_')}{activity_log.LOG_SUFFIX}"
+
+    def read_activity(self, workspace_id: str) -> list[ActivityEntry]:
+        # Appended line by line and replaced whole when rewritten, so no lock is needed.
+        path = self.activity_path(workspace_id)
+        return activity_log.parse_jsonl(path.read_text(encoding="utf-8")) if path.exists() else []
+
+    def append_activity(self, workspace_id: str, entries: list[ActivityEntry], now: float | None = None) -> None:
+        """Append to the activity log, rewriting it once its oldest line is well past the window. A log
+        that cannot be written is reported rather than allowed to fail what it records."""
+        if not entries:
+            return
+        try:
+            with self._activity_lock_for(workspace_id):
+                path = self.activity_path(workspace_id)
+                with open(path, "a", encoding="utf-8") as handle:
+                    _ = handle.write(activity_log.to_jsonl(entries))
+                with open(path, encoding="utf-8") as handle:
+                    first_line = handle.readline()
+                at = time.time() if now is None else now
+                if activity_log.needs_prune(first_line, at):
+                    self._rewrite_activity(workspace_id, at)
+        except OSError:
+            logger.warning("[activity] could not append to the %s activity log", workspace_id, exc_info=True)
+
+    def prune_activity(self, workspace_id: str, now: float) -> None:
+        """Drop the activity older than the window from the log."""
+        try:
+            with self._activity_lock_for(workspace_id):
+                if self.activity_path(workspace_id).exists():
+                    self._rewrite_activity(workspace_id, now)
+        except OSError:
+            logger.warning("[activity] could not prune the %s activity log", workspace_id, exc_info=True)
+
+    def _rewrite_activity(self, workspace_id: str, now: float) -> None:
+        """Keep only the window. The caller holds the activity lock."""
+        path = self.activity_path(workspace_id)
+        kept = activity_log.within_window(activity_log.parse_jsonl(path.read_text(encoding="utf-8")), now)
+        tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
+        with open(tmp, "w", encoding="utf-8") as handle:
+            _ = handle.write(activity_log.to_jsonl(kept))
+        try:
+            os.replace(tmp, path)
+        except OSError:
+            time.sleep(0.1)  # a reader holding the file open can be waited out
+            os.replace(tmp, path)
 
     def write_backup(self, workspace: Workspace, now: datetime) -> Path:
         """Write a full copy of `workspace` under `backups/` and return its path.
@@ -685,6 +747,7 @@ class Store:
 
             workspace.pages[page_id] = working
             self._touch_and_save(workspace, before)
+            self.append_activity(workspace_id, page_additions(page, working, workspace.updated_at))
             return MutatePageResult(page=working, created_ids=created_ids,
                                     transitioned=working.status != page.status)
 
@@ -976,8 +1039,10 @@ class Store:
             if source is None:
                 raise NotFoundError(f"Page '{from_id}' not found in workspace '{workspace_id}'.")
             role = self._validate_link(workspace, workspace_id, source, to_id, role)
+            before = source.copy()
             source.links.append({"to": to_id, "role": role})
             self._touch_and_save(workspace)
+            self.append_activity(workspace_id, page_additions(before, source, workspace.updated_at))
             return source, list(source.links)
 
     def unlink_page(

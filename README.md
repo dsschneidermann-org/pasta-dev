@@ -49,7 +49,7 @@ uv sync                      # Python 3.14
 uv run python main.py        # http://localhost:8000
 ```
 
-That serves the MCP endpoint at `/pasta/mcp` and the read-only web UI at `/` from one process. Leave a page open in the browser and it refreshes live as the agent writes. Each workspace also has a **Timeline** (`/ws:<id>/timeline`), which replays how its work moved through the workflow from start to finish, and a **Guidance** page (`/ws:<id>/guidance`), which shows the rules the workspace has.
+That serves the MCP endpoint at `/pasta/mcp` and the read-only web UI at `/` from one process. Leave a page open in the browser and it refreshes live as the agent writes. Every page, and the workspace's page index, opens with an **activity timeline** of the last 24 hours: each MCP call that touched the page or a page beneath it, with the bytes the agent sent or got back, each link and page reference it added, and each status change, playing on live as the agent works. Each workspace also has a **Timeline** (`/ws:<id>/timeline`), which replays how its work moved through the workflow from start to finish, and a **Guidance** page (`/ws:<id>/guidance`), which shows the rules the workspace has.
 
 Point your MCP client at it:
 
@@ -61,7 +61,7 @@ Point your MCP client at it:
 }
 ```
 
-Workspaces are plain JSON files under `./.pasta-data` (override with `PASTA_DATA_DIR`). One file per workspace, backed up before the hourly cleanup sweep ever deletes anything. Beside each one, `ws_<id>.events.jsonl` is an append-only log of every page's creation, status transitions and archiving, which the timeline replays.
+Workspaces are plain JSON files under `./.pasta-data` (override with `PASTA_DATA_DIR`). One file per workspace, backed up before the hourly cleanup sweep ever deletes anything. Beside each one, `ws_<id>.events.jsonl` is an append-only log of every page's creation, status transitions and archiving, which the timeline replays, and `ws_<id>.activity.jsonl` keeps the last 24 hours of MCP calls, links and page references for the activity timelines.
 
 ### Give your agent the habit
 

@@ -8,8 +8,11 @@ type (architecture): the toggle points at that page type's generated Sphinx doc,
 production types are documentable - a fixture has no doc to link to.
 """
 
+import asyncio
 import json
 import re
+import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -18,6 +21,7 @@ from fastapi.testclient import TestClient
 import src.server as server
 from src.errors import ValidationError
 from src.event_log import to_jsonl
+from src.live_sockets import ActivityConnectionManager
 from src.serialize import workspace_to_dict
 from src.source_link import SourceLink, read_remote_url, to_source_link
 from src.store import Store
@@ -351,6 +355,244 @@ def test_a_status_write_streams_its_event_to_a_watching_tab(client, monkeypatch)
     [event] = streamed["events"]
     assert (event["event"], event["pageId"], event["from"], event["status"]) == ("status", page.id, "draft", "open")
     assert streamed["timeline"]["lines"] == []          # a fixture type is logged but draws no line
+
+
+def _recent_call(page_id, tool="getPage"):
+    return {"at": datetime.now(timezone.utc).isoformat(), "kind": "call", "pageId": page_id, "tool": tool,
+            "write": False, "bytes": 10}
+
+
+def _next_timeline(websocket):
+    # The heartbeat and the catch-up are sent independently, so either may come first.
+    for _ in range(3):
+        message = websocket.receive_json()
+        if "timeline" in message:
+            return message["timeline"]
+    raise AssertionError("no timeline arrived")
+
+
+def test_the_activity_socket_sends_its_page_s_timeline_on_connect(client, monkeypatch):
+    monkeypatch.setenv("PASTA_CLEANUP", "0")     # entering the client runs the app's lifespan
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    server.STORE.create_page(workspace.id, "test-flow", "Other")
+    server.STORE.append_activity(workspace.id, [_recent_call(page.id)])
+    with TestClient(server.app) as live, \
+            live.websocket_connect(f"/ws/activity/{workspace.id}?page={page.id}") as websocket:
+        timeline = _next_timeline(websocket)
+    assert [line["id"] for line in timeline["lines"]] == [page.id]
+    assert [mark["kind"] for mark in timeline["lines"][0]["marks"]] == ["created", "call"]
+    assert server.ws_activity.active == []                  # a closed tab stops watching
+
+
+def test_a_status_change_in_the_browser_streams_to_a_watching_activity_tab(client, monkeypatch):
+    monkeypatch.setenv("PASTA_CLEANUP", "0")
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page title").page
+    part = workspace.id.removeprefix("ws:")
+    with TestClient(server.app) as live, live.websocket_connect(f"/ws/activity/{workspace.id}") as websocket:
+        _next_timeline(websocket)                              # the catch-up on connect
+        posted = live.post(f"/ws:{part}/page/{page.id}/status", data={"status": "open"}, follow_redirects=False)
+        assert posted.status_code == 303
+        timeline = _next_timeline(websocket)
+    [line] = timeline["lines"]
+    assert [(mark["kind"], mark["status"]) for mark in line["marks"]] == [("created", "draft"), ("status", "open")]
+
+
+def test_an_activity_socket_of_an_unknown_workspace_stays_open_on_heartbeats(client):
+    with client.websocket_connect("/ws/activity/ws:nope-000000") as websocket:
+        assert websocket.receive_json() == {"heartbeat": 1}
+
+
+class _Tab:
+    def __init__(self):
+        self.sent = []
+
+    async def accept(self):
+        pass
+
+    async def send_json(self, data):
+        self.sent.append(data)
+
+
+def _publish_burst(monkeypatch, during_rebuild: int, before_rebuild: int = 1):
+    """Ask for publishes before a rebuild starts and while it runs; return the rebuilds and what the tab got."""
+    builds, release = [], threading.Event()
+
+    def build(workspace_id, scopes):
+        builds.append(workspace_id)
+        _ = release.wait(5)
+        return {scope: {"lines": []} for scope in scopes}
+    monkeypatch.setattr(server, "_activity_payloads", build)
+    manager, tab = ActivityConnectionManager(), _Tab()
+    monkeypatch.setattr(server, "ws_activity", manager)
+
+    async def run():
+        await manager.connect(tab, "ws:a", None)  # pyright: ignore[reportArgumentType]
+        for _ in range(before_rebuild):
+            server.schedule_activity_publish("ws:a")
+        while not builds:
+            await asyncio.sleep(0.01)              # the first rebuild is under way
+        for _ in range(during_rebuild):
+            server.schedule_activity_publish("ws:a")
+        release.set()
+        while server._activity_tasks:
+            await asyncio.gather(*list(server._activity_tasks))
+    asyncio.run(run())
+    return builds, tab.sent
+
+
+def test_publishes_asked_for_before_a_rebuild_starts_share_it(monkeypatch):
+    builds, sent = _publish_burst(monkeypatch, during_rebuild=0, before_rebuild=5)
+    assert builds == ["ws:a"] and sent == [{"timeline": {"lines": []}}]
+
+
+def test_publishes_asked_for_while_a_rebuild_runs_cost_exactly_one_more(monkeypatch):
+    builds, sent = _publish_burst(monkeypatch, during_rebuild=4)
+    assert builds == ["ws:a", "ws:a"] and len(sent) == 2
+
+
+def test_nothing_is_rebuilt_while_no_tab_watches(monkeypatch):
+    monkeypatch.setattr(server, "ws_activity", ActivityConnectionManager())
+    monkeypatch.setattr(server, "_activity_payloads", lambda *args: pytest.fail("rebuilt with no tab watching"))
+
+    async def run():
+        server.schedule_activity_publish("ws:a")
+        return set(server._activity_tasks)
+    assert asyncio.run(run()) == set()
+
+
+def _activity(html: str) -> tuple[dict, str]:
+    match = re.search(r'<script type="application/json" id="activity-data" data-workspace="[^"]*" '
+                      r'data-page="([^"]*)">(.*?)</script>', html, re.S)
+    assert match is not None
+    return json.loads(match.group(2)), match.group(1)
+
+
+def test_a_page_view_shows_the_activity_of_the_page_and_every_page_beneath_it(client):
+    workspace = server.STORE.create_workspace("demo")
+    parent = server.STORE.create_page(workspace.id, "test-flow", "Parent").page
+    child = server.STORE.create_page(workspace.id, "test-flow", "Child", parent.id).page
+    sibling = server.STORE.create_page(workspace.id, "test-flow", "Sibling").page
+    server.STORE.append_activity(workspace.id, [_recent_call(child.id), _recent_call(sibling.id),
+                                                _recent_call(None, "tree")])
+    data, scope = _activity(client.get(f"/{workspace.id}/page/{parent.id}").text)
+    assert scope == parent.id
+    assert [line["id"] for line in data["lines"]] == [parent.id, child.id, workspace.id]
+
+
+def test_the_workspace_index_shows_every_page_and_the_calls_that_name_none(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    server.STORE.append_activity(workspace.id, [_recent_call(None, "search")])
+    data, scope = _activity(client.get(f"/{workspace.id}").text)
+    assert scope == ""
+    assert {line["id"]: line["colour"] for line in data["lines"]} == {page.id: "page", workspace.id: "workspace"}
+
+
+def test_the_activity_sits_at_the_top_and_out_of_the_in_place_update(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    page_html = client.get(f"/{workspace.id}/page/{page.id}").text
+    tree_html = client.get(f"/{workspace.id}").text
+    for html in (page_html, tree_html):
+        assert '<section id="activity" class="activity" data-morph-skip' in html
+    assert page_html.index('id="page-view"') < page_html.index('id="activity"') < page_html.index('id="page-actions"')
+    assert tree_html.index(">Guidance</a>") < tree_html.index('id="activity"')
+
+
+def test_a_section_a_script_owns_is_left_out_of_the_in_place_update(client):
+    workspace = server.STORE.create_workspace("demo")
+    text = client.get(f"/{workspace.id}").text
+    assert ('beforeNodeMorphed: (oldNode) => !(oldNode instanceof Element && oldNode.hasAttribute("data-morph-skip"))'
+            in text)
+
+
+def test_a_scope_with_nothing_in_the_last_day_says_so(client):
+    workspace = server.STORE.create_workspace("demo")          # no pages, so nothing was logged
+    html = client.get(f"/{workspace.id}").text
+    assert '<p class="ac-empty" id="ac-empty">No activity in the last 24 hours.</p>' in html
+    assert '<div id="ac-live" hidden>' in html
+
+
+def test_activity_colours_are_theme_tokens_defined_for_both_themes():
+    css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
+    for theme in ("body.light {", "body.dark {"):
+        block = css[css.index(theme):]
+        block = block[:block.index("}")]
+        assert "--line-page:" in block and "--line-workspace:" in block
+    section = css[css.index("/* Activity timeline"):]
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b", section)
+
+
+def _activity_section(html: str) -> str:
+    return html[html.index('<section id="activity"'):html.index("</section>")]
+
+
+def test_the_latest_changes_start_hidden_behind_a_symbol_in_the_legend(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    section = _activity_section(client.get(f"/{workspace.id}/page/{page.id}").text)
+    legend = section[section.index('<ul class="ac-legend">'):]
+    legend = legend[:legend.index("</ul>")]
+    assert ('<button type="button" class="ac-symbol" id="ac-feed-toggle" aria-expanded="false" '
+            'aria-controls="ac-feed" aria-label="Show the latest changes" title="Latest changes">▸</button>') in legend
+    assert '<ol class="ac-feed" id="ac-feed" hidden></ol>' in section and "<details" not in section
+    assert '<ol class="tl-feed" id="tl-feed"></ol>' in client.get(f"/{workspace.id}/timeline").text
+
+
+OPEN_LINK = ('<button type="button" class="ac-open" id="ac-open" aria-expanded="false" '
+             'aria-controls="ac-body" data-morph-keep="hidden aria-expanded">Activity ▸</button>')
+
+
+def test_the_index_puts_the_activity_link_in_its_top_line_after_guidance(client):
+    workspace = server.STORE.create_workspace("demo")
+    html = client.get(f"/{workspace.id}").text
+    assert re.search(r'>Guidance</a>\s*<span class="ac-sep">·</span>\s*' + re.escape(OPEN_LINK), html)
+    assert html.index(OPEN_LINK) < html.index('<section id="activity"')
+    assert 'id="ac-open"' not in _activity_section(html)
+    css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
+    assert ".ac-sep:has(+ #ac-open[hidden]) { display: none; }" in css
+
+
+def test_the_activity_starts_collapsed_to_a_link_and_closes_from_a_symbol_after_the_caption(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    html = client.get(f"/{workspace.id}/page/{page.id}").text
+    section = _activity_section(html)
+    assert html.index(OPEN_LINK) < html.index('<section id="activity"')
+    assert '<div id="ac-body" hidden>' in section
+    assert re.search(r'<span class="ac-caption">Activity, last 24 hours</span>\s*'
+                     r'<button type="button" class="ac-symbol" id="ac-close"', section)
+    assert section.index('class="ac-controls"') < section.index('id="ac-empty"') < section.index('id="ac-live"')
+
+
+def test_every_call_takes_one_symbol_and_one_legend_entry(client):
+    workspace = server.STORE.create_workspace("demo")
+    html = client.get(f"/{workspace.id}").text
+    legend = html[html.index('<ul class="ac-legend">'):]
+    legend = legend[:legend.index("</ul>")]
+    assert legend.count('class="ac-call"') == 1 and ">Call</li>" in legend
+    css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
+    assert "ac-write" not in html and "ac-write" not in css
+    assert ".ac-call { stroke: var(--c); stroke-width: 3; }" in css
+
+
+def test_every_time_both_timelines_show_is_24_hour():
+    templates = Path(server.__file__).parent / "templates"
+    for name in ("_activity.js", "_timeline.js"):
+        source = (templates / name).read_text(encoding="utf-8")
+        formats = re.findall(r"toLocale\w*String\(undefined, \{([^}]*)\}", source)
+        with_hours = [options for options in formats if "hour" in options]
+        assert with_hours and all('hourCycle: "h23"' in options for options in with_hours), name
+
+
+def test_the_activity_play_button_matches_the_timeline_s_and_the_section_keeps_half_a_rem_below(client):
+    css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
+    assert "#ac-play { min-width: 6.5rem; margin: 0; }" in css
+    assert ".activity { margin: 0 0 0.5rem; }" in css
+    workspace = server.STORE.create_workspace("demo")
+    assert "#tl-play { min-width: 6.5rem; margin: 0; }" in client.get(f"/{workspace.id}/timeline").text
 
 
 def test_responses_disable_caching(client):
