@@ -11,11 +11,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from .activity_log import WINDOW_SECONDS, ActivityEntry, entry_seconds
+from .activity_log import UNRECORDED_TOOLS, WINDOW_SECONDS, ActivityEntry, entry_seconds
 from .cleanup import _descendants
 from .event_log import Event
 from .model import Workspace
-from .timeline import LANE_GAP, LINE_TYPES, MIN_LINE, _round, _seconds, playback_segments, to_playback
+from .timeline import LINE_TYPES, _round, _seconds, playback_segments, to_playback
 
 ACTIVITY_RATE = 20.0      # workspace seconds per playback second: at 120 px/s one second of activity is 6 px
 ACTIVITY_WINDOW = 30.0    # seconds either side of a mark that play at ACTIVITY_RATE
@@ -29,6 +29,8 @@ def _title(workspace: Workspace, page_id: str) -> str:
 def _entry_mark(entry: ActivityEntry, workspace: Workspace) -> dict[str, Any] | None:
     kind, to = entry.get("kind"), entry.get("to")
     if kind == "call":
+        if entry.get("tool") in UNRECORDED_TOOLS:
+            return None
         return {"kind": "call", "tool": entry.get("tool"), "write": entry.get("write"), "bytes": entry.get("bytes")}
     if kind == "link" and isinstance(to, str):
         return {"kind": "link", "to": to, "title": _title(workspace, to), "role": entry.get("role")}
@@ -46,6 +48,22 @@ def _line_meta(workspace: Workspace, line_id: str, logged: Event | None) -> dict
     page_type = page.type if page is not None else logged.get("type")
     return {"id": line_id, "title": title, "colour": page_type if page_type in LINE_TYPES else "page",
             "href": f"/{workspace.id}/page/{line_id}"}
+
+
+def _tree_order(workspace: Workspace) -> dict[str, int]:
+    """Each page's position in the order the workspace tree shows it: depth first from the root pages
+    through child_ids, each page once."""
+    order: dict[str, int] = {}
+    stack = list(reversed(workspace.root_page_ids))
+    while stack:
+        page_id = stack.pop()
+        if page_id in order:
+            continue
+        order[page_id] = len(order)
+        page = workspace.pages.get(page_id)
+        if page is not None:
+            stack.extend(reversed(page.child_ids))
+    return order
 
 
 def build_activity_timeline(entries: Sequence[ActivityEntry], events: Sequence[Event],
@@ -88,22 +106,23 @@ def build_activity_timeline(entries: Sequence[ActivityEntry], events: Sequence[E
         if event is not None:
             logged[line_id] = event              # marks are in time order, so this ends on the latest
 
-    placed = sorted(((to_playback(line_marks[0][0], segments), to_playback(line_marks[-1][0], segments), line_id)
-                     for line_id, line_marks in by_line.items()), key=lambda item: (item[0], item[2]))
-    lane_ends: list[float] = []
-    lines: list[dict[str, Any]] = []
-    for p0, p1, line_id in placed:
-        occupied = max(p1, p0 + MIN_LINE)
-        lane = next((index for index, lane_end in enumerate(lane_ends) if lane_end + LANE_GAP <= p0), None)
-        if lane is None:
-            lane = len(lane_ends)
-            lane_ends.append(occupied)
-        else:
-            lane_ends[lane] = occupied
-        lines.append({**_line_meta(workspace, line_id, logged.get(line_id)), "lane": lane,
-                      "p0": _round(p0), "p1": _round(p1),
-                      "marks": [{"p": _round(to_playback(at, segments)), "at": _round(at), **mark}
-                                for at, mark in by_line[line_id]]})
+    # Lines follow the page hierarchy, one lane each, so a parent always sits right above its children.
+    position = _tree_order(workspace)
+
+    def line_order(line_id: str) -> tuple[int, int, float, str]:
+        if line_id == workspace.id:
+            return (0, 0, 0.0, "")
+        if line_id in position:
+            return (1, position[line_id], 0.0, "")
+        return (2, 0, by_line[line_id][0][0], line_id)       # outside the tree: by first activity
+
+    lines: list[dict[str, Any]] = [
+        {**_line_meta(workspace, line_id, logged.get(line_id)), "lane": lane,
+         "p0": _round(to_playback(by_line[line_id][0][0], segments)),
+         "p1": _round(to_playback(by_line[line_id][-1][0], segments)),
+         "marks": [{"p": _round(to_playback(at, segments)), "at": _round(at), **mark}
+                   for at, mark in by_line[line_id]]}
+        for lane, line_id in enumerate(sorted(by_line, key=line_order))]
 
     feed = sorted(({"p": mark["p"], "line": index, "mark": number}
                    for index, line in enumerate(lines) for number, mark in enumerate(line["marks"])),
@@ -111,4 +130,4 @@ def build_activity_timeline(entries: Sequence[ActivityEntry], events: Sequence[E
     return {"start": _round(times[0]), "end": _round(times[-1]), "duration": _round(duration),
             "baseRate": ACTIVITY_RATE,
             "segments": [[_round(s.t0), _round(s.t1), _round(s.p0), _round(s.p1)] for s in segments],
-            "lanes": len(lane_ends), "lines": lines, "feed": feed}
+            "lanes": len(lines), "lines": lines, "feed": feed}

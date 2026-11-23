@@ -106,10 +106,23 @@ def test_an_idle_hour_plays_in_at_most_a_second():
     assert payload["duration"] <= 30 / ACTIVITY_RATE * 2 + 1.0
 
 
-def test_overlapping_lines_take_separate_lanes_and_a_later_line_reuses_a_freed_one():
-    entries = [_call("feat", 100), _call("feat", 90), _call("plan", 95), _call("other", 10)]
-    lanes = {line["id"]: line["lane"] for line in build_activity_timeline(entries, [], _workspace(), None, NOW)["lines"]}
-    assert lanes == {"feat": 0, "plan": 1, "other": 0}
+def test_a_create_page_call_recorded_before_is_never_shown():
+    payload = build_activity_timeline([_call("toc", 10, tool="createPage", write=True)], [], _workspace(), None, NOW)
+    assert payload["lines"] == []
+
+
+def test_lines_follow_the_page_hierarchy_each_on_its_own_lane():
+    # the sibling bug report is busy first, the plan beneath the feature next, the feature itself last
+    entries = [_call("other", 100), _call("plan", 50), _call("feat", 10)]
+    lines = build_activity_timeline(entries, [], _workspace(), None, NOW)["lines"]
+    assert [(line["id"], line["lane"]) for line in lines] == [("feat", 0), ("plan", 1), ("other", 2)]
+
+
+def test_the_workspace_line_comes_first_and_pages_outside_the_tree_last():
+    entries = [_call("gone-b", 40), _call("gone-a", 30), _call("plan", 20), _call(None, 10, tool="search")]
+    payload = build_activity_timeline(entries, [], _workspace(), None, NOW)
+    assert [line["id"] for line in payload["lines"]] == ["ws:w", "plan", "gone-b", "gone-a"]
+    assert payload["lanes"] == 4
 
 
 def test_the_feed_lists_every_mark_in_playback_order():
