@@ -178,7 +178,7 @@
         }
         if (mark.kind === "link" || mark.kind === "ref") {
           return el("path", {
-            class: mark.kind === "link" ? "ac-link" : "ac-ref",
+            class: "ac-link",
             d: `M${cx} ${lineY - 3.5} L${cx + 3.5} ${lineY} L${cx} ${lineY + 3.5} L${cx - 3.5} ${lineY} Z`,
           }, parent);
         }

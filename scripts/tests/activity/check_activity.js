@@ -124,6 +124,17 @@ const checks = {
     const tall = load(script, { ...BEFORE, lanes: 10 });
     assert.strictEqual(Number(tall.ids["ac-stage"].attrs.height), 34 + 10 * 18 + 9, "a taller stage keeps its own height");
   },
+  "draws a link and a page ref as the same diamond, each labelled with its target"(script) {
+    const data = payload([1000, 1010]);
+    const line = data.lines[0];
+    line.marks = [
+      { p: line.marks[0].p, at: 1000, kind: "link", to: "feature-brief:q", title: "Other", role: "relates-to" },
+      { p: line.marks[1].p, at: 1010, kind: "ref", to: "feature-brief:q", title: "Other" }];
+    const page = load(script, data);
+    assert.strictEqual(page.classed("ac-link").length, 4, "both marks, in the grey and the coloured copy");
+    assert.strictEqual(page.classed("ac-ref").length, 0, "no second diamond");
+    assert.deepStrictEqual(page.classed("ac-label").map((label) => label.textContent), ["→ Other", "→ Other"]);
+  },
   "draws every call, read or write, as the same thick tick, labelled"(script) {
     const page = load(script, BEFORE);
     const ticks = page.classed("ac-call");
