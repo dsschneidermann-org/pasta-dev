@@ -22,8 +22,8 @@ _REPO_ROOT = HERE.parents[2]
 sys.path.insert(0, str(_REPO_ROOT))   # make `src` importable when run as a bare script
 
 from src.errors import PastaError
+from src.event_timeline import build_event_timeline
 from src.store import Store
-from src.timeline import build_timeline
 
 CHECKS = ("check_replay.js", "check_marks.js", "check_drag.js", "check_live.js")
 DEFAULT_WORKSPACE = "ws:mrteq0c5-238cf6"
@@ -36,7 +36,7 @@ def write_payload(data_dir: Path, workspace_id: str, path: Path) -> None:
         raise SystemExit(f"Data dir {data_dir} does not exist.")   # a mistyped path must not leave one behind
     store = Store(data_dir)
     try:
-        payload = build_timeline(store.read_events(workspace_id), store.load_workspace(workspace_id), time.time())
+        payload = build_event_timeline(store.read_events(workspace_id), store.load_workspace(workspace_id), time.time())
     except PastaError as exc:
         raise SystemExit(str(exc)) from exc
     if not payload["lines"]:

@@ -5,7 +5,7 @@ Checks for `src/templates/_timeline.js`, the script that draws and plays the wor
 so its drawing and playback can be verified without a browser.
 
 They sit beside the Python tests rather than inside them: the timeline's layout - the playback
-clock, lines, lanes and feed order - is tested in `tests/test_timeline.py`, and the served page in
+clock, lines, lanes and feed order - is tested in `tests/test_event_timeline.py`, and the served page in
 `tests/test_web.py`. These cover what only the browser script does.
 
 ## What you need

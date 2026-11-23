@@ -14,8 +14,8 @@ from typing import Any
 from .activity_log import UNRECORDED_TOOLS, WINDOW_SECONDS, ActivityEntry, entry_seconds
 from .cleanup import _descendants
 from .event_log import Event
+from .event_timeline import LINE_TYPES, _round, _seconds, playback_segments, to_playback
 from .model import Workspace
-from .timeline import LINE_TYPES, _round, _seconds, playback_segments, to_playback
 
 ACTIVITY_RATE = 20.0      # workspace seconds per playback second: at 120 px/s one second of activity is 6 px
 ACTIVITY_WINDOW = 30.0    # seconds either side of a mark that play at ACTIVITY_RATE

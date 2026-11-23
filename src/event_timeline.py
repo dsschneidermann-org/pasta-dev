@@ -171,7 +171,7 @@ def _round(value: float) -> float:
     return round(value, 3)
 
 
-def build_timeline(events: Sequence[Event], workspace: Workspace, now: float) -> dict[str, Any]:
+def build_event_timeline(events: Sequence[Event], workspace: Workspace, now: float) -> dict[str, Any]:
     """The replay of a workspace's log as plain JSON for the timeline view: the playback clock,
     one line per tracked page packed into lanes, and every station in the order it is narrated.
     The replay ends on its last station, so no time is spent on a stretch where nothing happened."""

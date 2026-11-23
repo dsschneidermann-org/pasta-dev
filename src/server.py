@@ -33,6 +33,7 @@ from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .event_cache import page_events
 from .event_log import Event
+from .event_timeline import build_event_timeline
 from .live_digest import items_digest
 from .live_publish import LivePublisher
 from .live_sockets import LiveConnectionManager, Scope, reload_failure, ws_activity, ws_events, ws_reloader
@@ -49,7 +50,6 @@ from .render_html import md2html
 from .serialize import page_to_dict
 from .source_link import read_remote_url, to_source_link
 from .store import Store
-from .timeline import build_timeline
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -201,7 +201,7 @@ def _timeline_items(workspace_id: str) -> tuple[str, list[Event]]:
 def _timeline_payloads(workspace_id: str, events: list[Event], scopes: list[Scope]) -> dict[Scope, dict[str, Any]]:
     workspace = STORE.load_workspace(workspace_id)
     now = time.time()
-    return {scope: build_timeline(events, workspace, now) for scope in scopes}
+    return {scope: build_event_timeline(events, workspace, now) for scope in scopes}
 
 
 events_publisher = LivePublisher("events", ws_events, _timeline_items, _timeline_payloads)
@@ -293,7 +293,7 @@ async def route_timeline(request: Request, workspaceIdPart: str):
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
         digest, events = _timeline_items(workspace_id)
-        payload = build_timeline(events, workspace, time.time())
+        payload = build_event_timeline(events, workspace, time.time())
         return templates.TemplateResponse(
             request=request,
             name="timeline.html",
