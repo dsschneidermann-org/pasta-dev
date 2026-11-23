@@ -7,7 +7,7 @@ const fs = require("fs");
 const assert = require("assert");
 
 const IDS = ["ac-stage", "ac-minimap", "ac-scrub", "ac-play", "ac-clock", "ac-feed", "ac-live", "ac-empty",
-  "ac-feed-toggle"];
+  "ac-feed-toggle", "ac-body", "ac-open", "ac-close"];
 const RATE = 20;
 
 // A 12-hour locale and a fixed zone, so a renderer that leaves the hour cycle to the locale shows AM/PM here.
@@ -43,6 +43,7 @@ function makeElement(tag, created) {
     setPointerCapture(pointerId) { this.captured = pointerId; },
     releasePointerCapture(pointerId) { if (this.captured === pointerId) this.captured = null; },
     hasPointerCapture(pointerId) { return this.captured === pointerId; },
+    focus() { created.focused = element; },
   };
   created.push(element);
   return element;
@@ -68,6 +69,7 @@ function load(script, data, options = {}) {
   ids["ac-play"].textContent = "Play";                         // as _activity.html serves them
   ids["ac-feed"].hidden = true;
   ids["ac-feed-toggle"].textContent = "▸";
+  ids["ac-body"].hidden = true;
   ids["activity-data"] = Object.assign(makeElement("script", created), {
     textContent: JSON.stringify(data), dataset: { workspace: "ws:check", page: options.page ?? "feature-brief:p" } });
   global.document = {
@@ -143,6 +145,20 @@ const checks = {
     assert.ok(!feed.hidden && toggle.attrs["aria-expanded"] === "true" && toggle.textContent === "▾");
     toggle.listeners.click();
     assert.ok(feed.hidden && toggle.attrs["aria-expanded"] === "false" && toggle.textContent === "▸");
+  },
+  "the activity opens from its link, laid out again, and closes from its symbol"(script) {
+    const page = load(script, BEFORE);
+    const body = page.ids["ac-body"], open = page.ids["ac-open"], close = page.ids["ac-close"];
+    const minimap = page.ids["ac-minimap"];
+    assert.ok(body.hidden && !open.hidden);
+    minimap.getBoundingClientRect = () => ({ width: 600 });      // the size it has once shown
+    open.listeners.click();
+    assert.ok(!body.hidden && open.hidden && open.attrs["aria-expanded"] === "true");
+    assert.strictEqual(minimap.attrs.viewBox, "0 0 600 48", "the stage is laid out again once shown");
+    assert.strictEqual(page.created.focused, close);
+    close.listeners.click();
+    assert.ok(body.hidden && !open.hidden && open.attrs["aria-expanded"] === "false");
+    assert.strictEqual(page.created.focused, open);
   },
   "a heartbeat changes nothing"(script) {
     const page = load(script, BEFORE);

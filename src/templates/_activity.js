@@ -370,6 +370,19 @@
 
     window.addEventListener("resize", layout);
 
+    const body = document.getElementById("ac-body");
+    const openButton = document.getElementById("ac-open");
+    const closeButton = document.getElementById("ac-close");
+    function setOpen(open) {
+      body.hidden = !open;
+      openButton.hidden = open;
+      openButton.setAttribute("aria-expanded", String(open));
+      if (open) layout();            // the stage can only be measured once it is shown
+      (open ? closeButton : openButton).focus();
+    }
+    openButton.addEventListener("click", () => setOpen(true));
+    closeButton.addEventListener("click", () => setOpen(false));
+
     const feedToggle = document.getElementById("ac-feed-toggle");
     feedToggle.addEventListener("click", () => {
       const show = feedList.hidden;

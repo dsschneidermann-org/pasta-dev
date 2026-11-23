@@ -541,6 +541,18 @@ def test_the_latest_changes_start_hidden_behind_a_symbol_in_the_legend(client):
     assert '<ol class="tl-feed" id="tl-feed"></ol>' in client.get(f"/{workspace.id}/timeline").text
 
 
+def test_the_activity_starts_collapsed_to_a_link_and_closes_from_a_symbol_after_the_caption(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    section = _activity_section(client.get(f"/{workspace.id}/page/{page.id}").text)
+    assert ('<button type="button" class="ac-open" id="ac-open" aria-expanded="false" '
+            'aria-controls="ac-body">Activity ▸</button>') in section
+    assert '<div id="ac-body" hidden>' in section
+    assert re.search(r'<span class="ac-caption">Activity, last 24 hours</span>\s*'
+                     r'<button type="button" class="ac-symbol" id="ac-close"', section)
+    assert section.index('class="ac-controls"') < section.index('id="ac-empty"') < section.index('id="ac-live"')
+
+
 def test_every_call_takes_one_symbol_and_one_legend_entry(client):
     workspace = server.STORE.create_workspace("demo")
     html = client.get(f"/{workspace.id}").text
