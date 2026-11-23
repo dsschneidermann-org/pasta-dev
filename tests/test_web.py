@@ -535,6 +535,16 @@ def test_the_latest_changes_start_collapsed_on_the_activity_timeline_only(client
     assert '<ol class="tl-feed" id="tl-feed"></ol>' in timeline_html and "<details" not in timeline_html
 
 
+def test_the_activity_play_button_is_slimmer_and_the_timeline_s_is_unchanged(client):
+    css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
+    match = re.search(r"#ac-play \{([^}]*)\}", css)
+    assert match is not None
+    rule = match.group(1)
+    assert "font-size: 0.85rem" in rule and "padding: 0.25rem 0.7rem" in rule and "min-width: 5.5rem" in rule
+    workspace = server.STORE.create_workspace("demo")
+    assert "#tl-play { min-width: 6.5rem; margin: 0; }" in client.get(f"/{workspace.id}/timeline").text
+
+
 def test_responses_disable_caching(client):
     # No-cache is stamped by middleware, so it covers both HTML routes and - the real target -
     # the /static mount where image/asset files are served.
