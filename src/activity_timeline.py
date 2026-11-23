@@ -14,7 +14,7 @@ from typing import Any
 from .activity_log import UNRECORDED_TOOLS, WINDOW_SECONDS, ActivityEntry, entry_seconds
 from .cleanup import _descendants
 from .event_log import Event
-from .event_timeline import LINE_TYPES, _round, _seconds, playback_segments, to_playback
+from .event_timeline import LINE_TYPES, _round, _seconds, playback_segments, title_path, to_playback
 from .model import Workspace
 
 ACTIVITY_RATE = 20.0      # workspace seconds per playback second: at 120 px/s one second of activity is 6 px
@@ -39,18 +39,6 @@ def _entry_mark(entry: ActivityEntry, workspace: Workspace) -> dict[str, Any] | 
     return None
 
 
-def _path(workspace: Workspace, page_id: str) -> list[str]:
-    """The titles from the page's root page down to it, following parent_id; a cycle stops the walk."""
-    titles: list[str] = []
-    seen: set[str] = set()
-    page = workspace.pages.get(page_id)
-    while page is not None and page.id not in seen:
-        seen.add(page.id)
-        titles.append(page.title)
-        page = workspace.pages.get(page.parent_id) if page.parent_id else None
-    return titles[::-1]
-
-
 def _line_meta(workspace: Workspace, line_id: str, logged: Event | None) -> dict[str, Any]:
     if line_id == workspace.id:
         return {"id": line_id, "title": workspace.name, "colour": "workspace", "path": [workspace.name],
@@ -60,7 +48,7 @@ def _line_meta(workspace: Workspace, line_id: str, logged: Event | None) -> dict
     title = page.title if page is not None else logged.get("title", line_id)
     page_type = page.type if page is not None else logged.get("type")
     return {"id": line_id, "title": title, "colour": page_type if page_type in LINE_TYPES else "page",
-            "path": _path(workspace, line_id) if page is not None else [title],
+            "path": title_path(workspace, line_id) if page is not None else [title],
             "href": f"/{workspace.id}/page/{line_id}"}
 
 

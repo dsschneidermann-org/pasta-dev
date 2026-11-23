@@ -94,6 +94,18 @@ def is_hidden(workspace: Workspace, page_id: str) -> bool:
     return page_id not in workspace.pages
 
 
+def title_path(workspace: Workspace, page_id: str) -> list[str]:
+    """The titles from the page's root page down to it, following parent_id; a cycle stops the walk."""
+    titles: list[str] = []
+    seen: set[str] = set()
+    page = workspace.pages.get(page_id)
+    while page is not None and page.id not in seen:
+        seen.add(page.id)
+        titles.append(page.title)
+        page = workspace.pages.get(page.parent_id) if page.parent_id else None
+    return titles[::-1]
+
+
 @dataclass(frozen=True)
 class _Stop:
     at: float
@@ -106,6 +118,7 @@ class _Line:
     page_id: str
     type: str
     title: str
+    path: list[str]        # the titles from its root page down to it
     stops: list[_Stop]
     end: str               # delivered | dropped | open
     end_at: float | None   # None while open: the line runs to the end of the replay
@@ -164,7 +177,8 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
 
     page = workspace.pages.get(page_id)
     title = page.title if page is not None else events[-1].get("title", page_id)
-    return _Line(page_id, page_type, title, stops, end, end_at)
+    path = title_path(workspace, page_id) if page is not None else [title]
+    return _Line(page_id, page_type, title, path, stops, end, end_at)
 
 
 def _round(value: float) -> float:
@@ -207,7 +221,7 @@ def build_event_timeline(events: Sequence[Event], workspace: Workspace, now: flo
         else:
             lane_ends[lane] = occupied
         payload_lines.append({
-            "id": line.page_id, "type": line.type, "title": line.title, "lane": lane,
+            "id": line.page_id, "type": line.type, "title": line.title, "path": line.path, "lane": lane,
             "p0": _round(p0), "p1": _round(p1), "end": line.end,
             "stops": [{"p": _round(to_playback(stop.at, segments)), "at": _round(stop.at),
                        "kind": stop.kind, "status": stop.status} for stop in line.stops],

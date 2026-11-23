@@ -264,6 +264,23 @@ def test_a_page_gone_from_the_workspace_ends_dropped_and_keeps_its_logged_title(
     assert line["title"] == "Last"
 
 
+def test_a_line_carries_its_whole_hierarchy_path():
+    toc, feature, change = "toc:features", _id("feature-brief", T0), _id("simple-change", T0)
+    workspace = _workspace(_page(toc, "active", title="Features"),
+                           _page(feature, "draft", title="Feature", parent=toc),
+                           _page(change, "draft", title="Change", parent=feature))
+    events = [_event(T0, "created", feature, "draft"), _event(T0 + HOUR, "created", change, "draft")]
+    lines = build_event_timeline(events, workspace, T0 + DAY)["lines"]
+    assert {line["id"]: line["path"] for line in lines} == {
+        feature: ["Features", "Feature"], change: ["Features", "Feature", "Change"]}
+
+
+def test_a_page_gone_from_the_workspace_is_its_logged_title_alone_in_its_path():
+    page = _id("simple-change", T0)
+    events = [_event(T0, "created", page, "draft", title="Gone")]
+    assert _only_line(build_event_timeline(events, _workspace(), T0 + DAY))["path"] == ["Gone"]
+
+
 def test_the_current_workspace_title_wins_over_the_logged_one():
     page = _id("feature-brief", T0)
     events = [_event(T0, "created", page, "draft", title="Old name")]

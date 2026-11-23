@@ -108,7 +108,7 @@ function main() {
     lineNodes = data.lines.map((line) => {
       const group = el("g", { class: "tl-line" }, el("a", { href: pagePath(line.id) }, linesGroup));
       group.style.setProperty("--c", `var(--line-${line.type})`);
-      el("title", {}, group).textContent = line.title;
+      el("title", {}, group).textContent = line.path.join(" › ");
       const lineY = y(line.lane);
       // Ahead of the playhead only the grey copy shows; the coloured copy is revealed as it passes.
       drawShapes(line, lineY, el("g", { class: "tl-ghost" }, group));
@@ -206,7 +206,7 @@ function main() {
     status.textContent = stationLabel(stop);
     const link = document.createElement("a");
     link.href = pagePath(line.id);
-    link.title = line.title;
+    link.title = line.path.join(" › ");
     link.textContent = line.title;
     item.append(time, dot, status, link);
     return item;

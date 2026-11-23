@@ -28,7 +28,8 @@ function grown(payload) {
     segments: [...payload.segments, [payload.end, end, payload.duration, duration]],
     lanes: payload.lanes + 1,
     lines: [...payload.lines, {
-      id: "simple-change:live", type: "simple-change", title: "A live change", lane: payload.lanes,
+      id: "simple-change:live", type: "simple-change", title: "A live change", path: ["Features", "A live change"],
+      lane: payload.lanes,
       p0, p1: duration, end: "open", stops: [{ p: p0, at: payload.end + 2 * 3600, kind: "created", status: "draft" }],
     }],
     feed: [...payload.feed, { p: p0, line: payload.lines.length, stop: 0 }],

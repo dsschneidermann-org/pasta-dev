@@ -35,6 +35,17 @@ const lineLinks = links.filter((link) => link.attrs.href !== undefined).map((lin
 assert.deepStrictEqual(lineLinks, data.lines.map((line) => `/ws:check/page/${line.id}`), "a line links to its page");
 links.forEach((link) => assert.ok(!(link.attrs.href ?? link.href).includes("?"), "a link carries no query"));
 
+// A line's hover title and its feed link's title name its whole page-hierarchy path; the link reads its title.
+const hoverTitles = created.filter((element) => element.tag === "title").map((element) => element.textContent);
+assert.deepStrictEqual(hoverTitles, data.lines.map((line) => line.path.join(" › ")), "a line's hover title is its path");
+const feedLinks = links.filter((link) => link.attrs.href === undefined);
+assert.ok(feedLinks.length > 0, "the feed lists the latest stations");
+feedLinks.forEach((link) => {
+  const line = data.lines.find((candidate) => link.href === `/ws:check/page/${candidate.id}`);
+  assert.strictEqual(link.title, line.path.join(" › "), "a feed link's title is its line's path");
+  assert.strictEqual(link.textContent, line.title, "a feed link reads its line's title");
+});
+
 // Labels are created line by line, station by station, so the nth label belongs to the nth station.
 const labels = timeline.classed("tl-label");
 assert.strictEqual(labels.length, stations.length, "one label per station");
@@ -101,8 +112,8 @@ if (close) {
 const KINDS = [["created", "draft", "draft"], ["status", "open", "open"], ["archived", "open", "archived"],
   ["unarchived", "open", "unarchived"]];
 const kindStops = KINDS.map(([kind, status], index) => ({ p: 1 + 3 * index, at: data.start + 3 * index, kind, status }));
-const kindLine = { id: "bug-report:kinds", type: "bug-report", title: "Label check", lane: 0, p0: 1, p1: 10,
-  end: "open", stops: kindStops };
+const kindLine = { id: "bug-report:kinds", type: "bug-report", title: "Label check", path: ["Bug Reports", "Label check"],
+  lane: 0, p0: 1, p1: 10, end: "open", stops: kindStops };
 const kindPayload = { start: data.start, end: data.start + 9, duration: 10, baseRate: data.baseRate,
   segments: [[data.start, data.start + 9, 1, 10]], lanes: 1, lines: [kindLine],
   feed: kindStops.map((stop, index) => ({ p: stop.p, line: 0, stop: index })) };
