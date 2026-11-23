@@ -24,7 +24,10 @@
             <li><svg width="10" height="10" style="--c: var(--text-muted)"><path class="ac-link" d="M5 1.5 L8.5 5 L5 8.5 L1.5 5 Z"/></svg>Link added</li>
             <li><svg width="10" height="10" style="--c: var(--text-muted)"><path class="ac-ref" d="M5 1.5 L8.5 5 L5 8.5 L1.5 5 Z"/></svg>Page ref added</li>
         </ul>
-        <ol class="ac-feed" id="ac-feed"></ol>
+        <details class="ac-latest">
+            <summary>Latest changes</summary>
+            <ol class="ac-feed" id="ac-feed"></ol>
+        </details>
     </div>
     <script type="application/json" id="activity-data" data-workspace="{{ workspace_id }}" data-page="{{ activity_scope }}">{{ activity | tojson }}</script>
     <script>

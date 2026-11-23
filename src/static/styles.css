@@ -164,4 +164,5 @@ body.dark {
 .ac-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--c); align-self: center; }
 .ac-what { font-family: monospace; color: var(--code); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-feed a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-latest summary { color: var(--text-muted); font-size: 0.9rem; cursor: pointer; }
 .ac-empty { color: var(--text-muted); }

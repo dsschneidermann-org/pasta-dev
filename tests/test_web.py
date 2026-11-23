@@ -525,6 +525,16 @@ def test_activity_colours_are_theme_tokens_defined_for_both_themes():
     assert not re.search(r"#[0-9a-fA-F]{3,6}\b", section)
 
 
+def test_the_latest_changes_start_collapsed_on_the_activity_timeline_only(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    page_html = client.get(f"/{workspace.id}/page/{page.id}").text
+    assert re.search(r'<details class="ac-latest">\s*<summary>Latest changes</summary>\s*'
+                     r'<ol class="ac-feed" id="ac-feed"></ol>\s*</details>', page_html)
+    timeline_html = client.get(f"/{workspace.id}/timeline").text
+    assert '<ol class="tl-feed" id="tl-feed"></ol>' in timeline_html and "<details" not in timeline_html
+
+
 def test_responses_disable_caching(client):
     # No-cache is stamped by middleware, so it covers both HTML routes and - the real target -
     # the /static mount where image/asset files are served.
