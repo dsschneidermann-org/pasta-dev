@@ -14,7 +14,7 @@ function main() {
   const X0 = 16;           // left margin, so the first station is not cut in half
   const HEAD = 0.7;        // how far across the stage the playhead rides
   const FRESH = 0.6;       // playback seconds a station stays highlighted after the playhead passes
-  const SPEAK = 1.5;       // playback seconds a transition's status label stays up after it is passed
+  const SPEAK = 1.5;       // playback seconds a station's label stays up after it is passed
   const MAX_STEP = 0.1;    // most playback seconds one frame advances, so a stalled frame never skips the replay ahead
   const FEED_SIZE = 6;
   const SVG = "http://www.w3.org/2000/svg";
@@ -267,8 +267,7 @@ function main() {
           node.fresh[number] = fresh;
           node.stops[number].classList.toggle("fresh", fresh);
         }
-        // The first station is the page's creation, not a transition, so it is not announced.
-        const speaking = number > 0 && number === latest && since < SPEAK;
+        const speaking = number === latest && since < SPEAK;
         if (speaking !== node.speaking[number]) {
           node.speaking[number] = speaking;
           node.labels[number].classList.toggle("speaking", speaking);

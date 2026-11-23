@@ -113,15 +113,32 @@ const checks = {
     assert.strictEqual(page.sockets[0].url, "/ws/activity/ws:check?page=feature-brief%3Ap&digest=rendered");
     assert.strictEqual(load(script, BEFORE, { page: "" }).sockets[0].url, "/ws/activity/ws:check?digest=rendered");
   },
-  "draws every call, read or write, as the same thick tick, labelled, and never scales a passed mark"(script) {
+  "draws every call, read or write, as the same thick tick, labelled"(script) {
     const page = load(script, BEFORE);
     const ticks = page.classed("ac-call");
     assert.ok(ticks.length >= 8 && ticks.every((tick) => tick.attrs.y2 - tick.attrs.y1 === 12));
     assert.strictEqual(page.classed("ac-write").length, 0);
     assert.ok(page.classed("ac-label").some((label) => label.textContent === "mutatePageBatch 2.0 KB"));
-    page.ids["ac-play"].listeners.click();           // Replay from the start
-    page.runFrames(200);
-    assert.ok(!page.created.some((element) => element.classList.set.has("fresh")));
+  },
+  "highlights and announces every kind of mark alike as it is passed, a page's creation included"(script) {
+    const kinds = [
+      [{ kind: "created", status: "draft" }, "draft"], [{ kind: "status", status: "open" }, "open"],
+      [{ kind: "archived", status: "open" }, "archived"], [{ kind: "unarchived", status: "open" }, "unarchived"],
+      [{ kind: "call", tool: "getPage", write: false, bytes: 2048 }, "getPage 2.0 KB"]];
+    const data = payload(kinds.map((_kind, index) => 1000 + 10 * index));
+    const line = data.lines[0];
+    line.marks = line.marks.map((mark, index) => ({ p: mark.p, at: mark.at, ...kinds[index][0] }));
+    const page = load(script, data);
+    const labels = page.classed("ac-label");
+    const drawn = page.created.filter((element) => /\bac-(stop|call|link|ref)\b/.test(String(element.attrs?.class ?? "")));
+    const marks = drawn.slice(kinds.length);         // the clipped copy, drawn after the grey one
+    kinds.forEach(([mark, text], index) => {
+      page.scrubTo(line.marks[index].p + 0.1);
+      assert.strictEqual(labels[index].textContent, text, `a ${mark.kind} mark is labelled ${text}`);
+      assert.deepStrictEqual(labels.map((label) => label.classList.set.has("speaking")),
+        kinds.map((_kind, other) => other === index), `passing a ${mark.kind} mark announces it alone`);
+      assert.ok(marks[index].classList.set.has("fresh"), `passing a ${mark.kind} mark highlights it`);
+    });
   },
   "hovering a line or its feed link names its whole path"(script) {
     const page = load(script, BEFORE);
