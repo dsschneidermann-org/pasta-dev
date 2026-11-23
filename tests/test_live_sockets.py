@@ -5,7 +5,7 @@ import ast
 import asyncio
 from pathlib import Path
 
-from src.live_sockets import ActivityConnectionManager, LiveConnectionManager, ReloaderConnectionManager
+from src.live_sockets import LiveConnectionManager, ReloaderConnectionManager
 
 TIMELINE = {"duration": 1.0, "lines": []}
 
@@ -23,41 +23,6 @@ class FakeSocket:
         if self.dead:
             raise RuntimeError("the tab is gone")
         self.sent.append(data)
-
-
-def _watching(manager: ActivityConnectionManager, workspace_id: str, page_id: str | None) -> FakeSocket:
-    socket = FakeSocket()
-    asyncio.run(manager.connect(socket, workspace_id, page_id))  # pyright: ignore[reportArgumentType]
-    assert socket.accepted
-    return socket
-
-
-def test_an_activity_publish_reaches_only_the_tabs_showing_that_page_of_that_workspace():
-    manager = ActivityConnectionManager()
-    page_tab, index_tab, other = (_watching(manager, "ws:a", "p"), _watching(manager, "ws:a", None),
-                                  _watching(manager, "ws:b", "p"))
-    asyncio.run(manager.publish("ws:a", "p", TIMELINE))
-    assert page_tab.sent == [{"timeline": TIMELINE}]
-    assert index_tab.sent == [] and other.sent == []
-
-
-def test_activity_scopes_are_each_watched_page_once_in_connect_order():
-    manager = ActivityConnectionManager()
-    for page_id in ("p", None, "p", "q"):
-        _ = _watching(manager, "ws:a", page_id)
-    assert manager.scopes("ws:a") == ["p", None, "q"]
-    assert manager.watching("ws:a") and not manager.watching("ws:c")
-
-
-def test_an_activity_tab_whose_send_fails_is_dropped_and_disconnect_is_idempotent():
-    manager = ActivityConnectionManager()
-    gone, kept = _watching(manager, "ws:a", None), _watching(manager, "ws:a", None)
-    gone.dead = True
-    asyncio.run(manager.publish("ws:a", None, TIMELINE))
-    assert [stream.websocket for stream in manager.active] == [kept]
-    manager.disconnect(gone)  # pyright: ignore[reportArgumentType]
-    manager.disconnect(kept)  # pyright: ignore[reportArgumentType]
-    assert manager.active == []
 
 
 def _live(manager: LiveConnectionManager, workspace_id: str, scope: str | None, digest: str) -> FakeSocket:

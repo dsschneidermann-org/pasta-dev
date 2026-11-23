@@ -621,7 +621,7 @@ def test_a_recording_that_fails_never_fails_the_call(mcp, monkeypatch, caplog):
 
 def test_a_recorded_call_asks_for_a_live_publish_of_its_workspace(mcp, monkeypatch):
     asked = []
-    monkeypatch.setattr(server, "schedule_activity_publish", asked.append)
+    monkeypatch.setattr(server.activity_publisher, "schedule", asked.append)
     workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     call(mcp, "tree", {"workspaceId": workspace_id})
     assert asked == [workspace_id]

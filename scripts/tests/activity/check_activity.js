@@ -71,7 +71,8 @@ function load(script, data, options = {}) {
   ids["ac-feed-toggle"].textContent = "▸";
   ids["ac-body"].hidden = true;
   ids["activity-data"] = Object.assign(makeElement("script", created), {
-    textContent: JSON.stringify(data), dataset: { workspace: "ws:check", page: options.page ?? "feature-brief:p" } });
+    textContent: JSON.stringify(data), dataset: { workspace: "ws:check", page: options.page ?? "feature-brief:p",
+      digest: options.digest ?? "rendered" } });
   global.document = {
     getElementById: (id) => ids[id] ?? null,
     createElementNS: (_namespace, tag) => makeElement(tag, created),
@@ -109,8 +110,8 @@ const checks = {
     const page = load(script, BEFORE);
     close(page.playhead(), 1.5, "the playhead rests at the end");
     assert.ok(!page.playing() && page.button().includes("Replay"));
-    assert.strictEqual(page.sockets[0].url, "/ws/activity/ws:check?page=feature-brief%3Ap");
-    assert.strictEqual(load(script, BEFORE, { page: "" }).sockets[0].url, "/ws/activity/ws:check");
+    assert.strictEqual(page.sockets[0].url, "/ws/activity/ws:check?page=feature-brief%3Ap&digest=rendered");
+    assert.strictEqual(load(script, BEFORE, { page: "" }).sockets[0].url, "/ws/activity/ws:check?digest=rendered");
   },
   "draws every call, read or write, as the same thick tick, labelled, and never scales a passed mark"(script) {
     const page = load(script, BEFORE);
@@ -168,7 +169,7 @@ const checks = {
   },
   "a live payload is played into from the moment the viewer rested at"(script) {
     const page = load(script, BEFORE);
-    page.push({ timeline: SLID });
+    page.push({ timeline: SLID, digest: "slid" });
     close(page.playhead(), 1.0, "1030 s sits at 1.0 s on the slid clock");
     assert.ok(page.playing(), "time moves ahead to the new mark");
     page.runFrames(200);
@@ -177,32 +178,34 @@ const checks = {
   },
   "with reduced motion a live payload is jumped to at rest"(script) {
     const page = load(script, BEFORE, { reducedMotion: true });
-    page.push({ timeline: SLID });
+    page.push({ timeline: SLID, digest: "slid" });
     close(page.playhead(), 1.5, "at the new end");
     assert.ok(!page.playing());
   },
   "a paused viewer keeps the moment they were looking at"(script) {
     const page = load(script, BEFORE);
     page.scrubTo(0.75);                               // 1015 s
-    page.push({ timeline: SLID });
+    page.push({ timeline: SLID, digest: "slid" });
     close(page.playhead(), 0.25, "1015 s sits at 0.25 s on the slid clock");
     assert.ok(!page.playing());
   },
   "an empty timeline brings up the map on its first payload and plays it"(script) {
     const page = load(script, EMPTY);
     assert.ok(page.ids["ac-live"].hidden && !page.ids["ac-empty"].hidden);
-    page.push({ timeline: BEFORE });
+    page.push({ timeline: BEFORE, digest: "before" });
     assert.ok(!page.ids["ac-live"].hidden && page.ids["ac-empty"].hidden);
     close(page.playhead(), 0, "it starts from the first mark");
     assert.ok(page.playing());
   },
-  "takes no Space shortcut, declares no global main, and reconnects a second after a close"(script) {
+  "takes no Space shortcut, declares no global main, and reconnects a second after a close with the latest digest"(script) {
     const page = load(script, BEFORE);
     assert.ok(!("keydown" in page.documentListeners));
     assert.strictEqual(typeof global.main, "undefined");
+    page.push({ timeline: SLID, digest: "slid" });
     page.sockets[0].onclose({ reason: "check" });
     page.runTimers();
     assert.strictEqual(page.sockets.length, 2);
+    assert.strictEqual(page.sockets[1].url, "/ws/activity/ws:check?page=feature-brief%3Ap&digest=slid");
   },
 };
 

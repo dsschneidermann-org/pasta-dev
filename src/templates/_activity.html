@@ -29,7 +29,7 @@
         <ol class="ac-feed" id="ac-feed" hidden></ol>
     </div>
     </div>
-    <script type="application/json" id="activity-data" data-workspace="{{ workspace_id }}" data-page="{{ activity_scope }}">{{ activity | tojson }}</script>
+    <script type="application/json" id="activity-data" data-workspace="{{ workspace_id }}" data-page="{{ activity_scope }}" data-digest="{{ activity_digest }}">{{ activity | tojson }}</script>
     <script>
 {% include '_activity.js' %}
     </script>

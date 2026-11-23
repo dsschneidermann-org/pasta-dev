@@ -413,14 +413,18 @@
       }
     }
 
-    // --- live activity: each recorded call, with the timeline rebuilt to include it ---
+    // --- live activity: the timeline rebuilt whenever its items change ---
+    let digest = dataNode.dataset.digest;   // the items the drawing was built from; a reconnect hands back the latest
+
     function connect() {
-      const query = pageId ? `?page=${encodeURIComponent(pageId)}` : "";
-      const socket = new WebSocket(`/ws/activity/${workspaceId}${query}`);
+      const page = pageId ? `page=${encodeURIComponent(pageId)}&` : "";
+      const socket = new WebSocket(`/ws/activity/${workspaceId}?${page}digest=${digest}`);
 
       socket.onmessage = function(event) {
         const message = JSON.parse(event.data);
-        if (message.timeline) show(message.timeline);      // anything else is the heartbeat
+        if (!message.timeline) return;      // the heartbeat
+        digest = message.digest;
+        show(message.timeline);
       };
 
       socket.onclose = function(e) {

@@ -54,51 +54,6 @@ class ReloaderConnectionManager:
 ws_reloader = ReloaderConnectionManager()
 
 
-@dataclass
-class ActivityStream:
-    """One activity timeline tab: the workspace it watches and the page it shows, None for the whole workspace."""
-    websocket: WebSocket
-    workspace_id: str
-    page_id: str | None
-
-
-class ActivityConnectionManager:
-    def __init__(self):
-        self.active: list[ActivityStream] = []
-
-    async def connect(self, websocket: WebSocket, workspace_id: str, page_id: str | None):
-        await websocket.accept()
-        self.active.append(ActivityStream(websocket, workspace_id, page_id))
-
-    def disconnect(self, websocket: WebSocket):
-        # Idempotent: a stream already dropped by a failed send is simply gone.
-        self.active = [stream for stream in self.active if stream.websocket is not websocket]
-
-    def watching(self, workspace_id: str) -> bool:
-        return any(stream.workspace_id == workspace_id for stream in self.active)
-
-    def scopes(self, workspace_id: str) -> list[str | None]:
-        """Each page watched in the workspace once, None for the whole workspace, in connect order."""
-        return list(dict.fromkeys(stream.page_id for stream in self.active if stream.workspace_id == workspace_id))
-
-    async def publish(self, workspace_id: str, page_id: str | None, timeline: dict[str, Any]):
-        """Send the rebuilt activity timeline to each tab showing that page of the workspace."""
-        dead: list[ActivityStream] = []
-        for stream in list(self.active):
-            if stream.workspace_id != workspace_id or stream.page_id != page_id:
-                continue
-            try:
-                await stream.websocket.send_json({"timeline": timeline})
-            except Exception:
-                dead.append(stream)
-        for stream in dead:
-            self.disconnect(stream.websocket)
-
-
-# Process-wide singleton. Must survive hot reloads, so it lives in this (reload-excluded) module.
-ws_activity = ActivityConnectionManager()
-
-
 type Scope = str | None   # the page a tab shows with every page beneath it; None for the whole workspace
 
 
@@ -150,6 +105,7 @@ class LiveConnectionManager:
 
 # Process-wide singletons. They must survive hot reloads, so they live in this (reload-excluded) module.
 ws_events = LiveConnectionManager()     # Timeline page tabs; their scope is always None
+ws_activity = LiveConnectionManager()   # activity timeline tabs
 
 
 # Kept here so the gates of a rolled-back build still see it.

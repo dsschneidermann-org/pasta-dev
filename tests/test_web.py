@@ -8,10 +8,8 @@ type (architecture): the toggle points at that page type's generated Sphinx doc,
 production types are documentable - a fixture has no doc to link to.
 """
 
-import asyncio
 import json
 import re
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +20,6 @@ import src.server as server
 from src.errors import ValidationError
 from src.event_log import to_jsonl
 from src.live_digest import items_digest
-from src.live_sockets import ActivityConnectionManager
 from src.serialize import workspace_to_dict
 from src.source_link import SourceLink, read_remote_url, to_source_link
 from src.store import Store
@@ -403,67 +400,29 @@ def test_an_activity_socket_of_an_unknown_workspace_stays_open_on_heartbeats(cli
         assert websocket.receive_json() == {"heartbeat": 1}
 
 
-class _Tab:
-    def __init__(self):
-        self.sent = []
-
-    async def accept(self):
-        pass
-
-    async def send_json(self, data):
-        self.sent.append(data)
-
-
-def _publish_burst(monkeypatch, during_rebuild: int, before_rebuild: int = 1):
-    """Ask for publishes before a rebuild starts and while it runs; return the rebuilds and what the tab got."""
-    builds, release = [], threading.Event()
-
-    def build(workspace_id, scopes):
-        builds.append(workspace_id)
-        _ = release.wait(5)
-        return {scope: {"lines": []} for scope in scopes}
-    monkeypatch.setattr(server, "_activity_payloads", build)
-    manager, tab = ActivityConnectionManager(), _Tab()
-    monkeypatch.setattr(server, "ws_activity", manager)
-
-    async def run():
-        await manager.connect(tab, "ws:a", None)  # pyright: ignore[reportArgumentType]
-        for _ in range(before_rebuild):
-            server.schedule_activity_publish("ws:a")
-        while not builds:
-            await asyncio.sleep(0.01)              # the first rebuild is under way
-        for _ in range(during_rebuild):
-            server.schedule_activity_publish("ws:a")
-        release.set()
-        while server._activity_tasks:
-            await asyncio.gather(*list(server._activity_tasks))
-    asyncio.run(run())
-    return builds, tab.sent
-
-
-def test_publishes_asked_for_before_a_rebuild_starts_share_it(monkeypatch):
-    builds, sent = _publish_burst(monkeypatch, during_rebuild=0, before_rebuild=5)
-    assert builds == ["ws:a"] and sent == [{"timeline": {"lines": []}}]
-
-
-def test_publishes_asked_for_while_a_rebuild_runs_cost_exactly_one_more(monkeypatch):
-    builds, sent = _publish_burst(monkeypatch, during_rebuild=4)
-    assert builds == ["ws:a", "ws:a"] and len(sent) == 2
-
-
-def test_nothing_is_rebuilt_while_no_tab_watches(monkeypatch):
-    monkeypatch.setattr(server, "ws_activity", ActivityConnectionManager())
-    monkeypatch.setattr(server, "_activity_payloads", lambda *args: pytest.fail("rebuilt with no tab watching"))
-
-    async def run():
-        server.schedule_activity_publish("ws:a")
-        return set(server._activity_tasks)
-    assert asyncio.run(run()) == set()
+def test_an_activity_tab_drawn_from_the_current_items_is_sent_nothing_until_they_change(client, monkeypatch):
+    monkeypatch.setenv("PASTA_CLEANUP", "0")
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page title").page
+    server.STORE.append_activity(workspace.id, [_recent_call(page.id)])
+    rendered = items_digest([server.STORE.read_activity(workspace.id), server.STORE.read_events(workspace.id)])
+    part = workspace.id.removeprefix("ws:")
+    with TestClient(server.app) as live, \
+            live.websocket_connect(f"/ws/activity/{workspace.id}?page={page.id}&digest={rendered}") as websocket:
+        assert websocket.receive_json() == {"heartbeat": 1}
+        posted = live.post(f"/ws:{part}/page/{page.id}/status", data={"status": "open"}, follow_redirects=False)
+        assert posted.status_code == 303
+        message = _next_live(websocket)
+    now = items_digest([server.STORE.read_activity(workspace.id), server.STORE.read_events(workspace.id)])
+    # Had the connect re-sent what the tab was drawn from, this would carry the rendered digest.
+    assert message["digest"] == now != rendered
+    [line] = message["timeline"]["lines"]
+    assert [mark["kind"] for mark in line["marks"]] == ["created", "call", "status"]
 
 
 def _activity(html: str) -> tuple[dict, str]:
     match = re.search(r'<script type="application/json" id="activity-data" data-workspace="[^"]*" '
-                      r'data-page="([^"]*)">(.*?)</script>', html, re.S)
+                      r'data-page="([^"]*)" data-digest="[0-9a-f]{16}">(.*?)</script>', html, re.S)
     assert match is not None
     return json.loads(match.group(2)), match.group(1)
 
@@ -487,6 +446,16 @@ def test_the_workspace_index_shows_every_page_and_the_calls_that_name_none(clien
     data, scope = _activity(client.get(f"/{workspace.id}").text)
     assert scope == ""
     assert {line["id"]: line["colour"] for line in data["lines"]} == {page.id: "page", workspace.id: "workspace"}
+
+
+def test_the_page_view_and_the_index_carry_the_digest_of_their_activity_items(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    server.STORE.append_activity(workspace.id, [_recent_call(page.id)])
+    digest = items_digest([server.STORE.read_activity(workspace.id), server.STORE.read_events(workspace.id)])
+    for path in (f"/{workspace.id}", f"/{workspace.id}/page/{page.id}"):
+        html = client.get(path).text
+        assert re.search(rf'id="activity-data"[^>]*data-digest="{digest}"', html), path
 
 
 def test_the_activity_sits_at_the_top_and_out_of_the_in_place_update(client):
