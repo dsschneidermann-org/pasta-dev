@@ -48,7 +48,7 @@ def test_a_tab_drawn_from_the_current_items_is_sent_nothing_and_nothing_is_built
     tab = _Tab()
 
     async def run():
-        await manager.connect(tab, "ws:a", None, "now")
+        await manager.connect(tab, "ws:a", None, "now")  # pyright: ignore[reportArgumentType]
         publisher.schedule("ws:a")
         await _settle(publisher)
     asyncio.run(run())
@@ -60,9 +60,9 @@ def test_each_tab_behind_is_sent_its_scope_s_payload_with_the_digest():
     page_tab, index_tab, current = _Tab(), _Tab(), _Tab()
 
     async def run():
-        await manager.connect(page_tab, "ws:a", "p", "")
-        await manager.connect(index_tab, "ws:a", None, "old")
-        await manager.connect(current, "ws:a", "q", "now")
+        await manager.connect(page_tab, "ws:a", "p", "")  # pyright: ignore[reportArgumentType]
+        await manager.connect(index_tab, "ws:a", None, "old")  # pyright: ignore[reportArgumentType]
+        await manager.connect(current, "ws:a", "q", "now")  # pyright: ignore[reportArgumentType]
         publisher.schedule("ws:a")
         await _settle(publisher)
     asyncio.run(run())
@@ -80,7 +80,7 @@ def _burst(before_round, during_round):
     tab = _Tab()
 
     async def run():
-        await manager.connect(tab, "ws:a", None, "")
+        await manager.connect(tab, "ws:a", None, "")  # pyright: ignore[reportArgumentType]
         for _ in range(before_round):
             publisher.schedule("ws:a")
         while not builds:
@@ -128,7 +128,7 @@ def test_a_failed_round_is_logged_never_raised_and_the_next_ask_runs_a_fresh_one
     tab = _Tab()
 
     async def run():
-        await manager.connect(tab, "ws:a", None, "")
+        await manager.connect(tab, "ws:a", None, "")  # pyright: ignore[reportArgumentType]
         publisher.schedule("ws:a")
         await _settle(publisher)
         publisher.schedule("ws:a")

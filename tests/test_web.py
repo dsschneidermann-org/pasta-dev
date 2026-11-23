@@ -404,7 +404,7 @@ def test_an_activity_tab_drawn_from_the_current_items_is_sent_nothing_until_they
     monkeypatch.setenv("PASTA_CLEANUP", "0")
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-flow", "Page title").page
-    server.STORE.append_activity(workspace.id, [_recent_call(page.id)])
+    server.STORE.append_activity(workspace.id, [_recent_call(page.id)])  # pyright: ignore[reportArgumentType]
     rendered = items_digest([server.STORE.read_activity(workspace.id), server.STORE.read_events(workspace.id)])
     part = workspace.id.removeprefix("ws:")
     with TestClient(server.app) as live, \
@@ -451,7 +451,7 @@ def test_the_workspace_index_shows_every_page_and_the_calls_that_name_none(clien
 def test_the_page_view_and_the_index_carry_the_digest_of_their_activity_items(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
-    server.STORE.append_activity(workspace.id, [_recent_call(page.id)])
+    server.STORE.append_activity(workspace.id, [_recent_call(page.id)])  # pyright: ignore[reportArgumentType]
     digest = items_digest([server.STORE.read_activity(workspace.id), server.STORE.read_events(workspace.id)])
     for path in (f"/{workspace.id}", f"/{workspace.id}/page/{page.id}"):
         html = client.get(path).text
