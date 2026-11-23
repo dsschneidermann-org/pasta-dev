@@ -535,6 +535,15 @@ def test_the_latest_changes_start_collapsed_on_the_activity_timeline_only(client
     assert '<ol class="tl-feed" id="tl-feed"></ol>' in timeline_html and "<details" not in timeline_html
 
 
+def test_every_time_both_timelines_show_is_24_hour():
+    templates = Path(server.__file__).parent / "templates"
+    for name in ("_activity.js", "_timeline.js"):
+        source = (templates / name).read_text(encoding="utf-8")
+        formats = re.findall(r"toLocale\w*String\(undefined, \{([^}]*)\}", source)
+        with_hours = [options for options in formats if "hour" in options]
+        assert with_hours and all('hourCycle: "h23"' in options for options in with_hours), name
+
+
 def test_the_activity_play_button_is_slimmer_and_the_timeline_s_is_unchanged(client):
     css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
     match = re.search(r"#ac-play \{([^}]*)\}", css)

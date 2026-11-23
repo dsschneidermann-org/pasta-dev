@@ -9,6 +9,13 @@ const assert = require("assert");
 const IDS = ["ac-stage", "ac-minimap", "ac-scrub", "ac-play", "ac-clock", "ac-feed", "ac-live", "ac-empty"];
 const RATE = 20;
 
+// A 12-hour locale and a fixed zone, so a renderer that leaves the hour cycle to the locale shows AM/PM here.
+process.env.TZ = "UTC";
+for (const name of ["toLocaleString", "toLocaleTimeString", "toLocaleDateString"]) {
+  const original = Date.prototype[name];
+  Date.prototype[name] = function (locale, options) { return original.call(this, locale ?? "en-US", options); };
+}
+
 // Just the element methods the renderer calls, recording what it creates and sets.
 function makeElement(tag, created) {
   const element = {
@@ -113,6 +120,14 @@ const checks = {
     const path = "Features › Feature › Page";
     assert.ok(page.created.some((element) => element.tag === "title" && element.textContent === path));
     assert.ok(page.created.some((element) => element.tag === "a" && element.title === path));
+  },
+  "shows every time in 24-hour form"(script) {
+    const page = load(script, payload([54000, 54010, 54020, 54030]));   // 15:00:00 to 15:00:30 UTC
+    const clock = page.ids["ac-clock"].textContent;
+    const times = page.created.filter((element) => element.tag === "time").map((element) => element.textContent);
+    assert.ok(clock.includes("15:00:30"), clock);
+    assert.ok(times.some((text) => text.includes("15:00")), times.join(" | "));
+    assert.ok([clock, ...times].every((text) => !/AM|PM/i.test(text)), [clock, ...times].join(" | "));
   },
   "a heartbeat changes nothing"(script) {
     const page = load(script, BEFORE);

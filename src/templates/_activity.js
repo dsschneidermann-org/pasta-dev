@@ -154,7 +154,7 @@
         const tick = el("g", { class: "ac-tick" }, axis);
         el("line", { x1: tickX, x2: tickX, y1: 16, y2: height }, tick);
         el("text", { x: tickX + 3, y: 12 }, tick).textContent =
-          minute.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+          minute.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
       }
       for (const s of segments) {
         const seconds = s.t1 - s.t0;
@@ -214,7 +214,7 @@
       const time = document.createElement("time");
       time.dateTime = new Date(mark.at * 1000).toISOString();
       time.textContent = new Date(mark.at * 1000).toLocaleTimeString(undefined, {
-        hour: "2-digit", minute: "2-digit", second: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
       });
       const dot = document.createElement("span");
       dot.className = "ac-dot";
@@ -258,6 +258,7 @@
       clock.dateTime = now.toISOString();
       clock.textContent = now.toLocaleString(undefined, {
         weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit",
+        hourCycle: "h23",
       });
 
       // A line announces only its latest mark passed, and never a page's creation, so a burst of
