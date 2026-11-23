@@ -535,6 +535,17 @@ def test_the_latest_changes_start_collapsed_on_the_activity_timeline_only(client
     assert '<ol class="tl-feed" id="tl-feed"></ol>' in timeline_html and "<details" not in timeline_html
 
 
+def test_every_call_takes_one_symbol_and_one_legend_entry(client):
+    workspace = server.STORE.create_workspace("demo")
+    html = client.get(f"/{workspace.id}").text
+    legend = html[html.index('<ul class="ac-legend">'):]
+    legend = legend[:legend.index("</ul>")]
+    assert legend.count('class="ac-call"') == 1 and ">Call</li>" in legend
+    css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
+    assert "ac-write" not in html and "ac-write" not in css
+    assert ".ac-call { stroke: var(--c); stroke-width: 3; }" in css
+
+
 def test_every_time_both_timelines_show_is_24_hour():
     templates = Path(server.__file__).parent / "templates"
     for name in ("_activity.js", "_timeline.js"):

@@ -107,9 +107,11 @@ const checks = {
     assert.strictEqual(page.sockets[0].url, "/ws/activity/ws:check?page=feature-brief%3Ap");
     assert.strictEqual(load(script, BEFORE, { page: "" }).sockets[0].url, "/ws/activity/ws:check");
   },
-  "draws calls as ticks, writes thicker, labels them, and never scales a passed mark"(script) {
+  "draws every call, read or write, as the same thick tick, labelled, and never scales a passed mark"(script) {
     const page = load(script, BEFORE);
-    assert.ok(page.classed("ac-call").length >= 4 && page.classed("ac-write").length >= 2);
+    const ticks = page.classed("ac-call");
+    assert.ok(ticks.length >= 8 && ticks.every((tick) => tick.attrs.y2 - tick.attrs.y1 === 12));
+    assert.strictEqual(page.classed("ac-write").length, 0);
     assert.ok(page.classed("ac-label").some((label) => label.textContent === "mutatePageBatch 2.0 KB"));
     page.ids["ac-play"].listeners.click();           // Replay from the start
     page.runFrames(200);

@@ -171,10 +171,7 @@
       for (const mark of line.marks) {
         const cx = x(mark.p);
         if (mark.kind === "call") {
-          const half = mark.write ? 6 : 4;
-          el("line", {
-            class: mark.write ? "ac-call ac-write" : "ac-call", x1: cx, x2: cx, y1: lineY - half, y2: lineY + half,
-          }, parent);
+          el("line", { class: "ac-call", x1: cx, x2: cx, y1: lineY - 6, y2: lineY + 6 }, parent);
         } else if (mark.kind === "link" || mark.kind === "ref") {
           el("path", {
             class: mark.kind === "link" ? "ac-link" : "ac-ref",

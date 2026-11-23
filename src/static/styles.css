@@ -131,8 +131,7 @@ body.dark {
 .activity a:hover .ac-track, .activity a:focus-visible .ac-track { stroke-width: 6; }
 .ac-stop { fill: var(--background-body); stroke: var(--c); stroke-width: 2; }
 .ac-transition { fill: var(--c); }
-.ac-call { stroke: var(--c); stroke-width: 1.5; }
-.ac-call.ac-write { stroke-width: 3; }
+.ac-call { stroke: var(--c); stroke-width: 3; }
 .ac-link { fill: var(--c); stroke: var(--c); stroke-width: 1; }
 .ac-ref { fill: var(--background-body); stroke: var(--c); stroke-width: 1.5; }
 .ac-label { font-size: 10px; fill: var(--text-main); stroke: var(--background-body); stroke-width: 3px;
