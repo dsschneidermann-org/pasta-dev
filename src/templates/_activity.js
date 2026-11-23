@@ -16,7 +16,8 @@
     const PX = 120;          // pixels per playback second
     const LANE_H = 18;
     const AXIS_H = 34;
-    const X0 = 16;           // left margin, so the first mark is not cut in half
+    const MIN_H = 130;       // fewest pixels the stage is tall, however few lines it holds
+    const X0 = 16;          // left margin, so the first mark is not cut in half
     const HEAD = 0.7;        // how far across the stage the playhead rides
     const FRESH = 0.6;       // playback seconds a mark stays highlighted after the playhead passes
     const SPEAK = 1.5;       // playback seconds a mark's label stays up after it is passed
@@ -104,7 +105,7 @@
 
     function draw() {
       segments = data.segments.map(([t0, t1, p0, p1]) => ({ t0, t1, p0, p1 }));
-      const height = AXIS_H + data.lanes * LANE_H + LANE_H / 2;
+      const height = Math.max(MIN_H, AXIS_H + data.lanes * LANE_H + LANE_H / 2);
       stage.replaceChildren();
       stage.setAttribute("height", height);
       const clip = el("clipPath", { id: "ac-clip" }, el("defs", {}, stage));

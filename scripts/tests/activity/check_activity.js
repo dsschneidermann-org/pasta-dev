@@ -113,6 +113,17 @@ const checks = {
     assert.strictEqual(page.sockets[0].url, "/ws/activity/ws:check?page=feature-brief%3Ap&digest=rendered");
     assert.strictEqual(load(script, BEFORE, { page: "" }).sockets[0].url, "/ws/activity/ws:check?digest=rendered");
   },
+  "keeps its stage at least 130 px tall, the playhead and minute ticks reaching its bottom"(script) {
+    const short = load(script, BEFORE);                // one lane needs 34 + 18 + 9 = 61 px
+    assert.strictEqual(Number(short.ids["ac-stage"].attrs.height), 130, "a one-lane stage is held at 130 px");
+    const playheads = short.classed("ac-playhead");
+    assert.ok(playheads.length && playheads.every((line) => Number(line.attrs.y2) === 130), "the playhead reaches the bottom");
+    const ticks = short.created.filter((element) => element.tag === "line" && element.attrs.y1 === 16);
+    assert.ok(ticks.length && ticks.every((tick) => Number(tick.attrs.y2) === 130), "the minute ticks reach the bottom");
+    assert.ok(short.classed("ac-track").every((track) => track.attrs.y1 === 43), "the line keeps its place from the top");
+    const tall = load(script, { ...BEFORE, lanes: 10 });
+    assert.strictEqual(Number(tall.ids["ac-stage"].attrs.height), 34 + 10 * 18 + 9, "a taller stage keeps its own height");
+  },
   "draws every call, read or write, as the same thick tick, labelled"(script) {
     const page = load(script, BEFORE);
     const ticks = page.classed("ac-call");
