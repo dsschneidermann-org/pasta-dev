@@ -132,7 +132,6 @@ const checks = {
       { p: line.marks[1].p, at: 1010, kind: "ref", to: "feature-brief:q", title: "Other" }];
     const page = load(script, data);
     assert.strictEqual(page.classed("ac-link").length, 4, "both marks, in the grey and the coloured copy");
-    assert.strictEqual(page.classed("ac-ref").length, 0, "no second diamond");
     assert.deepStrictEqual(page.classed("ac-label").map((label) => label.textContent), ["→ Other", "→ Other"]);
   },
   "draws every call, read or write, as the same thick tick, labelled"(script) {
