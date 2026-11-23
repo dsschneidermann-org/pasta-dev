@@ -370,6 +370,15 @@
 
     window.addEventListener("resize", layout);
 
+    const feedToggle = document.getElementById("ac-feed-toggle");
+    feedToggle.addEventListener("click", () => {
+      const show = feedList.hidden;
+      feedList.hidden = !show;
+      feedToggle.textContent = show ? "▾" : "▸";
+      feedToggle.setAttribute("aria-expanded", String(show));
+      feedToggle.setAttribute("aria-label", show ? "Hide the latest changes" : "Show the latest changes");
+    });
+
     // A live payload keeps the viewer at the same wall time, since a window that slid moves every
     // mark, and plays on to the new end only from rest at the old one - the Replay state. A paused
     // viewer is looking at something, so they are left where they are; one who prefers reduced motion

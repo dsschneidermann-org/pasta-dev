@@ -163,5 +163,8 @@ body.dark {
 .ac-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--c); align-self: center; }
 .ac-what { font-family: monospace; color: var(--code); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ac-feed a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ac-latest summary { color: var(--text-muted); font-size: 0.9rem; cursor: pointer; }
+.ac-symbol { margin: 0; padding: 0 0.3rem; background: none; border: 0; color: var(--text-muted);
+    font-size: 1rem; line-height: 1; cursor: pointer; }
+.ac-symbol:hover { background: none; color: var(--text-main); }
+.ac-legend-toggle { margin-left: auto; }
 .ac-empty { color: var(--text-muted); }

@@ -6,7 +6,8 @@
 const fs = require("fs");
 const assert = require("assert");
 
-const IDS = ["ac-stage", "ac-minimap", "ac-scrub", "ac-play", "ac-clock", "ac-feed", "ac-live", "ac-empty"];
+const IDS = ["ac-stage", "ac-minimap", "ac-scrub", "ac-play", "ac-clock", "ac-feed", "ac-live", "ac-empty",
+  "ac-feed-toggle"];
 const RATE = 20;
 
 // A 12-hour locale and a fixed zone, so a renderer that leaves the hour cycle to the locale shows AM/PM here.
@@ -64,7 +65,9 @@ const SLID = payload([1010, 1020, 1030, 1040]);     // the window slid past 1000
 function load(script, data, options = {}) {
   const created = [], ids = {}, documentListeners = {}, frames = [], timers = [], sockets = [];
   for (const id of IDS) ids[id] = makeElement(id, created);
-  ids["ac-play"].textContent = "Play";
+  ids["ac-play"].textContent = "Play";                         // as _activity.html serves them
+  ids["ac-feed"].hidden = true;
+  ids["ac-feed-toggle"].textContent = "▸";
   ids["activity-data"] = Object.assign(makeElement("script", created), {
     textContent: JSON.stringify(data), dataset: { workspace: "ws:check", page: options.page ?? "feature-brief:p" } });
   global.document = {
@@ -130,6 +133,16 @@ const checks = {
     assert.ok(clock.includes("15:00:30"), clock);
     assert.ok(times.some((text) => text.includes("15:00")), times.join(" | "));
     assert.ok([clock, ...times].every((text) => !/AM|PM/i.test(text)), [clock, ...times].join(" | "));
+  },
+  "the legend's symbol shows and hides the latest changes"(script) {
+    const page = load(script, BEFORE);
+    const toggle = page.ids["ac-feed-toggle"];
+    const feed = page.ids["ac-feed"];
+    assert.ok(feed.hidden);
+    toggle.listeners.click();
+    assert.ok(!feed.hidden && toggle.attrs["aria-expanded"] === "true" && toggle.textContent === "▾");
+    toggle.listeners.click();
+    assert.ok(feed.hidden && toggle.attrs["aria-expanded"] === "false" && toggle.textContent === "▸");
   },
   "a heartbeat changes nothing"(script) {
     const page = load(script, BEFORE);

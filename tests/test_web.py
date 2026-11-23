@@ -525,14 +525,20 @@ def test_activity_colours_are_theme_tokens_defined_for_both_themes():
     assert not re.search(r"#[0-9a-fA-F]{3,6}\b", section)
 
 
-def test_the_latest_changes_start_collapsed_on_the_activity_timeline_only(client):
+def _activity_section(html: str) -> str:
+    return html[html.index('<section id="activity"'):html.index("</section>")]
+
+
+def test_the_latest_changes_start_hidden_behind_a_symbol_in_the_legend(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
-    page_html = client.get(f"/{workspace.id}/page/{page.id}").text
-    assert re.search(r'<details class="ac-latest">\s*<summary>Latest changes</summary>\s*'
-                     r'<ol class="ac-feed" id="ac-feed"></ol>\s*</details>', page_html)
-    timeline_html = client.get(f"/{workspace.id}/timeline").text
-    assert '<ol class="tl-feed" id="tl-feed"></ol>' in timeline_html and "<details" not in timeline_html
+    section = _activity_section(client.get(f"/{workspace.id}/page/{page.id}").text)
+    legend = section[section.index('<ul class="ac-legend">'):]
+    legend = legend[:legend.index("</ul>")]
+    assert ('<button type="button" class="ac-symbol" id="ac-feed-toggle" aria-expanded="false" '
+            'aria-controls="ac-feed" aria-label="Show the latest changes" title="Latest changes">▸</button>') in legend
+    assert '<ol class="ac-feed" id="ac-feed" hidden></ol>' in section and "<details" not in section
+    assert '<ol class="tl-feed" id="tl-feed"></ol>' in client.get(f"/{workspace.id}/timeline").text
 
 
 def test_every_call_takes_one_symbol_and_one_legend_entry(client):

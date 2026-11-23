@@ -22,11 +22,9 @@
             <li><svg width="6" height="14" style="--c: var(--text-muted)"><line class="ac-call" x1="3" y1="1" x2="3" y2="13"/></svg>Call</li>
             <li><svg width="10" height="10" style="--c: var(--text-muted)"><path class="ac-link" d="M5 1.5 L8.5 5 L5 8.5 L1.5 5 Z"/></svg>Link added</li>
             <li><svg width="10" height="10" style="--c: var(--text-muted)"><path class="ac-ref" d="M5 1.5 L8.5 5 L5 8.5 L1.5 5 Z"/></svg>Page ref added</li>
+            <li class="ac-legend-toggle"><button type="button" class="ac-symbol" id="ac-feed-toggle" aria-expanded="false" aria-controls="ac-feed" aria-label="Show the latest changes" title="Latest changes">▸</button></li>
         </ul>
-        <details class="ac-latest">
-            <summary>Latest changes</summary>
-            <ol class="ac-feed" id="ac-feed"></ol>
-        </details>
+        <ol class="ac-feed" id="ac-feed" hidden></ol>
     </div>
     <script type="application/json" id="activity-data" data-workspace="{{ workspace_id }}" data-page="{{ activity_scope }}">{{ activity | tojson }}</script>
     <script>
