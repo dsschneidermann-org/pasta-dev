@@ -3,6 +3,7 @@
 {% block title %}{{ workspace_name }}{% endblock %}
 
 {% block main %}
+    {% include "_activity_open.html" %}
     {% include "_activity.html" %}
     {{ body | safe }}
 

@@ -116,6 +116,7 @@ body.dark {
 .activity { margin: 0 0 0.5rem; }
 .ac-open { margin: 0; padding: 0; background: none; border: 0; color: var(--links); font-size: 0.95rem; cursor: pointer; }
 .ac-open:hover { background: none; text-decoration: underline; }
+.ac-sep:has(+ #ac-open[hidden]) { display: none; }
 #ac-body:has(> #ac-live[hidden]) :is(#ac-play, #ac-clock) { display: none; }
 .activity time { background: var(--background-body); }
 .ac-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1.2rem; margin-bottom: 0.75rem; }

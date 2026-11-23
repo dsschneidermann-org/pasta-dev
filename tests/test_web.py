@@ -541,12 +541,26 @@ def test_the_latest_changes_start_hidden_behind_a_symbol_in_the_legend(client):
     assert '<ol class="tl-feed" id="tl-feed"></ol>' in client.get(f"/{workspace.id}/timeline").text
 
 
+OPEN_LINK = ('<button type="button" class="ac-open" id="ac-open" aria-expanded="false" '
+             'aria-controls="ac-body" data-morph-keep="hidden aria-expanded">Activity ▸</button>')
+
+
+def test_the_index_puts_the_activity_link_in_its_top_line_after_guidance(client):
+    workspace = server.STORE.create_workspace("demo")
+    html = client.get(f"/{workspace.id}").text
+    assert re.search(r'>Guidance</a>\s*<span class="ac-sep">·</span>\s*' + re.escape(OPEN_LINK), html)
+    assert html.index(OPEN_LINK) < html.index('<section id="activity"')
+    assert 'id="ac-open"' not in _activity_section(html)
+    css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
+    assert ".ac-sep:has(+ #ac-open[hidden]) { display: none; }" in css
+
+
 def test_the_activity_starts_collapsed_to_a_link_and_closes_from_a_symbol_after_the_caption(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
-    section = _activity_section(client.get(f"/{workspace.id}/page/{page.id}").text)
-    assert ('<button type="button" class="ac-open" id="ac-open" aria-expanded="false" '
-            'aria-controls="ac-body">Activity ▸</button>') in section
+    html = client.get(f"/{workspace.id}/page/{page.id}").text
+    section = _activity_section(html)
+    assert html.index(OPEN_LINK) < html.index('<section id="activity"')
     assert '<div id="ac-body" hidden>' in section
     assert re.search(r'<span class="ac-caption">Activity, last 24 hours</span>\s*'
                      r'<button type="button" class="ac-symbol" id="ac-close"', section)

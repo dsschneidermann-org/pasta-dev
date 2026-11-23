@@ -1,8 +1,7 @@
 {# The last day of activity of this page and every page beneath it, or of the whole workspace on its
-   index, collapsed to a link until opened. A page script draws it and keeps it current over its own
-   socket, so the in-place update leaves the whole section alone. #}
+   index, hidden until _activity_open.html's link opens it. A page script draws it and keeps it
+   current over its own socket, so the in-place update leaves the whole section alone. #}
 <section id="activity" class="activity" data-morph-skip aria-label="Activity in the last 24 hours">
-    <button type="button" class="ac-open" id="ac-open" aria-expanded="false" aria-controls="ac-body">Activity ▸</button>
     <div id="ac-body" hidden>
     <div class="ac-controls">
         <button type="button" id="ac-play">Play</button>
