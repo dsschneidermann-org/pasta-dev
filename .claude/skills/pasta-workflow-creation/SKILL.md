@@ -115,15 +115,10 @@ optionally the statuses it is allowed in. Names follow the field they write:
 ### The Timeline
 
 The workspace Timeline replays a workspace's history, with a coloured line for each page it
-draws. Which types it draws is not part of a page type's declaration:
-
-- **Drawn on the Timeline**: `feature-brief` (blue), `bug-report` (orange) and
-  `simple-change` (green). A page of any other type has no line there. The activity
-  timeline does draw it, in the purple all those other types share.
-- A new page type is not on the Timeline until it is added. If people will want to follow
-  its pages from start to finish there, pick a line colour for it: one that is easy to
-  tell from the colours above, and from the grey of the workspace's own line on the
-  activity timeline, in every theme.
+draws. Which types it draws is not part of a page type's declaration, and a new page type is
+not on it until it is added. If people will want to follow the type's pages there from start
+to finish, pick a line colour for it: one that is easy to tell from the Timeline's other
+lines in every theme.
 
 ## 2. How the workflow drives an agent
 
