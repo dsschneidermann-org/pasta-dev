@@ -554,9 +554,20 @@ def test_links_and_refs_take_one_hollow_diamond_and_one_legend_entry(client):
         legend = html[html.index('<ul class="ac-legend">'):]
         legend = legend[:legend.index("</ul>")]
         assert re.search(r'<path class="ac-link" [^>]*/></svg>Link / ref added</li>', legend), path
-        assert legend.count("<li>") == 4, path      # status change, created or archived, call, link / ref
+        assert legend.count("<li>") == 4, path      # status change, archived or unarchived, call, link / ref
     css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
     assert ".ac-link { fill: var(--background-body); stroke: var(--c); stroke-width: 1.5; }" in css
+
+
+def test_the_activity_legend_keeps_the_open_circle_for_archived_or_unarchived(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    for path in (f"/{workspace.id}", f"/{workspace.id}/page/{page.id}"):
+        html = client.get(path).text
+        legend = html[html.index('<ul class="ac-legend">'):]
+        legend = legend[:legend.index("</ul>")]
+        assert re.search(r'<circle class="ac-stop" [^>]*/></svg>Archived or unarchived</li>', legend), path
+        assert re.search(r'<circle class="ac-stop ac-transition" [^>]*/></svg>Status change</li>', legend), path
 
 
 def test_every_time_both_timelines_show_is_24_hour():
@@ -775,6 +786,19 @@ def test_timeline_times_sit_on_the_page_background_and_the_legend_checks_deliver
     html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
     assert ".timeline time { background: var(--background-body); }" in html
     assert re.search(r'<li><svg[^>]*><circle class="tl-delivered"[^>]*/><path class="tl-check"', html)
+
+
+def test_the_timeline_legend_draws_dropped_as_the_open_circle(client):
+    workspace = server.STORE.create_workspace("demo")
+    page_id = "bug-report:mrw7chrt-def44a"
+    server.STORE.events_path(workspace.id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "bug-report", "title": "A bug", "status": "draft"},
+    ]), encoding="utf-8")
+    html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
+    legend = html[html.index('<ul class="tl-legend">'):]
+    legend = legend[:legend.index("</ul>")]
+    assert re.search(r'<circle class="tl-stop" [^>]*/></svg>Dropped: abandoned or shelved</li>', legend)
 
 
 def test_timeline_play_button_is_plain_text_and_feed_rows_are_bordered_only_between(client):

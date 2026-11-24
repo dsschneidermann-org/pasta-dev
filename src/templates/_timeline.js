@@ -137,22 +137,21 @@ function main() {
   // A line's track, stations and end mark; drawn once in grey and once in colour.
   function drawShapes(line, lineY, parent) {
     el("line", { class: "tl-track", x1: x(line.p0), x2: x(line.p1), y1: lineY, y2: lineY }, parent);
-    const stops = line.stops.map((stop, index) => {
+    return line.stops.map((stop, index) => {
       const cx = x(stop.p);
-      if (line.end === "delivered" && index === line.stops.length - 1) {
+      const last = index === line.stops.length - 1;
+      if (line.end === "delivered" && last) {
         const mark = el("circle", { class: "tl-stop tl-delivered", cx, cy: lineY, r: 6 }, parent);
         el("path", {
           class: "tl-check", d: `M${cx - 2.8} ${lineY + 0.2} L${cx - 0.8} ${lineY + 2.2} L${cx + 2.8} ${lineY - 1.8}`,
         }, parent);
         return mark;
       }
-      const className = stop.kind === "status" ? "tl-stop tl-transition" : "tl-stop";
-      return el("circle", { class: className, cx, cy: lineY, r: 3.5 }, parent);
+      // A creation shows only the page's first status, so it is drawn as a status change; a dropped
+      // line's last station is its end mark, the open circle an (un)archiving takes too.
+      const filled = (stop.kind === "status" || stop.kind === "created") && !(line.end === "dropped" && last);
+      return el("circle", { class: filled ? "tl-stop tl-transition" : "tl-stop", cx, cy: lineY, r: 3.5 }, parent);
     });
-    if (line.end === "dropped") {
-      el("line", { class: "tl-dropped", x1: x(line.p1), x2: x(line.p1), y1: lineY - 6, y2: lineY + 6 }, parent);
-    }
-    return stops;
   }
 
   // --- the minimap under the scrubber: every line at once, and the window the stage shows ---
