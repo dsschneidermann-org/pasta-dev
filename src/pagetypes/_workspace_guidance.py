@@ -40,11 +40,3 @@ SUBAGENT_DISPATCH_DESC = (
     "capability tier maps to, the agent type or tool that launches them, whether they run in "
     "parallel or in the background, and how a run is handed its agent-plan page id."
 )
-
-PROOF_DELIVERY_FIELD = "proofDelivery"
-PROOF_DELIVERY_LABEL = "PROOF DELIVERY GUIDANCE: "
-PROOF_DELIVERY_DESC = (
-    "How a spike's proofs reach the user here - for example, one HTML page that opens from disk "
-    "with its data already in it - and where the spike branch holding them is kept until the "
-    "feature-brief it leads to has shipped."
-)

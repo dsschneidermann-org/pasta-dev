@@ -252,6 +252,9 @@ and waiting, not for researching. The work of it:
   the outcomes, the scenario, the direction's id and scope and any answered questions.
   Its worktree is a spike worktree of its own, since an investigation ends in a proof
   the user opens; spike code is never integrated.
+- Name in each task the form its proof takes: something the user can open or run as it
+  is. One HTML page that opens from disk with its data already in it is an example;
+  adjust it to the project.
 - Dispatch the investigators together: they share nothing and can run at once.
 - Accept a run only from its page. A run that answers with a long reply instead of a
   reported page has failed and is redispatched.
@@ -337,10 +340,10 @@ work of it:
   check the code half by reading. Cite what you read or ran, outside sources included,
   in the evidence. When it fires, rule the direction out here with no proof: a dead
   direction reported early is the cheapest result.
-- Otherwise build the proof in your spike worktree: one page per candidate the user
-  could choose, opened by double-click with no server or install, holding the
-  scenario's real data already captured. When there is nothing to look at, the page
-  shows the values before and after it. Spike code is never integrated.
+- Otherwise build the proof in your spike worktree, in the form your task names: one
+  per candidate the user could choose, holding the scenario's real data already
+  captured. When there is nothing to look at, it shows the values before and after.
+  Spike code is never integrated.
 - Choose which of the spike's outcomes the direction bears on and, for each, record
   from running the proof whether it shows it, partly shows it, does not show it or
   cannot show it, and where to look. Leave out an outcome it has nothing to do with;

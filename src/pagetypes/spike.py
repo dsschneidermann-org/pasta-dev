@@ -19,9 +19,6 @@ from ._workspace_guidance import (
     GROUNDING_TOOL_DESC,
     GROUNDING_TOOL_FIELD,
     GROUNDING_TOOL_LABEL,
-    PROOF_DELIVERY_DESC,
-    PROOF_DELIVERY_FIELD,
-    PROOF_DELIVERY_LABEL,
     SUBAGENT_DISPATCH_DESC,
     SUBAGENT_DISPATCH_FIELD,
     SUBAGENT_DISPATCH_LABEL,
@@ -158,7 +155,7 @@ _SPIKE = PageType(
             _scalar("proof", description="""
                 The candidate the user picked, as path@commit, exactly as they ran it: the proof file
                 of the chosen investigation and the commit it was shown at. The feature-brief's summary
-                names it as a reference to plan from, so whoever plans the brief opens the same page
+                names it as a reference to plan from, so whoever plans the brief opens the same proof
                 the user judged.
                 """),
         )),
@@ -242,8 +239,6 @@ _SPIKE = PageType(
     workspace_guidance=(
         WorkspaceGuidanceSpec(SUBAGENT_DISPATCH_FIELD, ("researching",), SUBAGENT_DISPATCH_DESC,
                               SUBAGENT_DISPATCH_LABEL),
-        WorkspaceGuidanceSpec(PROOF_DELIVERY_FIELD, ("researching",), PROOF_DELIVERY_DESC,
-                              PROOF_DELIVERY_LABEL),
     ),
 )
 
@@ -320,15 +315,15 @@ _SOLUTION_INVESTIGATION = PageType(
         )),
         SectionSpec("proof", "Proof", (
             _list("items", element_fields=("name", "path", "shows"), description="""
-                Each one page the user opens to see this direction handle the scenario: path is the
-                file inside your spike worktree, opened by double-click with no server, build step or
-                install, with the data it needs already in it. When the direction has nothing to look
-                at, the page shows the values before and after it. shows names what to look for and
-                what to do on the page. Correct one in place with editProof.
+                Each one proof the user opens or runs to see this direction handle the scenario, in
+                the form your task names: path is the file inside your spike worktree, ready to use as
+                it is, with the data it needs already in it. When the direction has nothing to look at,
+                it shows the values before and after. shows names what to look for and what to do with
+                it. Correct one in place with editProof.
                 """),
             _scalar("commit", description="""
-                The commit on your spike branch that holds every page listed, so the user, and whoever
-                plans the feature-brief, open exactly what you tested. Update it whenever a page
+                The commit on your spike branch that holds every proof listed, so the user, and whoever
+                plans the feature-brief, open exactly what you tested. Update it whenever a proof
                 changes.
                 """),
             _prose("data", description="""
@@ -447,7 +442,5 @@ _SOLUTION_INVESTIGATION = PageType(
     workspace_guidance=(
         WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("investigating",), GROUNDING_TOOL_DESC,
                               GROUNDING_TOOL_LABEL),
-        WorkspaceGuidanceSpec(PROOF_DELIVERY_FIELD, ("investigating",), PROOF_DELIVERY_DESC,
-                              PROOF_DELIVERY_LABEL),
     ),
 )
