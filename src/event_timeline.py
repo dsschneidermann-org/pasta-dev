@@ -133,12 +133,12 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
     times = [_seconds(event["at"]) for event in events]
     start = times[0]
     page_type = events[0]["type"]
-    status, status_at = events[0].get("status", ""), start
 
-    # The line starts at its creation; every other event adds a station.
-    stops = [_Stop(start, "created", status)]
+    # The first event, a page's creation, carries its initial status; every later one adds a station.
+    status, status_at = events[0].get("status", ""), start
+    stops = [_Stop(start, "status", status)]
     archived = False
-    for event, at in zip(events, times):
+    for event, at in zip(events[1:], times[1:]):
         kind = event["event"]
         if kind == "status":
             status, status_at = event.get("status", status), at
@@ -212,9 +212,8 @@ def build_event_timeline(events: Sequence[Event], workspace: Workspace, now: flo
         payload_lines.append({
             "id": line.page_id, "type": line.type, "title": line.title, "path": line.path, "lane": lane,
             "p0": _round(p0), "p1": _round(p1), "end": line.end,
-            # A creation only shows the initial status, so the first status change is the first station.
             "stops": [{"p": _round(to_playback(stop.at, segments)), "at": _round(stop.at),
-                       "kind": stop.kind, "status": stop.status} for stop in line.stops if stop.kind != "created"],
+                       "kind": stop.kind, "status": stop.status} for stop in line.stops],
         })
 
     feed = sorted(

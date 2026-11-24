@@ -94,7 +94,7 @@ assert.ok(mostSpeaking > 0, "transitions are announced during playback");
 let close = null;
 let offset = 0;
 for (const line of data.lines) {
-  for (let number = 1; number < line.stops.length && !close; number++) {
+  for (let number = 2; number < line.stops.length && !close; number++) {
     const [before, stop, after] = [line.stops[number - 1], line.stops[number], line.stops[number + 1]];
     if (stop.p > before.p && stop.p - before.p < SPEAK && !(after && after.p === stop.p)) {
       close = { first: offset + number - 1, second: offset + number, line, number };

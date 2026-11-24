@@ -15,7 +15,7 @@ const [payloadPath, scriptPath] = process.argv.slice(2);
 const data = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
 const PX = 120;                                              // the renderer's pixels per playback second
 
-// The replay as the server would rebuild it after one more write: a simple change opened a second
+// The replay as the server would rebuild it after one more write: a simple change created a second
 // of playback after the old end, in a lane of its own.
 function grown(payload) {
   const p0 = payload.duration + 1;
@@ -30,7 +30,7 @@ function grown(payload) {
     lines: [...payload.lines, {
       id: "simple-change:live", type: "simple-change", title: "A live change", path: ["Features", "A live change"],
       lane: payload.lanes,
-      p0, p1: duration, end: "open", stops: [{ p: p0, at: payload.end + 2 * 3600, kind: "status", status: "open" }],
+      p0, p1: duration, end: "open", stops: [{ p: p0, at: payload.end + 2 * 3600, kind: "status", status: "draft" }],
     }],
     feed: [...payload.feed, { p: p0, line: payload.lines.length, stop: 0 }],
   };
