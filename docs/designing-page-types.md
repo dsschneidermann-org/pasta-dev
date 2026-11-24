@@ -93,6 +93,19 @@ optionally the statuses it is allowed in. Names follow the field they write:
   moved child leaves its parent's guard with none of its type, and that transition is
   held shut.
 
+### The Timeline
+
+The workspace Timeline replays a workspace's history, with a coloured line for each page it
+draws. Which types it draws is not part of a page type's declaration:
+
+- **Drawn on the Timeline**: `feature-brief` (blue), `bug-report` (orange) and
+  `simple-change` (green). A page of any other type has no line there. The activity
+  timeline does draw it, in the purple all those other types share.
+- A new page type is not on the Timeline until it is added. If people will want to follow
+  its pages from start to finish there, pick a line colour for it: one that is easy to
+  tell from the colours above, and from the grey of the workspace's own line on the
+  activity timeline, in every theme.
+
 ## 2. How the workflow drives an agent
 
 You do not write a script of steps. The system recomputes what comes next from the
@@ -262,7 +275,8 @@ Two limits this example exposes:
 2. A state diagram (Mermaid `stateDiagram-v2`).
 3. A walk-through: for each non-terminal status, what is in do, blocked and humanGates
    when the page arrives there.
-4. The self-check below, answered item by item.
+4. Whether the Timeline should draw this type and, if so, the line colour you suggest.
+5. The self-check below, answered item by item.
 
 ## Self-check
 

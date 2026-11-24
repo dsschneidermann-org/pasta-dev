@@ -5,6 +5,9 @@ fields, its legal commands, and a **status finite-state machine**. A page advanc
 through its states only by firing the transition commands its type declares - and,
 for some transitions, only once the required content is present.
 
+The workspace Timeline displays the pages of three types: `feature-brief`, `bug-report`
+and `simple-change`. A page of any other type has no line there.
+
 The reference below is generated directly from the registered page types - one page
 per page-type *state*, each with the status machine (rendered with the
 `statemachine-diagram` directive) navigated to that state, the transitions legal out
