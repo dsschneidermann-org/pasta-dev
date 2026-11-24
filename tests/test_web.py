@@ -554,9 +554,21 @@ def test_links_and_refs_take_one_hollow_diamond_and_one_legend_entry(client):
         legend = html[html.index('<ul class="ac-legend">'):]
         legend = legend[:legend.index("</ul>")]
         assert re.search(r'<path class="ac-link" [^>]*/></svg>Link / ref added</li>', legend), path
-        assert legend.count("<li>") == 4, path      # status change, created or archived, call, link / ref
+        assert legend.count("<li>") == 4, path      # status change, archived or unarchived, call, link / ref
     css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
     assert ".ac-link { fill: var(--background-body); stroke: var(--c); stroke-width: 1.5; }" in css
+
+
+def test_the_activity_legend_keeps_the_open_circle_for_archived_or_unarchived(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
+    for path in (f"/{workspace.id}", f"/{workspace.id}/page/{page.id}"):
+        html = client.get(path).text
+        legend = html[html.index('<ul class="ac-legend">'):]
+        legend = legend[:legend.index("</ul>")]
+        assert re.search(r'<circle class="ac-stop" [^>]*/></svg>Archived or unarchived</li>', legend), path
+        assert re.search(r'<circle class="ac-stop ac-transition" [^>]*/></svg>Status change</li>', legend), path
+        assert "Created" not in legend, path
 
 
 def test_every_time_both_timelines_show_is_24_hour():
