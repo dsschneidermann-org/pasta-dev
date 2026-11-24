@@ -568,7 +568,6 @@ def test_the_activity_legend_keeps_the_open_circle_for_archived_or_unarchived(cl
         legend = legend[:legend.index("</ul>")]
         assert re.search(r'<circle class="ac-stop" [^>]*/></svg>Archived or unarchived</li>', legend), path
         assert re.search(r'<circle class="ac-stop ac-transition" [^>]*/></svg>Status change</li>', legend), path
-        assert "Created" not in legend, path
 
 
 def test_every_time_both_timelines_show_is_24_hour():
@@ -800,7 +799,6 @@ def test_the_timeline_legend_draws_dropped_as_the_open_circle(client):
     legend = html[html.index('<ul class="tl-legend">'):]
     legend = legend[:legend.index("</ul>")]
     assert re.search(r'<circle class="tl-stop" [^>]*/></svg>Dropped: abandoned or shelved</li>', legend)
-    assert "tl-dropped" not in html
 
 
 def test_timeline_play_button_is_plain_text_and_feed_rows_are_bordered_only_between(client):

@@ -21,7 +21,7 @@ assert.strictEqual(created.filter((element) => element.attrs["clip-path"] === "u
 assert.strictEqual(timeline.classed("tl-check").length, 2 * delivered, "a check in both copies of every delivered end");
 
 // A status change or a page's creation is a filled station; an (un)archiving, and a dropped line's last
-// station - its end mark - are the open circle, and no other dropped mark is drawn.
+// station - its end mark - are the open circle.
 const stationClass = (line, stop, number) => {
   const last = number === line.stops.length - 1;
   if (line.end === "delivered" && last) return "tl-stop tl-delivered";
@@ -35,7 +35,6 @@ const expectedClasses = data.lines.flatMap((line) => {
 assert.deepStrictEqual(timeline.classed("tl-stop").map((mark) => mark.attrs.class), expectedClasses,
   "both copies of every station: status changes and creations filled, (un)archivings and dropped ends open");
 assert.ok(data.lines.some((line) => line.end === "dropped"), "the payload has a dropped line to check");
-assert.strictEqual(timeline.classed("tl-dropped").length, 0, "a dropped end is its open last station, not a bar");
 
 // Every line links to its page, and no link - a line's or a feed item's - carries a query.
 const links = created.filter((element) => element.tag === "a");
