@@ -4,7 +4,7 @@ import os
 import asyncio
 import logging
 from contextlib import contextmanager, asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Annotated, Any, override
 from collections.abc import Generator
 from pathlib import Path
@@ -547,7 +547,7 @@ class _RefuseInvalidDeclarations(Middleware):
 
 class _RecordActivity(Middleware):
     """Record each tool call for the activity timeline once it has returned, so a call that is refused
-    or fails records nothing."""
+    or fails records nothing. It is placed at the instant it was received, ahead of what it wrote."""
 
     @override
     async def on_call_tool(
@@ -556,16 +556,16 @@ class _RecordActivity(Middleware):
         call_next: CallNext[mt.CallToolRequestParams, ToolResult],
     ) -> ToolResult:
         result = await call_next(context)
-        _record_call(context.message.name, context.message.arguments or {}, result)
+        _record_call(context.message.name, context.message.arguments or {}, result, context.timestamp)
         return result
 
 
-def _record_call(tool: str, arguments: dict[str, Any], result: ToolResult) -> None:
+def _record_call(tool: str, arguments: dict[str, Any], result: ToolResult, received: datetime) -> None:
     """The call has already run, so a recording that fails is logged, never raised."""
     try:
         returned = sum(len(block.text.encode("utf-8")) for block in result.content
                        if isinstance(block, mt.TextContent))
-        recorded = call_entry(tool, arguments, returned, datetime.now(timezone.utc).isoformat())
+        recorded = call_entry(tool, arguments, returned, received.isoformat())
         if recorded is None:
             return
         workspace_id, entry = recorded
