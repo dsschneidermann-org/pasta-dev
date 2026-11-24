@@ -172,6 +172,15 @@ const checks = {
       assert.ok(marks[index].classList.set.has("fresh"), `passing a ${mark.kind} mark highlights it`);
     });
   },
+  "the latest changes name a creation by its status alone, as its mark does"(script) {
+    const kinds = [{ kind: "created", status: "draft" }, { kind: "status", status: "open" }];
+    const data = payload([1000, 1010]);
+    const line = data.lines[0];
+    line.marks = line.marks.map((mark, index) => ({ p: mark.p, at: mark.at, ...kinds[index] }));
+    const rows = load(script, data).ids["ac-feed"].children;
+    const texts = rows.map((row) => row.children.find((part) => part.className === "ac-what").textContent);
+    assert.deepStrictEqual(texts, ["open", "draft"], "latest first");
+  },
   "hovering a line or its feed link names its whole path"(script) {
     const page = load(script, BEFORE);
     const path = "Features › Feature › Page";

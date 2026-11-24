@@ -139,8 +139,8 @@ def test_a_shipped_feature_ends_delivered_at_its_ship_station():
     payload = build_event_timeline(events, _workspace(_page(page, "shipped")), T0 + 10 * DAY)
     line = _only_line(payload)
     assert line["end"] == "delivered"
-    assert [stop["status"] for stop in line["stops"]] == ["draft", "grounding", "shipped"]
-    assert [stop["kind"] for stop in line["stops"]] == ["created", "status", "status"]
+    assert [stop["status"] for stop in line["stops"]] == ["grounding", "shipped"]
+    assert [stop["kind"] for stop in line["stops"]] == ["status", "status"]
     assert line["p1"] == line["stops"][-1]["p"]
     assert line["p1"] == payload["duration"]          # the ship station is the last event, so it ends the replay
 
@@ -195,11 +195,11 @@ def test_an_archived_page_ends_at_its_last_status_without_any_archive_stations()
     ]
     payload = build_event_timeline(events, _workspace(_page(page, "planning", archived=True)), T0 + 30 * DAY)
     line = _only_line(payload)
-    assert [stop["kind"] for stop in line["stops"]] == ["created", "status", "status"]
+    assert [stop["kind"] for stop in line["stops"]] == ["status", "status"]
     assert line["end"] == "dropped"
     assert line["p1"] == line["stops"][-1]["p"] == payload["duration"]
     assert payload["end"] == T0 + 4 * HOUR            # the archive a month on is not activity
-    assert len(payload["feed"]) == 3
+    assert len(payload["feed"]) == 2
 
 
 def test_a_page_gone_from_the_workspace_shows_no_archive_stations():
@@ -213,7 +213,7 @@ def test_a_page_gone_from_the_workspace_shows_no_archive_stations():
     ]
     payload = build_event_timeline(events, _workspace(), T0 + 20 * DAY)
     line = _only_line(payload)
-    assert [stop["kind"] for stop in line["stops"]] == ["created", "status"]
+    assert [stop["kind"] for stop in line["stops"]] == ["status"]
     assert line["end"] == "dropped"
     assert line["p1"] == line["stops"][-1]["p"]
     assert payload["end"] == T0 + 3 * HOUR
@@ -228,7 +228,7 @@ def test_a_delivered_page_archived_later_ends_delivered_at_its_close_station():
     ]
     payload = build_event_timeline(events, _workspace(_page(page, "closed", archived=True)), T0 + 10 * DAY)
     line = _only_line(payload)
-    assert [stop["kind"] for stop in line["stops"]] == ["created", "status"]
+    assert [stop["kind"] for stop in line["stops"]] == ["status"]
     assert line["end"] == "delivered"
     assert line["p1"] == line["stops"][-1]["p"] == payload["duration"]
     assert payload["end"] == T0 + HOUR
@@ -289,23 +289,48 @@ def test_the_current_workspace_title_wins_over_the_logged_one():
     assert line["end"] == "open"
 
 
-def test_a_page_first_seen_at_a_transition_starts_there_in_the_status_it_left():
+def test_a_page_first_seen_at_a_transition_starts_at_that_station():
     page = _id("feature-brief", T0)
     events = [_event(T0 + 3 * HOUR, "status", page, "grounding", "draft")]
     payload = build_event_timeline(events, _workspace(_page(page, "grounding")), T0 + DAY)
-    line = _only_line(payload)
-    assert line["stops"][0]["at"] == T0 + 3 * HOUR
-    assert line["stops"][0]["status"] == "draft"
-    assert line["stops"][0]["kind"] == "created"
+    [stop] = _only_line(payload)["stops"]
+    assert (stop["at"], stop["kind"], stop["status"]) == (T0 + 3 * HOUR, "status", "grounding")
     assert payload["start"] == T0 + 3 * HOUR
-    assert [stop["status"] for stop in line["stops"]] == ["draft", "grounding"]
 
 
-def test_the_created_event_is_the_first_station_and_never_a_second_one():
-    page = _id("feature-brief", T0)
-    events = [_event(T0 + 0.004, "created", page, "draft")]
-    line = _only_line(build_event_timeline(events, _workspace(_page(page, "draft")), T0 + DAY))
-    assert len(line["stops"]) == 1
+def test_a_creation_is_a_station_only_until_the_first_status_change():
+    page = _id("bug-report", T0)
+    created = [_event(T0, "created", page, "draft")]
+    payload = build_event_timeline(created, _workspace(_page(page, "draft")), T0 + DAY)
+    assert [(stop["kind"], stop["status"]) for stop in _only_line(payload)["stops"]] == [("created", "draft")]
+    assert len(payload["feed"]) == 1
+
+    opened = [*created, _event(T0 + HOUR, "status", page, "open", "draft")]
+    payload = build_event_timeline(opened, _workspace(_page(page, "open")), T0 + DAY)
+    line = _only_line(payload)
+    assert [(stop["kind"], stop["status"]) for stop in line["stops"]] == [("status", "open")]
+    assert len(payload["feed"]) == 1
+    assert payload["start"] == T0
+    assert line["p0"] == 0 < line["stops"][0]["p"]            # the line still starts at the creation
+
+
+def test_a_first_status_change_moves_nothing_already_drawn():
+    waiting, other = _id("bug-report", T0), _id("feature-brief", T0 + 2 * DAY)
+    events = [
+        _event(T0, "created", waiting, "draft"),
+        _event(T0 + 2 * DAY, "created", other, "draft"),
+        _event(T0 + 2 * DAY + HOUR, "status", other, "grounding", "draft"),
+    ]
+    before = build_event_timeline(
+        events, _workspace(_page(waiting, "draft"), _page(other, "grounding")), T0 + 3 * DAY)
+    after = build_event_timeline(
+        [*events, _event(T0 + 3 * DAY, "status", waiting, "open", "draft")],
+        _workspace(_page(waiting, "open"), _page(other, "grounding")), T0 + 3 * DAY)
+
+    assert after["start"] == before["start"]
+    [waited, others], [opened, unmoved] = before["lines"], after["lines"]
+    assert (opened["lane"], opened["p0"]) == (waited["lane"], waited["p0"])
+    assert (unmoved["lane"], unmoved["p0"], unmoved["stops"]) == (others["lane"], others["p0"], others["stops"])
 
 
 def test_only_feature_briefs_bug_reports_and_simple_changes_become_lines():
@@ -367,11 +392,11 @@ def test_the_feed_lists_every_station_in_playback_order():
     ]
     payload = build_event_timeline(events, _workspace(_page(first, "shipped"), _page(second, "draft")), T0 + DAY)
     feed = payload["feed"]
-    assert len(feed) == 3
+    assert len(feed) == 2
     ps = [entry["p"] for entry in feed]
     assert ps == sorted(ps)
     resolved = [payload["lines"][entry["line"]]["stops"][entry["stop"]]["status"] for entry in feed]
-    assert resolved == ["draft", "draft", "shipped"]
+    assert resolved == ["draft", "shipped"]
     json.dumps(payload)
 
 

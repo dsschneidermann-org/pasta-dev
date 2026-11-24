@@ -134,6 +134,9 @@ KINDS.forEach(([kind, , text], index) => {
     KINDS.map((_kind, other) => other === index), `passing a ${kind} station announces it alone`);
   assert.ok(kindMarks[index].classList.set.has("fresh"), `passing a ${kind} station highlights it`);
 });
+const feedTexts = kinds.ids["tl-feed"].children.map(
+  (row) => row.children.find((part) => part.className === "tl-status").textContent);
+assert.deepStrictEqual(feedTexts.reverse(), KINDS.map(([, , text]) => text), "a feed row reads its station's label");
 
 const stationsClassed = (name) => expectedClasses.filter((className) => className === name).length / 2;
 console.log(`ok - ${data.lines.length} lines in two copies, ${delivered} checked ends, `

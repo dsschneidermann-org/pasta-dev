@@ -180,10 +180,6 @@ function main() {
   const droppedCount = document.createElement("b");
   counts.append(inFlightCount, " in flight · ", deliveredCount, " delivered · ", droppedCount, " dropped");
 
-  function stationLabel(stop) {
-    return stop.kind === "status" ? stop.status : stop.kind;
-  }
-
   function statusLabel(stop) {
     return stop.kind === "archived" || stop.kind === "unarchived" ? stop.kind : stop.status;
   }
@@ -202,7 +198,7 @@ function main() {
     dot.style.setProperty("--c", `var(--line-${line.type})`);
     const status = document.createElement("span");
     status.className = "tl-status";
-    status.textContent = stationLabel(stop);
+    status.textContent = statusLabel(stop);
     const link = document.createElement("a");
     link.href = pagePath(line.id);
     link.title = line.path.join(" › ");

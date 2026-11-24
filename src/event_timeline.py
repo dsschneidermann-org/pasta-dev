@@ -2,11 +2,12 @@
 
 Each feature-brief, bug-report and simple-change is a line that starts at its first logged event,
 stops at a station for every one after it - an archived or deleted page's only up to its last
-status change - and ends delivered, dropped, or still open. The
-replay runs on a playback clock rather than the wall clock: stretches near an event play at a
-quarter of a day per second, and the idle time between them is squeezed, so a project months long
-replays in minutes and the drawing gives its space to the moments something happened. Every
-layout number is decided here, so the browser only draws and animates.
+status change - and ends delivered, dropped, or still open. The creation itself is a station only
+until the page's first status change. The replay runs on a playback clock rather than the wall
+clock: stretches near an event play at a quarter of a day per second, and the idle time between
+them is squeezed, so a project months long replays in minutes and the drawing gives its space to
+the moments something happened. Every layout number is decided here, so the browser only draws
+and animates.
 """
 
 from __future__ import annotations
@@ -119,6 +120,7 @@ class _Line:
     type: str
     title: str
     path: list[str]        # the titles from its root page down to it
+    start_at: float        # its first event, which need not be a station
     stops: list[_Stop]
     end: str               # delivered | dropped | open
     end_at: float | None   # None while open: the line runs to the end of the replay
@@ -143,8 +145,9 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
     else:
         status = events[0].get("status", "")
 
-    # The created event is the first station; every other event adds one of its own.
-    stops = [_Stop(start, "created", status)]
+    # A creation only shows the page's initial status, so it is a station just until the first
+    # status change; every other event adds one of its own.
+    stops = [_Stop(start, "created", status)] if first_status is None else []
     archived = False
     status_at = None
     for event, at in zip(events, times):
@@ -178,7 +181,7 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
     page = workspace.pages.get(page_id)
     title = page.title if page is not None else events[-1].get("title", page_id)
     path = title_path(workspace, page_id) if page is not None else [title]
-    return _Line(page_id, page_type, title, path, stops, end, end_at)
+    return _Line(page_id, page_type, title, path, start, stops, end, end_at)
 
 
 def _round(value: float) -> float:
@@ -198,14 +201,16 @@ def build_event_timeline(events: Sequence[Event], workspace: Workspace, now: flo
                 "segments": [], "lanes": 0, "lines": [], "feed": []}
 
     lines = [_line(page_id, page_events, workspace) for page_id, page_events in by_page.items()]
-    stop_times = [stop.at for line in lines for stop in line.stops]
-    start, end = min(stop_times), max(stop_times)
-    segments = playback_segments(stop_times, start, end)
+    # A line's start keeps its place on the clock when its creation stops being a station, so a
+    # first status change moves nothing already drawn.
+    times = [at for line in lines for at in (line.start_at, *(stop.at for stop in line.stops))]
+    start, end = min(times), max(times)
+    segments = playback_segments(times, start, end)
     duration = segments[-1].p1 if segments else 0.0
 
     placed: list[tuple[float, float, _Line]] = []
     for line in lines:
-        p0 = to_playback(line.stops[0].at, segments)
+        p0 = to_playback(line.start_at, segments)
         p1 = to_playback(line.end_at, segments) if line.end_at is not None else duration
         placed.append((p0, p1, line))
     placed.sort(key=lambda item: (item[0], item[2].page_id))
