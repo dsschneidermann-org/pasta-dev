@@ -99,9 +99,13 @@ def test_a_page_of_another_type_takes_the_page_colour_and_a_deleted_page_its_log
     assert (lines["gone"]["title"], lines["gone"]["colour"]) == ("Deleted bug", "bug-report")
 
 
-def test_marks_at_the_same_instant_keep_events_before_entries():
-    [line] = build_activity_timeline([_call("feat", 10)], [_status("feat", 10, "review")], _workspace(), "feat", NOW)["lines"]
-    assert [mark["kind"] for mark in line["marks"]] == ["status", "call"]
+def test_marks_at_the_same_instant_keep_entries_before_events():
+    entries = [{"at": _at(10), "kind": "link", "pageId": "feat", "to": "other", "role": "relates-to"},
+               {"at": _at(10), "kind": "ref", "pageId": "feat", "to": "other"}]
+    payload = build_activity_timeline(entries, [_status("feat", 10, "review")], _workspace(), "feat", NOW)
+    [line] = payload["lines"]
+    assert [mark["kind"] for mark in line["marks"]] == ["link", "ref", "status"]
+    assert [entry["mark"] for entry in payload["feed"]] == [0, 1, 2]
 
 
 def test_calls_seconds_apart_play_apart():

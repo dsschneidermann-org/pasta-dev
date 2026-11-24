@@ -76,22 +76,23 @@ def build_activity_timeline(entries: Sequence[ActivityEntry], events: Sequence[E
     members = (None if scope is None
                else _descendants(workspace, scope) if scope in workspace.pages else {scope})
 
-    # (time, events before entries, file order, line, mark, the event behind it)
+    # (time, entries before events, file order, line, mark, the event behind it). A batch's links, refs and
+    # status share the instant of its save, and its transition is its last command.
     marks: list[tuple[float, int, int, str, dict[str, Any], Event | None]] = []
     for order, event in enumerate(events):
         at = _seconds(event["at"])
         if at >= since and (members is None or event["pageId"] in members):
             # A creation carries the page's initial status, so it marks a status like any later change.
             kind = "status" if event["event"] == "created" else event["event"]
-            marks.append((at, 0, order, event["pageId"], {"kind": kind, "status": event.get("status", "")}, event))
+            marks.append((at, 1, order, event["pageId"], {"kind": kind, "status": event.get("status", "")}, event))
     for order, entry in enumerate(entries):
         at, page_id, mark = entry_seconds(entry), entry.get("pageId"), _entry_mark(entry, workspace)
         if at < since or mark is None:
             continue
         if page_id is None:
-            marks.append((at, 1, order, workspace.id, mark, None))
+            marks.append((at, 0, order, workspace.id, mark, None))
         elif isinstance(page_id, str) and (members is None or page_id in members):
-            marks.append((at, 1, order, page_id, mark, None))
+            marks.append((at, 0, order, page_id, mark, None))
     if not marks:
         return {"start": _round(now), "end": _round(now), "duration": 0, "baseRate": ACTIVITY_RATE,
                 "segments": [], "lanes": 0, "lines": [], "feed": []}
