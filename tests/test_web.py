@@ -377,7 +377,7 @@ def test_the_activity_socket_sends_its_page_s_timeline_on_connect(client, monkey
             live.websocket_connect(f"/ws/activity/{workspace.id}?page={page.id}") as websocket:
         timeline = _next_timeline(websocket)
     assert [line["id"] for line in timeline["lines"]] == [page.id]
-    assert [mark["kind"] for mark in timeline["lines"][0]["marks"]] == ["created", "call"]
+    assert [mark["kind"] for mark in timeline["lines"][0]["marks"]] == ["status", "call"]
     assert server.ws_activity.active == []                  # a closed tab stops watching
 
 
@@ -392,7 +392,7 @@ def test_a_status_change_in_the_browser_streams_to_a_watching_activity_tab(clien
         assert posted.status_code == 303
         timeline = _next_timeline(websocket)
     [line] = timeline["lines"]
-    assert [(mark["kind"], mark["status"]) for mark in line["marks"]] == [("created", "draft"), ("status", "open")]
+    assert [(mark["kind"], mark["status"]) for mark in line["marks"]] == [("status", "draft"), ("status", "open")]
 
 
 def test_an_activity_socket_of_an_unknown_workspace_stays_open_on_heartbeats(client):
@@ -417,7 +417,7 @@ def test_an_activity_tab_drawn_from_the_current_items_is_sent_nothing_until_they
     # Had the connect re-sent what the tab was drawn from, this would carry the rendered digest.
     assert message["digest"] == now != rendered
     [line] = message["timeline"]["lines"]
-    assert [mark["kind"] for mark in line["marks"]] == ["created", "call", "status"]
+    assert [mark["kind"] for mark in line["marks"]] == ["status", "call", "status"]
 
 
 def _activity(html: str) -> tuple[dict, str]:

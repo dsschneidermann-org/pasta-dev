@@ -88,7 +88,7 @@
 
     function feedText(mark) {
       switch (mark.kind) {
-        case "created": case "status": return mark.status;
+        case "status": return mark.status;
         case "archived": case "unarchived": return mark.kind;
         case "call": return `${mark.tool} · ${size(mark.bytes)} ${mark.write ? "sent" : "returned"}`;
         case "link": return `link → ${mark.title}`;
@@ -182,7 +182,7 @@
           }, parent);
         }
         return el("circle", {
-          class: mark.kind === "status" || mark.kind === "created" ? "ac-stop ac-transition" : "ac-stop", cx, cy: lineY, r: 3.5,
+          class: mark.kind === "status" ? "ac-stop ac-transition" : "ac-stop", cx, cy: lineY, r: 3.5,
         }, parent);
       });
     }

@@ -83,6 +83,14 @@ def test_marks_carry_their_fields_and_name_the_page_they_point_at():
     assert (line["title"], line["colour"], line["href"]) == ("Feature", "feature-brief", "/ws:w/page/feat")
 
 
+def test_a_creation_is_a_status_mark_with_the_initial_status():
+    events = [_status("feat", 30, "draft") | {"event": "created"}, _status("feat", 20, "grounding"),
+              _status("feat", 10, "grounding") | {"event": "archived"}]
+    [line] = build_activity_timeline([], events, _workspace(), "feat", NOW)["lines"]
+    assert [(mark["kind"], mark["status"]) for mark in line["marks"]] == [
+        ("status", "draft"), ("status", "grounding"), ("archived", "grounding")]
+
+
 def test_a_page_of_another_type_takes_the_page_colour_and_a_deleted_page_its_logged_title():
     events = [_status("plan", 30, "ready", page_type="implementation-plan"),
               _status("gone", 20, "closed", page_type="bug-report", title="Deleted bug")]
