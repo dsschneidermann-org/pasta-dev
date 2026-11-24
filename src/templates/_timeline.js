@@ -147,9 +147,8 @@ function main() {
         }, parent);
         return mark;
       }
-      // A creation shows only the page's first status, so it is drawn as a status change; a dropped
-      // line's last station is its end mark, the open circle an (un)archiving takes too.
-      const filled = (stop.kind === "status" || stop.kind === "created") && !(line.end === "dropped" && last);
+      // A dropped line's last station is its end mark, the open circle an (un)archiving takes too.
+      const filled = stop.kind === "status" && !(line.end === "dropped" && last);
       return el("circle", { class: filled ? "tl-stop tl-transition" : "tl-stop", cx, cy: lineY, r: 3.5 }, parent);
     });
   }

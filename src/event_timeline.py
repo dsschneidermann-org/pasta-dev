@@ -2,12 +2,11 @@
 
 Each feature-brief, bug-report and simple-change is a line that starts at its first logged event,
 stops at a station for every one after it - an archived or deleted page's only up to its last
-status change - and ends delivered, dropped, or still open. The creation itself is a station only
-until the page's first status change. The replay runs on a playback clock rather than the wall
-clock: stretches near an event play at a quarter of a day per second, and the idle time between
-them is squeezed, so a project months long replays in minutes and the drawing gives its space to
-the moments something happened. Every layout number is decided here, so the browser only draws
-and animates.
+status change - and ends delivered, dropped, or still open. The
+replay runs on a playback clock rather than the wall clock: stretches near an event play at a
+quarter of a day per second, and the idle time between them is squeezed, so a project months long
+replays in minutes and the drawing gives its space to the moments something happened. Every
+layout number is decided here, so the browser only draws and animates.
 """
 
 from __future__ import annotations
@@ -120,7 +119,6 @@ class _Line:
     type: str
     title: str
     path: list[str]        # the titles from its root page down to it
-    start_at: float        # its first event, which need not be a station
     stops: list[_Stop]
     end: str               # delivered | dropped | open
     end_at: float | None   # None while open: the line runs to the end of the replay
@@ -135,21 +133,11 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
     times = [_seconds(event["at"]) for event in events]
     start = times[0]
     page_type = events[0]["type"]
+    status, status_at = events[0].get("status", ""), start
 
-    created = next((event for event in events if event["event"] == "created"), None)
-    first_status = next((event for event in events if event["event"] == "status"), None)
-    if created is not None:
-        status = created.get("status", "")
-    elif first_status is not None:
-        status = first_status.get("from", first_status.get("status", ""))
-    else:
-        status = events[0].get("status", "")
-
-    # A creation only shows the page's initial status, so it is a station just until the first
-    # status change; every other event adds one of its own.
-    stops = [_Stop(start, "created", status)] if first_status is None else []
+    # The line starts at its creation; every other event adds a station.
+    stops = [_Stop(start, "created", status)]
     archived = False
-    status_at = None
     for event, at in zip(events, times):
         kind = event["event"]
         if kind == "status":
@@ -168,11 +156,9 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
         stops = [stop for stop in stops if stop.kind not in ("archived", "unarchived")]
 
     if status == DELIVERED.get(page_type):
-        end, end_at = "delivered", status_at if status_at is not None else stops[-1].at
-    elif status == DROPPED.get(page_type):
-        end, end_at = "dropped", status_at if status_at is not None else stops[-1].at
-    elif put_away:
-        end, end_at = "dropped", stops[-1].at
+        end, end_at = "delivered", status_at
+    elif put_away or status == DROPPED.get(page_type):
+        end, end_at = "dropped", status_at
     elif is_hidden(workspace, page_id):
         end, end_at = "dropped", max(times[-1], stops[-1].at)
     else:
@@ -181,7 +167,7 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
     page = workspace.pages.get(page_id)
     title = page.title if page is not None else events[-1].get("title", page_id)
     path = title_path(workspace, page_id) if page is not None else [title]
-    return _Line(page_id, page_type, title, path, start, stops, end, end_at)
+    return _Line(page_id, page_type, title, path, stops, end, end_at)
 
 
 def _round(value: float) -> float:
@@ -201,16 +187,14 @@ def build_event_timeline(events: Sequence[Event], workspace: Workspace, now: flo
                 "segments": [], "lanes": 0, "lines": [], "feed": []}
 
     lines = [_line(page_id, page_events, workspace) for page_id, page_events in by_page.items()]
-    # A line's start keeps its place on the clock when its creation stops being a station, so a
-    # first status change moves nothing already drawn.
-    times = [at for line in lines for at in (line.start_at, *(stop.at for stop in line.stops))]
-    start, end = min(times), max(times)
-    segments = playback_segments(times, start, end)
+    stop_times = [stop.at for line in lines for stop in line.stops]
+    start, end = min(stop_times), max(stop_times)
+    segments = playback_segments(stop_times, start, end)
     duration = segments[-1].p1 if segments else 0.0
 
     placed: list[tuple[float, float, _Line]] = []
     for line in lines:
-        p0 = to_playback(line.start_at, segments)
+        p0 = to_playback(line.stops[0].at, segments)
         p1 = to_playback(line.end_at, segments) if line.end_at is not None else duration
         placed.append((p0, p1, line))
     placed.sort(key=lambda item: (item[0], item[2].page_id))
@@ -228,8 +212,9 @@ def build_event_timeline(events: Sequence[Event], workspace: Workspace, now: flo
         payload_lines.append({
             "id": line.page_id, "type": line.type, "title": line.title, "path": line.path, "lane": lane,
             "p0": _round(p0), "p1": _round(p1), "end": line.end,
+            # A creation only shows the initial status, so the first status change is the first station.
             "stops": [{"p": _round(to_playback(stop.at, segments)), "at": _round(stop.at),
-                       "kind": stop.kind, "status": stop.status} for stop in line.stops],
+                       "kind": stop.kind, "status": stop.status} for stop in line.stops if stop.kind != "created"],
         })
 
     feed = sorted(

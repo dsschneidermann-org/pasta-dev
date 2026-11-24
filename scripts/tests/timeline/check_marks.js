@@ -1,8 +1,7 @@
 // The map's marks: every line in a grey copy and a clipped coloured copy, a checkmark in both copies
-// of each delivered end, status changes and creations filled, (un)archivings and dropped ends open,
-// links free of queries, a status label for every station, and the label of a line's latest
-// station - whatever its kind, a page's creation included - announced as the playhead passes it,
-// while every station passed is highlighted.
+// of each delivered end, status changes filled, (un)archivings and dropped ends open, links free of
+// queries, a status label for every station, and the label of a line's latest station - whatever its
+// kind - announced as the playhead passes it, while every station passed is highlighted.
 //
 //     node check_marks.js <payload.json> <_timeline.js>
 "use strict";
@@ -20,12 +19,12 @@ assert.strictEqual(created.filter((element) => element.attrs["clip-path"] === "u
   data.lines.length, "one clipped coloured copy per line");
 assert.strictEqual(timeline.classed("tl-check").length, 2 * delivered, "a check in both copies of every delivered end");
 
-// A status change or a page's creation is a filled station; an (un)archiving, and a dropped line's last
-// station - its end mark - are the open circle.
+// A status change is a filled station; an (un)archiving, and a dropped line's last station - its end
+// mark - are the open circle.
 const stationClass = (line, stop, number) => {
   const last = number === line.stops.length - 1;
   if (line.end === "delivered" && last) return "tl-stop tl-delivered";
-  const filled = (stop.kind === "status" || stop.kind === "created") && !(line.end === "dropped" && last);
+  const filled = stop.kind === "status" && !(line.end === "dropped" && last);
   return filled ? "tl-stop tl-transition" : "tl-stop";
 };
 const expectedClasses = data.lines.flatMap((line) => {
@@ -33,7 +32,7 @@ const expectedClasses = data.lines.flatMap((line) => {
   return [...classes, ...classes];
 });
 assert.deepStrictEqual(timeline.classed("tl-stop").map((mark) => mark.attrs.class), expectedClasses,
-  "both copies of every station: status changes and creations filled, (un)archivings and dropped ends open");
+  "both copies of every station: status changes filled, (un)archivings and dropped ends open");
 assert.ok(data.lines.some((line) => line.end === "dropped"), "the payload has a dropped line to check");
 
 // Every line links to its page, and no link - a line's or a feed item's - carries a query.
@@ -95,7 +94,7 @@ assert.ok(mostSpeaking > 0, "transitions are announced during playback");
 let close = null;
 let offset = 0;
 for (const line of data.lines) {
-  for (let number = 2; number < line.stops.length && !close; number++) {
+  for (let number = 1; number < line.stops.length && !close; number++) {
     const [before, stop, after] = [line.stops[number - 1], line.stops[number], line.stops[number + 1]];
     if (stop.p > before.p && stop.p - before.p < SPEAK && !(after && after.p === stop.p)) {
       close = { first: offset + number - 1, second: offset + number, line, number };
@@ -115,9 +114,8 @@ if (close) {
 }
 
 // Every kind of station behaves the same as the playhead passes it: highlighted, and announced as
-// its line's latest - a creation with the status it was created in, an (un)archiving by its kind.
-const KINDS = [["created", "draft", "draft"], ["status", "open", "open"], ["archived", "open", "archived"],
-  ["unarchived", "open", "unarchived"]];
+// its line's latest - a status change by its status, an (un)archiving by its kind.
+const KINDS = [["status", "open", "open"], ["archived", "open", "archived"], ["unarchived", "open", "unarchived"]];
 const kindStops = KINDS.map(([kind, status], index) => ({ p: 1 + 3 * index, at: data.start + 3 * index, kind, status }));
 const kindLine = { id: "bug-report:kinds", type: "bug-report", title: "Label check", path: ["Bug Reports", "Label check"],
   lane: 0, p0: 1, p1: 10, end: "open", stops: kindStops };
@@ -143,4 +141,4 @@ console.log(`ok - ${data.lines.length} lines in two copies, ${delivered} checked
   + `${stationsClassed("tl-stop tl-transition")} filled and ${stationsClassed("tl-stop")} open stations, `
   + `${labels.length} labels, up to ${mostSpeaking} announced at once, `
   + (close ? `close transitions on ${close.line.id} scrubbed` : "no close transitions to scrub")
-  + `, and a creation, status change, archiving and unarchiving each highlighted and announced alike`);
+  + `, and a status change, archiving and unarchiving each highlighted and announced alike`);
