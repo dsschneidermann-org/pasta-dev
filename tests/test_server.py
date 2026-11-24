@@ -621,6 +621,22 @@ def test_a_failed_call_records_nothing(mcp):
     assert server.STORE.read_activity(workspace_id) == []
 
 
+def test_a_rejected_batch_records_neither_the_call_nor_anything_it_would_have_written(mcp):
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    target = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-fields", "title": "Target"})
+    page = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"})
+    stamp = {"statusRevisionToken": page["statusRevisionToken"]}
+    link = {"command": "addLink", "args": stamp | {"toId": target["id"], "role": "relates-to"}}
+    created = server.STORE.read_events(workspace_id)
+    for commands in ([link, {"command": "reopen", "args": stamp}],       # an illegal transition after a legal link
+                     [{"command": "open", "args": stamp}, link],         # a command on the token the transition made stale
+                     "not a list"):                                      # refused before the tool runs
+        with pytest.raises(ToolError):
+            call(mcp, "mutatePageBatch", {"workspaceId": workspace_id, "pageId": page["id"], "commands": commands})
+    assert server.STORE.read_activity(workspace_id) == []
+    assert server.STORE.read_events(workspace_id) == created
+
+
 def test_a_call_refused_by_the_quarantine_records_nothing(mcp, invalid_declarations):
     workspace = server.STORE.create_workspace("demo")
     with pytest.raises(ToolError):
