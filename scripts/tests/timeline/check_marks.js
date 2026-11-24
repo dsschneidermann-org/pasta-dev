@@ -1,8 +1,8 @@
 // The map's marks: every line in a grey copy and a clipped coloured copy, a checkmark in both copies
 // of each delivered end, status changes and creations filled, (un)archivings and dropped ends open,
-// links free of queries, a status label for every
-// station, and the label of a line's latest station - whatever its kind, a page's creation included -
-// announced as the playhead passes it, while every station passed is highlighted.
+// links free of queries, a status label for every station, and the label of a line's latest
+// station - whatever its kind, a page's creation included - announced as the playhead passes it,
+// while every station passed is highlighted.
 //
 //     node check_marks.js <payload.json> <_timeline.js>
 "use strict";
