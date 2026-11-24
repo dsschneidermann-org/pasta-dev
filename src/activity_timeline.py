@@ -81,8 +81,9 @@ def build_activity_timeline(entries: Sequence[ActivityEntry], events: Sequence[E
     for order, event in enumerate(events):
         at = _seconds(event["at"])
         if at >= since and (members is None or event["pageId"] in members):
-            marks.append((at, 0, order, event["pageId"],
-                          {"kind": event["event"], "status": event.get("status", "")}, event))
+            # A creation carries the page's initial status, so it marks a status like any later change.
+            kind = "status" if event["event"] == "created" else event["event"]
+            marks.append((at, 0, order, event["pageId"], {"kind": kind, "status": event.get("status", "")}, event))
     for order, entry in enumerate(entries):
         at, page_id, mark = entry_seconds(entry), entry.get("pageId"), _entry_mark(entry, workspace)
         if at < since or mark is None:

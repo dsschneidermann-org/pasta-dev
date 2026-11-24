@@ -141,21 +141,21 @@ const checks = {
     assert.strictEqual(page.classed("ac-write").length, 0);
     assert.ok(page.classed("ac-label").some((label) => label.textContent === "mutatePageBatch 2.0 KB"));
   },
-  "draws a creation as a status change and an (un)archiving as the open circle"(script) {
-    const kinds = [{ kind: "created", status: "draft" }, { kind: "status", status: "open" },
-      { kind: "archived", status: "open" }, { kind: "unarchived", status: "open" }];
+  "draws a status change filled and an (un)archiving as the open circle"(script) {
+    const kinds = [{ kind: "status", status: "open" }, { kind: "archived", status: "open" },
+      { kind: "unarchived", status: "open" }];
     const data = payload(kinds.map((_kind, index) => 1000 + 10 * index));
     const line = data.lines[0];
     line.marks = line.marks.map((mark, index) => ({ p: mark.p, at: mark.at, ...kinds[index] }));
     const page = load(script, data);
     const circles = page.classed("ac-stop").map((circle) => circle.attrs.class);
-    const expected = ["ac-stop ac-transition", "ac-stop ac-transition", "ac-stop", "ac-stop"];
+    const expected = ["ac-stop ac-transition", "ac-stop", "ac-stop"];
     assert.deepStrictEqual(circles, [...expected, ...expected], "in the grey and the coloured copy");
   },
-  "highlights and announces every kind of mark alike as it is passed, a page's creation included"(script) {
+  "highlights and announces every kind of mark alike as it is passed"(script) {
     const kinds = [
-      [{ kind: "created", status: "draft" }, "draft"], [{ kind: "status", status: "open" }, "open"],
-      [{ kind: "archived", status: "open" }, "archived"], [{ kind: "unarchived", status: "open" }, "unarchived"],
+      [{ kind: "status", status: "open" }, "open"], [{ kind: "archived", status: "open" }, "archived"],
+      [{ kind: "unarchived", status: "open" }, "unarchived"],
       [{ kind: "call", tool: "getPage", write: false, bytes: 2048 }, "getPage 2.0 KB"]];
     const data = payload(kinds.map((_kind, index) => 1000 + 10 * index));
     const line = data.lines[0];
@@ -171,6 +171,16 @@ const checks = {
         kinds.map((_kind, other) => other === index), `passing a ${mark.kind} mark announces it alone`);
       assert.ok(marks[index].classList.set.has("fresh"), `passing a ${mark.kind} mark highlights it`);
     });
+  },
+  "the latest changes name a status change by its status and an (un)archiving by its kind"(script) {
+    const kinds = [{ kind: "status", status: "open" }, { kind: "archived", status: "open" },
+      { kind: "unarchived", status: "open" }];
+    const data = payload(kinds.map((_kind, index) => 1000 + 10 * index));
+    const line = data.lines[0];
+    line.marks = line.marks.map((mark, index) => ({ p: mark.p, at: mark.at, ...kinds[index] }));
+    const rows = load(script, data).ids["ac-feed"].children;
+    const texts = rows.map((row) => row.children.find((part) => part.className === "ac-what").textContent);
+    assert.deepStrictEqual(texts, ["unarchived", "archived", "open"], "latest first");
   },
   "hovering a line or its feed link names its whole path"(script) {
     const page = load(script, BEFORE);

@@ -134,20 +134,11 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
     start = times[0]
     page_type = events[0]["type"]
 
-    created = next((event for event in events if event["event"] == "created"), None)
-    first_status = next((event for event in events if event["event"] == "status"), None)
-    if created is not None:
-        status = created.get("status", "")
-    elif first_status is not None:
-        status = first_status.get("from", first_status.get("status", ""))
-    else:
-        status = events[0].get("status", "")
-
-    # The created event is the first station; every other event adds one of its own.
-    stops = [_Stop(start, "created", status)]
+    # The first event, a page's creation, carries its initial status; every later one adds a station.
+    status, status_at = events[0].get("status", ""), start
+    stops = [_Stop(start, "status", status)]
     archived = False
-    status_at = None
-    for event, at in zip(events, times):
+    for event, at in zip(events[1:], times[1:]):
         kind = event["event"]
         if kind == "status":
             status, status_at = event.get("status", status), at
@@ -165,11 +156,9 @@ def _line(page_id: str, events: list[Event], workspace: Workspace) -> _Line:
         stops = [stop for stop in stops if stop.kind not in ("archived", "unarchived")]
 
     if status == DELIVERED.get(page_type):
-        end, end_at = "delivered", status_at if status_at is not None else stops[-1].at
-    elif status == DROPPED.get(page_type):
-        end, end_at = "dropped", status_at if status_at is not None else stops[-1].at
-    elif put_away:
-        end, end_at = "dropped", stops[-1].at
+        end, end_at = "delivered", status_at
+    elif put_away or status == DROPPED.get(page_type):
+        end, end_at = "dropped", status_at
     elif is_hidden(workspace, page_id):
         end, end_at = "dropped", max(times[-1], stops[-1].at)
     else:
