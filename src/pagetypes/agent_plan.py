@@ -95,8 +95,8 @@ _AGENT_PLAN = PageType(
             _scalar("worktree", description="""
                 The git worktree this agent creates and works in, by name. Give every agent that
                 edits code a different one: two agents in one checkout overwrite each other's edits.
-                An agent that only reads code names none. An investigator names none, or a throwaway
-                spike worktree of its own when its test needs code run; spike code is never
+                An agent that only reads code names none. An investigator names a spike worktree of
+                its own, since an investigation ends in a proof the user opens; spike code is never
                 integrated.
                 """),
         )),

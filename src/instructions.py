@@ -88,7 +88,7 @@ feature-spec: The detailed product/UX specification for a feature, authored duri
 
 epic: The root of a major feature too large for one feature-brief - it decomposes into several child feature-briefs and is built by subagents, each dispatched from an agent-plan page of its own. Use it when the work splits into parts that each ship on their own; when it does not, use a feature-brief.
 
-spike: Works out how to build an idea before anything is planned: subagents investigate a few solution directions on solution-investigation pages of its own, the user picks one, and it hands off a single feature-brief for another agent to plan. Pick it whenever the user is unsure about the outcome - what it should be, or which way gets there - without waiting for them to ask for research; when they know both, use a feature-brief.
+spike: Works out how to build an idea before anything is planned: subagents investigate a few solution directions on solution-investigation pages of its own, each building a proof the user can open, the user picks one, and it hands off a single feature-brief for another agent to plan. Pick it whenever the user is unsure about the outcome - what it should be, or which way gets there - without waiting for them to ask for research; when they know both, use a feature-brief.
 
 agent-plan: One subagent an epic or a spike dispatches - its role, capability, exact task and worktree, linked to the pages it works on, and the page it reports back into as it starts and works. Created as a child of that epic or spike.
 """

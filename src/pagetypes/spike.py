@@ -19,6 +19,9 @@ from ._workspace_guidance import (
     GROUNDING_TOOL_DESC,
     GROUNDING_TOOL_FIELD,
     GROUNDING_TOOL_LABEL,
+    PROOF_DELIVERY_DESC,
+    PROOF_DELIVERY_FIELD,
+    PROOF_DELIVERY_LABEL,
     SUBAGENT_DISPATCH_DESC,
     SUBAGENT_DISPATCH_FIELD,
     SUBAGENT_DISPATCH_LABEL,
@@ -53,6 +56,15 @@ _QUESTION_FSM = ElementFSMSpec(
     transitions=(("answer", "open", "answered", "agent"),),
 )
 
+# A reaction stays open until a later proof answers it, or the user withdraws it.
+_REACTION_FSM = ElementFSMSpec(
+    name="Reaction",
+    initial="open", states=("open", "shown", "dropped"),
+    transitions=(("show", "open", "shown", "agent"),
+                 ("drop", "open", "dropped", "agent")),
+    checkmark_done="shown",
+)
+
 
 # Seeded into every spike as its first section and written by no command: who may edit this page.
 _CONTROLLER_NOTICE = """
@@ -61,9 +73,9 @@ _CONTROLLER_NOTICE = """
     agents: each investigator is handed one agent-plan page, a child of this spike, works from that
     page, reports back onto it, and writes only that page and the solution-investigation page it
     links to with works-on. It never edits this spike or another agent's page. The controller reads
-    the investigations' digests rather than the whole pages. Nothing is designed, decomposed or built
-    from this page: once the user has picked, it ends by creating one feature-brief next to it for
-    another agent to plan.
+    the investigations' digests rather than the whole pages, and the user opens and judges the
+    proofs. Nothing is designed, decomposed or built from this page: once the user has picked, it
+    ends by creating one feature-brief next to it for another agent to plan.
     """
 
 
@@ -72,12 +84,12 @@ _SPIKE = PageType(
     name="Spike (solution research)",
     description=(
         "Works out how to build an idea before anything is planned: one investigator subagent per "
-        "solution direction works it out on a solution-investigation page of its own, the user "
-        "picks a direction, and the spike hands off a single feature-brief created next to it for "
-        "another agent to specify, plan and build. Pick it whenever the user is unsure about the "
-        "outcome - what it should be, or which way gets there - without waiting for them to ask "
-        "for research; when they know both, create a feature-brief, and for work that splits into "
-        "parts that each ship on their own, an epic."
+        "solution direction works it out on a solution-investigation page of its own and builds a "
+        "proof the user can open, the user picks a direction, and the spike hands off a single "
+        "feature-brief created next to it for another agent to specify, plan and build. Pick it "
+        "whenever the user is unsure about the outcome - what it should be, or which way gets "
+        "there - without waiting for them to ask for research; when they know both, create a "
+        "feature-brief, and for work that splits into parts that each ship on their own, an epic."
     ),
     sections=(
         SectionSpec("notice", "Controller notice", (
@@ -107,6 +119,12 @@ _SPIKE = PageType(
                 becomes a criterion nobody can check. Refine one in place with editOutcome as the
                 conversation settles it.
                 """),
+            _prose("scenario", description="""
+                One real case from the user's own data that shows the problem today: which workspace,
+                files, dates or records, and what they see now. Every proof runs on it, so the
+                directions compare on the same thing and the user judges them on something they
+                recognise. An invented case proves nothing to them; ask for a real one.
+                """),
         )),
         SectionSpec("directions", "Solution directions", (
             _list("items", element_fields=("name", "scope"), description="""
@@ -119,6 +137,16 @@ _SPIKE = PageType(
                 editDirection so the id holds.
                 """),
         )),
+        SectionSpec("tryout", "Try-out", (
+            _list("reactions", element_fields=("investigationId", "said", "status"),
+                  element_fsm=_REACTION_FSM, description="""
+                Each one thing the user said after opening a proof, in their words, with the page id
+                of the solution-investigation whose proof it was. The controller's own opinion of a
+                proof is not a reaction. Mark one shown once a later proof answers it, or dropped when
+                the user withdraws it; a reaction that changes what a direction must show goes back to
+                its investigator with research reopened.
+                """),
+        )),
         SectionSpec("decision", "Approach decision", (
             _scalar("chosen", description="""
                 The page id of the solution-investigation page under this spike whose direction the
@@ -126,6 +154,12 @@ _SPIKE = PageType(
                 pick question says what it takes from the others. Record only a pick the user made,
                 or, when they handed you the how, your recommendation, saying so in that answer. The
                 feature-brief is created from exactly this.
+                """),
+            _scalar("proof", description="""
+                The candidate the user picked, as path@commit, exactly as they ran it: the proof file
+                of the chosen investigation and the commit it was shown at. The feature-brief's summary
+                names it as a reference to plan from, so whoever plans the brief opens the same page
+                the user judged.
                 """),
         )),
         SectionSpec("questions", "Questions", (
@@ -143,10 +177,19 @@ _SPIKE = PageType(
         set_prose_cmd("summary"),
         set_prose_cmd("framing", field="why", name="setWhy", label="why"),
         *list_cmds("framing", field="outcomes", add_args=(_text(),), editable=True),
+        set_prose_cmd("framing", field="scenario", name="setScenario", label="scenario"),
         # Editable so a refined direction keeps the id its investigation page records.
         *list_cmds("directions", add_args=(_text("name"), _text("scope")), editable=True),
-        # The pick is recorded while the user is choosing and frozen once they have chosen.
+        # What the user said about a proof, and what they picked, are recorded while they are choosing
+        # and frozen once they have chosen.
+        *list_cmds("tryout", field="reactions", legal_in=("deciding",),
+                   add_args=(_text("investigationId"), _text("said"))),
+        *element_cmds("tryout", field="reactions", singular="reaction", legal_in=("deciding",), marks=(
+            ("markReactionShown", "show", "mark a reaction shown - a later proof answers it"),
+            ("dropReaction", "drop", "drop a reaction the user withdrew"))),
         set_scalar_cmd("decision", "chosen", name="setChosenApproach", label="chosen approach",
+                       legal_in=("deciding",)),
+        set_scalar_cmd("decision", "proof", name="setChosenProof", label="chosen proof",
                        legal_in=("deciding",)),
         # Questions carry the same surface as a feature-brief's: askQuestion (no remove), an answer
         # transition that also writes the answer, and an escalate that raises the needsHuman flag.
@@ -156,20 +199,23 @@ _SPIKE = PageType(
             ("answerQuestion", "answer", "answer a question (open -> answered)", (_text("answer"),)),)),
         set_element_field_cmd("questions", name="escalateQuestion",
                               description="flag a question as awaiting a human", const=("needsHuman", True)),
-        # draft -> researching needs the intent, the why, the outcomes and the directions: each
-        # direction's investigation reads the repo from the first and is compared against the
-        # outcomes, which are written before any direction is investigated so they cannot be
-        # fitted to one.
+        # draft -> researching needs the intent, the why, the outcomes, the scenario and the
+        # directions: each direction's investigation reads the repo from the first, runs its proof on
+        # the scenario and is compared against the outcomes, which are written before any direction is
+        # investigated so they cannot be fitted to one.
         transition_cmd("beginResearch", "draft -> researching",
                        requires=(("summary", "body"), ("framing", "why"), ("framing", "outcomes"),
-                                 ("directions", "items"))),
+                                 ("framing", "scenario"), ("directions", "items"))),
+        # A ruled-out direction needs no proof, so it does not hold the user's choice up.
         transition_cmd("presentFindings", "researching -> deciding", guards=(
-            ChildStateGuard("solution-investigation", ("reported",), "every investigation must be reported"),)),
+            ChildStateGuard("solution-investigation", ("reported", "ruledOut"),
+                            "every investigation must be reported or ruled out"),)),
         transition_cmd("reopenResearch", "deciding -> researching", agency="either"),
-        # A human picks the approach; the agent records it, then stops here. No feature-brief is
-        # created before this gate.
+        # A human picks the approach after opening the proofs; the agent records what they said and
+        # what they picked, then stops here. No feature-brief is created before this gate.
         transition_cmd("chooseApproach", "deciding -> briefing (human gate)", agency="human",
-                       requires=(("decision", "chosen"), ("questions", "items"))),
+                       requires=(("tryout", "reactions"), ("decision", "chosen"), ("decision", "proof"),
+                                 ("questions", "items"))),
         # The spike hands off only once the feature-brief it created is linked, live and a
         # feature-brief (a link guard, checked in the store).
         transition_cmd("handOff", "briefing -> handedOff", link_guards=(
@@ -196,6 +242,8 @@ _SPIKE = PageType(
     workspace_guidance=(
         WorkspaceGuidanceSpec(SUBAGENT_DISPATCH_FIELD, ("researching",), SUBAGENT_DISPATCH_DESC,
                               SUBAGENT_DISPATCH_LABEL),
+        WorkspaceGuidanceSpec(PROOF_DELIVERY_FIELD, ("researching",), PROOF_DELIVERY_DESC,
+                              PROOF_DELIVERY_LABEL),
     ),
 )
 
@@ -212,6 +260,8 @@ _SPIKE_RESEARCHING = ParentStateGuard(
 _COSTS = ("small", "medium", "large")
 _TEST_RESULTS = ("held", "falsified", "untested")
 _VIABILITY = ("viable", "viable-with-caveats", "not-viable")
+# What running the proof shows of an outcome; "could be reached" is not a verdict.
+_FIT_VERDICTS = ("shown", "partly", "not-shown", "not-visible")
 
 
 _SOLUTION_INVESTIGATION = PageType(
@@ -219,10 +269,10 @@ _SOLUTION_INVESTIGATION = PageType(
     name="Solution investigation",
     description=(
         "One delegated investigation of a spike: an investigator agent takes one solution direction "
-        "from the spike, works out how it would be built in this codebase and tests it, and returns "
-        "a verdict and a digest, so the controller reads the digest instead of doing the research "
-        "itself. Created by the controller as a child of its spike, one per direction; architecture "
-        "documents how the system is shaped today instead."
+        "from the spike, works out how it would be built in this codebase, builds a proof the user "
+        "can open, and returns a verdict and a digest, so the controller reads the digest instead of "
+        "doing the research itself. Created by the controller as a child of its spike, one per "
+        "direction; architecture documents how the system is shaped today instead."
     ),
     sections=(
         SectionSpec("direction", "Direction", (
@@ -252,8 +302,9 @@ _SOLUTION_INVESTIGATION = PageType(
         SectionSpec("test", "Test", (
             _prose("falsifier", description="""
                 The observation that would show this direction wrong for this codebase: a behaviour,
-                a measurement, a call path that does not exist. A direction nothing could falsify is
-                a preference, not a direction.
+                a measurement, a call path that does not exist. Write a second half for the user: what
+                they would see in the proof if the direction did not solve their why. A direction
+                nothing could falsify is a preference, not a direction.
                 """),
             _scalar("result", choices=_TEST_RESULTS, description="""
                 held when you checked for the falsifier and it did not occur, falsified when it did,
@@ -265,6 +316,40 @@ _SOLUTION_INVESTIGATION = PageType(
                 the worktree and commit, and any outside source it rests on. Put each command and its
                 output in a code block and each file path in an inline code run. Spike code is never
                 integrated; it exists only to make this observation.
+                """),
+        )),
+        SectionSpec("proof", "Proof", (
+            _list("items", element_fields=("name", "path", "shows"), description="""
+                Each one page the user opens to see this direction handle the scenario: path is the
+                file inside your spike worktree, opened by double-click with no server, build step or
+                install, with the data it needs already in it. When the direction has nothing to look
+                at, the page shows the values before and after it. shows names what to look for and
+                what to do on the page. Correct one in place with editProof.
+                """),
+            _scalar("commit", description="""
+                The commit on your spike branch that holds every page listed, so the user, and whoever
+                plans the feature-brief, open exactly what you tested. Update it whenever a page
+                changes.
+                """),
+            _prose("data", description="""
+                The real data the proof runs on and how you captured it, then everything simulated,
+                hard-coded or left out, so the user never judges a stand-in as the real thing. A proof
+                on invented data does not show an outcome.
+                """),
+            _blocks("howItWorks", block_kinds=(_paragraph_runs(), _code_block()), description="""
+                What building the proof taught about building the feature: for each part, the real file
+                and function it stands for, what can be kept, what has to be rewritten, and what
+                surprised you. Name each path in an inline code run. This is what the user learns the
+                build from, and what whoever plans the brief starts from.
+                """),
+        )),
+        SectionSpec("fit", "Outcomes shown", (
+            _list("items", element_fields=("outcomeId", "verdict", "where"), description="""
+                Each one spike outcome this direction bears on, added by its id, with the verdict from
+                running the proof - shown, partly, not-shown, or not-visible when the proof has nothing
+                that would show it - and where to look. You choose which outcomes belong here: an
+                outcome this direction has nothing to do with is left out. A verdict comes from running
+                the proof, so an outcome the direction could only reach is not shown.
                 """),
         )),
         SectionSpec("conclusion", "Conclusion", (
@@ -286,10 +371,10 @@ _SOLUTION_INVESTIGATION = PageType(
         SectionSpec("digest", "Digest", (
             _prose("body", description="""
                 At most 150 words, the only part of this page the controller reads by default: the
-                direction in one line, the facts that most shape it, its cost and caveats, how it
-                fares on each of the spike's outcomes, the test result, the viability, and how many
-                questions wait. Write it last, from the page, so it never says anything the page
-                does not.
+                direction in one line, the facts that most shape it, its cost and caveats, the proofs'
+                paths and what they simulate, how it fares on the outcomes it lists, the test result,
+                the viability, and how many questions wait. Write it last, from the page, so it never
+                says anything the page does not.
                 """),
         )),
     ),
@@ -306,6 +391,18 @@ _SOLUTION_INVESTIGATION = PageType(
                      remove_name="removeEvidenceBlock", remove_desc="remove an evidence block",
                      reorder_name="reorderEvidenceBlock",
                      reorder_desc="move an evidence block to an anchored position (precedingId guards a stale read)"),
+        *list_cmds("proof", add_args=(_text("name"), _text("path"), _text("shows")), editable=True),
+        set_scalar_cmd("proof", "commit", name="setProofCommit", label="proof commit"),
+        set_prose_cmd("proof", field="data", name="setProofData", label="proof data"),
+        *blocks_cmds("proof", field="howItWorks", add_name="addHowItWorks",
+                     remove_name="removeHowItWorksBlock", remove_desc="remove a how-it-works block",
+                     reorder_name="reorderHowItWorksBlock",
+                     reorder_desc="move a how-it-works block to an anchored position (precedingId guards a stale read)"),
+        # Checked against the parent spike's outcomes; which of them belong here is the investigator's
+        # call, so nothing asks for one entry per outcome.
+        *list_cmds("fit", add_args=(_text("outcomeId"), _text("verdict", choices=_FIT_VERDICTS),
+                                    _text("where")),
+                   ref_check=RefCheck(arg="outcomeId", scope="parent", section="framing", field="outcomes")),
         set_scalar_cmd("conclusion", "viability", choices=_VIABILITY),
         *list_cmds("questions", add_args=(_text(), _text("changes"))),
         set_prose_cmd("digest"),
@@ -317,23 +414,40 @@ _SOLUTION_INVESTIGATION = PageType(
             ("test", "falsifier"),
             ("test", "result"),
             ("test", "evidence"),
+            ("proof", "items"),
+            ("proof", "commit"),
+            ("proof", "data"),
+            ("proof", "howItWorks"),
+            ("fit", "items"),
             ("conclusion", "viability"),
             ("digest", "body"),
         )),
-        # A reported page reopens only when the spike has gone back to researching.
-        transition_cmd("reopen", "reported -> investigating", parent_guards=(_SPIKE_RESEARCHING,)),
+        # A direction its falsifier killed ends here, with the test that killed it and no proof.
+        transition_cmd("ruleOut", "investigating -> ruledOut", requires=(
+            ("direction", "items"),
+            ("test", "falsifier"),
+            ("test", "result"),
+            ("test", "evidence"),
+            ("conclusion", "viability"),
+            ("digest", "body"),
+        )),
+        # A reported or ruled-out page reopens only when the spike has gone back to researching.
+        transition_cmd("reopen", "reported or ruledOut -> investigating", legal_in=("reported", "ruledOut"),
+                       parent_guards=(_SPIKE_RESEARCHING,)),
         add_link_cmd(),
         set_title_cmd(),
     ),
     fsm=FSMSpec(
         name="SolutionInvestigation",
         initial="waiting",
-        states=("waiting", "investigating", "reported"),
-        terminal_states=("reported",),
+        states=("waiting", "investigating", "reported", "ruledOut"),
+        terminal_states=("reported", "ruledOut"),
         status_guidance=(("investigating", INVESTIGATING),),
     ),
     workspace_guidance=(
         WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("investigating",), GROUNDING_TOOL_DESC,
                               GROUNDING_TOOL_LABEL),
+        WorkspaceGuidanceSpec(PROOF_DELIVERY_FIELD, ("investigating",), PROOF_DELIVERY_DESC,
+                              PROOF_DELIVERY_LABEL),
     ),
 )

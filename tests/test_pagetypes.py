@@ -961,14 +961,14 @@ def test_validate_block_and_validate_blocks_are_one_grammar():
 def test_the_block_surface_is_three_commands_per_field():
     """The headline outcome, and the only place it is pinned.
 
-    One add per blocks field - eight page-level fields plus one block-bearing element field - and
+    One add per blocks field - nine page-level fields plus one block-bearing element field - and
     no in-place edit at all: a block is replaced by removing it and adding at its slot.
     """
     adds = [command.name
             for page_type in PRODUCTION_TYPES.values()
             for command in page_type.commands
             if command.kind == ADD_BLOCK]
-    assert len(adds) == 9
+    assert len(adds) == 10
     document = {command.name for command in PRODUCTION_TYPES["document"].commands}
     assert document == {"addBody", "removeBlock", "reorderBlock", "addLink", "setTitle"}
 
