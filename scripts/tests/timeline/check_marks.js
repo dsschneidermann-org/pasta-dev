@@ -1,5 +1,6 @@
 // The map's marks: every line in a grey copy and a clipped coloured copy, a checkmark in both copies
-// of each delivered end, status changes filled, links free of queries, a status label for every
+// of each delivered end, status changes and creations filled, (un)archivings and dropped ends open,
+// links free of queries, a status label for every
 // station, and the label of a line's latest station - whatever its kind, a page's creation included -
 // announced as the playhead passes it, while every station passed is highlighted.
 //
@@ -19,15 +20,22 @@ assert.strictEqual(created.filter((element) => element.attrs["clip-path"] === "u
   data.lines.length, "one clipped coloured copy per line");
 assert.strictEqual(timeline.classed("tl-check").length, 2 * delivered, "a check in both copies of every delivered end");
 
-// A status change is a filled station; a creation or an (un)archiving stays hollow.
-const deliveredEnd = (line, number) => line.end === "delivered" && number === line.stops.length - 1;
-const marks = data.lines.flatMap((line) => line.stops.filter((_stop, number) => !deliveredEnd(line, number)));
-const transitions = marks.filter((stop) => stop.kind === "status").length;
-const filled = timeline.classed("tl-transition");
-assert.strictEqual(filled.length, 2 * transitions, "both copies of every status change are filled");
-assert.ok(filled.every((mark) => mark.attrs.class.split(" ").includes("tl-stop")), "a filled station is still a station");
-const hollow = timeline.classed("tl-stop").filter((mark) => !/\btl-(transition|delivered)\b/.test(mark.attrs.class));
-assert.strictEqual(hollow.length, 2 * (marks.length - transitions), "creations and (un)archivings stay hollow");
+// A status change or a page's creation is a filled station; an (un)archiving, and a dropped line's last
+// station - its end mark - are the open circle, and no other dropped mark is drawn.
+const stationClass = (line, stop, number) => {
+  const last = number === line.stops.length - 1;
+  if (line.end === "delivered" && last) return "tl-stop tl-delivered";
+  const filled = (stop.kind === "status" || stop.kind === "created") && !(line.end === "dropped" && last);
+  return filled ? "tl-stop tl-transition" : "tl-stop";
+};
+const expectedClasses = data.lines.flatMap((line) => {
+  const classes = line.stops.map((stop, number) => stationClass(line, stop, number));
+  return [...classes, ...classes];
+});
+assert.deepStrictEqual(timeline.classed("tl-stop").map((mark) => mark.attrs.class), expectedClasses,
+  "both copies of every station: status changes and creations filled, (un)archivings and dropped ends open");
+assert.ok(data.lines.some((line) => line.end === "dropped"), "the payload has a dropped line to check");
+assert.strictEqual(timeline.classed("tl-dropped").length, 0, "a dropped end is its open last station, not a bar");
 
 // Every line links to its page, and no link - a line's or a feed item's - carries a query.
 const links = created.filter((element) => element.tag === "a");
@@ -128,7 +136,9 @@ KINDS.forEach(([kind, , text], index) => {
   assert.ok(kindMarks[index].classList.set.has("fresh"), `passing a ${kind} station highlights it`);
 });
 
-console.log(`ok - ${data.lines.length} lines in two copies, ${delivered} checked ends, ${transitions} filled `
-  + `status changes, ${labels.length} labels, up to ${mostSpeaking} announced at once, `
+const stationsClassed = (name) => expectedClasses.filter((className) => className === name).length / 2;
+console.log(`ok - ${data.lines.length} lines in two copies, ${delivered} checked ends, `
+  + `${stationsClassed("tl-stop tl-transition")} filled and ${stationsClassed("tl-stop")} open stations, `
+  + `${labels.length} labels, up to ${mostSpeaking} announced at once, `
   + (close ? `close transitions on ${close.line.id} scrubbed` : "no close transitions to scrub")
   + `, and a creation, status change, archiving and unarchiving each highlighted and announced alike`);
