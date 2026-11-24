@@ -789,6 +789,20 @@ def test_timeline_times_sit_on_the_page_background_and_the_legend_checks_deliver
     assert re.search(r'<li><svg[^>]*><circle class="tl-delivered"[^>]*/><path class="tl-check"', html)
 
 
+def test_the_timeline_legend_draws_dropped_as_the_open_circle(client):
+    workspace = server.STORE.create_workspace("demo")
+    page_id = "bug-report:mrw7chrt-def44a"
+    server.STORE.events_path(workspace.id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "bug-report", "title": "A bug", "status": "draft"},
+    ]), encoding="utf-8")
+    html = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/timeline").text
+    legend = html[html.index('<ul class="tl-legend">'):]
+    legend = legend[:legend.index("</ul>")]
+    assert re.search(r'<circle class="tl-stop" [^>]*/></svg>Dropped: abandoned or shelved</li>', legend)
+    assert "tl-dropped" not in html
+
+
 def test_timeline_play_button_is_plain_text_and_feed_rows_are_bordered_only_between(client):
     workspace = server.STORE.create_workspace("demo")
     page_id = "bug-report:mrw7chrt-def44a"
