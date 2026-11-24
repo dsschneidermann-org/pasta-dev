@@ -182,7 +182,9 @@
             d: `M${cx} ${lineY - 3.5} L${cx + 3.5} ${lineY} L${cx} ${lineY + 3.5} L${cx - 3.5} ${lineY} Z`,
           }, parent);
         }
-        return el("circle", { class: mark.kind === "status" ? "ac-stop ac-transition" : "ac-stop", cx, cy: lineY, r: 3.5 }, parent);
+        return el("circle", {
+          class: mark.kind === "status" || mark.kind === "created" ? "ac-stop ac-transition" : "ac-stop", cx, cy: lineY, r: 3.5,
+        }, parent);
       });
     }
 

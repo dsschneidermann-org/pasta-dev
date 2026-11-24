@@ -141,6 +141,17 @@ const checks = {
     assert.strictEqual(page.classed("ac-write").length, 0);
     assert.ok(page.classed("ac-label").some((label) => label.textContent === "mutatePageBatch 2.0 KB"));
   },
+  "draws a creation as a status change and an (un)archiving as the open circle"(script) {
+    const kinds = [{ kind: "created", status: "draft" }, { kind: "status", status: "open" },
+      { kind: "archived", status: "open" }, { kind: "unarchived", status: "open" }];
+    const data = payload(kinds.map((_kind, index) => 1000 + 10 * index));
+    const line = data.lines[0];
+    line.marks = line.marks.map((mark, index) => ({ p: mark.p, at: mark.at, ...kinds[index] }));
+    const page = load(script, data);
+    const circles = page.classed("ac-stop").map((circle) => circle.attrs.class);
+    const expected = ["ac-stop ac-transition", "ac-stop ac-transition", "ac-stop", "ac-stop"];
+    assert.deepStrictEqual(circles, [...expected, ...expected], "in the grey and the coloured copy");
+  },
   "highlights and announces every kind of mark alike as it is passed, a page's creation included"(script) {
     const kinds = [
       [{ kind: "created", status: "draft" }, "draft"], [{ kind: "status", status: "open" }, "open"],
