@@ -417,6 +417,68 @@ def test_child_guard_refuses_when_its_only_child_is_archived(store):
         _mutate(store, workspace.id, parent.id, [{"command": "ship"}])
 
 
+def test_link_guard_refuses_a_page_with_no_link(store):
+    workspace = store.create_workspace("demo")
+    page, _ = _page_with_one_item(store, workspace.id)
+    with pytest.raises(IllegalCommandError, match="there is no 'evidence' link to a live 'test-flow' page"):
+        _mutate(store, workspace.id, page.id, [{"command": "markReady"}])
+
+
+def test_link_guard_ignores_a_link_with_another_role_or_target_type(store):
+    workspace = store.create_workspace("demo")
+    page, _ = _page_with_one_item(store, workspace.id)
+    flow = store.create_page(workspace.id, "test-flow", "Evidence").page
+    fields = store.create_page(workspace.id, "test-fields", "Not evidence").page
+    _mutate(store, workspace.id, page.id, [
+        {"command": "addLink", "args": {"toId": flow.id, "role": "relates-to"}},
+        {"command": "addLink", "args": {"toId": fields.id, "role": "evidence"}},
+    ])
+    with pytest.raises(IllegalCommandError, match="a test-flow page must be linked as evidence"):
+        _mutate(store, workspace.id, page.id, [{"command": "markReady"}])
+
+
+def test_link_guard_ignores_an_archived_target(store):
+    workspace = store.create_workspace("demo")
+    page, _ = _page_with_one_item(store, workspace.id)
+    flow = store.create_page(workspace.id, "test-flow", "Evidence").page
+    _mutate(store, workspace.id, page.id, [
+        {"command": "addLink", "args": {"toId": flow.id, "role": "evidence"}}])
+    store.archive_page(workspace.id, flow.id)
+    with pytest.raises(IllegalCommandError, match="a test-flow page must be linked as evidence"):
+        _mutate(store, workspace.id, page.id, [{"command": "markReady"}])
+    store.unarchive_page(workspace.id, flow.id)
+    ready = _mutate(store, workspace.id, page.id, [{"command": "markReady"}]).page
+    assert ready.status == "ready"
+
+
+def test_link_guard_passes_on_a_link_added_in_the_same_batch(store):
+    workspace = store.create_workspace("demo")
+    page, _ = _page_with_one_item(store, workspace.id)
+    flow = store.create_page(workspace.id, "test-flow", "Evidence").page
+    ready = _mutate(store, workspace.id, page.id, [
+        {"command": "addLink", "args": {"toId": flow.id, "role": "evidence"}},
+        {"command": "markReady"},
+    ]).page
+    assert ready.status == "ready"
+
+
+def test_next_actions_reports_a_link_guard_as_the_blocked_reason(store):
+    workspace = store.create_workspace("demo")
+    page, _ = _page_with_one_item(store, workspace.id)
+    actions = store.next_actions(workspace.id, page.id)
+    blocked = {edge["command"]: edge["reason"] for edge in actions["blocked"]}
+    assert "a test-flow page must be linked as evidence" in blocked["markReady"]
+    assert "markReady" not in [edge.get("command") for edge in actions["do"]]
+
+
+def test_next_actions_ranks_unmet_content_ahead_of_a_link_guard(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-element-blocks", "Plan").page
+    blocked = {edge["command"]: edge["reason"]
+               for edge in store.next_actions(workspace.id, page.id)["blocked"]}
+    assert blocked["markReady"] == "requires: items.items"
+
+
 def test_reopen_unskips_a_step(store):
     workspace = store.create_workspace("demo")
     result = store.create_page(workspace.id, "test-lifecycle", "Feature")

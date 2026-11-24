@@ -31,6 +31,7 @@ from .specs import (
     SET_TITLE,
     TRANSITION,
     ChildStateGuard,
+    LinkGuard,
     ParentStateGuard,
     RefCheck,
 )
@@ -147,6 +148,8 @@ class StatusTransitionCommand(BaseCommand):
     guards: tuple[ChildStateGuard, ...] = ()
     # cross-page guard over the PARENT's status (evaluated in the store) - see ParentStateGuard
     parent_guards: tuple[ParentStateGuard, ...] = ()
+    # cross-page guard over the pages this page links to (evaluated in the store) - see LinkGuard
+    link_guards: tuple[LinkGuard, ...] = ()
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -451,7 +454,8 @@ def transition_cmd(name: str, description: str, *, legal_in: tuple[str, ...] | N
                    event: str | None = None, agency: str = "agent",
                    requires: tuple[tuple[str, str], ...] = (),
                    guards: tuple[ChildStateGuard, ...] = (),
-                   parent_guards: tuple[ParentStateGuard, ...] = ()) -> CommandSpec:
+                   parent_guards: tuple[ParentStateGuard, ...] = (),
+                   link_guards: tuple[LinkGuard, ...] = ()) -> CommandSpec:
     """A page-status TRANSITION command whose `description` carries the edge as 'from -> to'. A written
     '->' is substituted once to the arrow glyph '→', which the edge is then split on. The dest is the
     first word after the arrow - a trailing parenthetical is ignored (so 'a -> b (note)' resolves to
@@ -466,14 +470,15 @@ def transition_cmd(name: str, description: str, *, legal_in: tuple[str, ...] | N
     sources = tuple(legal_in) if legal_in is not None else (before.strip(),)
     return TransitionCommand(name=name, description=description, event=event or name, dest=words[0],
                              legal_in=sources, agency=agency, requires=requires, guards=guards,
-                             parent_guards=parent_guards)
+                             parent_guards=parent_guards, link_guards=link_guards)
 
 
 def transition_on_add_cmd(name: str, t_description: str, *, legal_in: tuple[str, ...] | None = None, section: str,
                  field: str, add_args: tuple[ArgSpec, ...], description: str = "", event: str | None = None,
                  agency: str = "agent", requires: tuple[tuple[str, str], ...] = (),
                  guards: tuple[ChildStateGuard, ...] = (),
-                 parent_guards: tuple[ParentStateGuard, ...] = ()) -> CommandSpec:
+                 parent_guards: tuple[ParentStateGuard, ...] = (),
+                 link_guards: tuple[LinkGuard, ...] = ()) -> CommandSpec:
     """A COMPOUND that atomically adds an element to a list field AND fires a page transition.
     `t_description` carries the edge as 'from -> to'. The outer command owns
     the FSM edge (event/source/dest/agency) and its args; its single step is the add, declaring
@@ -486,8 +491,8 @@ def transition_on_add_cmd(name: str, t_description: str, *, legal_in: tuple[str,
     sources = tuple(legal_in) if legal_in is not None else (before.strip(),)
     return CompoundCommand(
         name=name, description=f"{description} ({t_description})", event=event or name, dest=words[0],
-        legal_in=sources, agency=agency,
-        args=add_args, requires=requires, guards=guards, parent_guards=parent_guards,
+        legal_in=sources, agency=agency, args=add_args, requires=requires, guards=guards,
+        parent_guards=parent_guards, link_guards=link_guards,
         steps=(AddElementCommand(name=f"_{name}Add", section=section, field=field, args=add_args,
                                  element_map=_same_named(add_args)),),
     )

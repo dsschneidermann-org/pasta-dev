@@ -96,8 +96,7 @@ optionally the statuses it is allowed in. Names follow the field they write:
 
 - **Pinned children** are declared on the parent and created in the same step as the
   parent (a feature brief creates its spec, implementation plan and testing plan).
-- **Ordinary children** are created later, as the work needs them (an epic's feature
-  briefs, and one agent-plan page per agent it dispatches).
+- **Ordinary children** are created later, as the work needs them.
 - A **child guard** holds a parent's transition until its direct children of a given type
   are in an accepted set of states (ship waits until every plan step is done or skipped
   and every test case has passed or been skipped). It ignores archived children and
@@ -105,6 +104,9 @@ optionally the statuses it is allowed in. Names follow the field they write:
   children it never created. Archiving a child is how it is dropped.
 - A **parent guard** keeps a child locked until its parent reaches a given status (no plan
   steps can be written until the brief is in planning).
+- A **link guard** holds a transition until the page links, with a given role, to a live
+  page of a given type. A link to an archived page or to a page of another type does not
+  count.
 - There is no gate on the states of elements on the same page. To require "every step
   is done", put the steps on a child page and give the parent a child guard.
 - To make one sibling child wait for another, add a status to the parent. Never order
@@ -171,6 +173,7 @@ pagetype <tag> "<Display name>"
         requires: <section.field>, ...
         guard child <type>: <section.field> all in {<state>, <state>}
         guard parent: status in {<status>, ...}
+        guard link <role> -> <type>
         steps: <command>(<args>)                  # makes the edge a compound
 
   commands                                        # only the non-obvious ones; set/add/remove/reorder are implied

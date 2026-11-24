@@ -587,8 +587,9 @@ class Store:
                 parent_reason = self._parent_guard_failure(workspace, page, command)
                 if parent_reason is not None:
                     parent_blocked.add(command.event)
-                # Same precedence as _first_guard_failure: child guards first, then parent.
-                guard_reason = self._child_guard_failure(workspace, page, command) or parent_reason
+                # Same precedence as _first_guard_failure: child, then link, then parent guards.
+                guard_reason = (self._child_guard_failure(workspace, page, command)
+                                or self._link_guard_failure(workspace, page, command) or parent_reason)
                 if command.agency == "human":
                     edge = {"pageId": page.id, "pageType": page.type, "command": command.name,
                             "statusRevisionToken": page.status_revision_token}
@@ -1195,10 +1196,12 @@ class Store:
     def _first_guard_failure(workspace: Workspace, page: Page, command: CommandSpec) -> str | None:
         """The message of the first cross-page guard `command` fails on `page`, or None if all pass.
 
-        Checks the command's child-state guards (looking down at `page`'s children) and then its
-        parent-state guards (looking up at `page`'s parent) - the two halves below, in that order.
+        Checks the command's child-state guards (looking down at `page`'s children), then its link
+        guards (looking across at the pages `page` links to), then its parent-state guards (looking
+        up at `page`'s parent) - the three below, in that order.
         """
         return (Store._child_guard_failure(workspace, page, command)
+                or Store._link_guard_failure(workspace, page, command)
                 or Store._parent_guard_failure(workspace, page, command))
 
     @staticmethod
@@ -1227,6 +1230,24 @@ class Store:
                     if element.get("status") not in guard.allowed:
                         return (f"{guard.message} ('{child.id}' has an item in "
                                 f"status '{element.get('status')}')")
+        return None
+
+    @staticmethod
+    def _link_guard_failure(workspace: Workspace, page: Page, command: CommandSpec) -> str | None:
+        """The message of the first link guard `command` fails on `page`, or None.
+
+        Looks across at the pages `page` links to. Like a child-guard failure it says work it waits
+        on is not finished, and adding the link on this page clears it, so it never suppresses a
+        field setter. Only a live target of the guarded type counts.
+        """
+        if not isinstance(command, StatusTransitionCommand):
+            return None
+        for guard in command.link_guards:
+            targets = [workspace.pages.get(link["to"]) for link in page.links if link["role"] == guard.role]
+            if not any(target is not None and target.type == guard.target_type and not target.archived
+                       for target in targets):
+                return (f"{guard.message} (there is no '{guard.role}' link to a live "
+                        f"'{guard.target_type}' page)")
         return None
 
     @staticmethod
