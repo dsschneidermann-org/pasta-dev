@@ -24,7 +24,7 @@ WRITE_TOOLS = frozenset({
     "archiveWorkspace", "unarchiveWorkspace", "archivePage", "unarchivePage",
     "reparentPage", "reorderPage", "renamePage", "link", "unlink",
 })
-UNRECORDED_TOOLS = frozenset({"createPage"})   # a new page shows through its created station instead
+UNRECORDED_TOOLS = frozenset({"createPage"})   # a new page shows through its initial status instead
 PAGE_ARGS = ("pageId", "fromId", "parentId")   # the argument naming a call's page; the first present wins
 
 # One line of the log: at, kind, pageId, then a call's tool, write and bytes, or a link's to and role, or a ref's to.
