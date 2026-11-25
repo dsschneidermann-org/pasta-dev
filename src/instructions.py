@@ -46,8 +46,8 @@ If calling `tree` reveals an empty workspace, no project overview doc or the `to
 
 - Project Overview + `architecture` and `document` pages go under the Documentation `toc` page.
 - `decision-record` pages go under the ADRs `toc` page.
-- `feature-brief`, `simple-change`, `epic` and `spike` pages go under the Features `toc` page.
-- `bug-report` pages go under the Bug Reports `toc` page.
+- `feature-brief`, `simple-change`, `epic`, `spike`, `speckit-idea` and `speckit-spec` pages go under the Features `toc` page.
+- `bug-report` and `speckit-bug` pages go under the Bug Reports `toc` page.
 
 ## Response shapes
 
@@ -91,6 +91,14 @@ epic: The root of a major feature too large for one feature-brief - it decompose
 spike: Works out how to build an idea before anything is planned: subagents investigate a few solution directions on solution-investigation pages of its own, each building a proof the user can open, the user picks one, and it hands off a single feature-brief for another agent to plan. Pick it whenever the user is unsure about the outcome - what it should be, or which way gets there - without waiting for them to ask for research; when they know both, use a feature-brief.
 
 agent-plan: One subagent an epic or a spike dispatches - its role, capability, exact task and worktree, linked to the pages it works on, and the page it reports back into as it starts and works. Created as a child of that epic or spike.
+
+speckit-idea: GitHub Spec Kit's idea assessment - intake, research, define, shape and decide - ending in a go or kill the user accepts. Use it ONLY when the user asks for a Spec Kit assessment.
+
+speckit-spec: GitHub Spec Kit's Spec-Driven Development - specify, clarify, plan, checklist, tasks, analyze, implement and converge - with the user approving the spec and the plan. Use it ONLY when the user asks for a Spec Kit spec; otherwise use a feature-brief.
+
+speckit-tasks: The task list and analyze findings of a Spec Kit spec. Auto-created as a child of a speckit-spec.
+
+speckit-bug: GitHub Spec Kit's bug triage - assess, fix and test - with the user approving the assessment before any code changes. Use it ONLY when the user asks for Spec Kit bug fixing; otherwise use a bug-report.
 """
 
 

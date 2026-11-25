@@ -40,3 +40,11 @@ SUBAGENT_DISPATCH_DESC = (
     "capability tier maps to, the agent type or tool that launches them, whether they run in "
     "parallel or in the background, and how a run is handed its agent-plan page id."
 )
+
+CONSTITUTION_FIELD = "constitution"
+CONSTITUTION_LABEL = "CONSTITUTION: "
+CONSTITUTION_DESC = (
+    "The project constitution of Spec Kit: the guiding principles that every later phase is evaluated "
+    "against - each a succinct name line and a paragraph or bullet list of non-negotiable rules, with "
+    "its rationale if not obvious, then the governance rules for amending them and a version line."
+)
