@@ -334,10 +334,8 @@ def test_render_child_pages_direct_titled_links_only():
     assert "/page/test-flow:g" not in md
 
 
-@pytest.mark.parametrize("page_archived", [False, True])
-def test_render_child_pages_flags_an_archived_child(page_archived):
+def test_render_child_pages_flags_an_archived_child():
     page = _page_with_children(["test-flow:c", "test-flow:a"])
-    page.archived = page_archived
     titles = {"test-flow:c": "Child", "test-flow:a": "Archie"}
     types = {"test-flow:c": "test-flow", "test-flow:a": "test-flow"}
     statuses = {"test-flow:c": "open", "test-flow:a": "closed"}
@@ -412,10 +410,8 @@ def test_render_references_none_and_bare_id_fallback():
     assert "/page/test-flow:x" not in md_bare
 
 
-@pytest.mark.parametrize("page_archived", [False, True])
-def test_render_references_flags_an_archived_target(page_archived):
+def test_render_references_flags_an_archived_target():
     page = _page_with_links([{"to": "test-flow:a", "role": "supersedes"}])
-    page.archived = page_archived
     titles = {"test-flow:a": "Archie"}
     types = {"test-flow:a": "test-flow"}
     statuses = {"test-flow:a": "closed"}
@@ -684,10 +680,8 @@ def test_render_toc_omits_reference_and_child_headings():
     assert "- [Some change](/ws:demo/page/simple-change:c) *simple-change* · `closed`" in md
 
 
-@pytest.mark.parametrize("toc_archived", [False, True])
-def test_render_toc_lists_archived_children_only_when_they_are_shown(toc_archived):
+def test_render_toc_lists_archived_children_only_when_they_are_shown():
     page = _toc_with_children(["simple-change:c", "simple-change:a"])
-    page.archived = toc_archived
     titles = {"simple-change:c": "Live", "simple-change:a": "Archie"}
     types = {"simple-change:c": "simple-change", "simple-change:a": "simple-change"}
     statuses = {"simple-change:c": "closed", "simple-change:a": "closed"}

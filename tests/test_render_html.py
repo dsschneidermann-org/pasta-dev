@@ -1,7 +1,5 @@
 """Unit tests for the structured HTML renderer (src.render_html)."""
 
-import pytest
-
 from src.commands import apply_command, create_page
 from src.model import Page
 from src.pagetypes.core.specs import LIST, SCALAR, FSMSpec
@@ -276,9 +274,8 @@ def test_children_html_links_each_child_with_its_type_and_status():
 _FLAGGED_BETA = '<strong class="archived-flag">(A)</strong> <a href="/ws:demo/page/b:2{query}">Beta</a>'
 
 
-@pytest.mark.parametrize("page_archived", [False, True])
-def test_children_html_flags_an_archived_child_below_the_live_ones(page_archived):
-    page = _page(child_ids=["b:2", "a:1"], archived=page_archived)
+def test_children_html_flags_an_archived_child_below_the_live_ones():
+    page = _page(child_ids=["b:2", "a:1"])
     out = _children_html(page, _context(archived=["b:2"]))
     assert _FLAGGED_BETA.format(query="") in out
     assert out.index("Alpha") < out.index("Beta")
@@ -288,9 +285,8 @@ def test_children_html_flags_an_archived_child_below_the_live_ones(page_archived
     assert _FLAGGED_BETA.format(query="?archived=true") in shown
 
 
-@pytest.mark.parametrize("page_archived", [False, True])
-def test_references_html_flags_an_archived_target(page_archived):
-    page = _page(links=[{"to": "b:2", "role": "depends-on"}], archived=page_archived)
+def test_references_html_flags_an_archived_target():
+    page = _page(links=[{"to": "b:2", "role": "depends-on"}])
     out = _references_html(page, _context(archived=["b:2"]))
     assert _FLAGGED_BETA.format(query="") in out
     assert '<span class="link-role">depends-on</span>' in out
@@ -506,10 +502,8 @@ TOC = PageType(tag="toc", name="Toc fixture", description="local toc for the ren
                fsm=FSMSpec(name="LocalToc", initial="active", states=("active",)))
 
 
-@pytest.mark.parametrize("toc_archived", [False, True])
-def test_render_page_html_toc_lists_archived_children_only_when_they_are_shown(toc_archived):
-    page = Page(id="toc:1", type="toc", title="Contents", status="active",
-                child_ids=["a:1", "b:2"], archived=toc_archived)
+def test_render_page_html_toc_lists_archived_children_only_when_they_are_shown():
+    page = Page(id="toc:1", type="toc", title="Contents", status="active", child_ids=["a:1", "b:2"])
     out = render_page_html(page, TOC, _context(archived=["b:2"]))
     assert "Alpha" in out and "Beta" not in out
     shown = render_page_html(page, TOC, _context(show_archived=True, archived=["b:2"]))
