@@ -162,11 +162,12 @@ def test_page_actions_post_with_fetch_and_leave_the_redirect_unfollowed(client):
     listener = 'document.getElementById("page-actions").addEventListener("submit"'
     assert text.index('id="status-form"') < text.index(listener)   # the forms exist when the script runs
     script = text[text.index(listener):]
-    assert "if (!window.__ws_reloader_open)" in script
+    # Every click is taken over; the socket only decides between fetch and the form's own post.
+    assert script.index("event.preventDefault()") < script.index("if (window.__ws_reloader_open)")
+    assert script.index("if (window.__ws_reloader_open)") < script.index("form.submit()")
     assert 'method: "POST"' in script
     assert 'redirect: "manual"' in script
     assert 'response.type === "opaqueredirect"' in script
-    assert "form.submit()" in script
 
 
 def test_unarchive_route_restores_page(client):
