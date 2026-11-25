@@ -234,7 +234,7 @@ def _link_html(page_id: str, ref_context: RefContext | None,
 
 def _children_html(page: Page, ref_context: RefContext | None, listing: bool = False) -> str:
     """The page's direct children as links. Archived children sink below active ones, and a
-    `listing` leaves them out unless the context asks for them."""
+    `listing` includes them only when the context shows archived pages."""
     def is_archived(child_id: str) -> bool:
         return ref_context is not None and child_id in ref_context.archived_ids
 
