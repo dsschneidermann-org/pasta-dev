@@ -66,10 +66,9 @@ class RefContext:
     `titles`, `types`, and `statuses` map every page id in the workspace (archived pages included) to
     its title, page type, and status: a ref's or a child's label is its target's title, and a child
     link is annotated with its `type · status`. `archived_ids` is the subset of those ids that are
-    archived, so the child list can hide (or flag) them the way the tree render does. The link points
-    at that page's web route, carrying `show_archived` (as `?archived=true`) so following it keeps the
-    archived view. It is built by the store-driven render path; a direct render with no context falls
-    back to bare ids.
+    archived, so a link to one can be flagged. The link points at that page's web route, carrying
+    `show_archived` (as `?archived=true`) so following it keeps the archived view. It is built by the
+    store-driven render path; a direct render with no context falls back to bare ids.
 
     `escape_plain_text` is the render-mode flag (like `show_archived`): when set, the renderer
     markdown-escapes every plain-text leaf it emits - the web path sets it; the MCP path leaves it off.
@@ -250,24 +249,25 @@ def _field_content(field_spec: FieldSpec, value: Any, ref_context: RefContext | 
     return _NONE
 
 
-def _render_child_pages(page: Page, ref_context: RefContext | None = None) -> str:
+def _render_child_pages(page: Page, ref_context: RefContext | None = None,
+                        listing: bool = False) -> str:
     """A bullet list linking to this page's DIRECT children (each child lists its own children).
 
-    Archived children are hidden unless `ref_context.show_archived`, then listed with a bold `**(A)**`
-    marker prefixed BEFORE the link - mirroring how the tree (workspace-link) render flags archiving.
-    Links carry `show_archived` (as `?archived=true`) so a click keeps the archived view. With no
-    `ref_context` (a direct render with no workspace) a child is listed as its bare id; an empty list
-    renders the `*None.*` fallback.
+    An archived child is listed with a bold `**(A)**` marker before the link. A `listing` includes
+    archived children only when `ref_context.show_archived` is set. Links carry `show_archived` (as
+    `?archived=true`) so a click keeps the archived view. With no `ref_context` (a direct render with
+    no workspace) a child is listed as its bare id; an empty list renders the `*None.*` fallback.
     """
     # Stable partition: archived children sink below non-archived ones, each group's order preserved
     # (`sorted` is stable, `False < True`) - mirrors how Store.tree orders every level.
     def _is_archived(child_id: str) -> bool:
         return ref_context is not None and child_id in ref_context.archived_ids
 
+    hide_archived = listing and ref_context is not None and not ref_context.show_archived
     lines: list[str] = []
     for child_id in sorted(page.child_ids, key=_is_archived):
         archived = _is_archived(child_id)
-        if archived and not page.archived and ref_context and not ref_context.show_archived:
+        if archived and hide_archived:
             continue
         prefix = "**(A)** " if archived else ""
         if ref_context is None or child_id not in ref_context.titles:
@@ -285,17 +285,13 @@ def _render_references(page: Page, ref_context: RefContext | None = None) -> str
     """A bullet list of the page's OUTGOING reference links (page.links): each the target page as a
     titled `type · status` link (the same form as a child link) followed by the edge `role`.
 
-    Mirrors `_render_child_pages` archiving: an archived target is hidden unless
-    `ref_context.show_archived`, then listed with a bold `**(A)**` marker prefixed BEFORE the link,
-    with `?archived=true` on the link. With no `ref_context` the target is its bare id; an empty list
-    renders the `*None.*` fallback.
+    An archived target is listed with a bold `**(A)**` marker before the link, as an archived child
+    is. With no `ref_context` the target is its bare id; an empty list renders the `*None.*` fallback.
     """
     lines: list[str] = []
     for link in page.links:
         to_id, role = link["to"], link["role"]
         archived = ref_context is not None and to_id in ref_context.archived_ids
-        if archived and ref_context and not ref_context.show_archived:
-            continue
         prefix = "**(A)** " if archived else ""
         if ref_context is None or to_id not in ref_context.titles:
             lines.append(f"- {prefix}{to_id} - {_plain(role, ref_context)}")
@@ -335,7 +331,7 @@ def render_page(page: Page, page_type: PageType, level: int = 1,
     if page_type.tag == "toc":
         # A toc's References list is always empty (no addLink) and its whole purpose is the child list,
         # so emit only that list - unheadered - as the table of contents.
-        lines += [_render_child_pages(page, ref_context), ""]
+        lines += [_render_child_pages(page, ref_context, listing=True), ""]
     else:
         lines += [f"{section_heading} References", "", _render_references(page, ref_context), ""]
         lines += [f"{section_heading} Child pages", "", _render_child_pages(page, ref_context), ""]
