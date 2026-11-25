@@ -65,7 +65,12 @@ function main() {
       }
     }
 
+    socket.onopen = function() {
+      window.__ws_reloader_open = true;
+    };
+
     socket.onclose = function(e) {
+      window.__ws_reloader_open = false;
       console.log("Socket is closed. Reconnect will be attempted in 1 second.", e.reason);
       setTimeout(function() {
         connect();

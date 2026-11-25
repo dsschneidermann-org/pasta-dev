@@ -280,6 +280,12 @@ def test_the_reloader_updates_in_place_on_a_data_change(client):
     assert "beforeAttributeUpdated" in text
 
 
+def test_the_reloader_publishes_whether_its_socket_is_open(client):
+    text = client.get("/").text
+    assert "window.__ws_reloader_open = true" in text
+    assert "window.__ws_reloader_open = false" in text
+
+
 def test_a_live_view_loads_the_morph_library_before_the_reloader(client):
     text = client.get("/").text
     assert '<script src="/static/idiomorph/idiomorph.min.js"></script>' in text
