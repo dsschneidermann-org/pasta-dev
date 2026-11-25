@@ -10,7 +10,8 @@ production types are documentable - a fixture has no doc to link to.
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -518,6 +519,25 @@ def _activity_section(html: str) -> str:
     return html[html.index('<section id="activity"'):html.index("</section>")]
 
 
+def _scrubber_end(html: str, scrubber_id: str) -> float:
+    """The furthest a scrubber drags: a browser keeps a range input's value on its step grid."""
+    match = re.search(rf'<input type="range" id="{scrubber_id}" min="0" max="([^"]+)" step="([^"]+)"', html)
+    assert match is not None
+    end, step = match.groups()
+    return float(end if step == "any" else Decimal(end) // Decimal(step) * Decimal(step))
+
+
+def test_the_activity_scrubber_reaches_the_last_mark(client):
+    workspace = server.STORE.create_workspace("demo")
+    first = datetime.now(timezone.utc) - timedelta(minutes=1)
+    server.STORE.append_activity(workspace.id, [
+        {**_recent_call(None, "search"), "at": at.isoformat()} for at in (first, first + timedelta(seconds=10.1))])
+    html = client.get(f"/{workspace.id}").text
+    data, _scope = _activity(html)
+    assert data["duration"] == data["feed"][-1]["p"] == 0.505
+    assert _scrubber_end(html, "ac-scrub") == 0.505
+
+
 def test_the_latest_changes_start_hidden_behind_a_symbol_in_the_legend(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-flow", "Page").page
@@ -787,6 +807,21 @@ def test_timeline_replays_the_workspace_log_without_the_live_reload_socket(clien
     assert "idiomorph" not in response.text
     assert '<p class="tl-empty" id="tl-empty" hidden>' in response.text
     assert '<div id="tl-live">' in response.text
+
+
+def test_the_timeline_scrubber_reaches_the_last_station(client):
+    workspace = server.STORE.create_workspace("demo")
+    page_id = "feature-brief:mrw7chrt-def44a"
+    server.STORE.events_path(workspace.id).write_text(to_jsonl([
+        {"at": "2026-07-22T14:53:00+00:00", "event": "created", "pageId": page_id,
+         "type": "feature-brief", "title": "Anchored insert", "status": "draft"},
+        {"at": "2026-07-22T16:20:00+00:00", "event": "status", "pageId": page_id,
+         "type": "feature-brief", "title": "Anchored insert", "status": "shipped", "from": "draft"},
+    ]), encoding="utf-8")
+    html = client.get(f"/{workspace.id}/timeline").text
+    data = _timeline_data(html)
+    assert data["duration"] == data["feed"][-1]["p"] == 0.242
+    assert _scrubber_end(html, "tl-scrub") == 0.242
 
 
 def test_timeline_page_carries_the_digest_of_its_log_for_the_live_socket(client):
