@@ -403,10 +403,10 @@ class Store:
 
         `show_archived` flows onto page links (as `?archived=true`) so following one keeps the
         archived view, and decides whether a toc lists its archived children; it does not change
-        which pages the tree render includes.
-        `escape_plain_text` markdown-escapes every plain-text leaf for the web HTML view; it defaults
-        off so the MCP render path (renderPage) returns Markdown unchanged. The whole-tree render is
-        MCP-only (no web route renders it), so it always renders unescaped.
+        which pages the tree render includes. `escape_plain_text` markdown-escapes every plain-text
+        leaf for the web HTML view; it defaults off so the MCP render path (renderPage) returns
+        Markdown unchanged. The whole-tree render is MCP-only (no web route renders it), so it always
+        renders unescaped.
         """
         workspace = self.load_workspace(workspace_id)
         if page_id is None:
