@@ -254,8 +254,8 @@ def _render_child_pages(page: Page, ref_context: RefContext | None = None,
                         listing: bool = False) -> str:
     """A bullet list linking to this page's DIRECT children (each child lists its own children).
 
-    An archived child is listed with a bold `**(A)**` marker prefixed BEFORE the link - mirroring how
-    the tree (workspace-link) render flags archiving. A `listing` leaves archived children out unless
+    An archived child is listed with a bold `**(A)**` marker before the link - mirroring how the tree
+    (workspace-link) render flags archiving. A `listing` leaves archived children out unless
     `ref_context.show_archived`. Links carry `show_archived` (as `?archived=true`) so a click keeps
     the archived view. With no `ref_context` (a direct render with no workspace) a child is listed as
     its bare id; an empty list renders the `*None.*` fallback.
@@ -287,8 +287,8 @@ def _render_references(page: Page, ref_context: RefContext | None = None) -> str
     """A bullet list of the page's OUTGOING reference links (page.links): each the target page as a
     titled `type · status` link (the same form as a child link) followed by the edge `role`.
 
-    An archived target is listed with a bold `**(A)**` marker prefixed BEFORE the link, as an archived
-    child is. With no `ref_context` the target is its bare id; an empty list renders the `*None.*`
+    An archived target is listed with a bold `**(A)**` marker before the link, as an archived child
+    is. With no `ref_context` the target is its bare id; an empty list renders the `*None.*`
     fallback.
     """
     lines: list[str] = []
