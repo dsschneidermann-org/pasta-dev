@@ -8,8 +8,8 @@ Read from `github/spec-kit` at `f201054` (25 Nov 2026): the README, `docs/refere
 
 | Page type | Workflow | Signs off | Counts as done |
 |---|---|---|---|
-| `speckit-idea` | A raw idea is captured, researched for and against, framed as a problem, shaped into options and given a verdict, which the user accepts, sends back with facts, or turns into a kill. | user | verdict accepted: `go` or `killed` |
-| `speckit-spec` | A feature description becomes a spec the user approves, then a plan the user approves, then tasks an agent analyzes, implements and converges on until nothing is missing. | user | converged, then shipped |
+| `speckit-idea` | A raw idea is captured, researched for and against, framed as a problem, shaped into options and given a verdict, which the user accepts, sends back with facts, or turns into a kill. | user | verdict accepted: `closed` on go, `abandoned` on kill |
+| `speckit-spec` | A feature description becomes a spec the user approves, then a plan the user approves, then tasks an agent analyzes, implements and converges on until nothing is missing. | user | shipped, once converged |
 | `speckit-bug` | A report is assessed against the code, the user approves the assessment before any code changes, the fix is applied and tested, and the user closes on the recorded result. | user | result reviewed and closed |
 | `speckit-tasks` | The only child page. Holds the task list and the analyze findings, because pasta can gate on element states only across pages. | - | closed with its spec |
 
@@ -44,8 +44,8 @@ Spec Kit's `workflow.yml` files do, rather than stopping after every skill as it
 | `/speckit-tasks` | spec: `tasks`, and the child | child `tasks.items`, `tasks.execution` | `beginAnalyze` agent | nothing |
 | `/speckit-analyze` | spec: `analyze`, and the child | `analysis.report`, child `findings.items` | `beginImplement` agent, guarded | only to accept a finding unfixed |
 | `/speckit-implement` | spec: `implement` | marks child tasks done | `beginConverge` agent, guarded | nothing |
-| `/speckit-converge` | spec: `converge` | `convergence.summary`, appended child tasks | `appendWork` or `markConverged` agent | nothing |
-| review, open a PR | spec: `converged` | none | `ship` **human** | sign-off |
+| `/speckit-converge` | spec: `converge` | `convergence.summary`, appended child tasks | `appendWork` agent, while work is left | nothing |
+| review, open a PR | spec: `converge` | `pull_request.url`, which any status may fill | `ship` **human**, guarded | sign-off |
 | `/speckit-bug-assess` | bug: `assess` | `report`, `triage`, `symptom`, `reproduction`, `cause`, `remediation`, `questions` | `submitAssessment` agent | the report |
 | review-assessment gate | bug: `assessmentReview` | none | `approveAssessment` **human** | approval, answers |
 | `/speckit-bug-fix` | bug: `fix` | `fix` | `submitFix` agent | nothing |
@@ -88,10 +88,10 @@ Spec Kit's `workflow.yml` files do, rather than stopping after every skill as it
 | `review-plan` gate | `approvePlan` |
 | `implement` asks "unchecked items, proceed anyway?" | asked at `approvePlan`, where the same person sees the open items |
 | `analyze` leaves findings for the user to decide | `acceptFinding` is human; `beginImplement` is held while any finding is open |
-| `converge` ends in review or a PR | `ship` |
+| `converge` ends in review or a PR | `ship`, or `requestChanges` |
 | bug `review-assessment` gate, and `fix` asking before it proceeds on an unreproduced report | `approveAssessment`, or `closeInvalid` |
 | bug result `verified`, `partial` or `failed` | `close`, `refix`, `retest` or `reassess` |
-| idea `review-verdict` gate | `acceptGo` or `confirmKill` |
+| idea `review-verdict` gate | `acceptGo` to `closed`, or `confirmKill` to `abandoned` |
 | `needs-clarification`: the user supplies the missing facts | `supplyFacts(stage, text)`, which writes `clarifications.facts` |
 | skipping an optional stage | `skipResearch` and `skipAnalyze` are human; `clarify` and `checklist` are skipped by approving straight away |
 | an unknown host: "fetch it?" | asked in chat, from the fixed fetch-safety notice |
@@ -177,24 +177,26 @@ pagetype speckit-idea "Idea (Spec Kit)"
       > Only for go: the problem in one line, the chosen option, what is in and out of scope, the success metrics, and the questions carried forward. It is pasted unchanged into a speckit-spec, so write it to be read alone.
 
   section clarifications "Facts supplied"
-    facts: list {stage(intake | research | define | shape), text}     locked-to: verdictReview, go, killed
+    facts: list {stage(intake | research | define | shape), text}     locked-to: verdictReview, closed, abandoned
       > Each one fact the user supplied at the gate, in their words, and the stage whose fields it changes. Written only by the gate.
 
   lifecycle
     initial:  intake
-    terminal: go, killed, abandoned
+    terminal: closed, abandoned
     intake        --beginResearch/agent--> research       requires: intake.source, intake.type, intake.captured, intake.restated, intake.origin, questions.items
     intake        --skipResearch/human-->  define         requires: intake.source, intake.type, intake.captured, intake.restated, intake.origin, questions.items
     research      --beginDefine/agent-->   define         requires: research.confidence, research.findings, research.against
     define        --beginShape/agent-->    shape          requires: problem.statement, problem.users, problem.stakeholders, problem.goals, problem.nonGoals, problem.metrics, problem.inaction
     shape         --beginDecide/agent-->   decide         requires: concept.options, concept.recommended, concept.recommendation, concept.outOfScope, concept.assumptions
     decide        --submitVerdict/agent--> verdictReview  requires: decision.verdict, decision.scorecard, decision.rationale
-    verdictReview --acceptGo/human-->      go             requires: handoff.summary
-    verdictReview --confirmKill/human-->   killed
+    verdictReview --acceptGo/human-->      closed         requires: handoff.summary
+    verdictReview --confirmKill/human-->   abandoned
     verdictReview --supplyFacts/human-->   clarifying     steps: addFact(stage, text)
     verdictReview --reviseVerdict/either--> decide
     clarifying    --redecide/agent-->      decide
-    go|killed     --reopen/human-->        clarifying     steps: addFact(stage, text)
+    closed|abandoned --reopen/human-->     clarifying
+        requires: decision.verdict
+        steps: addFact(stage, text)
     intake|research|define|shape|decide|verdictReview|clarifying --abandon/human--> abandoned
 
   commands
@@ -330,7 +332,11 @@ pagetype speckit-spec "Spec (Spec Kit)"
 
   section convergence "Convergence"
     summary: prose     locked-to: converge
-      > What was checked against the code, and the outcome: converged, or how many tasks were appended, with counts by gap type and severity. A ticked task is not evidence; say what you read.
+      > What was checked against the code, and the outcome: converged, or how many tasks were appended, with counts by gap type and severity. A ticked task is not evidence; say what you read. Rewrite it on every pass: the user ships on the one they see.
+
+  section pull_request "Pull Request"
+    url: scalar     locked-to: specify, clarify, plan, checklist, tasks, analyze, implement, converge, shipped, abandoned
+      > The URL of the pull request for this feature, recorded as soon as one exists and replaced if another takes over. Every status may write it, the terminal ones included, because a pull request can be opened early and outlive the page's last status.
 
   lifecycle
     initial:  specify
@@ -349,15 +355,14 @@ pagetype speckit-spec "Spec (Spec Kit)"
     implement  --beginConverge/agent-->  converge
         guard child speckit-tasks: tasks.items all in {done, skipped}
     converge   --appendWork/agent-->     implement  steps: setSummary(summary)
-    converge   --markConverged/agent-->  converged  steps: setSummary(summary)
+    converge   --ship/human-->           shipped    requires: convergence.summary
         guard child speckit-tasks: tasks.items all in {done, skipped}
-    converged  --ship/human-->           shipped
-    converged  --requestChanges/either--> implement
+    converge   --requestChanges/either--> implement
     clarify|checklist|analyze|implement|converge --reviseSpec/either--> specify
     checklist|analyze|implement|converge --revisePlan/either--> plan
     analyze|implement --reviseTasks/either--> tasks
     shipped    --reopen/human-->         specify
-    specify|clarify|plan|checklist|tasks|analyze|implement|converge|converged --abandon/human--> abandoned
+    specify|clarify|plan|checklist|tasks|analyze|implement|converge --abandon/human--> abandoned
 
   commands
     setDirection/human:   set plan.direction
@@ -406,22 +411,19 @@ pagetype speckit-spec "Spec (Spec Kit)"
     - Go phase by phase; run [P] tasks together and tasks on the same file in order; write a test before the code it covers.
     - Mark each task done from a result you saw. Stop when a sequential task fails and say why.
     - If the user scoped this run, stop where they said. After requested changes, append a task for each before starting.
-    Editing the spec, plan or checklist is not due here. Begin converge once every task is done or skipped. Use reviseTasks, revisePlan or reviseSpec for what the tasks did not foresee.
+    - Follow the merge process, if the workspace has one, as far as it covers work in progress, and record the pull request URL if one is opened.
+    Editing the spec, plan or checklist is not due here, and neither is merging. Begin converge once every task is done or skipped. Use reviseTasks, revisePlan or reviseSpec for what the tasks did not foresee.
   guidance converge: |
-    converge - every task is marked done. This status is for checking the code against the spec, plan and tasks, as if the marks were not there. The work of it:
+    converge - every task is marked done. This status is for checking the code against the spec, plan and tasks, as if the marks were not there, and is the last stop before the user ships. The work of it:
     - Check every requirement, acceptance scenario, plan decision and constitution rule against the code in scope.
     - Append one task per gap to the child, missing, partial, contradicts or unrequested, with the key it traces to. Never edit or renumber a task, and never touch code.
-    Append work when a task was added, mark converged when none was needed; each takes this pass's summary.
-  guidance converged: |
-    converged - the code satisfies the spec, plan and tasks. This status is for the user's review. The work of it:
-    - Follow the merge process, if the workspace has one.
-    - Show the user the success criteria and where each is met.
-    Nothing is built here. Shipping is the user's; use requestChanges for anything outstanding.
+    - With no gap left, write this pass's summary, show the user the success criteria and where each is met, follow the merge process, if the workspace has one, and record the pull request URL.
+    Merging is not due here: it waits for ship. Append work when a task was added. Shipping is the user's: drive up to it and stop. Use requestChanges for anything they ask for.
 
   workspace-slot constitution  at specify, clarify, plan, checklist, tasks, analyze, implement, converge: "the project's principles: named rules, each stated as MUST or SHOULD with its reason, then how they are amended and a version line"
   workspace-slot groundingTool at plan: "the repository index or code-graph tool this workspace uses"
   workspace-slot testingTool   at implement: "the test runner and command this workspace uses"
-  workspace-slot mergeProcess  at converged: "how this workspace integrates finished work"
+  workspace-slot mergeProcess  at implement, converge: "how this workspace integrates finished work"
 ```
 
 ### 4.3 speckit-tasks
@@ -635,15 +637,15 @@ stateDiagram-v2
   define --> shape: beginShape
   shape --> decide: beginDecide
   decide --> verdictReview: submitVerdict
-  verdictReview --> go: acceptGo [H]
-  verdictReview --> killed: confirmKill [H]
+  verdictReview --> closed: acceptGo [H]
+  verdictReview --> abandoned: confirmKill [H]
   verdictReview --> clarifying: supplyFacts [H]
   verdictReview --> decide: reviseVerdict
   clarifying --> decide: redecide
-  go --> clarifying: reopen [H]
-  killed --> clarifying: reopen [H]
-  go --> [*]
-  killed --> [*]
+  closed --> clarifying: reopen [H]
+  abandoned --> clarifying: reopen [H], only with a verdict
+  closed --> [*]
+  abandoned --> [*]
 ```
 
 ```mermaid
@@ -658,9 +660,8 @@ stateDiagram-v2
   analyze --> implement: beginImplement (no open finding)
   implement --> converge: beginConverge (tasks done)
   converge --> implement: appendWork
-  converge --> converged: markConverged (tasks done)
-  converged --> shipped: ship [H]
-  converged --> implement: requestChanges
+  converge --> shipped: ship [H] (tasks done)
+  converge --> implement: requestChanges
   clarify --> specify: reviseSpec
   checklist --> specify: reviseSpec
   analyze --> specify: reviseSpec
@@ -734,8 +735,7 @@ Every status also lists `abandon` under humanGates, except on `speckit-tasks`.
 | `tasks` | nothing; the work is on the child | beginAnalyze (child ready) | skipAnalyze, once the child is ready |
 | `analyze` | beginImplement(report); reviseSpec; revisePlan; reviseTasks | none; beginImplement once a finding is recorded, until every one is resolved or accepted | none |
 | `implement` | reviseSpec; revisePlan; reviseTasks | beginConverge (child tasks done/skipped) | none |
-| `converge` | appendWork(summary); markConverged(summary); reviseSpec; revisePlan | none; markConverged once a task is appended, until it is done | none |
-| `converged` | requestChanges | none | ship |
+| `converge` | fill convergence: summary; appendWork(summary); requestChanges; reviseSpec; revisePlan | none | ship (needs the summary; held once a task is appended, until it is done) |
 
 **speckit-tasks**
 
@@ -769,17 +769,17 @@ Draw `speckit-idea`, `speckit-spec` and `speckit-bug`; leave `speckit-tasks` off
 | `speckit-bug` | vermilion | reads as a defect without matching amber |
 
 The three existing lines are theme tokens whose values I did not read, so check these against them in
-both themes. The Timeline also ends a line only on `shipped`, `closed` or `abandoned`: `go` and
-`killed` need adding as delivered ends, or an idea's line runs open for good. Both are delivered,
-because a documented kill is a finished assessment.
+both themes. Every terminal status is one the Timeline already ends a line on: `shipped` and `closed` as
+delivered, `abandoned` as dropped. So a killed idea draws as dropped, like one given up halfway, and
+`decision.verdict` tells the two apart. It is also what lets only an idea that reached a verdict reopen.
 
 ## 8. What the model cannot express
 
 None of these blocks the design; each names what stands in for it.
 
 - `EXTENSION:` a same-page guard on element states (`questions.items all in {answered, deferred}`) - `plan` must not start with an unresolved clarification. Stands in: the human `approveSpec` gate.
-- `EXTENSION:` a `requires` that wants content written in this visit - a send-back leaves the old content in place, so the exit is legal at once. Stands in: `beginImplement`, `appendWork` and `markConverged` are compounds that take a fresh report, since those stages repeat by design; elsewhere the guidance says to clear the lists first.
-- `EXTENSION:` a guard on a field's value - `go` needs adequate evidence, and a `failed` result must not be closed. Stands in: the human gates, and the instructions.
+- `EXTENSION:` a `requires` that wants content written in this visit - a send-back leaves the old content in place, so the exit is legal at once. Stands in: `beginImplement` and `appendWork` are compounds that take a fresh report, since those stages repeat by design; `ship` is the user's and reads the summary on the page, so its instruction says to rewrite it every pass; elsewhere the guidance says to clear the lists first.
+- `EXTENSION:` a guard on a field's value - a go needs adequate evidence, and a `failed` result must not be closed. Stands in: the human gates, and the instructions.
 - `EXTENSION:` list elements seeded by the type - the quality criteria and the six scorecard rows are fixed sets. Stands in: fixed text, and an enum with "one entry for each".
 - `EXTENSION:` a checked reference to an element on the same page - acceptance scenarios belong to a story. Stands in: scenarios numbered inside the story.
 
@@ -795,11 +795,11 @@ Three behaviours to confirm when building:
 |---|---|
 | Says when to use it and what instead | Yes, on all four. |
 | Every status reachable, every non-terminal has an exit | Yes, checked by script. |
-| Field work in the exit `requires`, the rest in guidance | Yes, or an argument of the exit compound (`approveSpec`, `beginImplement`, `appendWork`, `markConverged`). Optional by Spec Kit's own templates, so outside `requires`: `research.sources`, `requirements.entities`, `plan.complexity`, `dataModel.entities`, `contracts.items`, `checklist.items`, `remediation.alternatives`, `fix.highlights`, `fix.deviations`, `fix.followUps`, `verification.excerpts`, `verification.residualRisks`; and `handoff.summary` in `decide`, which is for go only. |
+| Field work in the exit `requires`, the rest in guidance | Yes, or an argument of the exit compound (`approveSpec`, `beginImplement`, `appendWork`). Optional by Spec Kit's own templates, so outside `requires`: `research.sources`, `requirements.entities`, `plan.complexity`, `dataModel.entities`, `contracts.items`, `checklist.items`, `remediation.alternatives`, `fix.highlights`, `fix.deviations`, `fix.followUps`, `verification.excerpts`, `verification.residualRisks`; and `handoff.summary` in `decide`, which is for go only. |
 | Human gates exactly at sign-off, abandon is human | Yes, see 3.3. |
-| Every review stage has a send-back | `clarify`, `checklist`, `analyze`, `converge`, `converged`, `assessmentReview`, `resultReview`, `verdictReview`: yes. |
+| Every review stage has a send-back | `clarify`, `checklist`, `analyze`, `converge`, `assessmentReview`, `resultReview`, `verdictReview`: yes. |
 | Instructions a stranger can act on | Yes. |
-| Locks are deliberate | Each field is locked to the status of the skill that owns its file. `questions` is unlocked so any stage can ask. |
+| Locks are deliberate | Each field is locked to the status of the skill that owns its file. `questions` is unlocked so any stage can ask, and `pull_request.url` names every status, the terminal ones included, so any of them can fill it. |
 | "All done" gates use a child and a guard | `tasks.items` and `findings.items` on `speckit-tasks`. |
 | Guarded children exist when checked | `speckit-tasks` is pinned, so it exists from the start. |
 | Inexpressible things marked | Section 8. |
@@ -811,6 +811,6 @@ report is invalid, and `verdictReview` prompts for the handoff even on a kill. T
 
 - File mechanics: slugs, path and symlink checks, template resolution, `feature.json`, overwrite prompts. The page id and the locks replace them.
 - Extension hooks (`before_*`, `after_*`), the git extension and `taskstoissues`. Workspace slots cover the parts a team would keep.
-- Commits and a pull-request URL, which `feature-brief` and `bug-report` have: no skill writes them.
+- Commits, which `feature-brief` and `bug-report` record, and a pull-request URL on the bug page: no skill writes them. The spec page has the URL by choice.
 - Deciding without a concept, which `assess.decide` allows but may not call go. Here `shape` always comes first and may recommend none.
 - A constitution page. The slot pushes the text to the agent at the statuses whose skills load it, but it has no amendment gate or history; use a `document` page if you want those.
