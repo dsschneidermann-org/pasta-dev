@@ -1,5 +1,7 @@
 """Unit tests for the structured HTML renderer (src.render_html)."""
 
+import pytest
+
 from src.commands import apply_command, create_page
 from src.model import Page
 from src.pagetypes.core.specs import LIST, SCALAR, FSMSpec
@@ -271,13 +273,29 @@ def test_children_html_links_each_child_with_its_type_and_status():
     assert '<span class="link-status">active</span>' in out
 
 
-def test_children_html_hides_an_archived_child_then_flags_it_when_shown():
-    page = _page(child_ids=["a:1", "b:2"])
-    hidden = _children_html(page, _context(archived=["b:2"]))
-    assert "Beta" not in hidden and "Alpha" in hidden
+_FLAGGED_BETA = '<strong class="archived-flag">(A)</strong> <a href="/ws:demo/page/b:2{query}">Beta</a>'
+
+
+@pytest.mark.parametrize("page_archived", [False, True])
+def test_children_html_flags_an_archived_child_below_the_live_ones(page_archived):
+    page = _page(child_ids=["b:2", "a:1"], archived=page_archived)
+    out = _children_html(page, _context(archived=["b:2"]))
+    assert _FLAGGED_BETA.format(query="") in out
+    assert out.index("Alpha") < out.index("Beta")
+    assert out.count("archived-flag") == 1        # a:1 is not archived
+    # show_archived decides only whether the links carry ?archived=true.
     shown = _children_html(page, _context(show_archived=True, archived=["b:2"]))
-    assert "Beta" in shown and 'class="archived-flag"' in shown
-    assert "/page/b:2?archived=true" in shown
+    assert _FLAGGED_BETA.format(query="?archived=true") in shown
+
+
+@pytest.mark.parametrize("page_archived", [False, True])
+def test_references_html_flags_an_archived_target(page_archived):
+    page = _page(links=[{"to": "b:2", "role": "depends-on"}], archived=page_archived)
+    out = _references_html(page, _context(archived=["b:2"]))
+    assert _FLAGGED_BETA.format(query="") in out
+    assert '<span class="link-role">depends-on</span>' in out
+    shown = _references_html(page, _context(show_archived=True, archived=["b:2"]))
+    assert _FLAGGED_BETA.format(query="?archived=true") in shown
 
 
 def test_children_html_is_the_none_fallback_when_there_are_none():
@@ -481,14 +499,26 @@ def test_list_element_links_are_absent_without_a_context():
     assert "a:1" in out and '<a href="/ws:demo' not in out
 
 
+# A locally constructed page type, not a registered one: conftest puts the run in test mode,
+# which blocks resolving the production toc type but does not stop a test building its own.
+TOC = PageType(tag="toc", name="Toc fixture", description="local toc for the render test",
+               sections=(), commands=(),
+               fsm=FSMSpec(name="LocalToc", initial="active", states=("active",)))
+
+
+@pytest.mark.parametrize("toc_archived", [False, True])
+def test_render_page_html_toc_lists_archived_children_only_when_they_are_shown(toc_archived):
+    page = Page(id="toc:1", type="toc", title="Contents", status="active",
+                child_ids=["a:1", "b:2"], archived=toc_archived)
+    out = render_page_html(page, TOC, _context(archived=["b:2"]))
+    assert "Alpha" in out and "Beta" not in out
+    shown = render_page_html(page, TOC, _context(show_archived=True, archived=["b:2"]))
+    assert _FLAGGED_BETA.format(query="?archived=true") in shown
+
+
 def test_render_page_html_toc_is_its_child_list_alone():
-    # A locally constructed page type, not a registered one: conftest puts the run in test mode,
-    # which blocks resolving the production toc type but does not stop a test building its own.
-    toc = PageType(tag="toc", name="Toc fixture", description="local toc for the render test",
-                   sections=(), commands=(),
-                   fsm=FSMSpec(name="LocalToc", initial="active", states=("active",)))
     page = Page(id="toc:1", type="toc", title="Contents", status="active", child_ids=["a:1"])
-    out = render_page_html(page, toc, _context())
+    out = render_page_html(page, TOC, _context())
     assert '<h1 class="page-title">Contents</h1>' in out
     assert '<a href="/ws:demo/page/a:1">Alpha</a>' in out
     assert "section-references" not in out

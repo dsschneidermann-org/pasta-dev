@@ -401,8 +401,9 @@ class Store:
     ) -> str:
         """Render one page, or the whole (non-archived) workspace tree, to Markdown.
 
-        `show_archived` only flows onto inline-ref links (as `?archived=true`) so following a ref
-        keeps the archived view; it does not change which pages the tree render includes.
+        `show_archived` flows onto page links (as `?archived=true`) so following one keeps the
+        archived view, and decides whether a toc lists its archived children; it does not change
+        which pages the tree render includes.
         `escape_plain_text` markdown-escapes every plain-text leaf for the web HTML view; it defaults
         off so the MCP render path (renderPage) returns Markdown unchanged. The whole-tree render is
         MCP-only (no web route renders it), so it always renders unescaped.
@@ -423,9 +424,8 @@ class Store:
         """One page as structured HTML for the web view. Its Markdown sibling, `render_markdown`,
         is what the renderPage MCP tool returns and is unchanged.
 
-        `show_archived` reaches the child and reference lists exactly as it does on the Markdown
-        path: it decides whether an archived target is hidden or flagged, and rides onto the links
-        as a query parameter.
+        `show_archived` acts exactly as it does on the Markdown path: it decides whether a toc lists
+        its archived children, and rides onto the links as a query parameter.
         """
         workspace = self.load_workspace(workspace_id)
         page = workspace.get_page(page_id)

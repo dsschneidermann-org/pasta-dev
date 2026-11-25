@@ -334,18 +334,19 @@ def test_render_child_pages_direct_titled_links_only():
     assert "/page/test-flow:g" not in md
 
 
-def test_render_child_pages_show_archived_query_and_flag():
+@pytest.mark.parametrize("page_archived", [False, True])
+def test_render_child_pages_flags_an_archived_child(page_archived):
     page = _page_with_children(["test-flow:c", "test-flow:a"])
+    page.archived = page_archived
     titles = {"test-flow:c": "Child", "test-flow:a": "Archie"}
     types = {"test-flow:c": "test-flow", "test-flow:a": "test-flow"}
     statuses = {"test-flow:c": "open", "test-flow:a": "closed"}
     archived = frozenset({"test-flow:a"})
-    # default: the archived child is hidden and the active child's link carries no query
+    # the archived child is listed with a bold (A) marker before its link, whatever the view
     md = render_page(page, FIELDS, ref_context=RefContext("ws:demo", titles, types, statuses, archived_ids=archived))
     assert "- [Child](/ws:demo/page/test-flow:c) *test-flow* · `open`" in md
-    assert "test-flow:a" not in md
-    # show_archived: the archived child appears with a bold (A) marker prefixed before the link,
-    # keeps its type · status, and links carry ?archived=true
+    assert "- **(A)** [Archie](/ws:demo/page/test-flow:a) *test-flow* · `closed`" in md
+    # show_archived decides only whether the links carry ?archived=true
     md_arch = render_page(page, FIELDS,
                           ref_context=RefContext("ws:demo", titles, types, statuses,
                                                  show_archived=True, archived_ids=archived))
@@ -411,16 +412,18 @@ def test_render_references_none_and_bare_id_fallback():
     assert "/page/test-flow:x" not in md_bare
 
 
-def test_render_references_archived_target_hidden_then_flagged():
+@pytest.mark.parametrize("page_archived", [False, True])
+def test_render_references_flags_an_archived_target(page_archived):
     page = _page_with_links([{"to": "test-flow:a", "role": "supersedes"}])
+    page.archived = page_archived
     titles = {"test-flow:a": "Archie"}
     types = {"test-flow:a": "test-flow"}
     statuses = {"test-flow:a": "closed"}
     archived = frozenset({"test-flow:a"})
-    # default: an archived target is hidden -> the reference is absent
+    # the archived target is listed with a bold (A) marker before its link, whatever the view
     md = render_page(page, FIELDS, ref_context=RefContext("ws:demo", titles, types, statuses, archived_ids=archived))
-    assert "test-flow:a" not in md
-    # show_archived: shown with the (A) marker prefixed before the link, ?archived=true carried
+    assert "- **(A)** [Archie](/ws:demo/page/test-flow:a) *test-flow* · `closed` - supersedes" in md
+    # show_archived decides only whether the link carries ?archived=true
     md_arch = render_page(page, FIELDS,
                           ref_context=RefContext("ws:demo", titles, types, statuses,
                                                  show_archived=True, archived_ids=archived))
@@ -679,6 +682,22 @@ def test_render_toc_omits_reference_and_child_headings():
     assert "## Child pages" not in md
     # the child list itself is still rendered, unheadered, in the usual titled type·status link form
     assert "- [Some change](/ws:demo/page/simple-change:c) *simple-change* · `closed`" in md
+
+
+@pytest.mark.parametrize("toc_archived", [False, True])
+def test_render_toc_lists_archived_children_only_when_they_are_shown(toc_archived):
+    page = _toc_with_children(["simple-change:c", "simple-change:a"])
+    page.archived = toc_archived
+    titles = {"simple-change:c": "Live", "simple-change:a": "Archie"}
+    types = {"simple-change:c": "simple-change", "simple-change:a": "simple-change"}
+    statuses = {"simple-change:c": "closed", "simple-change:a": "closed"}
+    archived = frozenset({"simple-change:a"})
+    md = render_page(page, TOC, ref_context=RefContext("ws:demo", titles, types, statuses, archived_ids=archived))
+    assert "[Live](/ws:demo/page/simple-change:c)" in md
+    assert "simple-change:a" not in md
+    md_arch = render_page(page, TOC, ref_context=RefContext("ws:demo", titles, types, statuses,
+                                                            show_archived=True, archived_ids=archived))
+    assert "- **(A)** [Archie](/ws:demo/page/simple-change:a?archived=true) *simple-change* · `closed`" in md_arch
 
 
 def test_render_toc_empty_shows_none_without_headings():

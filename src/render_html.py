@@ -232,30 +232,22 @@ def _link_html(page_id: str, ref_context: RefContext | None,
     return f"<li>{_page_link(page_id, ref_context) or _escape(page_id)}{suffix}</li>"
 
 
-def _children_html(page: Page, ref_context: RefContext | None) -> str:
-    """The page's direct children as links. Archived children sink below active ones and are
-    hidden unless the context asks for them."""
+def _children_html(page: Page, ref_context: RefContext | None, listing: bool = False) -> str:
+    """The page's direct children as links. Archived children sink below active ones, and a
+    `listing` leaves them out unless the context asks for them."""
     def is_archived(child_id: str) -> bool:
         return ref_context is not None and child_id in ref_context.archived_ids
 
-    rows: list[str] = []
-    for child_id in sorted(page.child_ids, key=is_archived):
-        archived = is_archived(child_id)
-        if archived and not page.archived and ref_context and not ref_context.show_archived:
-            continue
-        rows.append(_link_html(child_id, ref_context))
+    hide_archived = listing and ref_context is not None and not ref_context.show_archived
+    rows = [_link_html(child_id, ref_context)
+            for child_id in sorted(page.child_ids, key=is_archived)
+            if not (hide_archived and is_archived(child_id))]
     return f'<ul class="link-list">{"".join(rows)}</ul>' if rows else _NONE_HTML
 
 
 def _references_html(page: Page, ref_context: RefContext | None) -> str:
     """The page's outgoing reference edges, each the target link plus its role."""
-    rows: list[str] = []
-    for link in page.links:
-        to_id, role = link["to"], link["role"]
-        archived = ref_context is not None and to_id in ref_context.archived_ids
-        if archived and ref_context and not ref_context.show_archived:
-            continue
-        rows.append(_link_html(to_id, ref_context, role))
+    rows = [_link_html(link["to"], ref_context, link["role"]) for link in page.links]
     return f'<ul class="link-list">{"".join(rows)}</ul>' if rows else _NONE_HTML
 
 
@@ -328,7 +320,8 @@ def render_page_html(page: Page, page_type: PageType,
             f'<p class="page-meta"><span class="page-type">{_escape(page.type)}&nbsp;·&nbsp;</span>'
             f'<span class="page-status">{_escape(page.status)}</span>{revision}</p></header>')
     if page_type.tag == "toc":
-        return f'<article class="pasta-page">{head}{_children_html(page, ref_context)}</article>'
+        return (f'<article class="pasta-page">{head}'
+                f"{_children_html(page, ref_context, listing=True)}</article>")
     sections = "".join(_section_html(section, page, ref_context)
                        for section in page_type.sections)
     tail = ('<section class="page-section" id="section-references">'
