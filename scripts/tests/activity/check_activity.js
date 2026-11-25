@@ -248,6 +248,13 @@ const checks = {
     close(page.playhead(), 0.25, "1015 s sits at 0.25 s on the slid clock");
     assert.ok(!page.playing());
   },
+  "a call drawn in behind the last mark leaves a viewer resting at the end at rest"(script) {
+    const page = load(script, BEFORE);
+    page.push({ timeline: payload([1000, 1010, 1020, 1025, 1030]), digest: "filled" });
+    close(page.playhead(), 1.5, "the end has not moved");
+    assert.ok(!page.playing() && page.button().includes("Replay"));
+    assert.strictEqual(page.classed("ac-call").length, 2 * (4 + 5), "the filled-in call is drawn, grey and coloured");
+  },
   "an empty timeline brings up the map on its first payload and plays it"(script) {
     const page = load(script, EMPTY);
     assert.ok(page.ids["ac-live"].hidden && !page.ids["ac-empty"].hidden);

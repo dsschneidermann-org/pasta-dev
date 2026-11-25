@@ -10,6 +10,7 @@ advertised surface a real client sees, since the fixtures are hidden from discov
 
 import asyncio
 import logging
+import time
 
 import pytest
 from fastmcp import Client
@@ -17,6 +18,7 @@ from fastmcp.exceptions import ToolError
 
 import src.server as server
 from src.activity_log import sent_bytes
+from src.activity_timeline import build_activity_timeline
 from src.hmr_server import _build_proxy, _mount
 from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.store import Store
@@ -594,11 +596,45 @@ def test_every_call_naming_a_workspace_is_recorded_with_its_bytes_but_create_pag
     assert entries[2]["bytes"] == sent_bytes(rename_args)
 
 
+def test_a_call_comes_before_what_it_wrote_and_the_status_it_moved_comes_last(mcp):
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    target = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-fields", "title": "Target"})
+    page = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"})
+    token = page["statusRevisionToken"]
+    call(mcp, "mutatePageBatch", {"workspaceId": workspace_id, "pageId": page["id"], "commands": [
+        {"command": "addLink", "args": {"statusRevisionToken": token, "toId": target["id"], "role": "relates-to"}},
+        {"command": "open", "args": {"statusRevisionToken": token}}]})
+    call(mcp, "archivePage", {"workspaceId": workspace_id, "pageId": page["id"]})
+    store = server.STORE
+    [line] = build_activity_timeline(store.read_activity(workspace_id), store.read_events(workspace_id),
+                                     store.load_workspace(workspace_id), page["id"], time.time())["lines"]
+    assert [(mark["kind"], mark.get("tool") or mark.get("role") or mark["status"]) for mark in line["marks"]] == [
+        ("status", "draft"),
+        ("call", "mutatePageBatch"), ("link", "relates-to"), ("status", "open"),
+        ("call", "archivePage"), ("archived", "open")]
+
+
 def test_a_failed_call_records_nothing(mcp):
     workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     with pytest.raises(ToolError):
         call(mcp, "getPage", {"workspaceId": workspace_id, "pageId": "test-flow:nope"})
     assert server.STORE.read_activity(workspace_id) == []
+
+
+def test_a_rejected_batch_records_neither_the_call_nor_anything_it_would_have_written(mcp):
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    target = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-fields", "title": "Target"})
+    page = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-flow", "title": "A change"})
+    stamp = {"statusRevisionToken": page["statusRevisionToken"]}
+    link = {"command": "addLink", "args": stamp | {"toId": target["id"], "role": "relates-to"}}
+    created = server.STORE.read_events(workspace_id)
+    for commands in ([link, {"command": "reopen", "args": stamp}],       # an illegal transition after a legal link
+                     [{"command": "open", "args": stamp}, link],         # a command on the token the transition made stale
+                     "not a list"):                                      # refused before the tool runs
+        with pytest.raises(ToolError):
+            call(mcp, "mutatePageBatch", {"workspaceId": workspace_id, "pageId": page["id"], "commands": commands})
+    assert server.STORE.read_activity(workspace_id) == []
+    assert server.STORE.read_events(workspace_id) == created
 
 
 def test_a_call_refused_by_the_quarantine_records_nothing(mcp, invalid_declarations):
