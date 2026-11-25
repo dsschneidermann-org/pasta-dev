@@ -33,14 +33,6 @@
         {% endif %}
     </div>
     <script>
-        document.getElementById("archive-form").addEventListener("submit", function(event) {
-            window.scrollTo(0, 0);
-        })
-        document.getElementById("delete-schedule-form").addEventListener("submit", function(event) {
-            window.scrollTo(0, 0);
-        })
-        document.getElementById("status-form").addEventListener("submit", function(event) {
-            window.scrollTo(0, 0);
-        })
+{% include '_page_actions.js' %}
     </script>
 {% endblock %}

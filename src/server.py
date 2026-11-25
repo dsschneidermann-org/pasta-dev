@@ -383,8 +383,9 @@ def page_view_after_action(workspace_id_part: str, page_id: str, referer: str | 
 # Archive/unarchive a page from its web view. These mirror the archivePage / unarchivePage MCP
 # tools (a browser can't call MCP), so the wiki's Archive/Unarchive button POSTs here. Each sends
 # the in-place update and streams its events to timeline and activity tabs like the MCP tools do, then
-# redirects back to the page it was posted from (303), so the posting tab loads it again with a
-# GET and a reload or back button never re-POSTs the change.
+# redirects back to the page it was posted from (303). The page posts with fetch, leaves the redirect
+# unfollowed and takes the update; a native form post follows it, so that tab loads the page with a GET
+# and a reload or back button never re-POSTs the change.
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/archive", response_class=RedirectResponse)
 async def route_archive_page(request: Request, workspaceIdPart: str, pageId: str):
     with _guard_http():

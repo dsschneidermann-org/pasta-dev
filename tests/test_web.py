@@ -155,6 +155,21 @@ def test_a_page_action_never_returns_anywhere_but_its_own_page():
     assert server.page_view_after_action("demo", "test-fields:p1", "https://elsewhere.example/?next=/") == page
 
 
+def test_page_actions_post_with_fetch_and_leave_the_redirect_unfollowed(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page title").page
+    text = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/page/{page.id}").text
+    listener = 'document.getElementById("page-actions").addEventListener("submit"'
+    assert text.index('id="status-form"') < text.index(listener)   # the forms exist when the script runs
+    script = text[text.index(listener):]
+    # Every click is taken over; the socket only decides between fetch and the form's own post.
+    assert script.index("event.preventDefault()") < script.index("if (window.__ws_reloader_open)")
+    assert script.index("if (window.__ws_reloader_open)") < script.index("form.submit()")
+    assert 'method: "POST"' in script
+    assert 'redirect: "manual"' in script
+    assert 'response.type === "opaqueredirect"' in script
+
+
 def test_unarchive_route_restores_page(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
@@ -278,6 +293,12 @@ def test_the_reloader_updates_in_place_on_a_data_change(client):
     assert "Idiomorph.morph(document.body, fetched.body.childNodes" in text
     assert 'morphStyle: "innerHTML"' in text
     assert "beforeAttributeUpdated" in text
+
+
+def test_the_reloader_publishes_whether_its_socket_is_open(client):
+    text = client.get("/").text
+    assert "window.__ws_reloader_open = true" in text
+    assert "window.__ws_reloader_open = false" in text
 
 
 def test_a_live_view_loads_the_morph_library_before_the_reloader(client):
