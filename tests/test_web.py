@@ -155,6 +155,20 @@ def test_a_page_action_never_returns_anywhere_but_its_own_page():
     assert server.page_view_after_action("demo", "test-fields:p1", "https://elsewhere.example/?next=/") == page
 
 
+def test_page_actions_post_with_fetch_and_leave_the_redirect_unfollowed(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-flow", "Page title").page
+    text = client.get(f"/ws:{workspace.id.removeprefix('ws:')}/page/{page.id}").text
+    listener = 'document.getElementById("page-actions").addEventListener("submit"'
+    assert text.index('id="status-form"') < text.index(listener)   # the forms exist when the script runs
+    script = text[text.index(listener):]
+    assert "if (!window.__ws_reloader_open)" in script
+    assert 'method: "POST"' in script
+    assert 'redirect: "manual"' in script
+    assert 'response.type === "opaqueredirect"' in script
+    assert "form.submit()" in script
+
+
 def test_unarchive_route_restores_page(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
