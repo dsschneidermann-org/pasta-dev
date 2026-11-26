@@ -121,22 +121,21 @@ _SPEC_NOTICE = """
     The field instructions and stage guidance of this page are GitHub Spec Kit's own words. Spec Kit
     runs skills over files; this page stands in for both.
 
-    A file it names is a section here: spec.md is Input through Assumptions and Clarifications,
-    checklists/requirements.md is Spec quality, plan.md is Plan, research.md, data-model.md,
-    contracts/ and quickstart.md are the sections of those names, and the other checklists are
-    Requirements checklist. tasks.md and the analyze findings are the Spec Kit tasks child. A
-    directory it names is this page. The constitution is the `speckitConstitution` workspace guidance
-    field: fetch it with `getWorkspaceGuidance` if the `prepare` status response did not already show
-    it. A stage it names comes with the command that moves this page there, such as plan
-    (`approveSpec`). A [NEEDS CLARIFICATION: ...] marker is an open question on this page, flagged
-    needsHuman, and only the user answers one.
+    Where Spec Kit names one of its files, the text names the section or field that holds it
+    instead. The spec sections are Input through Assumptions, and Clarifications; `tasks.items` and
+    the analyze findings are on the Spec Kit tasks child. The constitution is the
+    `speckitConstitution` workspace guidance field: fetch it with `getWorkspaceGuidance` if the
+    `prepare` status response did not already show it. A stage it names comes with the command that
+    moves this page there, such as plan (`approveSpec`). A [NEEDS CLARIFICATION: ...] marker is an
+    open question on this page, flagged needsHuman, and only the user answers one.
     """
 
 _TASKS_NOTICE = """
-    The field instructions and stage guidance of this page are GitHub Spec Kit's own words. tasks.md
-    is this page; spec.md, plan.md, data-model.md, contracts/, research.md and quickstart.md are
-    sections of the Spec Kit spec above it. A stage it names comes with the command that moves the
-    spec there.
+    The field instructions and stage guidance of this page are GitHub Spec Kit's own words. Where
+    Spec Kit names one of its files, the text names the section or field that holds it instead:
+    `tasks.items` is on this page, and the spec sections, the `plan` section, `dataModel.entities`,
+    `contracts.items`, `research.decisions` and `quickstart.guide` are on the Spec Kit spec above
+    it. A stage it names comes with the command that moves the spec there.
     """
 
 # What the spec's gates count on its one pinned child. A list with nothing in it passes.
@@ -449,7 +448,7 @@ _SPECKIT_SPEC = PageType(
                 - For each dependency → best practices task
                 - For each integration → patterns task
 
-                **Consolidate findings** in `research.md` using format:
+                **Consolidate findings** in `research.decisions` using format:
                 - Decision: [what was chosen]
                 - Rationale: [why chosen]
                 - Alternatives considered: [what else evaluated]
@@ -457,19 +456,20 @@ _SPECKIT_SPEC = PageType(
         )),
         SectionSpec("dataModel", "Data model", (
             _list("entities", element_fields=("name", "fields", "relationships", "rules", "states"), description="""
-                **Extract entities from feature spec** → `data-model.md`:
+                **Extract entities from feature spec** → `dataModel.entities`:
                 - Entity name, fields, relationships
                 - Validation rules from requirements
                 - State transitions if applicable
 
-                data-model.md is the canonical source for field constraints (max/min length,
+                `dataModel.entities` is the canonical source for field constraints (max/min length,
                 nullable/required, enum values, validation rules), including constraints encoded in
                 field types
                 """),
         )),
         SectionSpec("contracts", "Contracts", (
             _list("items", element_fields=("name", "format", "shape"), description="""
-                **Define interface contracts** (if project has external interfaces) → `/contracts/`:
+                **Define interface contracts** (if project has external interfaces) →
+                `contracts.items`:
                 - Identify what interfaces the project exposes to users or other systems
                 - Document the contract format appropriate for the project type
                 - Examples: public APIs for libraries, command schemas for CLI tools, endpoints for
@@ -479,7 +479,7 @@ _SPECKIT_SPEC = PageType(
         )),
         SectionSpec("quickstart", "Quickstart", (
             _blocks("guide", block_kinds=standard_blocks(), description="""
-                **Create quickstart validation guide** → `quickstart.md`:
+                **Create quickstart validation guide** → `quickstart.guide`:
                 - Document runnable validation scenarios that prove the feature works end-to-end
                 - Include prerequisites, setup commands, test/run commands, and expected outcomes
                 - Use links or references to contracts and data model details instead of duplicating
@@ -487,7 +487,7 @@ _SPECKIT_SPEC = PageType(
                 - Do not include full implementation code, model/service/controller bodies,
                   migrations, or complete test suites
                 - Keep this artifact as a validation/run guide; implementation details belong in
-                  `tasks.md` and the implementation phase
+                  `tasks.items` and the implementation phase
                 """),
         )),
         SectionSpec("checklist", "Requirements checklist", (
@@ -540,7 +540,7 @@ _SPECKIT_SPEC = PageType(
 
                 | ID | Category | Severity | Location(s) | Summary | Recommendation |
                 |----|----------|----------|-------------|---------|----------------|
-                | A1 | Duplication | HIGH | spec.md:L120-134 | Two similar requirements ... | Merge phrasing; keep clearer version |
+                | A1 | Duplication | HIGH | `requirements.functional` | Two similar requirements ... | Merge phrasing; keep clearer version |
 
                 (Add one row per finding; generate stable IDs prefixed by category initial.)
 
@@ -584,7 +584,7 @@ _SPECKIT_SPEC = PageType(
 
                 | ID | Gap Type | Severity | Source | Evidence | Remaining Work |
                 |----|----------|----------|--------|----------|----------------|
-                | F1 | missing  | HIGH     | FR-008 | Example: no append-only guard detected in path/to/module.py when writing tasks.md | Add append-only enforcement |
+                | F1 | missing  | HIGH     | FR-008 | Example: no append-only guard detected in path/to/module.py when writing `tasks.items` | Add append-only enforcement |
 
                 **Summary metrics:**
 
@@ -784,7 +784,7 @@ _SPECKIT_TASKS = PageType(
                 3. **[P] marker**: Include ONLY if task is parallelizable (different files, no
                    dependencies on incomplete tasks)
                 4. **[Story] label**: REQUIRED for user story phase tasks only
-                   - Format: [US1], [US2], [US3], etc. (maps to user stories from spec.md)
+                   - Format: [US1], [US2], [US3], etc. (maps to user stories from `stories.items`)
                    - Setup phase: NO story label
                    - Foundational phase: NO story label
                    - User Story phases: MUST have story label
@@ -817,7 +817,7 @@ _SPECKIT_TASKS = PageType(
                   element_fsm=_FINDING_FSM, description="""
                 | ID | Category | Severity | Location(s) | Summary | Recommendation |
                 |----|----------|----------|-------------|---------|----------------|
-                | A1 | Duplication | HIGH | spec.md:L120-134 | Two similar requirements ... | Merge phrasing; keep clearer version |
+                | A1 | Duplication | HIGH | `requirements.functional` | Two similar requirements ... | Merge phrasing; keep clearer version |
 
                 (Add one row per finding; generate stable IDs prefixed by category initial.)
 

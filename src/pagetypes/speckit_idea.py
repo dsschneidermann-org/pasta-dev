@@ -71,11 +71,10 @@ _NOTICE = """
     The field instructions and stage guidance of this page are GitHub Spec Kit's own words. Spec Kit
     runs skills over files; this page stands in for both.
 
-    A file it names is a section here: intake.md is Intake, research.md is Research, problem.md is
-    Problem, concept.md is Concept, and decision.md is Decision and Handoff. A directory it names is
-    this page. A stage it names comes with the command that moves this page there, such as define
-    (`beginDefine`), and specify is a new speckit-spec page. A [NEEDS CLARIFICATION: ...] marker is
-    an open question on this page, flagged needsHuman, and only the user answers one.
+    Where Spec Kit names one of its files, the text names the section or field of this page that
+    holds it instead. A stage it names comes with the command that moves this page there, such as
+    define (`beginDefine`), and specify is a new speckit-spec page. A [NEEDS CLARIFICATION: ...]
+    marker is an open question on this page, flagged needsHuman, and only the user answers one.
     """
 
 # Everything intake must hold before any later stage, whichever one the user goes to next.
@@ -102,8 +101,8 @@ _SPECKIT_IDEA = PageType(
             _scalar("source", description="""
                 **Source**: sanitized URL, "pasted text", or repo path
 
-                Record in `intake.md`: the **sanitized URL** (strip any `user:password@` userinfo and
-                drop query/fragment parameters that may carry credentials or signatures — e.g.
+                Record in `intake.source`: the **sanitized URL** (strip any `user:password@` userinfo
+                and drop query/fragment parameters that may carry credentials or signatures — e.g.
                 `token`, `sig`, `signature`, `key`, `password`, `access_token`, and anything under a
                 `X-Amz-*`/`Goog-*` signed-URL scheme; keep the scheme, host, and path), the parsed
                 host (no redirect following), and the policy branch taken (`allowlisted` /
@@ -164,8 +163,8 @@ _SPECKIT_IDEA = PageType(
                    Support tickets, interviews, usage data, requests. Distinguish *stated* wants from
                    *observed* behavior.
                 2. **Prior art** — Has this been tried before, here or elsewhere? Existing internal
-                   features, past specs/decisions in `.specify/`, competitor products, open-source
-                   alternatives. Why did prior attempts succeed or fail?
+                   features, past speckit-spec and speckit-idea pages in this workspace, competitor
+                   products, open-source alternatives. Why did prior attempts succeed or fail?
                 3. **Market & context** — Trends, alternatives users cope with today, the cost of
                    doing nothing.
                 4. **Data & constraints** — Relevant metrics, volumes, compliance/legal factors,
@@ -184,7 +183,7 @@ _SPECKIT_IDEA = PageType(
             _list("sources", element_fields=("url", "host", "policy"), description="""
                 Record each source's **sanitized URL** (strip `user:password@` userinfo and drop
                 credential/signature query parameters, per the intake policy), parsed host, and policy
-                branch in `research.md`. Never persist a verbatim URL that may embed secrets.
+                branch in `research.sources`. Never persist a verbatim URL that may embed secrets.
 
                 <sanitized URL> (host: <host>, policy: allowlisted/confirmed-by-user/auto-refused)
                 """),
@@ -275,14 +274,14 @@ _SPECKIT_IDEA = PageType(
                 **Score the idea** against explicit criteria, each rated
                 `strong | adequate | weak | unknown` with a one-line justification drawn from the
                 artifacts:
-                - **Problem validity** — is the problem real and worth solving? (from `problem.md` +
-                  `research.md`)
-                - **Evidence strength** — how well-supported, vs. assumption-driven? (from
-                  `research.md`)
-                - **Value vs. cost of inaction** — does solving it beat doing nothing? (from
-                  `problem.md`)
+                - **Problem validity** — is the problem real and worth solving? (from the `problem` +
+                  `research` sections)
+                - **Evidence strength** — how well-supported, vs. assumption-driven? (from the
+                  `research` section)
+                - **Value vs. cost of inaction** — does solving it beat doing nothing? (from the
+                  `problem` section)
                 - **Feasibility / appetite fit** — is there a credible option within a sane appetite?
-                  (from `concept.md`)
+                  (from the `concept` section)
                 - **Strategic fit** — does it align with the project's constitution/goals, if known?
                   The constitution is the `speckitConstitution` workspace guidance field (fetch it
                   with `getWorkspaceGuidance` if the `prepare` status response did not already show

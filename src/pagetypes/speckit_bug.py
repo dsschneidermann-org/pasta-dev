@@ -72,11 +72,11 @@ _NOTICE = """
     The field instructions and stage guidance of this page are GitHub Spec Kit's own words. Spec Kit
     runs skills over files; this page stands in for both.
 
-    A file it names is part of this page: assessment.md is Report through Open questions, fix.md is
-    Fix, and test.md is Verification. A directory it names is this page. A stage it names comes with
-    the command that moves this page there, such as fix (`approveAssessment`). A
-    [NEEDS CLARIFICATION: ...] marker is an open question on this page, flagged needsHuman, and only
-    the user answers one.
+    Where Spec Kit names one of its files, the text names the section or field of this page that
+    holds it instead; the assessment is `report` through `questions`. A stage it names comes with
+    the command that moves this page there, such as fix (`approveAssessment`). A [NEEDS
+    CLARIFICATION: ...] marker is an open question on this page, flagged needsHuman, and only the
+    user answers one.
     """
 
 
@@ -97,7 +97,7 @@ _SPECKIT_BUG = PageType(
             _scalar("source", description="""
                 **Source**: <URL or "pasted text">
 
-                In every case, record in `assessment.md`:
+                In every case, record in `report.source`:
 
                 - The verbatim URL the user supplied.
                 - The host parsed from that URL (no redirect following — see the rule above).
