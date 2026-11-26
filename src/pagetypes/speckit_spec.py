@@ -1,30 +1,31 @@
 """The `speckit-spec` page type and the `speckit-tasks` page created with it: GitHub Spec Kit's
 Spec-Driven Development as one page and one child.
 
-They are declared together because each one's gates read the other's statuses. Each status of the
-spec is one `/speckit-*` skill; the child holds what the gates count, the tasks and the analyze
-findings. Field descriptions are Spec Kit's own words (github/spec-kit at f201054, MIT - see
-SPEC_KIT_LICENSE), with only marks and line breaks changed for reading; each notice maps the files
-and skills that text names onto the page.
+They are declared together because each one's gates read the other's statuses. The spec starts in
+prepare, where the constitution is read and updated; after that each of its statuses is one
+`/speckit-*` skill, and the child holds what the gates count, the tasks and the analyze findings.
+Field descriptions are Spec Kit's own words (github/spec-kit at f201054, MIT), with only marks and
+line breaks changed for reading; each notice maps the files and skills that text names onto the page.
 """
 
 from __future__ import annotations
 
 from ._stage_guidance import (
-    ANALYZE,
-    CHECKLIST,
-    CLARIFY,
-    CONVERGE,
-    DRAFTING,
-    IMPLEMENT,
-    PLAN,
-    SPECIFY,
-    TASKS,
+    SPECKIT_PREPARE,
+    SPECKIT_ANALYZE,
+    SPECKIT_CHECKLIST,
+    SPECKIT_CLARIFY,
+    SPECKIT_CONVERGE,
+    SPECKIT_DRAFTING,
+    SPECKIT_IMPLEMENT,
+    SPECKIT_PLAN,
+    SPECKIT_SPECIFY,
+    SPECKIT_TASKS,
 )
 from ._workspace_guidance import (
-    CONSTITUTION_DESC,
-    CONSTITUTION_FIELD,
-    CONSTITUTION_LABEL,
+    SPECKIT_CONSTITUTION_DESC,
+    SPECKIT_CONSTITUTION_FIELD,
+    SPECKIT_CONSTITUTION_LABEL,
     GROUNDING_TOOL_DESC,
     GROUNDING_TOOL_FIELD,
     GROUNDING_TOOL_LABEL,
@@ -112,7 +113,7 @@ _IN_PLAN = ("plan",)
 _IN_CHECKLIST = ("checklist",)
 _IN_CONVERGE = ("converge",)
 
-_ALL_STATUSES = ("specify", "clarify", "plan", "checklist", "tasks", "analyze", "implement", "converge",
+_ALL_STATUSES = ("prepare", "specify", "clarify", "plan", "checklist", "tasks", "analyze", "implement", "converge",
                  "shipped", "abandoned")
 
 _SPEC_NOTICE = """
@@ -123,7 +124,7 @@ _SPEC_NOTICE = """
     checklists/requirements.md is Spec quality, plan.md is Plan, research.md, data-model.md,
     contracts/ and quickstart.md are the sections of those names, and the other checklists are
     Requirements checklist. tasks.md and the analyze findings are the Spec Kit tasks child. A
-    directory it names is this page, and the constitution is the workspace guidance of that name. A
+    directory it names is this page, and the constitution is the speckitConstitution workspace guidance. A
     skill it names is the status of that name, so /speckit-plan is the plan status. A
     [NEEDS CLARIFICATION: ...] marker is an open question on this page, flagged needsHuman, and only
     the user answers one.
@@ -660,6 +661,7 @@ _SPECKIT_SPEC = PageType(
         # Open in every status: a pull request can be opened early and outlive the page's last status.
         set_scalar_cmd("pull_request", "url", name="setPullRequestUrl", label="pull request url",
                        legal_in=_ALL_STATUSES),
+        transition_cmd("proceed", "prepare -> specify"),
         transition_cmd("submitSpec", "specify -> clarify",
                        requires=(("input", "description"), ("stories", "items"), ("edges", "items"),
                                  ("requirements", "functional"), ("success", "outcomes"),
@@ -694,33 +696,34 @@ _SPECKIT_SPEC = PageType(
                        legal_in=("analyze", "implement")),
         transition_cmd("reopen", "shipped -> specify (human gate)", agency="human"),
         transition_cmd("abandon", "drop the work -> abandoned", agency="human",
-                       legal_in=("specify", "clarify", "plan", "checklist", "tasks", "analyze", "implement",
-                                 "converge")),
+                       legal_in=("prepare", "specify", "clarify", "plan", "checklist", "tasks", "analyze",
+                                 "implement", "converge")),
         add_link_cmd(),
         set_title_cmd(),
     ),
     fsm=FSMSpec(
         name="SpeckitSpec",
-        initial="specify",
+        initial="prepare",
         states=_ALL_STATUSES,
         terminal_states=("shipped", "abandoned"),
         status_guidance=(
-            ("specify", SPECIFY),
-            ("clarify", CLARIFY),
-            ("plan", PLAN),
-            ("checklist", CHECKLIST),
-            ("tasks", TASKS),
-            ("analyze", ANALYZE),
-            ("implement", IMPLEMENT),
-            ("converge", CONVERGE),
+            ("prepare", SPECKIT_PREPARE),
+            ("specify", SPECKIT_SPECIFY),
+            ("clarify", SPECKIT_CLARIFY),
+            ("plan", SPECKIT_PLAN),
+            ("checklist", SPECKIT_CHECKLIST),
+            ("tasks", SPECKIT_TASKS),
+            ("analyze", SPECKIT_ANALYZE),
+            ("implement", SPECKIT_IMPLEMENT),
+            ("converge", SPECKIT_CONVERGE),
         ),
     ),
     auto_children=(AutoChildSpec("speckit-tasks"),),
     workspace_guidance=(
-        WorkspaceGuidanceSpec(CONSTITUTION_FIELD,
-                              ("specify", "clarify", "plan", "checklist", "tasks", "analyze", "implement",
-                               "converge"),
-                              CONSTITUTION_DESC, CONSTITUTION_LABEL),
+        WorkspaceGuidanceSpec(SPECKIT_CONSTITUTION_FIELD,
+                              ("prepare", "specify", "clarify", "plan", "checklist", "tasks", "analyze",
+                               "implement", "converge"),
+                              SPECKIT_CONSTITUTION_DESC, SPECKIT_CONSTITUTION_LABEL),
         WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("plan",), GROUNDING_TOOL_DESC, GROUNDING_TOOL_LABEL),
         WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("implement",), TESTING_TOOL_DESC, TESTING_TOOL_LABEL),
         WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("implement", "converge"), MERGE_PROCESS_DESC,
@@ -864,6 +867,6 @@ _SPECKIT_TASKS = PageType(
         initial="waiting",
         states=("waiting", "drafting", "ready", "closed"),
         terminal_states=("closed",),
-        status_guidance=(("drafting", DRAFTING),),
+        status_guidance=(("drafting", SPECKIT_DRAFTING),),
     ),
 )

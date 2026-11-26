@@ -1,22 +1,24 @@
 """The `speckit-idea` page type: GitHub Spec Kit's idea assessment as one page.
 
-Each status is one `/speckit-assess-*` skill. Field descriptions are Spec Kit's own words
-(github/spec-kit at f201054, MIT - see SPEC_KIT_LICENSE), with only marks and line breaks changed
-for reading; the notice maps the files and skills that text names onto this page.
+It starts in prepare, where the constitution is read and updated; after that each status is one
+`/speckit-assess-*` skill. Field descriptions are Spec Kit's own words (github/spec-kit at f201054,
+MIT), with only marks and line breaks changed for reading; the notice maps the files and skills that
+text names onto this page.
 """
 
 from __future__ import annotations
 
 from ._stage_guidance import (
-    CLARIFYING,
-    DECIDE,
-    DEFINE,
-    INTAKE,
-    RESEARCH,
-    SHAPE,
-    VERDICT_REVIEW,
+    SPECKIT_PREPARE,
+    SPECKIT_CLARIFYING,
+    SPECKIT_DECIDE,
+    SPECKIT_DEFINE,
+    SPECKIT_INTAKE,
+    SPECKIT_RESEARCH,
+    SPECKIT_SHAPE,
+    SPECKIT_VERDICT_REVIEW,
 )
-from ._workspace_guidance import CONSTITUTION_DESC, CONSTITUTION_FIELD, CONSTITUTION_LABEL
+from ._workspace_guidance import SPECKIT_CONSTITUTION_DESC, SPECKIT_CONSTITUTION_FIELD, SPECKIT_CONSTITUTION_LABEL
 from .core.args import _boolean, _text
 from .core.commands import (
     add_link_cmd,
@@ -368,6 +370,7 @@ _SPECKIT_IDEA = PageType(
         # The gate below records the fact it was sent back with; the rest are added while refining.
         *list_cmds("clarifications", field="facts", label="supplied fact", remove=False,
                    legal_in=("clarifying",), add_args=(_text("stage", choices=_STAGES), _text())),
+        transition_cmd("proceed", "prepare -> intake"),
         transition_cmd("beginResearch", "intake -> research", requires=_INTAKE_DONE),
         transition_cmd("skipResearch", "intake -> define (human gate)", agency="human", requires=_INTAKE_DONE),
         transition_cmd("beginDefine", "research -> define",
@@ -396,27 +399,29 @@ _SPECKIT_IDEA = PageType(
         transition_cmd("reopen", "closed or abandoned -> clarifying", legal_in=("closed", "abandoned"),
                        agency="human", requires=(("decision", "verdict"),)),
         transition_cmd("abandon", "drop the idea -> abandoned", agency="human",
-                       legal_in=("intake", "research", "define", "shape", "decide", "verdictReview", "clarifying")),
+                       legal_in=("prepare", "intake", "research", "define", "shape", "decide", "verdictReview",
+                                 "clarifying")),
         add_link_cmd(),
         set_title_cmd(),
     ),
     fsm=FSMSpec(
         name="SpeckitIdea",
-        initial="intake",
-        states=("intake", "research", "define", "shape", "decide", "verdictReview", "clarifying",
+        initial="prepare",
+        states=("prepare", "intake", "research", "define", "shape", "decide", "verdictReview", "clarifying",
                 "closed", "abandoned"),
         terminal_states=("closed", "abandoned"),
         status_guidance=(
-            ("intake", INTAKE),
-            ("research", RESEARCH),
-            ("define", DEFINE),
-            ("shape", SHAPE),
-            ("decide", DECIDE),
-            ("verdictReview", VERDICT_REVIEW),
-            ("clarifying", CLARIFYING),
+            ("prepare", SPECKIT_PREPARE),
+            ("intake", SPECKIT_INTAKE),
+            ("research", SPECKIT_RESEARCH),
+            ("define", SPECKIT_DEFINE),
+            ("shape", SPECKIT_SHAPE),
+            ("decide", SPECKIT_DECIDE),
+            ("verdictReview", SPECKIT_VERDICT_REVIEW),
+            ("clarifying", SPECKIT_CLARIFYING),
         ),
     ),
     workspace_guidance=(
-        WorkspaceGuidanceSpec(CONSTITUTION_FIELD, ("decide",), CONSTITUTION_DESC, CONSTITUTION_LABEL),
+        WorkspaceGuidanceSpec(SPECKIT_CONSTITUTION_FIELD, ("prepare", "decide"), SPECKIT_CONSTITUTION_DESC, SPECKIT_CONSTITUTION_LABEL),
     ),
 )

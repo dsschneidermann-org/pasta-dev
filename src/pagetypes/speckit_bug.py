@@ -1,15 +1,25 @@
 """The `speckit-bug` page type: GitHub Spec Kit's bug triage as one page.
 
-assess, fix and test are the three `/speckit-bug-*` skills, and the two review statuses are where the
-user decides. Field descriptions are Spec Kit's own words (github/spec-kit at f201054, MIT - see
-SPEC_KIT_LICENSE), with only marks and line breaks changed for reading; the notice maps the files and
-skills that text names onto this page.
+It starts in prepare, where the constitution is read and updated. assess, fix and test are then the
+three `/speckit-bug-*` skills, and the two review statuses are where the user decides. Field
+descriptions are Spec Kit's own words (github/spec-kit at f201054, MIT), with only marks and line
+breaks changed for reading; the notice maps the files and skills that text names onto this page.
 """
 
 from __future__ import annotations
 
-from ._stage_guidance import ASSESS, ASSESSMENT_REVIEW, FIX, RESULT_REVIEW, TEST
+from ._stage_guidance import (
+    SPECKIT_ASSESS,
+    SPECKIT_ASSESSMENT_REVIEW,
+    SPECKIT_FIX,
+    SPECKIT_PREPARE,
+    SPECKIT_RESULT_REVIEW,
+    SPECKIT_TEST,
+)
 from ._workspace_guidance import (
+    SPECKIT_CONSTITUTION_DESC,
+    SPECKIT_CONSTITUTION_FIELD,
+    SPECKIT_CONSTITUTION_LABEL,
     GROUNDING_TOOL_DESC,
     GROUNDING_TOOL_FIELD,
     GROUNDING_TOOL_LABEL,
@@ -333,6 +343,7 @@ _SPECKIT_BUG = PageType(
                    add_args=(_text(),)),
         set_prose_cmd("verification", field="recommendation", name="setRecommendation",
                       label="recommendation", legal_in=_IN_TEST),
+        transition_cmd("proceed", "prepare -> assess"),
         transition_cmd("submitAssessment", "assess -> assessmentReview",
                        requires=(("report", "source"), ("report", "body"), ("triage", "verdict"),
                                  ("triage", "severity"), ("triage", "rationale"), ("symptom", "body"),
@@ -361,24 +372,27 @@ _SPECKIT_BUG = PageType(
                        legal_in=("assessmentReview", "fix", "test", "resultReview")),
         transition_cmd("reopen", "closed -> assess", agency="either"),
         transition_cmd("abandon", "drop the bug -> abandoned", agency="human",
-                       legal_in=("assess", "assessmentReview", "fix", "test", "resultReview")),
+                       legal_in=("prepare", "assess", "assessmentReview", "fix", "test", "resultReview")),
         add_link_cmd(),
         set_title_cmd(),
     ),
     fsm=FSMSpec(
         name="SpeckitBug",
-        initial="assess",
-        states=("assess", "assessmentReview", "fix", "test", "resultReview", "closed", "abandoned"),
+        initial="prepare",
+        states=("prepare", "assess", "assessmentReview", "fix", "test", "resultReview", "closed", "abandoned"),
         terminal_states=("closed", "abandoned"),
         status_guidance=(
-            ("assess", ASSESS),
-            ("assessmentReview", ASSESSMENT_REVIEW),
-            ("fix", FIX),
-            ("test", TEST),
-            ("resultReview", RESULT_REVIEW),
+            ("prepare", SPECKIT_PREPARE),
+            ("assess", SPECKIT_ASSESS),
+            ("assessmentReview", SPECKIT_ASSESSMENT_REVIEW),
+            ("fix", SPECKIT_FIX),
+            ("test", SPECKIT_TEST),
+            ("resultReview", SPECKIT_RESULT_REVIEW),
         ),
     ),
     workspace_guidance=(
+        WorkspaceGuidanceSpec(SPECKIT_CONSTITUTION_FIELD, ("prepare",), SPECKIT_CONSTITUTION_DESC,
+                              SPECKIT_CONSTITUTION_LABEL),
         WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("assess",), GROUNDING_TOOL_DESC, GROUNDING_TOOL_LABEL),
         WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("fix", "test"), TESTING_TOOL_DESC, TESTING_TOOL_LABEL),
         WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("resultReview",), MERGE_PROCESS_DESC, MERGE_PROCESS_LABEL),

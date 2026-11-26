@@ -559,17 +559,69 @@ that shape cannot show belongs here. The work of it:
 
 
 # --- Spec Kit -------------------------------------------------------------------
-# Every text from here on is GitHub Spec Kit's own words (github/spec-kit at f201054, MIT - see
-# SPEC_KIT_LICENSE): what its skills, and its workflow gates where a status is a gate, say about the
-# stage. Its command placeholders read as its Claude skills show them. Left out are the parts a page
+# Every text from here on is GitHub Spec Kit's own words (github/spec-kit at f201054, MIT): what its
+# skills, and its workflow gates where a status is a gate, say about the stage, except the note that
+# opens SPECKIT_PREPARE, which is pasta's. Every name carries SPECKIT_, whatever its status.
+# Its command placeholders read as its Claude skills show them. Left out are the parts a page
 # replaces - scripts, templates, slugs, file writing, hooks and completion reports - and the steps
 # the field instructions already carry. Only marks and line breaks differ from spec-kit: angle
 # brackets around a whole sentence are dropped and lines are rewrapped. Do not reword these;
 # refresh them from spec-kit instead.
 
 
+# --- speckit-spec, speckit-idea and speckit-bug -------------------------------
+SPECKIT_PREPARE = """
+prepare - the page is created and no Spec Kit skill has run on it yet. This status is
+only for reading the project constitution and updating it where it needs it, then
+proceeding. The work of it:
+
+- Read the constitution: the speckitConstitution workspace guidance shown beside this
+  text, or getWorkspaceGuidance when none is shown because it is empty.
+- Update it with setWorkspaceGuidance only when the user gave principles for it or it
+  is still empty, following the Spec Kit text below.
+
+Nothing on this page is written here, and no skill's work starts here. Proceed once
+the constitution is read, and updated where it needed it.
+
+2. Collect/derive values for placeholders:
+   - If user input (conversation) supplies a value, use it.
+   - Otherwise infer from existing repo context (README, docs, prior constitution
+     versions if embedded).
+   - For governance dates: `RATIFICATION_DATE` is the original adoption date (if
+     unknown ask or mark TODO), `LAST_AMENDED_DATE` is today if changes are made,
+     otherwise keep previous.
+   - `CONSTITUTION_VERSION` must increment according to semantic versioning rules:
+     - MAJOR: Backward incompatible governance/principle removals or redefinitions.
+     - MINOR: New principle/section added or materially expanded guidance.
+     - PATCH: Clarifications, wording, typo fixes, non-semantic refinements.
+   - If version bump type ambiguous, propose reasoning before finalizing.
+
+3. Draft the updated constitution content using the resolved template as the required
+   structure:
+   - Replace every placeholder with concrete text (no bracketed tokens left except
+     intentionally retained template slots that the project has chosen not to define
+     yet—explicitly justify any left).
+   - Preserve heading hierarchy and comments can be removed once replaced unless they
+     still add clarifying guidance.
+   - Ensure each Principle section: succinct name line, paragraph (or bullet list)
+     capturing non‑negotiable rules, explicit rationale if not obvious.
+   - Ensure Governance section lists amendment procedure, versioning policy, and
+     compliance review expectations.
+
+5. Validation before final output:
+   - No remaining unexplained bracket tokens.
+   - Version line matches report.
+   - Dates ISO format YYYY-MM-DD.
+   - Principles are declarative, testable, and free of vague language ("should" →
+     replace with MUST/SHOULD rationale where appropriate).
+
+If the user supplies partial updates (e.g., only one principle revision), still
+perform validation and version decision steps.
+"""
+
+
 # --- speckit-idea -------------------------------------------------------------
-INTAKE = """
+SPECKIT_INTAKE = """
 This is the front door of the assessment pipeline: it records *what the idea is and
 where it came from* without judging it yet.
 
@@ -662,7 +714,7 @@ that probe is itself the gated request.
   fabricating one.
 """
 
-RESEARCH = """
+SPECKIT_RESEARCH = """
 This stage exists to *challenge* the idea as much as support it — surfacing prior art,
 real user signal, market context, and data so the later `/speckit-assess-define` and
 `/speckit-assess-decide` stages rest on facts, not enthusiasm.
@@ -712,7 +764,7 @@ a citation or be flagged as an assumption.**
 - Never decide the idea's fate or design a solution here.
 """
 
-DEFINE = """
+SPECKIT_DEFINE = """
 This is the pivot of the pipeline: it converts a fuzzy idea into a sharply-stated
 *problem in the problem space* — who is affected, what hurts, and what success would
 look like — without proposing a solution.
@@ -745,7 +797,7 @@ to solve.
   statement.
 """
 
-SHAPE = """
+SPECKIT_SHAPE = """
 This is where the assessment crosses from problem space into solution space — but only
 at the *concept* level. Detailed design (architecture, data models, APIs, tasks) stays
 with `/speckit-specify` and the rest of the SDD lifecycle.
@@ -772,7 +824,7 @@ Think Shape Up "pitch," not blueprint.
   rather than manufacturing a winner.
 """
 
-DECIDE = """
+SPECKIT_DECIDE = """
 This is the gate between discovery and delivery: a **go** hands the idea off to
 `/speckit-specify`; a **kill** stops it with a documented reason;
 **needs-clarification** sends it back to an earlier stage. Killing ideas here is a
@@ -804,7 +856,7 @@ and commits to a defensible call.
   understood and revisited later.
 """
 
-VERDICT_REVIEW = """
+SPECKIT_VERDICT_REVIEW = """
 Review the assessment verdict. A go verdict is handed off manually with the specify
 command; this workflow stops here.
 
@@ -816,7 +868,7 @@ command; this workflow stops here.
     reference.
 """
 
-CLARIFYING = """
+SPECKIT_CLARIFYING = """
 `[NEEDS CLARIFICATION: …]` markers are gaps in the artifact, not a signal to
 regenerate the whole stage from scratch.
 
@@ -841,7 +893,7 @@ slug or a discarded draft), not the default path for answering clarification mar
 
 
 # --- speckit-spec -------------------------------------------------------------
-SPECIFY = """
+SPECKIT_SPECIFY = """
 5. **IF EXISTS**: Load `.specify/memory/constitution.md` for project principles and
    governance constraints.
 
@@ -967,7 +1019,7 @@ When creating this spec from a user prompt:
   services, function calls for libraries, CLI args for tools, etc.)
 """
 
-CLARIFY = """
+SPECKIT_CLARIFY = """
 Review the generated spec before planning.
 
 Goal: Detect and reduce ambiguity or missing decision points in the active feature
@@ -1165,7 +1217,7 @@ Behavior rules:
   them under Deferred with rationale.
 """
 
-PLAN = """
+SPECKIT_PLAN = """
 **Load context**: Read FEATURE_SPEC and `.specify/memory/constitution.md`.
 
 3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
@@ -1235,7 +1287,7 @@ PLAN = """
 - ERROR on gate failures or unresolved clarifications
 """
 
-CHECKLIST = """
+SPECKIT_CHECKLIST = """
 Review the plan before generating tasks.
 
 ## Checklist Purpose: "Unit Tests for English"
@@ -1384,7 +1436,7 @@ Ask questions about the requirements themselves:
   requirements? [Coverage]"
 """
 
-TASKS = """
+SPECKIT_TASKS = """
 2. **Load design documents**: Read from FEATURE_DIR:
    - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories
      with priorities)
@@ -1430,7 +1482,7 @@ an LLM can complete it without context beyond the feature's design documents. Th
 does not require copying those documents into task descriptions.
 """
 
-ANALYZE = """
+SPECKIT_ANALYZE = """
 ## Goal
 
 Identify inconsistencies, duplications, ambiguities, and underspecified items across
@@ -1576,7 +1628,7 @@ issues?" (Do NOT apply them automatically.)
 - **Report zero issues gracefully** (emit success report with coverage statistics)
 """
 
-IMPLEMENT = """
+SPECKIT_IMPLEMENT = """
 2. **Check checklists status** (if FEATURE_DIR/checklists/ exists):
    - Treat checklist markers as a read-only gate: scan checkbox state, report status,
      and ask before proceeding when needed; do NOT modify checklist files or markers
@@ -1722,7 +1774,7 @@ IMPLEMENT = """
    - Confirm the implementation follows the technical plan
 """
 
-CONVERGE = """
+SPECKIT_CONVERGE = """
 ## Goal
 
 Close the gap between what a feature's specification, plan, and tasks call for and
@@ -1856,7 +1908,7 @@ Append to the **end** of `tasks.md`, per the append contract:
 
 
 # --- speckit-tasks ------------------------------------------------------------
-DRAFTING = """
+SPECKIT_DRAFTING = """
 ## Task Generation Rules
 
 **CRITICAL**: Tasks MUST be organized by user story to enable independent
@@ -1920,7 +1972,7 @@ feature specification or if user requests TDD approach.
 
 
 # --- speckit-bug --------------------------------------------------------------
-ASSESS = """
+SPECKIT_ASSESS = """
 Triage a bug report against the current codebase: understand the symptom, locate the
 suspected root cause, judge severity, and propose a remediation.
 
@@ -2010,7 +2062,7 @@ request to "see what it is" — that probe is itself the request the policy gate
   to `invalid` with a clear reason and stop.
 """
 
-ASSESSMENT_REVIEW = """
+SPECKIT_ASSESSMENT_REVIEW = """
 Review the assessment before any code change.
 
 - If the assessment's verdict is `invalid`, stop — there is nothing to fix. Tell the
@@ -2020,7 +2072,7 @@ Review the assessment before any code change.
   interactive mode, or stop in automated mode.
 """
 
-FIX = """
+SPECKIT_FIX = """
 This command is **only** valid after an assessment exists for the given slug.
 
 - Read `BUG_DIR/assessment.md` in full. Treat its **Proposed Remediation**, **Files
@@ -2063,7 +2115,7 @@ This command is **only** valid after an assessment exists for the given slug.
 - Never delete files unless the assessment explicitly required it.
 """
 
-TEST = """
+SPECKIT_TEST = """
 Validate that the fix recorded by `/speckit-bug-fix` actually resolves the bug
 described by `/speckit-bug-assess`.
 
@@ -2109,7 +2161,7 @@ described by `/speckit-bug-assess`.
   and say so.
 """
 
-RESULT_REVIEW = """
+SPECKIT_RESULT_REVIEW = """
 only `verified` confirms a successful fix.
 
 - If the result is `failed`, recommend re-running `/speckit-bug-assess` with the new

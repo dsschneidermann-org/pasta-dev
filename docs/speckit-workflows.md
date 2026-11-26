@@ -19,7 +19,8 @@ Spec Kit's `workflow.yml` files do, rather than stopping after every skill as it
 ## 2. How Spec Kit becomes pasta
 
 1. **One skill is one status.** The page sits in `research` while `/speckit-assess-research` is due.
-   The exceptions are `constitution` (a workspace slot) and the review statuses, which hold a gate.
+   The exceptions are `/speckit-constitution`, which is the `prepare` status every page starts in, and the
+   review statuses, which hold a gate.
 2. **One output heading is one field.** A mandatory heading is in the status's exit `requires`, so the
    agent is prompted for it. A heading the template calls optional is a field outside `requires`.
 3. **One file's owner is a lock.** Spec Kit says "plan never edits spec.md" and "never edit
@@ -36,7 +37,7 @@ Spec Kit's `workflow.yml` files do, rather than stopping after every skill as it
 
 | Spec Kit skill | Page and status | Fields it fills | Exit edge | Needs from the user |
 |---|---|---|---|---|
-| `/speckit-constitution` | workspace slot `constitution` | the slot text: principles, governance, version line | none | the principles |
+| `/speckit-constitution` | spec, idea and bug: `prepare` | workspace guidance `speckitConstitution`: principles, governance, version line | `proceed` agent | principles, if it is empty or they change |
 | `/speckit-specify` | spec: `specify` | `input.description`, `stories`, `edges`, `requirements`, `success`, `assumptions`, `quality.result`, up to 3 `questions` | `submitSpec` agent | the description |
 | `/speckit-clarify` | spec: `clarify` | up to 5 `questions`, answers folded into the spec fields, `quality.result` again | `approveSpec` **human** | answers, and the technical direction |
 | `/speckit-plan` | spec: `plan` | `plan`, `research`, `dataModel`, `contracts`, `quickstart` | `submitPlan` agent | nothing more: the direction came with the gate |
@@ -62,7 +63,7 @@ Spec Kit's `workflow.yml` files do, rather than stopping after every skill as it
 
 | Spec Kit file | pasta |
 |---|---|
-| `.specify/memory/constitution.md` | workspace slot `constitution` |
+| `.specify/memory/constitution.md` | workspace guidance `speckitConstitution` |
 | `specs/NNN-name/` | one `speckit-spec` page; the page id replaces the number and `.specify/feature.json` |
 | `spec.md` | sections `input`, `stories`, `edges`, `requirements`, `success`, `assumptions` |
 | `spec.md` Clarifications | section `questions`; the session date is the page's history |
@@ -107,7 +108,7 @@ The page types are declared in code, which is the source of truth for sections, 
 | `speckit-spec`, `speckit-tasks` | `src/pagetypes/speckit_spec.py` |
 | `speckit-bug` | `src/pagetypes/speckit_bug.py` |
 
-Field descriptions and stage guidance are Spec Kit's own words (MIT, `src/pagetypes/SPEC_KIT_LICENSE`); the
+Field descriptions and stage guidance are Spec Kit's own words (MIT); the
 stage guidance is in `src/pagetypes/_stage_guidance.py`. Only marks and line breaks differ from spec-kit: angle
 brackets around a whole sentence are dropped while a few-word placeholder keeps them, the marker of a list item
 that stands alone in a field is dropped, and lines are rewrapped to 86 characters. Left out are the parts a page
@@ -118,6 +119,9 @@ each page that maps the files and skills Spec Kit's text names onto the page.
 
 What the engine changed from the design above it:
 
+- Spec, idea and bug start in `prepare`, which shows the `speckitConstitution` workspace guidance: the agent
+  reads the constitution, updates it only if the user gave principles or it is empty, and proceeds. Its stage
+  guidance opens with pasta's own note, followed by what Spec Kit's constitution skill says about writing one.
 - Compounds add a list element, so the technical direction, the analyze reports and the convergence summaries
   are lists: each gate or visit adds its own entry.
 - A compound cannot write in a terminal status, so reopening an idea is a plain human gate, and the facts that
@@ -131,7 +135,8 @@ What the engine changed from the design above it:
 
 ```mermaid
 stateDiagram-v2
-  [*] --> intake
+  [*] --> prepare
+  prepare --> intake: proceed
   intake --> research: beginResearch
   intake --> define: skipResearch [H]
   research --> define: beginDefine
@@ -151,7 +156,8 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-  [*] --> specify
+  [*] --> prepare
+  prepare --> specify: proceed
   specify --> clarify: submitSpec
   clarify --> plan: approveSpec(direction) [H]
   plan --> checklist: submitPlan
@@ -191,7 +197,8 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-  [*] --> assess
+  [*] --> prepare
+  prepare --> assess: proceed
   assess --> assessmentReview: submitAssessment
   assess --> assessmentReview: submitAsInvalid
   assessmentReview --> fix: approveAssessment [H]
@@ -217,6 +224,7 @@ Every status also lists `abandon` under humanGates, except on `speckit-tasks`.
 
 | status | do | blocked | humanGates |
 |---|---|---|---|
+| `prepare` | proceed | none | none |
 | `intake` | fill intake: source, type, captured, restated, origin / questions: items | beginResearch (its fields) | skipResearch |
 | `research` | fill research: confidence, findings, against | beginDefine (its fields) | none |
 | `define` | fill problem: statement, users, stakeholders, goals, nonGoals, metrics, inaction | beginShape (its fields) | none |
@@ -229,6 +237,7 @@ Every status also lists `abandon` under humanGates, except on `speckit-tasks`.
 
 | status | do | blocked | humanGates |
 |---|---|---|---|
+| `prepare` | proceed | none | none |
 | `specify` | fill input: description / stories: items / edges: items / requirements: functional / success: outcomes / assumptions: items / quality: result | submitSpec (its fields) | none |
 | `clarify` | reviseSpec | none | approveSpec(direction) |
 | `plan` | fill plan: summary, context, constitutionCheck, structure / research: decisions / quickstart: guide | submitPlan (its fields) | none |
@@ -250,6 +259,7 @@ Every status also lists `abandon` under humanGates, except on `speckit-tasks`.
 
 | status | do | blocked | humanGates |
 |---|---|---|---|
+| `prepare` | proceed | none | none |
 | `assess` | fill report: source, body / triage: verdict, severity, rationale / symptom: body / reproduction: steps / cause: codePaths, hypothesis, confidence / remediation: preferred, files, tests, risks | submitAssessment (its fields); submitAsInvalid (its fields) | none |
 | `assessmentReview` | reassess | none | approveAssessment (needs a remediation, so never on an invalid report), closeInvalid |
 | `fix` | fill fix: status, summary, changes, tests, verification; reassess | submitFix (its fields) | none |
@@ -314,4 +324,4 @@ report is invalid, and `verdictReview` prompts for the handoff even on a kill. T
 - Extension hooks (`before_*`, `after_*`), the git extension and `taskstoissues`. Workspace slots cover the parts a team would keep.
 - Commits, which `feature-brief` and `bug-report` record, and a pull-request URL on the bug page: no skill writes them. The spec page has the URL by choice.
 - Deciding without a concept, which `assess.decide` allows but may not call go. Here `shape` always comes first and may recommend none.
-- A constitution page. The slot pushes the text to the agent at the statuses whose skills load it, but it has no amendment gate or history; use a `document` page if you want those.
+- A constitution page. The `speckitConstitution` workspace guidance pushes the text to the agent at the statuses whose skills load it, but it has no amendment gate or history; use a `document` page if you want those.

@@ -318,7 +318,8 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
 
 
 def element_cmds(section: str, *, field: str = "items", singular: str | None = None,
-                 marks: tuple[tuple[str, str, str, tuple[ArgSpec, ...]] | tuple[str, str, str], ...], legal_in: tuple[str, ...] | None = None,
+                 marks: tuple[tuple[str, str, str, tuple[ArgSpec, ...]] | tuple[str, str, str], ...],
+                 legal_in: tuple[str, ...] | None = None,
                  agency: str = "agent") -> tuple[CommandSpec, ...]:
     """ELEMENT_TRANSITION commands for an element-FSM list. Each `marks` entry is
     (name, event, description) or (name, event, description, extra_args) - the derived `<noun>Id` arg
