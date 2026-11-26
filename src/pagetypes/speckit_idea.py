@@ -18,7 +18,11 @@ from ._stage_guidance import (
     SPECKIT_SHAPE,
     SPECKIT_VERDICT_REVIEW,
 )
-from ._workspace_guidance import SPECKIT_CONSTITUTION_DESC, SPECKIT_CONSTITUTION_FIELD, SPECKIT_CONSTITUTION_LABEL
+from ._workspace_guidance import (
+    SPECKIT_CONSTITUTION_DESC,
+    SPECKIT_CONSTITUTION_FIELD,
+    SPECKIT_CONSTITUTION_LABEL,
+)
 from .core.args import _boolean, _text
 from .core.commands import (
     add_link_cmd,

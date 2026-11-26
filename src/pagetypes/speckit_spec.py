@@ -5,7 +5,8 @@ They are declared together because each one's gates read the other's statuses. T
 prepare, where the constitution is read and updated; after that each of its statuses is one
 `/speckit-*` skill, and the child holds what the gates count, the tasks and the analyze findings.
 Field descriptions are Spec Kit's own words (github/spec-kit at f201054, MIT), with only marks and
-line breaks changed for reading; each notice maps the files and skills that text names onto the page.
+line breaks changed for reading; each notice maps the files and skills that text names onto the
+page.
 """
 
 from __future__ import annotations
