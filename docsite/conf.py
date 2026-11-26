@@ -32,6 +32,9 @@ autodoc2_packages = [
 autodoc2_render_plugin = "myst"
 autodoc2_hidden_objects = ["inherited", "private"]
 
+# Markdown carries no raw HTML, so text such as a <placeholder> is shown as written.
+myst_disable_syntax = ["html_block", "html_inline"]
+
 source_suffix = {
     ".rst": "restructuredtext",
     ".md": "markdown",
