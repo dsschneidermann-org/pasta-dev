@@ -107,10 +107,12 @@ The page types are declared in code, which is the source of truth for sections, 
 | `speckit-spec`, `speckit-tasks` | `src/pagetypes/speckit_spec.py` |
 | `speckit-bug` | `src/pagetypes/speckit_bug.py` |
 
-Field descriptions and stage guidance are Spec Kit's own text, verbatim (MIT, `src/pagetypes/SPEC_KIT_LICENSE`);
-the stage guidance is in `src/pagetypes/_stage_guidance.py`. Left out of it are the parts a page replaces:
-scripts, templates, slugs, file writing, hooks and completion reports. Where a status is a gate and no skill
-speaks for it, the text is the gate's own message in `workflows/*/workflow.yml`, the assess README or the
+Field descriptions and stage guidance are Spec Kit's own words (MIT, `src/pagetypes/SPEC_KIT_LICENSE`); the
+stage guidance is in `src/pagetypes/_stage_guidance.py`. Only marks and line breaks differ from spec-kit: angle
+brackets around a whole sentence are dropped while a few-word placeholder keeps them, the marker of a list item
+that stands alone in a field is dropped, and lines are rewrapped to 86 characters. Left out are the parts a page
+replaces: scripts, templates, slugs, file writing, hooks and completion reports. Where a status is a gate and no
+skill speaks for it, the text is the gate's own message in `workflows/*/workflow.yml`, the assess README or the
 reference page. Only the pull-request field and the notices are pasta's words. A notice is a fixed section on
 each page that maps the files and skills Spec Kit's text names onto the page.
 

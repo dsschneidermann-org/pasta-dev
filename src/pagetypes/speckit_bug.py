@@ -1,8 +1,9 @@
 """The `speckit-bug` page type: GitHub Spec Kit's bug triage as one page.
 
 assess, fix and test are the three `/speckit-bug-*` skills, and the two review statuses are where the
-user decides. Field descriptions are Spec Kit's own text, verbatim (github/spec-kit at f201054, MIT -
-see SPEC_KIT_LICENSE); the notice maps the files and skills that text names onto this page.
+user decides. Field descriptions are Spec Kit's own words (github/spec-kit at f201054, MIT - see
+SPEC_KIT_LICENSE), with only marks and line breaks changed for reading; the notice maps the files and
+skills that text names onto this page.
 """
 
 from __future__ import annotations
@@ -83,59 +84,70 @@ _SPECKIT_BUG = PageType(
         )),
         SectionSpec("report", "Report", (
             _scalar("source", description="""
-                - **Source**: <URL or "pasted text">
+                **Source**: <URL or "pasted text">
 
                 In every case, record in `assessment.md`:
 
                 - The verbatim URL the user supplied.
                 - The host parsed from that URL (no redirect following — see the rule above).
-                - Which branch of the policy was taken: `allowlisted` / `confirmed-by-user` / `auto-refused: <reason>`.
+                - Which branch of the policy was taken: `allowlisted` / `confirmed-by-user` /
+                  `auto-refused: <reason>`.
                 """),
             _prose("body", description="""
-                <Quoted/condensed report content. If a URL was fetched, include the title and a short excerpt; link the URL.>
+                Quoted/condensed report content. If a URL was fetched, include the title and a short
+                excerpt; link the URL.
 
-                - Capture the verbatim source (URL or pasted block) so it can be quoted in the report.
+                Capture the verbatim source (URL or pasted block) so it can be quoted in the report.
                 """),
         )),
         SectionSpec("triage", "Triage", (
             _scalar("verdict", choices=_VERDICTS, description="""
-                - Decide whether the report is:
-                  - **Valid** — reproducible or clearly grounded in code behavior.
-                  - **Likely valid, needs reproduction** — plausible but unverified.
-                  - **Invalid / not a bug** — misuse, expected behavior, duplicate, or out of scope. State why.
+                Decide whether the report is:
+                - **Valid** — reproducible or clearly grounded in code behavior.
+                - **Likely valid, needs reproduction** — plausible but unverified.
+                - **Invalid / not a bug** — misuse, expected behavior, duplicate, or out of scope.
+                  State why.
                 """),
             _scalar("severity", choices=_SEVERITIES, description="""
-                - Assign a severity (`critical`, `high`, `medium`, `low`) and a short rationale (user impact, blast radius, data risk, regression vs. long-standing).
+                Assign a severity (`critical`, `high`, `medium`, `low`) and a short rationale (user
+                impact, blast radius, data risk, regression vs. long-standing).
                 """),
             _prose("rationale", description="""
                 a short rationale (user impact, blast radius, data risk, regression vs. long-standing)
 
-                - **Invalid / not a bug** — misuse, expected behavior, duplicate, or out of scope. State why.
+                **Invalid / not a bug** — misuse, expected behavior, duplicate, or out of scope. State
+                why.
                 """),
         )),
         SectionSpec("symptom", "Symptom", (
             _prose("body", description="""
-                - Reproduce the bug in one or two sentences: what happens, what was expected, under which conditions.
+                Reproduce the bug in one or two sentences: what happens, what was expected, under
+                which conditions.
 
-                <One or two sentences describing the observed behavior and the expected behavior.>
+                One or two sentences describing the observed behavior and the expected behavior.
                 """),
         )),
         SectionSpec("reproduction", "Reproduction", (
             _list("steps", element_fields=("text",), description="""
-                - List concrete reproduction steps if discoverable; mark unknowns as `[NEEDS CLARIFICATION]` rather than guessing.
-                - Never invent reproduction steps or file paths that are not supported by either the report or the codebase.
+                List concrete reproduction steps if discoverable; mark unknowns as
+                `[NEEDS CLARIFICATION]` rather than guessing.
+
+                Never invent reproduction steps or file paths that are not supported by either the
+                report or the codebase.
                 """),
         )),
         SectionSpec("cause", "Cause", (
             _list("codePaths", element_fields=("location", "why"), description="""
-                - Search the codebase for the relevant symbols, file paths, error messages, log strings, route names, or component identifiers mentioned in the report.
-                - List the candidate files / functions / lines with brief justifications. Do not exceed what the evidence supports.
+                - Search the codebase for the relevant symbols, file paths, error messages, log
+                  strings, route names, or component identifiers mentioned in the report.
+                - List the candidate files / functions / lines with brief justifications. Do not
+                  exceed what the evidence supports.
 
                 - `path/to/file.py:42` — <why>
                 - `path/to/other.ts:func()` — <why>
                 """),
             _prose("hypothesis", description="""
-                <One paragraph. State confidence: high / medium / low.>
+                One paragraph. State confidence: high / medium / low.
                 """),
             _scalar("confidence", choices=_CONFIDENCE, description="""
                 State confidence: high / medium / low.
@@ -143,37 +155,40 @@ _SPECKIT_BUG = PageType(
         )),
         SectionSpec("remediation", "Remediation", (
             _prose("preferred", description="""
-                - Outline one preferred fix and, if non-obvious, one or two alternatives with trade-offs.
+                Outline one preferred fix and, if non-obvious, one or two alternatives with
+                trade-offs.
 
-                **Preferred**: <one or two paragraphs describing the change.>
+                **Preferred**: one or two paragraphs describing the change.
                 """),
             _list("alternatives", element_fields=("text",), description="""
                 **Alternatives** (optional):
-                - <alternative + trade-off>
+                <alternative + trade-off>
                 """),
             _list("files", element_fields=("path",), description="""
-                - Identify files to change and the shape of the change (without writing the patch yet — that is `/speckit-bug-fix`'s job).
+                Identify files to change and the shape of the change (without writing the patch yet —
+                that is `/speckit-bug-fix`'s job).
                 """),
             _list("tests", element_fields=("text",), description="""
-                - Call out tests that should exist or be added to lock the fix in.
+                Call out tests that should exist or be added to lock the fix in.
                 """),
             _list("risks", element_fields=("text",), description="""
-                - Flag risks: API breakage, migrations, performance, security, observability.
+                Flag risks: API breakage, migrations, performance, security, observability.
                 """),
         )),
         SectionSpec("questions", "Open questions", (
             _list("items", element_fields=("text", "answer", "needsHuman", "status"),
                   element_fsm=_QUESTION_FSM, description="""
-                <Mark unknowns as [NEEDS CLARIFICATION: …].>
+                Mark unknowns as [NEEDS CLARIFICATION: …].
+
                 - [NEEDS CLARIFICATION: …]
                 """),
         )),
         SectionSpec("fix", "Fix", (
             _scalar("status", choices=_FIX_STATUSES, description="""
-                - **Status**: applied | partial | not-applied
+                **Status**: applied | partial | not-applied
                 """),
             _prose("summary", description="""
-                <One or two sentences describing what was changed and why.>
+                One or two sentences describing what was changed and why.
                 """),
             _list("changes", element_fields=("file", "change", "notes"), description="""
                 | File | Change | Notes |
@@ -182,38 +197,49 @@ _SPECKIT_BUG = PageType(
                 | `path/to/test_file.py` | added test | <short note> |
                 """),
             _blocks("highlights", block_kinds=standard_blocks(), description="""
-                <Short, illustrative snippets of the most important hunks — not a full diff dump.>
+                Short, illustrative snippets of the most important hunks — not a full diff dump.
                 """),
             _list("tests", element_fields=("test", "pins"), description="""
-                - Add or update the tests called out in the assessment so the bug cannot regress silently.
-                - `path/to/test_file.py::test_name` — <what it pins down>
+                Add or update the tests called out in the assessment so the bug cannot regress
+                silently.
+
+                `path/to/test_file.py::test_name` — <what it pins down>
                 """),
             _list("verification", element_fields=("command", "result"), description="""
-                - If the project has obvious test commands (e.g., `pytest`, `npm test`, `cargo test`), run the tests that exercise the changed paths. Capture pass/fail and key output.
+                - If the project has obvious test commands (e.g., `pytest`, `npm test`, `cargo test`),
+                  run the tests that exercise the changed paths. Capture pass/fail and key output.
                 - Do not run destructive or network-dependent suites without the user's consent.
 
                 - Commands run: `<command>` → <result, brief>
-                - Manual checks: <what was verified by hand, if anything>
+                - Manual checks: what was verified by hand, if anything
                 """),
             _list("deviations", element_fields=("text",), description="""
-                <Empty if none. Otherwise, list any places where the actual fix departed from the proposed remediation and why.>
+                Empty if none. Otherwise, list any places where the actual fix departed from the
+                proposed remediation and why.
                 """),
             _list("followUps", element_fields=("text",), description="""
-                - <suggested cleanup, monitoring, doc update, etc.>
+                suggested cleanup, monitoring, doc update, etc.
                 """),
         )),
         SectionSpec("verification", "Verification", (
             _scalar("result", choices=_RESULTS, description="""
-                - Mark the fix as:
-                  - **verified** — all critical checks pass and the original symptom no longer reproduces.
-                  - **partial** — the original symptom is gone but unrelated regressions appeared, or some checks are inconclusive.
-                  - **failed** — the symptom still reproduces or the regression suite is broken by the fix.
+                Mark the fix as:
+                - **verified** — all critical checks pass and the original symptom no longer
+                  reproduces.
+                - **partial** — the original symptom is gone but unrelated regressions appeared, or
+                  some checks are inconclusive.
+                - **failed** — the symptom still reproduces or the regression suite is broken by the
+                  fix.
 
-                - Do not over-claim. If reproduction was not actually performed (e.g., the bug required a production environment), say so explicitly.
-                - Never mark a fix as `verified` based on tests alone if the original assessment listed a reproduction that you did not actually exercise — downgrade to `partial` and say so.
+                - Do not over-claim. If reproduction was not actually performed (e.g., the bug
+                  required a production environment), say so explicitly.
+                - Never mark a fix as `verified` based on tests alone if the original assessment
+                  listed a reproduction that you did not actually exercise — downgrade to `partial`
+                  and say so.
                 """),
             _prose("summary", description="""
-                <One or two sentences: does the bug reproduce, did the fix hold, were any regressions found.>
+                One or two sentences: does the bug reproduce, did the fix hold, were any regressions
+                found.
                 """),
             _list("checks", element_fields=("check", "action", "outcome", "notes"), description="""
                 | Check | Command / Action | Result | Notes |
@@ -223,18 +249,22 @@ _SPECKIT_BUG = PageType(
                 | Regression suite | `<command>` | pass / fail / skipped | <short note> |
                 | Lint / type-check | `<command>` | pass / fail / skipped | <short note> |
 
-                - Execute each planned check. Capture command, exit status, and a short excerpt of relevant output (last few lines, or the failing assertion).
-                - If a check is destructive, network-dependent, or expensive, skip it and record it as `skipped` with a reason; do not run it without explicit user consent.
-                - If you cannot run a check at all (missing tooling, no test framework configured), record it as `not-run` with a reason instead of fabricating a result.
+                - Execute each planned check. Capture command, exit status, and a short excerpt of
+                  relevant output (last few lines, or the failing assertion).
+                - If a check is destructive, network-dependent, or expensive, skip it and record it as
+                  `skipped` with a reason; do not run it without explicit user consent.
+                - If you cannot run a check at all (missing tooling, no test framework configured),
+                  record it as `not-run` with a reason instead of fabricating a result.
                 """),
             _blocks("excerpts", block_kinds=standard_blocks(), description="""
-                <Short snippets of relevant output (e.g., final summary line of a test run, the failing assertion). Keep it tight — no full logs.>
+                Short snippets of relevant output (e.g., final summary line of a test run, the failing
+                assertion). Keep it tight — no full logs.
                 """),
             _list("residualRisks", element_fields=("text",), description="""
-                - <known limitation, environment not covered, etc.>
+                known limitation, environment not covered, etc.
                 """),
             _prose("recommendation", description="""
-                <One paragraph. Examples:>
+                One paragraph. Examples:
                 - "Close the bug — verified end-to-end."
                 - "Hold — reproduction inconclusive; needs verification in staging."
                 - "Reopen — symptom still reproduces; rerun `/speckit-bug-assess`."

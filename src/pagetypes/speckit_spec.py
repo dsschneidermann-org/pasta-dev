@@ -3,8 +3,9 @@ Spec-Driven Development as one page and one child.
 
 They are declared together because each one's gates read the other's statuses. Each status of the
 spec is one `/speckit-*` skill; the child holds what the gates count, the tasks and the analyze
-findings. Field descriptions are Spec Kit's own text, verbatim (github/spec-kit at f201054, MIT - see
-SPEC_KIT_LICENSE); each notice maps the files and skills that text names onto the page.
+findings. Field descriptions are Spec Kit's own words (github/spec-kit at f201054, MIT - see
+SPEC_KIT_LICENSE), with only marks and line breaks changed for reading; each notice maps the files
+and skills that text names onto the page.
 """
 
 from __future__ import annotations
@@ -161,15 +162,17 @@ _SPECKIT_SPEC = PageType(
             _prose("description", description="""
                 **Input**: User description: "$ARGUMENTS"
 
-                The text the user typed after `/speckit-specify` in the triggering message **is** the feature description.
+                The text the user typed after `/speckit-specify` in the triggering message **is** the
+                feature description.
                 """),
         )),
         SectionSpec("stories", "User scenarios", (
             _list("items", element_fields=("title", "priority", "journey", "why", "independentTest", "scenarios"),
                   description="""
                 IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
-                Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
-                you should still have a viable MVP (Minimum Viable Product) that delivers value.
+                Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just
+                ONE of them, you should still have a viable MVP (Minimum Viable Product) that delivers
+                value.
 
                 Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
                 Think of each story as a standalone slice of functionality that can be:
@@ -184,7 +187,8 @@ _SPECKIT_SPEC = PageType(
 
                 **Why this priority**: [Explain the value and why it has this priority level]
 
-                **Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by [specific action] and delivers [specific value]"]
+                **Independent Test**: [Describe how this can be tested independently - e.g., "Can be
+                fully tested by [specific action] and delivers [specific value]"]
 
                 **Acceptance Scenarios**:
 
@@ -200,11 +204,13 @@ _SPECKIT_SPEC = PageType(
         )),
         SectionSpec("requirements", "Requirements", (
             _list("functional", element_fields=("key", "text"), description="""
-                5. Generate Functional Requirements
-                   Each requirement must be testable
-                   Use reasonable defaults for unspecified details (document assumptions in Assumptions section)
+                Generate Functional Requirements
+                Each requirement must be testable
+                Use reasonable defaults for unspecified details (document assumptions in Assumptions
+                section)
 
-                - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
+                - **FR-001**: System MUST [specific capability, e.g., "allow users to create
+                  accounts"]
                 - **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]
                 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
                 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
@@ -212,11 +218,13 @@ _SPECKIT_SPEC = PageType(
 
                 *Example of marking unclear requirements:*
 
-                - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
-                - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+                - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not
+                  specified - email/password, SSO, OAuth?]
+                - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period
+                  not specified]
                 """),
             _list("entities", element_fields=("name", "text"), description="""
-                7. Identify Key Entities (if data involved)
+                Identify Key Entities (if data involved)
 
                 - **[Entity 1]**: [What it represents, key attributes without implementation]
                 - **[Entity 2]**: [What it represents, relationships to other entities]
@@ -230,7 +238,8 @@ _SPECKIT_SPEC = PageType(
 
                 1. **Measurable**: Include specific metrics (time, percentage, count, rate)
                 2. **Technology-agnostic**: No mention of frameworks, languages, databases, or tools
-                3. **User-focused**: Describe outcomes from user/business perspective, not system internals
+                3. **User-focused**: Describe outcomes from user/business perspective, not system
+                   internals
                 4. **Verifiable**: Can be tested/validated without knowing implementation details
 
                 **Good examples**:
@@ -242,25 +251,31 @@ _SPECKIT_SPEC = PageType(
 
                 **Bad examples** (implementation-focused):
 
-                - "API response time is under 200ms" (too technical, use "Users see results instantly")
+                - "API response time is under 200ms" (too technical, use "Users see results
+                  instantly")
                 - "Database can handle 1000 TPS" (implementation detail, use user-facing metric)
                 - "React components render efficiently" (framework-specific)
                 - "Redis cache hit rate above 80%" (technology-specific)
 
-                - **SC-001**: [Measurable metric, e.g., "Users can complete account creation in under 2 minutes"]
-                - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
-                - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
+                - **SC-001**: [Measurable metric, e.g., "Users can complete account creation in under
+                  2 minutes"]
+                - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without
+                  degradation"]
+                - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete
+                  primary task on first attempt"]
                 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
                 """),
         )),
         SectionSpec("assumptions", "Assumptions", (
             _list("items", element_fields=("text",), description="""
-                2. **Document assumptions**: Record reasonable defaults in the Assumptions section
+                **Document assumptions**: Record reasonable defaults in the Assumptions section
 
                 - [Assumption about target users, e.g., "Users have stable internet connectivity"]
                 - [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
-                - [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
-                - [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]
+                - [Assumption about data/environment, e.g., "Existing authentication system will be
+                  reused"]
+                - [Dependency on existing system/service, e.g., "Requires access to the existing user
+                  profile API"]
                 """),
         )),
         SectionSpec("quality", "Spec quality", (
@@ -291,45 +306,57 @@ _SPECKIT_SPEC = PageType(
                 - [ ] No implementation details leak into specification
                 """),
             _prose("result", description="""
-                b. **Run Validation Check**: Review the spec against each checklist item:
-                   - For each item, determine if it passes or fails
-                   - Document specific issues found (quote relevant spec sections)
+                **Run Validation Check**: Review the spec against each checklist item:
+                - For each item, determine if it passes or fails
+                - Document specific issues found (quote relevant spec sections)
 
-                - **If items fail (excluding [NEEDS CLARIFICATION])**:
-                  1. List the failing items and specific issues
-                  2. Update the spec to address each issue
-                  3. Re-run validation until all items pass (max 3 iterations)
-                  4. If still failing after 3 iterations, document remaining issues in checklist notes and warn user
+                **If items fail (excluding [NEEDS CLARIFICATION])**:
+                1. List the failing items and specific issues
+                2. Update the spec to address each issue
+                3. Re-run validation until all items pass (max 3 iterations)
+                4. If still failing after 3 iterations, document remaining issues in checklist notes
+                   and warn user
                 """),
         )),
         SectionSpec("questions", "Clarifications", (
             _list("items", element_fields=("text", "why", "options", "answer", "needsHuman", "status"),
                   element_fsm=_QUESTION_FSM, description="""
-                3. For unclear aspects:
-                   - Make informed guesses based on context and industry standards
-                   - Only mark with [NEEDS CLARIFICATION: specific question] if:
-                     - The choice significantly impacts feature scope or user experience
-                     - Multiple reasonable interpretations exist with different implications
-                     - No reasonable default exists
-                   - **LIMIT: Maximum 3 [NEEDS CLARIFICATION] markers total**
-                   - Prioritize clarifications by impact: scope > security/privacy > user experience > technical details
+                For unclear aspects:
+                - Make informed guesses based on context and industry standards
+                - Only mark with [NEEDS CLARIFICATION: specific question] if:
+                  - The choice significantly impacts feature scope or user experience
+                  - Multiple reasonable interpretations exist with different implications
+                  - No reasonable default exists
+                - **LIMIT: Maximum 3 [NEEDS CLARIFICATION] markers total**
+                - Prioritize clarifications by impact: scope > security/privacy > user experience >
+                  technical details
 
-                - **Question writing quality (applies to every question, MC or short-answer):**
-                   - Lead with `**Question:**` followed by a full interrogative that ends with `?`. The question text before the `?` must make sense on its own.
-                   - NEVER use a topic label, section heading, or requirement id as the question itself. For example, `Acceptance device/runtime matrix (FR-023)` is INVALID — it is a label, not a question.
-                   - After the `?`, the only permitted suffix is an optional parenthesized requirement/question id. Exact format: `**Question:** <interrogative>?` or `**Question:** <interrogative>? (FR-023)`. Never put the id before the `?`, and never use the id (alone or with a topic label) as the whole prompt.
-                   - Immediately after the question line, add one plain-language "Why it matters" sentence (the stake for acceptance or shipping) before the recommendation/options.
-                   - Use everyday wording; introduce jargon only if defined in the same sentence. Self-check: a reader who does not know Spec Kit must be able to answer from the Question line alone. Terse is fine; cryptic labels are not.
+                **Question writing quality (applies to every question, MC or short-answer):**
+                 - Lead with `**Question:**` followed by a full interrogative that ends with `?`. The
+                   question text before the `?` must make sense on its own.
+                 - NEVER use a topic label, section heading, or requirement id as the question itself.
+                   For example, `Acceptance device/runtime matrix (FR-023)` is INVALID — it is a
+                   label, not a question.
+                 - After the `?`, the only permitted suffix is an optional parenthesized
+                   requirement/question id. Exact format: `**Question:** <interrogative>?` or
+                   `**Question:** <interrogative>? (FR-023)`. Never put the id before the `?`, and
+                   never use the id (alone or with a topic label) as the whole prompt.
+                 - Immediately after the question line, add one plain-language "Why it matters"
+                   sentence (the stake for acceptance or shipping) before the recommendation/options.
+                 - Use everyday wording; introduce jargon only if defined in the same sentence.
+                   Self-check: a reader who does not know Spec Kit must be able to answer from the
+                   Question line alone. Terse is fine; cryptic labels are not.
 
-                - For multiple‑choice questions:
-                   - **Analyze all options** and determine the **most suitable option** based on:
-                      - Best practices for the project type
-                      - Common patterns in similar implementations
-                      - Risk reduction (security, performance, maintainability)
-                      - Alignment with any explicit project goals or constraints visible in the spec
-                   - Present your **recommended option prominently** at the top with clear reasoning (1-2 sentences explaining why this is the best choice).
-                   - Format as: `**Recommended:** Option [X] - <reasoning>`
-                   - Then render all options as a Markdown table:
+                For multiple‑choice questions:
+                 - **Analyze all options** and determine the **most suitable option** based on:
+                    - Best practices for the project type
+                    - Common patterns in similar implementations
+                    - Risk reduction (security, performance, maintainability)
+                    - Alignment with any explicit project goals or constraints visible in the spec
+                 - Present your **recommended option prominently** at the top with clear reasoning
+                   (1-2 sentences explaining why this is the best choice).
+                 - Format as: `**Recommended:** Option [X] - <reasoning>`
+                 - Then render all options as a Markdown table:
 
                    | Option | Description |
                    |--------|-------------|
@@ -338,23 +365,27 @@ _SPECKIT_SPEC = PageType(
                    | C | <Option C description> (add D/E as needed up to 5) |
                    | Short | Provide a different short answer (<=5 words) (Include only if free-form alternative is appropriate) |
 
-                   - After the table, add: `You can reply with the option letter (e.g., "A"), accept the recommendation by saying "yes" or "recommended", or provide your own short answer.`
+                   - After the table, add: `You can reply with the option letter (e.g., "A"), accept
+                     the recommendation by saying "yes" or "recommended", or provide your own short
+                     answer.`
 
-                - For short‑answer style (no meaningful discrete options):
-                   - Provide your **suggested answer** based on best practices and context.
-                   - Format as: `**Suggested:** <your proposed answer> - <brief reasoning>`
-                   - Then output: `Format: Short answer (<=5 words). You can accept the suggestion by saying "yes" or "suggested", or provide your own answer.`
+                For short‑answer style (no meaningful discrete options):
+                 - Provide your **suggested answer** based on best practices and context.
+                 - Format as: `**Suggested:** <your proposed answer> - <brief reasoning>`
+                 - Then output: `Format: Short answer (<=5 words). You can accept the suggestion by
+                   saying "yes" or "suggested", or provide your own answer.`
                 """),
         )),
         SectionSpec("plan", "Plan", (
             _list("direction", element_fields=("text",), description="""
-                This is where implementation detail belongs — provide your tech stack, architecture, and technical constraints as arguments.
+                This is where implementation detail belongs — provide your tech stack, architecture,
+                and technical constraints as arguments.
                 """),
             _prose("summary", description="""
                 [Extract from feature spec: primary requirement + technical approach from research]
                 """),
             _list("context", element_fields=("aspect", "value"), description="""
-                - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
+                Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
 
                 **Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]
 
@@ -366,13 +397,17 @@ _SPECKIT_SPEC = PageType(
 
                 **Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
 
-                **Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]
+                **Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or
+                NEEDS CLARIFICATION]
 
-                **Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]
+                **Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or
+                NEEDS CLARIFICATION]
 
-                **Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]
+                **Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or
+                NEEDS CLARIFICATION]
 
-                **Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+                **Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS
+                CLARIFICATION]
                 """),
             _list("constitutionCheck", element_fields=("principle", "verdict", "evidence"), description="""
                 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
@@ -392,10 +427,9 @@ _SPECKIT_SPEC = PageType(
                 | [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
                 """),
             _blocks("structure", block_kinds=standard_blocks(), description="""
-                ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-                for this feature. Delete unused options and expand the chosen structure with
-                real paths (e.g., apps/admin, packages/something). The delivered plan must
-                not include Option labels.
+                ACTION REQUIRED: Replace the placeholder tree below with the concrete layout for this
+                feature. Delete unused options and expand the chosen structure with real paths (e.g.,
+                apps/admin, packages/something). The delivered plan must not include Option labels.
 
                 **Structure Decision**: [Document the selected structure and reference the real
                 directories captured above]
@@ -403,44 +437,50 @@ _SPECKIT_SPEC = PageType(
         )),
         SectionSpec("research", "Research", (
             _list("decisions", element_fields=("topic", "decision", "rationale", "alternatives"), description="""
-                1. **Extract unknowns from Technical Context** above:
-                   - For each NEEDS CLARIFICATION → research task
-                   - For each dependency → best practices task
-                   - For each integration → patterns task
+                **Extract unknowns from Technical Context** above:
+                - For each NEEDS CLARIFICATION → research task
+                - For each dependency → best practices task
+                - For each integration → patterns task
 
-                3. **Consolidate findings** in `research.md` using format:
-                   - Decision: [what was chosen]
-                   - Rationale: [why chosen]
-                   - Alternatives considered: [what else evaluated]
+                **Consolidate findings** in `research.md` using format:
+                - Decision: [what was chosen]
+                - Rationale: [why chosen]
+                - Alternatives considered: [what else evaluated]
                 """),
         )),
         SectionSpec("dataModel", "Data model", (
             _list("entities", element_fields=("name", "fields", "relationships", "rules", "states"), description="""
-                1. **Extract entities from feature spec** → `data-model.md`:
-                   - Entity name, fields, relationships
-                   - Validation rules from requirements
-                   - State transitions if applicable
+                **Extract entities from feature spec** → `data-model.md`:
+                - Entity name, fields, relationships
+                - Validation rules from requirements
+                - State transitions if applicable
 
-                - data-model.md is the canonical source for field constraints (max/min length, nullable/required, enum values, validation rules), including constraints encoded in field types
+                data-model.md is the canonical source for field constraints (max/min length,
+                nullable/required, enum values, validation rules), including constraints encoded in
+                field types
                 """),
         )),
         SectionSpec("contracts", "Contracts", (
             _list("items", element_fields=("name", "format", "shape"), description="""
-                2. **Define interface contracts** (if project has external interfaces) → `/contracts/`:
-                   - Identify what interfaces the project exposes to users or other systems
-                   - Document the contract format appropriate for the project type
-                   - Examples: public APIs for libraries, command schemas for CLI tools, endpoints for web services, grammars for parsers, UI contracts for applications
-                   - Skip if project is purely internal (build scripts, one-off tools, etc.)
+                **Define interface contracts** (if project has external interfaces) → `/contracts/`:
+                - Identify what interfaces the project exposes to users or other systems
+                - Document the contract format appropriate for the project type
+                - Examples: public APIs for libraries, command schemas for CLI tools, endpoints for
+                  web services, grammars for parsers, UI contracts for applications
+                - Skip if project is purely internal (build scripts, one-off tools, etc.)
                 """),
         )),
         SectionSpec("quickstart", "Quickstart", (
             _blocks("guide", block_kinds=standard_blocks(), description="""
-                3. **Create quickstart validation guide** → `quickstart.md`:
-                   - Document runnable validation scenarios that prove the feature works end-to-end
-                   - Include prerequisites, setup commands, test/run commands, and expected outcomes
-                   - Use links or references to contracts and data model details instead of duplicating them
-                   - Do not include full implementation code, model/service/controller bodies, migrations, or complete test suites
-                   - Keep this artifact as a validation/run guide; implementation details belong in `tasks.md` and the implementation phase
+                **Create quickstart validation guide** → `quickstart.md`:
+                - Document runnable validation scenarios that prove the feature works end-to-end
+                - Include prerequisites, setup commands, test/run commands, and expected outcomes
+                - Use links or references to contracts and data model details instead of duplicating
+                  them
+                - Do not include full implementation code, model/service/controller bodies,
+                  migrations, or complete test suites
+                - Keep this artifact as a validation/run guide; implementation details belong in
+                  `tasks.md` and the implementation phase
                 """),
         )),
         SectionSpec("checklist", "Requirements checklist", (
@@ -456,11 +496,15 @@ _SPECKIT_SPEC = PageType(
 
                 **Traceability Requirements**:
                 - MINIMUM: ≥80% of items MUST include at least one traceability reference
-                - Each item should reference: spec section `[Spec §X.Y]`, or use markers: `[Gap]`, `[Ambiguity]`, `[Conflict]`, `[Assumption]`
-                - If no ID system exists: "Is a requirement & acceptance criteria ID scheme established? [Traceability]"
+                - Each item should reference: spec section `[Spec §X.Y]`, or use markers: `[Gap]`,
+                  `[Ambiguity]`, `[Conflict]`, `[Assumption]`
+                - If no ID system exists: "Is a requirement & acceptance criteria ID scheme
+                  established? [Traceability]"
 
-                **🚫 ABSOLUTELY PROHIBITED** - These make it an implementation test, not a requirements test:
-                - ❌ Any item starting with "Verify", "Test", "Confirm", "Check" + implementation behavior
+                **🚫 ABSOLUTELY PROHIBITED** - These make it an implementation test, not a requirements
+                test:
+                - ❌ Any item starting with "Verify", "Test", "Confirm", "Check" + implementation
+                  behavior
                 - ❌ References to code execution, user actions, system behavior
                 - ❌ "Displays correctly", "works properly", "functions as expected"
                 - ❌ "Click", "navigate", "render", "load", "execute"
@@ -475,7 +519,8 @@ _SPECKIT_SPEC = PageType(
                 - ✅ "Are [edge cases/scenarios] addressed in requirements?"
                 - ✅ "Does the spec define [missing aspect]?"
 
-                - Leave every newly generated item unchecked (`[ ]`); checkbox state belongs to the reviewer
+                Leave every newly generated item unchecked (`[ ]`); checkbox state belongs to the
+                reviewer
                 """),
         )),
         SectionSpec("analysis", "Analysis", (
@@ -502,7 +547,10 @@ _SPECKIT_SPEC = PageType(
                 | Field (`Entity.field`) | Canonical Location | Implementing Task IDs | Coverage / Consistency Notes |
                 |------------------------|--------------------|-----------------------|------------------------------|
 
-                Use the existing finding table for field findings, including source locations and actionable recommendations. Field findings share the 50-finding limit and overflow summary; do not change the existing requirement coverage denominator or FR/SC coverage table semantics.
+                Use the existing finding table for field findings, including source locations and
+                actionable recommendations. Field findings share the 50-finding limit and overflow
+                summary; do not change the existing requirement coverage denominator or FR/SC coverage
+                table semantics.
 
                 **Constitution Alignment Issues:** (if any)
 
@@ -522,7 +570,8 @@ _SPECKIT_SPEC = PageType(
             _list("summaries", element_fields=("text",), description="""
                 ### 6. Present the In-Session Findings Summary
 
-                Before appending anything, output a compact, severity-graded summary (no file writes yet):
+                Before appending anything, output a compact, severity-graded summary (no file writes
+                yet):
 
                 ## Convergence Findings
 
@@ -723,7 +772,8 @@ _SPECKIT_TASKS = PageType(
 
                 1. **Checkbox**: ALWAYS start with `- [ ]` (markdown checkbox)
                 2. **Task ID**: Sequential number (T001, T002, T003...) in execution order
-                3. **[P] marker**: Include ONLY if task is parallelizable (different files, no dependencies on incomplete tasks)
+                3. **[P] marker**: Include ONLY if task is parallelizable (different files, no
+                   dependencies on incomplete tasks)
                 4. **[Story] label**: REQUIRED for user story phase tasks only
                    - Format: [US1], [US2], [US3], etc. (maps to user stories from spec.md)
                    - Setup phase: NO story label
@@ -735,7 +785,8 @@ _SPECKIT_TASKS = PageType(
                 **Examples**:
 
                 - ✅ CORRECT: `- [ ] T001 Create project structure per implementation plan`
-                - ✅ CORRECT: `- [ ] T005 [P] Implement authentication middleware in src/middleware/auth.py`
+                - ✅ CORRECT:
+                  `- [ ] T005 [P] Implement authentication middleware in src/middleware/auth.py`
                 - ✅ CORRECT: `- [ ] T012 [P] [US1] Create User model in src/models/user.py`
                 - ✅ CORRECT: `- [ ] T014 [US1] Implement UserService in src/services/user_service.py`
                 - ❌ WRONG: `- [ ] Create User model` (missing ID and Story label)
@@ -765,9 +816,14 @@ _SPECKIT_TASKS = PageType(
 
                 Use this heuristic to prioritize findings:
 
-                - **CRITICAL**: Violates constitution MUST, missing core spec artifact, or requirement with zero coverage that blocks baseline functionality
-                - **HIGH**: Duplicate or conflicting requirement, ambiguous security/performance attribute, untestable acceptance criterion, missing/unresolved constrained-field citations (Coverage), or contradictory task constraints (Inconsistency); retain CRITICAL escalation above
-                - **MEDIUM**: Terminology drift, missing non-functional task coverage, underspecified edge case
+                - **CRITICAL**: Violates constitution MUST, missing core spec artifact, or requirement
+                  with zero coverage that blocks baseline functionality
+                - **HIGH**: Duplicate or conflicting requirement, ambiguous security/performance
+                  attribute, untestable acceptance criterion, missing/unresolved constrained-field
+                  citations (Coverage), or contradictory task constraints (Inconsistency); retain
+                  CRITICAL escalation above
+                - **MEDIUM**: Terminology drift, missing non-functional task coverage, underspecified
+                  edge case
                 - **LOW**: Style/wording improvements, minor redundancy not affecting execution order
                 """),
         )),

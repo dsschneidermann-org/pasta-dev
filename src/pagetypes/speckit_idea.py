@@ -1,8 +1,8 @@
 """The `speckit-idea` page type: GitHub Spec Kit's idea assessment as one page.
 
-Each status is one `/speckit-assess-*` skill. Field descriptions are Spec Kit's own text, verbatim
-(github/spec-kit at f201054, MIT - see SPEC_KIT_LICENSE); the notice maps the files and skills that
-text names onto this page.
+Each status is one `/speckit-assess-*` skill. Field descriptions are Spec Kit's own words
+(github/spec-kit at f201054, MIT - see SPEC_KIT_LICENSE), with only marks and line breaks changed
+for reading; the notice maps the files and skills that text names onto this page.
 """
 
 from __future__ import annotations
@@ -93,133 +93,207 @@ _SPECKIT_IDEA = PageType(
         )),
         SectionSpec("intake", "Intake", (
             _scalar("source", description="""
-                - **Source**: <sanitized URL, "pasted text", or repo path>
+                **Source**: sanitized URL, "pasted text", or repo path
 
-                Record in `intake.md`: the **sanitized URL** (strip any `user:password@` userinfo and drop query/fragment parameters that may carry credentials or signatures — e.g. `token`, `sig`, `signature`, `key`, `password`, `access_token`, and anything under a `X-Amz-*`/`Goog-*` signed-URL scheme; keep the scheme, host, and path), the parsed host (no redirect following), and the policy branch taken (`allowlisted` / `confirmed-by-user` / `auto-refused: <reason>`). Never persist a verbatim URL that may embed secrets. Never issue a preflight `HEAD` (or any) request to "see what it is" — that probe is itself the gated request.
+                Record in `intake.md`: the **sanitized URL** (strip any `user:password@` userinfo and
+                drop query/fragment parameters that may carry credentials or signatures — e.g.
+                `token`, `sig`, `signature`, `key`, `password`, `access_token`, and anything under a
+                `X-Amz-*`/`Goog-*` signed-URL scheme; keep the scheme, host, and path), the parsed
+                host (no redirect following), and the policy branch taken (`allowlisted` /
+                `confirmed-by-user` / `auto-refused: <reason>`). Never persist a verbatim URL that may
+                embed secrets. Never issue a preflight `HEAD` (or any) request to "see what it is" —
+                that probe is itself the gated request.
                 """),
             _scalar("type", choices=_IDEA_TYPES, description="""
-                4. **Note the idea type** so downstream stages know what to weigh: `new-capability` | `improvement` | `fix` | `exploration` | `cost-saving` | `compliance` | `other`.
+                **Note the idea type** so downstream stages know what to weigh: `new-capability` |
+                `improvement` | `fix` | `exploration` | `cost-saving` | `compliance` | `other`.
                 """),
             _prose("captured", description="""
-                1. **Capture the idea, redacting secrets.** Preserve the original wording (quoted) plus the source (URL, pasted block, or repo path) — but apply the same sanitization as the Source field *inside the quoted text too*: sanitize any credential-bearing URL and redact tokens, passwords, API keys, or cookies. Never persist a secret just because it appeared in the original.
+                **Capture the idea, redacting secrets.** Preserve the original wording (quoted) plus
+                the source (URL, pasted block, or repo path) — but apply the same sanitization as the
+                Source field *inside the quoted text too*: sanitize any credential-bearing URL and
+                redact tokens, passwords, API keys, or cookies. Never persist a secret just because it
+                appeared in the original.
 
-                <Quoted original, with any credential-bearing URL sanitized and secrets (tokens, passwords, keys, cookies) redacted. If a URL was fetched, include the title and a short excerpt; link the sanitized URL and record the URL Trust Policy branch taken.>
+                Quoted original, with any credential-bearing URL sanitized and secrets (tokens,
+                passwords, keys, cookies) redacted. If a URL was fetched, include the title and a
+                short excerpt; link the sanitized URL and record the URL Trust Policy branch taken.
                 """),
             _prose("restated", description="""
-                2. **Restate it in one or two neutral sentences.** What is being proposed, in plain language, without endorsing or dismissing it.
+                **Restate it in one or two neutral sentences.** What is being proposed, in plain
+                language, without endorsing or dismissing it.
                 """),
             _prose("origin", description="""
-                3. **Record origin and context.** Who raised it, when, and any triggering event (a complaint, an outage, a sales ask, a strategy shift). Mark unknowns as `[NEEDS CLARIFICATION: …]`.
+                **Record origin and context.** Who raised it, when, and any triggering event (a
+                complaint, an outage, a sales ask, a strategy shift). Mark unknowns as
+                `[NEEDS CLARIFICATION: …]`.
                 - **Raised by**: <who / [NEEDS CLARIFICATION]>
-                - **Trigger**: <what prompted it / [NEEDS CLARIFICATION]>
+                - **Trigger**: what prompted it / [NEEDS CLARIFICATION]
                 """),
         )),
         SectionSpec("questions", "Open questions", (
             _list("items", element_fields=("text", "stage", "answer", "needsHuman", "status"),
                   element_fsm=_QUESTION_FSM, description="""
-                5. **List first-glance unknowns** — the obvious questions that must be answered before anyone decides. Do not answer them here.
-                7. **Carry forward open questions** from intake/research that must be resolved before or during specification.
+                **List first-glance unknowns** — the obvious questions that must be answered before
+                anyone decides. Do not answer them here.
+
+                **Carry forward open questions** from intake/research that must be resolved before or
+                during specification.
+
                 - **Blocking questions**: [NEEDS CLARIFICATION: …]
                 - **Revisit stage**: intake | research | define | shape
                 """),
         )),
         SectionSpec("research", "Research", (
             _scalar("confidence", choices=_CONFIDENCE, description="""
-                - **Evidence confidence (overall)**: high | medium | low
+                **Evidence confidence (overall)**: high | medium | low
                 """),
             _list("findings", element_fields=("lens", "text", "source", "confidence", "basis"), description="""
-                Investigate the idea across these lenses. Skip any that genuinely do not apply, and mark gaps as `[NEEDS CLARIFICATION: …]` rather than guessing. **Every claim must carry a citation or be flagged as an assumption.**
+                Investigate the idea across these lenses. Skip any that genuinely do not apply, and
+                mark gaps as `[NEEDS CLARIFICATION: …]` rather than guessing. **Every claim must carry
+                a citation or be flagged as an assumption.**
 
-                1. **Users & demand** — Who actually has this problem, and how strong is the signal? Support tickets, interviews, usage data, requests. Distinguish *stated* wants from *observed* behavior.
-                2. **Prior art** — Has this been tried before, here or elsewhere? Existing internal features, past specs/decisions in `.specify/`, competitor products, open-source alternatives. Why did prior attempts succeed or fail?
-                3. **Market & context** — Trends, alternatives users cope with today, the cost of doing nothing.
-                4. **Data & constraints** — Relevant metrics, volumes, compliance/legal factors, platform limits.
-                5. **Evidence quality** — For each finding, tag confidence `high | medium | low` and whether it is `cited` (source given) or `assumption` (no source).
+                1. **Users & demand** — Who actually has this problem, and how strong is the signal?
+                   Support tickets, interviews, usage data, requests. Distinguish *stated* wants from
+                   *observed* behavior.
+                2. **Prior art** — Has this been tried before, here or elsewhere? Existing internal
+                   features, past specs/decisions in `.specify/`, competitor products, open-source
+                   alternatives. Why did prior attempts succeed or fail?
+                3. **Market & context** — Trends, alternatives users cope with today, the cost of
+                   doing nothing.
+                4. **Data & constraints** — Relevant metrics, volumes, compliance/legal factors,
+                   platform limits.
+                5. **Evidence quality** — For each finding, tag confidence `high | medium | low` and
+                   whether it is `cited` (source given) or `assumption` (no source).
 
-                - <finding> — [source: <url/system> | ASSUMPTION] (confidence: high/medium/low)
+                <finding> — [source: <url/system> | ASSUMPTION] (confidence: high/medium/low)
                 """),
             _list("against", element_fields=("text", "source"), description="""
-                - <the strongest reasons this may not be worth building> — [source]
+                the strongest reasons this may not be worth building — [source]
 
-                Include an **Evidence Against the Idea** section every time — if you cannot find any, say so explicitly; do not omit it.
+                Include an **Evidence Against the Idea** section every time — if you cannot find any,
+                say so explicitly; do not omit it.
                 """),
             _list("sources", element_fields=("url", "host", "policy"), description="""
-                - Record each source's **sanitized URL** (strip `user:password@` userinfo and drop credential/signature query parameters, per the intake policy), parsed host, and policy branch in `research.md`. Never persist a verbatim URL that may embed secrets.
-                - <sanitized URL> (host: <host>, policy: allowlisted/confirmed-by-user/auto-refused)
+                Record each source's **sanitized URL** (strip `user:password@` userinfo and drop
+                credential/signature query parameters, per the intake policy), parsed host, and policy
+                branch in `research.md`. Never persist a verbatim URL that may embed secrets.
+
+                <sanitized URL> (host: <host>, policy: allowlisted/confirmed-by-user/auto-refused)
                 """),
         )),
         SectionSpec("problem", "Problem", (
             _prose("statement", description="""
-                1. **State the problem** in one or two sentences: who is affected, what hurts today, under what conditions, and why it matters now. Keep it in the *problem space* — no features, no architecture.
+                **State the problem** in one or two sentences: who is affected, what hurts today,
+                under what conditions, and why it matters now. Keep it in the *problem space* — no
+                features, no architecture.
                 """),
             _list("users", element_fields=("who", "effect"), description="""
-                2. **Identify users and stakeholders.** Users experience the problem; stakeholders decide, fund, or are impacted. Cite research where available; mark invented entries `[NEEDS CLARIFICATION: …]`.
-                - **Users**: <persona> — <how they are affected>
+                **Identify users and stakeholders.** Users experience the problem; stakeholders
+                decide, fund, or are impacted. Cite research where available; mark invented entries
+                `[NEEDS CLARIFICATION: …]`.
+
+                **Users**: <persona> — <how they are affected>
                 """),
             _list("stakeholders", element_fields=("role", "interest"), description="""
-                2. **Identify users and stakeholders.** Users experience the problem; stakeholders decide, fund, or are impacted. Cite research where available; mark invented entries `[NEEDS CLARIFICATION: …]`.
-                - **Stakeholders**: <role> — <interest / decision power>
+                **Identify users and stakeholders.** Users experience the problem; stakeholders
+                decide, fund, or are impacted. Cite research where available; mark invented entries
+                `[NEEDS CLARIFICATION: …]`.
+
+                **Stakeholders**: <role> — <interest / decision power>
                 """),
             _list("goals", element_fields=("text",), description="""
-                3. **Set goals** — the outcomes that would make solving this worthwhile.
+                **Set goals** — the outcomes that would make solving this worthwhile.
                 """),
             _list("nonGoals", element_fields=("text",), description="""
-                4. **Set non-goals** — what is explicitly out of scope, to bound the work and prevent creep.
+                **Set non-goals** — what is explicitly out of scope, to bound the work and prevent
+                creep.
                 """),
             _list("metrics", element_fields=("text", "baseline"), description="""
-                5. **Define success metrics** — how you would know it worked. Prefer measurable signals; use qualitative ones only when necessary, and label them as such.
-                - <measurable signal> (baseline: <current value / unknown>)
+                **Define success metrics** — how you would know it worked. Prefer measurable signals;
+                use qualitative ones only when necessary, and label them as such.
+
+                <measurable signal> (baseline: <current value / unknown>)
                 """),
             _prose("inaction", description="""
-                6. **Establish a baseline** — what happens if nothing is built (the cost of inaction). This is what `/speckit-assess-decide` weighs against.
+                **Establish a baseline** — what happens if nothing is built (the cost of inaction).
+                This is what `/speckit-assess-decide` weighs against.
                 """),
         )),
         SectionSpec("concept", "Concept", (
             _list("options", element_fields=("name", "sketch", "appetite", "tradeoffs", "rabbitHoles"), description="""
-                1. **Generate 2–3 distinct options**, spanning the trade-off space. Always include a lightweight "smallest thing that could work" option and, where relevant, a "do nothing / buy instead of build" option. Each option:
-                   - **Sketch**: one paragraph describing the approach at concept level (what the user experiences / what changes), not how it is engineered.
-                   - **Appetite**: a rough size — `small` (days) | `medium` (weeks) | `large` (months) — as a budget, not an estimate.
-                   - **Trade-offs**: what it wins and what it sacrifices; key risks and unknowns.
-                   - **Rabbit holes**: the parts most likely to blow up scope, so `/speckit-assess-decide` sees them.
+                **Generate 2–3 distinct options**, spanning the trade-off space. Always include a
+                lightweight "smallest thing that could work" option and, where relevant, a "do nothing
+                / buy instead of build" option. Each option:
+                - **Sketch**: one paragraph describing the approach at concept level (what the user
+                  experiences / what changes), not how it is engineered.
+                - **Appetite**: a rough size — `small` (days) | `medium` (weeks) | `large` (months) —
+                  as a budget, not an estimate.
+                - **Trade-offs**: what it wins and what it sacrifices; key risks and unknowns.
+                - **Rabbit holes**: the parts most likely to blow up scope, so
+                  `/speckit-assess-decide` sees them.
                 """),
             _scalar("recommended", description="""
-                - **Recommended option**: <name> | none
-                - It is a valid outcome to recommend that **no** option is worth building; say so rather than manufacturing a winner.
+                **Recommended option**: <name> | none
+
+                It is a valid outcome to recommend that **no** option is worth building; say so rather
+                than manufacturing a winner.
                 """),
             _prose("recommendation", description="""
-                2. **Recommend one option** with a short rationale tied to the problem's goals and metrics — or explicitly recommend *not proceeding* if no option clears the bar.
+                **Recommend one option** with a short rationale tied to the problem's goals and
+                metrics — or explicitly recommend *not proceeding* if no option clears the bar.
                 """),
             _list("outOfScope", element_fields=("text",), description="""
-                3. **Bound the concept**: restate what is explicitly out of scope for the recommended option (inherited from non-goals plus anything newly excluded).
+                **Bound the concept**: restate what is explicitly out of scope for the recommended
+                option (inherited from non-goals plus anything newly excluded).
                 """),
             _list("assumptions", element_fields=("text",), description="""
-                4. **List the assumptions** the recommendation depends on, so they can be validated during specification.
+                **List the assumptions** the recommendation depends on, so they can be validated
+                during specification.
                 """),
         )),
         SectionSpec("decision", "Decision", (
             _scalar("verdict", choices=_VERDICTS, description="""
-                2. **Reach a verdict**:
-                   - **go** — the idea is worth specifying. Requires problem validity `adequate`+, **evidence strength `adequate`+ (never `weak` or `unknown`)**, and a recommended concept option. If evidence is `weak`/`unknown`, the verdict is `needs-clarification`, not `go`.
-                   - **needs-clarification** — promising but blocked on specific unknowns. List exactly what must be answered and which stage to revisit.
-                   - **kill** — not worth building now. State the decisive reason plainly (weak problem, better alternative exists, cost > value, out of scope, superseded).
+                **Reach a verdict**:
+                - **go** — the idea is worth specifying. Requires problem validity `adequate`+,
+                  **evidence strength `adequate`+ (never `weak` or `unknown`)**, and a recommended
+                  concept option. If evidence is `weak`/`unknown`, the verdict is
+                  `needs-clarification`, not `go`.
+                - **needs-clarification** — promising but blocked on specific unknowns. List exactly
+                  what must be answered and which stage to revisit.
+                - **kill** — not worth building now. State the decisive reason plainly (weak problem,
+                  better alternative exists, cost > value, out of scope, superseded).
                 """),
             _list("scorecard", element_fields=("criterion", "rating", "justification"), description="""
-                1. **Score the idea** against explicit criteria, each rated `strong | adequate | weak | unknown` with a one-line justification drawn from the artifacts:
-                   - **Problem validity** — is the problem real and worth solving? (from `problem.md` + `research.md`)
-                   - **Evidence strength** — how well-supported, vs. assumption-driven? (from `research.md`)
-                   - **Value vs. cost of inaction** — does solving it beat doing nothing? (from `problem.md`)
-                   - **Feasibility / appetite fit** — is there a credible option within a sane appetite? (from `concept.md`)
-                   - **Strategic fit** — does it align with the project's constitution/goals, if known?
-                   - **Risk posture** — are the major risks understood and acceptably mitigated? Rate with the same positive polarity as the other criteria: `strong` = key risks identified and credibly mitigated; `weak` = serious, unmitigated risk. (from all artifacts)
+                **Score the idea** against explicit criteria, each rated
+                `strong | adequate | weak | unknown` with a one-line justification drawn from the
+                artifacts:
+                - **Problem validity** — is the problem real and worth solving? (from `problem.md` +
+                  `research.md`)
+                - **Evidence strength** — how well-supported, vs. assumption-driven? (from
+                  `research.md`)
+                - **Value vs. cost of inaction** — does solving it beat doing nothing? (from
+                  `problem.md`)
+                - **Feasibility / appetite fit** — is there a credible option within a sane appetite?
+                  (from `concept.md`)
+                - **Strategic fit** — does it align with the project's constitution/goals, if known?
+                - **Risk posture** — are the major risks understood and acceptably mitigated? Rate
+                  with the same positive polarity as the other criteria: `strong` = key risks
+                  identified and credibly mitigated; `weak` = serious, unmitigated risk. (from all
+                  artifacts)
                 """),
             _prose("rationale", description="""
-                3. **Record the rationale** so the decision is auditable months later. Any `unknown` score must be acknowledged, not glossed.
-                <The call and why, in a short paragraph. Reference the scorecard.>
+                **Record the rationale** so the decision is auditable months later. Any `unknown`
+                score must be acknowledged, not glossed.
+
+                The call and why, in a short paragraph. Reference the scorecard.
                 """),
         )),
         SectionSpec("handoff", "Handoff to specify", (
             _prose("summary", description="""
-                4. **Define the handoff (go only)**: summarize what `/speckit-specify` should receive — the problem statement, the recommended option, in/out of scope, success metrics, and open questions carried forward.
+                **Define the handoff (go only)**: summarize what `/speckit-specify` should receive —
+                the problem statement, the recommended option, in/out of scope, success metrics, and
+                open questions carried forward.
 
                 - **Problem**: <one-line problem statement>
                 - **Chosen approach**: <recommended concept option>
@@ -230,9 +304,11 @@ _SPECKIT_IDEA = PageType(
         )),
         SectionSpec("clarifications", "Facts supplied", (
             _list("facts", element_fields=("stage", "text"), description="""
-                you can supply the missing facts and ask the agent to revise the scorecard, rationale, verdict, or handoff.
+                you can supply the missing facts and ask the agent to revise the scorecard, rationale,
+                verdict, or handoff.
 
-                When you add evidence, keep the source and confidence tags the research stage already uses (`ASSUMPTION` vs cited claims). Do not invent citations.
+                When you add evidence, keep the source and confidence tags the research stage already
+                uses (`ASSUMPTION` vs cited claims). Do not invent citations.
                 """),
         )),
     ),
