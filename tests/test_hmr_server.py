@@ -450,8 +450,8 @@ def test_a_module_kept_unless_changed_survives_until_its_own_file_changes(packag
 
 
 def test_the_suite_runs_without_writing_bytecode():
-    """conftest turns bytecode writing off for the whole run, so a test that needs a .pyc opts back
-    in for itself."""
+    """Bytecode writing is off for the whole run, so a test that needs a .pyc opts back in for
+    itself."""
     assert sys.dont_write_bytecode is True
 
 
