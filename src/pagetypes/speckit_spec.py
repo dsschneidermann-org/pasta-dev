@@ -124,16 +124,18 @@ _SPEC_NOTICE = """
     checklists/requirements.md is Spec quality, plan.md is Plan, research.md, data-model.md,
     contracts/ and quickstart.md are the sections of those names, and the other checklists are
     Requirements checklist. tasks.md and the analyze findings are the Spec Kit tasks child. A
-    directory it names is this page, and the constitution is the speckitConstitution workspace guidance. A
-    skill it names is the status of that name, so /speckit-plan is the plan status. A
-    [NEEDS CLARIFICATION: ...] marker is an open question on this page, flagged needsHuman, and only
-    the user answers one.
+    directory it names is this page. The constitution is the `speckitConstitution` workspace guidance
+    field: fetch it with `getWorkspaceGuidance` if the `prepare` status response did not already show
+    it. A stage it names comes with the command that moves this page there, such as plan
+    (`approveSpec`). A [NEEDS CLARIFICATION: ...] marker is an open question on this page, flagged
+    needsHuman, and only the user answers one.
     """
 
 _TASKS_NOTICE = """
     The field instructions and stage guidance of this page are GitHub Spec Kit's own words. tasks.md
     is this page; spec.md, plan.md, data-model.md, contracts/, research.md and quickstart.md are
-    sections of the Spec Kit spec above it. A skill it names is the status of that name there.
+    sections of the Spec Kit spec above it. A stage it names comes with the command that moves the
+    spec there.
     """
 
 # What the spec's gates count on its one pinned child. A list with nothing in it passes.
@@ -163,7 +165,7 @@ _SPECKIT_SPEC = PageType(
             _prose("description", description="""
                 **Input**: User description: "$ARGUMENTS"
 
-                The text the user typed after `/speckit-specify` in the triggering message **is** the
+                The text the user typed in the message that asked for specify (`proceed`) **is** the
                 feature description.
                 """),
         )),
@@ -413,9 +415,12 @@ _SPECKIT_SPEC = PageType(
             _list("constitutionCheck", element_fields=("principle", "verdict", "evidence"), description="""
                 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-                [Gates determined based on constitution file]
+                [Gates determined based on the `speckitConstitution` workspace guidance field (fetch
+                it with `getWorkspaceGuidance` if the `prepare` status response did not already show
+                it)]
 
-                - Fill Constitution Check section from constitution
+                - Fill Constitution Check section from the `speckitConstitution` workspace guidance
+                  field
                 - Evaluate gates (ERROR if violations unjustified)
                 - Re-evaluate Constitution Check post-design
                 """),

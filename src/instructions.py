@@ -92,7 +92,7 @@ spike: Works out how to build an idea before anything is planned: subagents inve
 
 agent-plan: One subagent an epic or a spike dispatches - its role, capability, exact task and worktree, linked to the pages it works on, and the page it reports back into as it starts and works. Created as a child of that epic or spike.
 
-speckit-idea: GitHub Spec Kit's idea assessment - intake, research, define, shape and decide - ending in a go or kill the user accepts. Use it ONLY when the user asks for a Spec Kit assessment.
+speckit-idea: GitHub Spec Kit's idea assessment - intake, research, define, shape and decide - ending in a ship or close, or an abandon, that the user accepts. Use it ONLY when the user asks for a Spec Kit assessment.
 
 speckit-spec: GitHub Spec Kit's Spec-Driven Development - specify, clarify, plan, checklist, tasks, analyze, implement and converge - with the user approving the spec and the plan. Use it ONLY when the user asks for a Spec Kit spec; otherwise use a feature-brief.
 

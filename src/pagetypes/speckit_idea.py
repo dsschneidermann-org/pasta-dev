@@ -50,7 +50,7 @@ _LENSES = ("users", "prior-art", "market", "data")
 _BASIS = ("cited", "assumption")
 _URL_POLICY = ("allowlisted", "confirmed-by-user", "auto-refused", "skipped")
 _APPETITE = ("small", "medium", "large")
-_VERDICTS = ("go", "needs-clarification", "kill")
+_VERDICTS = ("ship or close", "needs-clarification", "abandon")
 _CRITERIA = ("Problem validity", "Evidence strength", "Value vs. inaction", "Feasibility / appetite",
              "Strategic fit", "Risk posture")
 _RATINGS = ("strong", "adequate", "weak", "unknown")
@@ -69,8 +69,8 @@ _NOTICE = """
 
     A file it names is a section here: intake.md is Intake, research.md is Research, problem.md is
     Problem, concept.md is Concept, and decision.md is Decision and Handoff. A directory it names is
-    this page. A skill it names is the status of that name, so /speckit-assess-define is the define
-    status, and /speckit-specify is a new speckit-spec page. A [NEEDS CLARIFICATION: ...] marker is
+    this page. A stage it names comes with the command that moves this page there, such as define
+    (`beginDefine`), and specify is a new speckit-spec page. A [NEEDS CLARIFICATION: ...] marker is
     an open question on this page, flagged needsHuman, and only the user answers one.
     """
 
@@ -85,7 +85,8 @@ _SPECKIT_IDEA = PageType(
     description=(
         "Spec Kit's idea assessment: decides whether an idea is worth building by capturing it, "
         "gathering evidence for and against it, defining the problem, shaping options and recording a "
-        "go, needs-clarification or kill verdict the user accepts. Use it only when the user asks for "
+        "ship or close, needs-clarification or abandon verdict the user accepts. Use it only when the "
+        "user asks for "
         "a Spec Kit assessment; use a spike when the idea is worth doing and the open question is how, "
         "and a speckit-spec when it is already decided and ready to specify."
     ),
@@ -219,7 +220,7 @@ _SPECKIT_IDEA = PageType(
                 """),
             _prose("inaction", description="""
                 **Establish a baseline** — what happens if nothing is built (the cost of inaction).
-                This is what `/speckit-assess-decide` weighs against.
+                This is what decide (`beginDecide`) weighs against.
                 """),
         )),
         SectionSpec("concept", "Concept", (
@@ -232,8 +233,8 @@ _SPECKIT_IDEA = PageType(
                 - **Appetite**: a rough size — `small` (days) | `medium` (weeks) | `large` (months) —
                   as a budget, not an estimate.
                 - **Trade-offs**: what it wins and what it sacrifices; key risks and unknowns.
-                - **Rabbit holes**: the parts most likely to blow up scope, so
-                  `/speckit-assess-decide` sees them.
+                - **Rabbit holes**: the parts most likely to blow up scope, so decide (`beginDecide`)
+                  sees them.
                 """),
             _scalar("recommended", description="""
                 **Recommended option**: <name> | none
@@ -257,14 +258,14 @@ _SPECKIT_IDEA = PageType(
         SectionSpec("decision", "Decision", (
             _scalar("verdict", choices=_VERDICTS, description="""
                 **Reach a verdict**:
-                - **go** — the idea is worth specifying. Requires problem validity `adequate`+,
-                  **evidence strength `adequate`+ (never `weak` or `unknown`)**, and a recommended
-                  concept option. If evidence is `weak`/`unknown`, the verdict is
-                  `needs-clarification`, not `go`.
+                - **ship or close** — the idea is worth specifying. Requires problem validity
+                  `adequate`+, **evidence strength `adequate`+ (never `weak` or `unknown`)**, and a
+                  recommended concept option. If evidence is `weak`/`unknown`, the verdict is
+                  `needs-clarification`, not `ship or close`.
                 - **needs-clarification** — promising but blocked on specific unknowns. List exactly
                   what must be answered and which stage to revisit.
-                - **kill** — not worth building now. State the decisive reason plainly (weak problem,
-                  better alternative exists, cost > value, out of scope, superseded).
+                - **abandon** — not worth building now. State the decisive reason plainly (weak
+                  problem, better alternative exists, cost > value, out of scope, superseded).
                 """),
             _list("scorecard", element_fields=("criterion", "rating", "justification"), description="""
                 **Score the idea** against explicit criteria, each rated
@@ -279,6 +280,9 @@ _SPECKIT_IDEA = PageType(
                 - **Feasibility / appetite fit** — is there a credible option within a sane appetite?
                   (from `concept.md`)
                 - **Strategic fit** — does it align with the project's constitution/goals, if known?
+                  The constitution is the `speckitConstitution` workspace guidance field (fetch it
+                  with `getWorkspaceGuidance` if the `prepare` status response did not already show
+                  it).
                 - **Risk posture** — are the major risks understood and acceptably mitigated? Rate
                   with the same positive polarity as the other criteria: `strong` = key risks
                   identified and credibly mitigated; `weak` = serious, unmitigated risk. (from all
@@ -293,9 +297,9 @@ _SPECKIT_IDEA = PageType(
         )),
         SectionSpec("handoff", "Handoff to specify", (
             _prose("summary", description="""
-                **Define the handoff (go only)**: summarize what `/speckit-specify` should receive —
-                the problem statement, the recommended option, in/out of scope, success metrics, and
-                open questions carried forward.
+                **Define the handoff (ship or close only)**: summarize what specify (`proceed` on a
+                new speckit-spec page) should receive — the problem statement, the recommended option,
+                in/out of scope, success metrics, and open questions carried forward.
 
                 - **Problem**: <one-line problem statement>
                 - **Chosen approach**: <recommended concept option>
@@ -385,10 +389,10 @@ _SPECKIT_IDEA = PageType(
                                  ("concept", "assumptions"))),
         transition_cmd("submitVerdict", "decide -> verdictReview",
                        requires=(("decision", "verdict"), ("decision", "scorecard"), ("decision", "rationale"))),
-        # The three ways out of the verdict gate are the user's.
-        transition_cmd("acceptGo", "verdictReview -> closed (human gate)", agency="human",
+        # The ways out of the verdict gate are the user's: close on a ship or close verdict, supply the
+        # facts it lacks, or abandon, which is also how an abandon verdict is confirmed.
+        transition_cmd("close", "verdictReview -> closed (human gate)", agency="human",
                        requires=(("handoff", "summary"),)),
-        transition_cmd("confirmKill", "verdictReview -> abandoned (human gate)", agency="human"),
         transition_on_add_cmd("supplyFacts", "verdictReview -> clarifying", section="clarifications",
                               field="facts", agency="human",
                               description="record a fact the user supplied AND go back to refining",

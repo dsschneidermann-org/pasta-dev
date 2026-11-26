@@ -73,9 +73,10 @@ _NOTICE = """
     runs skills over files; this page stands in for both.
 
     A file it names is part of this page: assessment.md is Report through Open questions, fix.md is
-    Fix, and test.md is Verification. A directory it names is this page. A skill it names is the
-    status of that name, so /speckit-bug-fix is the fix status. A [NEEDS CLARIFICATION: ...] marker is
-    an open question on this page, flagged needsHuman, and only the user answers one.
+    Fix, and test.md is Verification. A directory it names is this page. A stage it names comes with
+    the command that moves this page there, such as fix (`approveAssessment`). A
+    [NEEDS CLARIFICATION: ...] marker is an open question on this page, flagged needsHuman, and only
+    the user answers one.
     """
 
 
@@ -176,7 +177,7 @@ _SPECKIT_BUG = PageType(
                 """),
             _list("files", element_fields=("path",), description="""
                 Identify files to change and the shape of the change (without writing the patch yet —
-                that is `/speckit-bug-fix`'s job).
+                that is the job of fix (`approveAssessment`)).
                 """),
             _list("tests", element_fields=("text",), description="""
                 Call out tests that should exist or be added to lock the fix in.
@@ -277,7 +278,7 @@ _SPECKIT_BUG = PageType(
                 One paragraph. Examples:
                 - "Close the bug — verified end-to-end."
                 - "Hold — reproduction inconclusive; needs verification in staging."
-                - "Reopen — symptom still reproduces; rerun `/speckit-bug-assess`."
+                - "Reopen — symptom still reproduces; rerun assess (`reassess`)."
                 """),
         )),
     ),
