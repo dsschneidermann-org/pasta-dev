@@ -13,13 +13,9 @@ brief-probe *ARGS:
     uv run python scripts/feature_brief_probe.py {{ARGS}}
 
 test:
-    #!/bin/bash
-    export PYTHONDONTWRITEBYTECODE=1
     uv run pytest
 
 testincr:
-    #!/bin/bash
-    export PYTHONDONTWRITEBYTECODE=1
     uv run pytest --testmon
 
 types:

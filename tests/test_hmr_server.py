@@ -449,7 +449,14 @@ def test_a_module_kept_unless_changed_survives_until_its_own_file_changes(packag
     assert sys.modules[f"{package.name}.entry"].ITEMS == [1]
 
 
-def test_a_same_size_rewrite_in_the_same_second_is_not_served_from_old_bytecode(package):
+def test_the_suite_runs_without_writing_bytecode():
+    """Bytecode writing is off for the whole run, so a test that needs a .pyc opts back in for
+    itself."""
+    assert sys.dont_write_bytecode is True
+
+
+def test_a_same_size_rewrite_in_the_same_second_is_not_served_from_old_bytecode(package, monkeypatch):
+    monkeypatch.setattr(sys, "dont_write_bytecode", False)
     package.write("a.py", "X = 1\n")
     package.write("entry.py", "from .a import X\n")
     import_module(f"{package.name}.entry")

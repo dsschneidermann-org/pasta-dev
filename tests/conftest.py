@@ -15,9 +15,13 @@ below.
 """
 
 import logging
+import sys
 from typing import override
 
 import pytest
+
+# The run writes no bytecode, set ahead of the imports below so the modules they load are covered.
+sys.dont_write_bytecode = True
 
 from src.event_cache import set_cache_disabled
 from src.pagetypes._registry import set_test_mode
