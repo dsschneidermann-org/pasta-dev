@@ -32,6 +32,7 @@ A page type is declared as data, not code. It has six parts:
 | list    | ordered elements; each is a record of named fields and gets an id | `criteria {text}`, `contracts {name, owner, shape}` |
 | blocks  | structured rich text: paragraphs, headings, lists, code, tables, quotes, links to other pages | `details` |
 | fixed   | text set by the type itself; no command can write it          | a standing notice |
+| fixed web-only | like fixed, but shown only on the web UI, under a note that agents cannot see it | a note for human readers |
 
 A list element can also have:
 - **its own lifecycle**, e.g. `todo -> done | skipped`, `pending -> passed | failed | skipped`,
@@ -137,7 +138,7 @@ pagetype <tag> "<Display name>"
   instead:  <other-type> for <case>; <other-type> for <case>
 
   section <key> "<Name>"
-    <field>: scalar | scalar enum(a | b) | prose | blocks | fixed "<text>"
+    <field>: scalar | scalar enum(a | b) | prose | blocks | fixed "<text>" | fixed web-only "<text>"
       > <instruction the agent reads>
     <field>: list {<f1>, <f2>, <flag>?}
       lifecycle: <state> -> <state> | <state>     checkbox: <state>
