@@ -145,6 +145,11 @@ TEST_FIELDS = PageType(
             _prose("body", fixed="Fixture notice: seeded from the declaration and never written.",
                    description="a fixed prose body - seeded from the page type, no command writes it"),
         )),
+        SectionSpec("presentation", "Presentation", (
+            _prose("body", fixed="Fixture presentation: shown to people on the web UI only.",
+                   web_only=True,
+                   description="a web-only fixed prose body - shown on the web UI, never over MCP"),
+        )),
     ),
     commands=(
         set_scalar_cmd("basics", "label"),
