@@ -8,10 +8,12 @@ from src.commands import apply_command, create_page
 from src.errors import ConflictError, ValidationError
 from src.model import Page
 from src.pagetypes.core.specs import FSMSpec
+from src.pagetypes.core.commands import set_prose_cmd
+from src.pagetypes.core.fields import SectionSpec, _prose
 from src.pagetypes.core.pagetype import PageType, get_pagetype_field
 from src.pagetypes._registry import get_page_type
-from src.render import (RefContext, checkbox_state, escape_markdown, page_text, render_page,
-                            render_workspace_links)
+from src.render import (WEB_ONLY_NOTE, RefContext, checkbox_state, escape_markdown, page_text,
+                            render_page, render_workspace_links)
 
 # Hand-authored capability fixtures (src.testtypes): test-fields for scalar/prose/list content,
 # test-blocks for the inline-run block surface, test-child for element-FSM checkboxes, test-lifecycle
@@ -319,6 +321,48 @@ def test_render_shows_a_fixed_field():
     md = render_page(create_page(FIELDS, "Blank", None, make_counter()), FIELDS)
     assert "## Notice" in md
     assert "Fixture notice: seeded from the declaration and never written." in md
+
+
+_PRESENTATION = "Fixture presentation: shown to people on the web UI only."
+
+
+def test_render_leaves_out_a_web_only_section_by_default():
+    md = render_page(create_page(FIELDS, "Blank", None, make_counter()), FIELDS)
+    assert "## Presentation" not in md
+    assert _PRESENTATION not in md and WEB_ONLY_NOTE not in md
+    assert "## Notice" in md                     # the ordinary fixed field still renders
+
+
+def test_render_includes_a_web_only_field_with_its_note_when_asked():
+    md = render_page(create_page(FIELDS, "Blank", None, make_counter()), FIELDS,
+                     include_web_only=True)
+    assert f"## Presentation\n\n*{WEB_ONLY_NOTE}*\n\n{_PRESENTATION}\n" in md
+
+
+def test_render_leaves_out_only_the_web_only_field_of_a_mixed_section():
+    page_type = PageType(
+        tag="xtest-mixed", name="Mixed", description="ad-hoc",
+        sections=(SectionSpec("notes", "Notes", (
+            _prose("body", description="x"),
+            _prose("aside", fixed="people only", web_only=True, description="d"))),),
+        commands=(set_prose_cmd("notes"),),
+        fsm=FSMSpec(name="XTestMixed", initial="active", states=("active",)))
+    page = create_page(page_type, "P", None, make_counter())
+    md = render_page(page, page_type)
+    assert "## Notes\n\n*None.*\n" in md and "people only" not in md
+
+
+def test_render_escapes_web_only_text_on_the_web_path():
+    page_type = PageType(
+        tag="xtest-web-escape", name="Esc", description="ad-hoc",
+        sections=(SectionSpec("p", "P", (
+            _prose("body", fixed="a *b* c", web_only=True, description="d"),)),),
+        commands=(),
+        fsm=FSMSpec(name="XTestWebEscape", initial="active", states=("active",)))
+    page = create_page(page_type, "P", None, make_counter())
+    context = RefContext("ws:demo", {}, {}, {}, escape_plain_text=True)
+    md = render_page(page, page_type, ref_context=context, include_web_only=True)
+    assert escape_markdown("a *b* c") in md and "a *b* c" not in md
 
 
 def test_render_child_pages_direct_titled_links_only():

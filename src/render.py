@@ -228,6 +228,9 @@ def render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None =
 # is visible before it is filled. Rendered italic in the final Markdown.
 _NONE = "*None.*"
 
+# Shown above web-only fixed text on both web views, so a reader knows agents never see it.
+WEB_ONLY_NOTE = "Not visible to agents: this text is shown on the web UI only."
+
 
 def _field_content(field_spec: FieldSpec, value: Any, ref_context: RefContext | None = None) -> str:
     """One field's Markdown, or the italic `*None.*` fallback when it holds no content.
@@ -247,6 +250,11 @@ def _field_content(field_spec: FieldSpec, value: Any, ref_context: RefContext | 
         rendered = render_blocks(value, ref_context) if value else None
         return rendered if rendered else _NONE
     return _NONE
+
+
+def _web_only_content(field_spec: FieldSpec, ref_context: RefContext | None = None) -> str:
+    """A web-only fixed field's Markdown: the note in italics, then its declared text."""
+    return f"*{WEB_ONLY_NOTE}*\n\n{_plain(field_spec.fixed or '', ref_context)}"
 
 
 def _render_child_pages(page: Page, ref_context: RefContext | None = None,
@@ -306,10 +314,14 @@ def _render_references(page: Page, ref_context: RefContext | None = None) -> str
 
 
 def render_page(page: Page, page_type: PageType, level: int = 1,
-                ref_context: RefContext | None = None) -> str:
+                ref_context: RefContext | None = None, include_web_only: bool = False) -> str:
     """A page as Markdown: a title heading, then EVERY declared section and field, then
     `References` and `Child pages` lists. An empty field (and an empty list) renders the italic
     `*None.*` fallback, so a page's shape is visible before it is filled.
+
+    A web-only fixed field renders only when include_web_only is set (the web views), under the
+    not-visible-to-agents note; otherwise it is left out, and so is a section with nothing else
+    to show.
 
     A `toc` is the exception: it carries no subject matter and - as the one type with no authoring
     commands (hence no `addLink`) - can never hold an outgoing link, so its References list is always
@@ -325,8 +337,13 @@ def render_page(page: Page, page_type: PageType, level: int = 1,
     lines = [f"{'#' * level} {_plain(page.title, ref_context)}", "", meta, ""]
     section_heading = "#" * (level + 1)
     for section in page_type.sections:
-        chunks = [_field_content(field_spec, page.sections.get(section.key, {}).get(field_spec.key), ref_context)
-                  for field_spec in section.fields]
+        shown = [field_spec for field_spec in section.fields
+                 if include_web_only or not field_spec.web_only]
+        if not shown:
+            continue
+        chunks = [_web_only_content(field_spec, ref_context) if field_spec.web_only else
+                  _field_content(field_spec, page.sections.get(section.key, {}).get(field_spec.key), ref_context)
+                  for field_spec in shown]
         lines += [f"{section_heading} {section.name}", "", "\n\n".join(chunks), ""]
     if page_type.tag == "toc":
         # A toc's References list is always empty (no addLink) and its whole purpose is the child list,
