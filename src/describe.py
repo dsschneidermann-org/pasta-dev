@@ -136,6 +136,7 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
                         "blockKinds": ([block.kind for block in field_spec.block_kinds]
                                        if field_spec.kind == BLOCKS else None),
                         "fixed": field_spec.fixed is not None,
+                        "webOnly": field_spec.web_only,
                         "description": field_spec.description,
                     }
                     for field_spec in section.fields

@@ -279,6 +279,15 @@ def test_field_line_notes_a_fixed_field():
         "  - `body` *(prose)* · fixed - seeded from the page type, no command writes it")
 
 
+def test_field_line_notes_a_web_only_field():
+    field = {"key": "body", "kind": "prose", "description": "",
+             "choices": None, "elementFields": None, "elementStates": None,
+             "elementBlocks": None, "blockKinds": None, "fixed": True, "webOnly": True}
+    assert _field_line(field) == (
+        "  - `body` *(prose)* · fixed, web UI only - shown to people on the web wiki, "
+        "never to agents over MCP")
+
+
 def test_field_line_renders_a_list_field_from_its_element_fields():
     field = {"key": "items", "kind": "list", "description": "",
              "choices": None, "elementFields": ["text"], "elementStates": None,

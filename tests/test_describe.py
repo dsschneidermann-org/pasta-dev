@@ -95,6 +95,15 @@ def test_describe_page_type_reports_a_fixed_field():
     assert sections["basics"]["fields"][2]["fixed"] is False      # the ordinary prose body
 
 
+def test_describe_page_type_reports_a_web_only_field_but_not_its_text():
+    described = describe_page_type(FIELDS)
+    sections = {section["key"]: section for section in described["sections"]}
+    presentation = sections["presentation"]["fields"][0]
+    assert presentation["fixed"] is True and presentation["webOnly"] is True
+    assert sections["notice"]["fields"][0]["webOnly"] is False
+    assert "Fixture presentation" not in str(described)
+
+
 def test_describe_page_type_keeps_the_instruction_on_the_field_not_the_setter():
     """A field's authoring instruction is reported once, on the field; its setter carries a short
     description instead."""
