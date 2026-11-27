@@ -63,6 +63,16 @@ def test_page_view_renders_body_and_sidebar(client):
     assert 'id="sidebar"' in response.text               # the nav sidebar layout
 
 
+def test_page_view_shows_web_only_text_and_says_agents_do_not_see_it(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    view = f"/ws:{workspace.id.removeprefix('ws:')}/page/{page.id}"
+    for url in (view, f"{view}?markdown=true"):
+        text = client.get(url).text
+        assert "Not visible to agents: this text is shown on the web UI only." in text
+        assert "Fixture presentation: shown to people on the web UI only." in text
+
+
 def test_sidebar_workspace_link_keeps_the_archived_view(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page

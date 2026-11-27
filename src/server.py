@@ -338,7 +338,8 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
         nav = md2html.render(render_workspace_links(STORE.tree(workspace_id, show_archived), show_archived, show_meta=False, escape_plain_text=True))
         body = STORE.render_html(workspace_id, pageId, show_archived)
         if markdown == "true":
-            body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived, escape_plain_text=True))
+            body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived,
+                                                        escape_plain_text=True, include_web_only=True))
         activity_digest, (entries, events) = _activity_items(workspace_id)
         activity = build_activity_timeline(entries, events, workspace, page.id, time.time())
         return templates.TemplateResponse(

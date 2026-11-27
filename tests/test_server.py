@@ -269,6 +269,17 @@ def test_add_link_via_server(mcp):
                                                     "args": {"toId": b, "role": "depends-on"}}]})
 
 
+def test_mcp_reads_never_carry_web_only_text(mcp):
+    workspace_id = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    page_id = call(mcp, "createPage", {"workspaceId": workspace_id, "type": "test-fields",
+                                       "title": "P"})["id"]
+    text = "Fixture presentation"
+    assert text not in call(mcp, "renderPage", {"workspaceId": workspace_id, "pageId": page_id})["markdown"]
+    assert text not in call(mcp, "renderPage", {"workspaceId": workspace_id})["markdown"]
+    assert text not in str(call(mcp, "getPage", {"workspaceId": workspace_id, "pageId": page_id}))
+    assert call(mcp, "search", {"workspaceId": workspace_id, "query": "shown"})["hits"] == []
+
+
 def test_lifecycle_auto_children_via_server(mcp):
     workspace = call(mcp, "createWorkspace", {"name": "demo"})
     page = call(mcp, "createPage",
