@@ -534,6 +534,8 @@ def validate_field_spec(field: FieldSpec) -> list[str]:
     errors: list[str] = []
     if field.fixed is not None and field.kind != PROSE:
         errors.append(f"{field.key}: fixed is only valid on a prose field.")
+    if field.web_only and field.fixed is None:
+        errors.append(f"{field.key}: web_only is only valid on a fixed field.")
     if field.block_kinds and field.kind != BLOCKS:
         errors.append(f"{field.key}: block_kinds is only valid on a blocks field.")
     if field.kind == BLOCKS and not field.block_kinds:

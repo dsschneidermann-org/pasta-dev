@@ -1316,6 +1316,18 @@ def test_fixed_on_a_non_prose_field_is_reported(kind: str):
     assert "f: fixed is only valid on a prose field." in validate_field_spec(field)
 
 
+def test_a_web_only_fixed_prose_field_is_declared_through_prose():
+    field = _prose("body", fixed="x", web_only=True, description="d")
+    assert field.web_only is True and field.fixed == "x"
+    assert _prose("body", fixed="x").web_only is False
+    assert validate_field_spec(field) == []
+
+
+def test_web_only_without_fixed_text_is_reported():
+    field = FieldSpec(key="f", kind=PROSE, web_only=True)
+    assert "f: web_only is only valid on a fixed field." in validate_field_spec(field)
+
+
 def test_a_command_writing_a_fixed_field_is_reported():
     page_type = PageType(
         tag="xtest-fixed-written", name="Fixed", description="ad-hoc",
