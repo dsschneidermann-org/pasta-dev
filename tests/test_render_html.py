@@ -3,10 +3,10 @@
 from src.commands import apply_command, create_page
 from src.model import Page
 from src.pagetypes.core.specs import LIST, SCALAR, FSMSpec
-from src.pagetypes.core.fields import FieldSpec
+from src.pagetypes.core.fields import FieldSpec, SectionSpec, _prose
 from src.pagetypes.core.pagetype import PageType, get_pagetype_field
 from src.pagetypes._registry import get_page_type
-from src.render import RefContext
+from src.render import WEB_ONLY_NOTE, RefContext
 from src.render_html import (_children_html, _field_html, _list_html, _references_html,
                              _text_html, element_view, render_page_html)
 
@@ -557,3 +557,22 @@ def test_an_element_block_ref_resolves_to_a_titled_link():
                          {"itemId": added.created_id, "blocks": [{"kind": "paragraph", "inlines": ["see ", {"ref": "a:1"}]}]}, factory).page
     out = render_page_html(page, ELEMENT_BLOCKS, _context())
     assert '<a href="/ws:demo/page/a:1">Alpha</a>' in out
+
+
+def test_html_shows_web_only_text_under_its_note():
+    out = render_page_html(create_page(FIELDS, "Blank", None, _counter()), FIELDS)
+    assert ('<div class="field field-prose field-web-only">'
+            f'<p class="web-only-note">{WEB_ONLY_NOTE}</p>'
+            '<p>Fixture presentation: shown to people on the web UI only.</p></div>') in out
+    assert '<a href="#section-presentation">Presentation</a>' in out
+
+
+def test_html_escapes_web_only_text():
+    page_type = PageType(
+        tag="xtest-web-html", name="Esc", description="ad-hoc",
+        sections=(SectionSpec("p", "P", (
+            _prose("body", fixed="a <b> c", web_only=True, description="d"),)),),
+        commands=(),
+        fsm=FSMSpec(name="XTestWebHtml", initial="active", states=("active",)))
+    out = render_page_html(create_page(page_type, "P", None, _counter()), page_type)
+    assert "<p>a &lt;b&gt; c</p>" in out and "<b>" not in out
