@@ -70,6 +70,7 @@ body.dark {
 .pasta-page .field { margin: 0 0 1rem; }
 .pasta-page .field:last-child { margin-bottom: 0; }
 .pasta-page .empty { color: var(--text-muted); font-style: italic; }
+.pasta-page .web-only-note { margin: 0 0 0.5rem; color: var(--text-muted); font-size: 0.85rem; font-style: italic; }
 
 .pasta-page .field-rows { display: grid; gap: 0.25rem 1rem; margin: 0;
     grid-template-columns: minmax(5rem, max-content) 1fr; }
