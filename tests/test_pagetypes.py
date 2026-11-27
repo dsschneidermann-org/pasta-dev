@@ -216,7 +216,10 @@ def test_initial_sections_cover_every_field(tag: str):
     for section in page_type.sections:
         assert section.key in sections
         for field_spec in section.fields:
-            assert field_spec.key in sections[section.key]
+            if field_spec.web_only:
+                assert field_spec.key not in sections[section.key]
+            else:
+                assert field_spec.key in sections[section.key]
 
 
 @pytest.mark.parametrize("tag", list(ALL_TYPES))
