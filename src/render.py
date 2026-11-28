@@ -344,7 +344,7 @@ def render_page_parts(page: Page, page_type: PageType, level: int = 1,
         shown = [field_spec for field_spec in section.fields if not field_spec.web_only]
         if not shown:
             continue
-        parts += [("section-title", f"{section_heading} {section.name}"), ("text", "\n\n")]
+        parts.extend([("section-title", f"{section_heading} {section.name}"), ("text", "\n\n")])
         for index, field_spec in enumerate(shown):
             if index:
                 parts.append(("text", "\n\n"))
@@ -356,10 +356,10 @@ def render_page_parts(page: Page, page_type: PageType, level: int = 1,
         # so emit only that list - unheadered - as the table of contents.
         parts.append(("text", f"{_render_child_pages(page, ref_context, listing=True)}\n\n"))
     else:
-        parts += [("section-title", f"{section_heading} References"),
-                  ("text", f"\n\n{_render_references(page, ref_context)}\n\n"),
-                  ("section-title", f"{section_heading} Child pages"),
-                  ("text", f"\n\n{_render_child_pages(page, ref_context)}\n\n")]
+        parts.extend([("section-title", f"{section_heading} References"),
+                      ("text", f"\n\n{_render_references(page, ref_context)}\n\n"),
+                      ("section-title", f"{section_heading} Child pages"),
+                      ("text", f"\n\n{_render_child_pages(page, ref_context)}\n\n")])
     # The Markdown ends in exactly one newline. The last part always holds the child list, which is
     # never blank, so stripping that part alone strips the whole text's trailing whitespace.
     role, text = parts[-1]
