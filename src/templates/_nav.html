@@ -31,10 +31,11 @@
 <div id="layout">
     <nav id="sidebar">
         <a href="/{{ workspace_id }}{% if show_archived %}?archived=true{% endif %}"><strong>Workspace</strong></a>
+        {# The toggle keeps the raw Markdown view, as its switch link keeps the archived one. #}
         {% if show_archived %}
-        <a style="float:right" href="{{ request.url.path }}">Hide archived</a>
+        <a style="float:right" href="{{ request.url.path }}{% if markdown_view %}?markdown=true{% endif %}">Hide archived</a>
         {% else %}
-        <a style="float:right" href="{{ request.url.path }}?archived=true">Show archived</a>
+        <a style="float:right" href="{{ request.url.path }}?{% if markdown_view %}markdown=true&amp;{% endif %}archived=true">Show archived</a>
         {% endif %}
         {{ nav | safe }}
     </nav>

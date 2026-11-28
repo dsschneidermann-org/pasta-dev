@@ -728,6 +728,22 @@ def test_the_markdown_view_links_back_to_the_rendered_page(client):
             in client.get(f"{path}?markdown=true&archived=true").text)
 
 
+def test_the_archived_toggle_keeps_the_markdown_view(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    assert (f'href="{path}?markdown=true&amp;archived=true">Show archived</a>'
+            in client.get(f"{path}?markdown=true").text)
+    assert (f'href="{path}?markdown=true">Hide archived</a>'
+            in client.get(f"{path}?markdown=true&archived=true").text)
+
+
+def test_the_archived_toggle_of_the_structured_view_is_unchanged(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    assert f'href="{path}?archived=true">Show archived</a>' in client.get(path).text
+    assert f'href="{path}">Hide archived</a>' in client.get(f"{path}?archived=true").text
+
+
 def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
     workspace = server.STORE.create_workspace("demo")
     created = server.STORE.create_page(workspace.id, "test-lifecycle", "Brief")
