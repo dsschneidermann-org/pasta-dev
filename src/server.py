@@ -357,7 +357,6 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 "workspace_id": workspace_id,
                 "workspace_name": workspace.name,
                 "show_archived": show_archived,
-                # Drives the Raw markdown / Rendered page link and the sidebar's archived toggle.
                 "markdown_view": markdown_view,
                 "nav": nav,
                 "body": body,
