@@ -704,6 +704,13 @@ def test_a_markdown_value_other_than_true_shows_the_structured_page(client):
     assert 'class="markdown-source"' not in text and '<article class="pasta-page">' in text
 
 
+def test_a_page_view_of_an_unknown_page_is_an_error_page(client):
+    workspace = server.STORE.create_workspace("demo")
+    for query in ("", "?markdown=true"):
+        response = client.get(f"/{workspace.id}/page/test-fields:nope{query}")
+        assert response.status_code == 500 and "not found in workspace" in response.text
+
+
 def test_the_page_view_links_to_its_raw_markdown_before_the_activity(client):
     workspace = server.STORE.create_workspace("demo")
     path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
