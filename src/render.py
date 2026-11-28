@@ -228,11 +228,11 @@ def render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None =
 # is visible before it is filled. Rendered italic in the final Markdown.
 _NONE = "*None.*"
 
-# Shown above web-only fixed text on the structured page view, so a reader knows agents never see it.
+# Shown above web-only fixed text in the web UI, so a reader knows agents never see it.
 WEB_ONLY_NOTE = "Not visible to agents: this text is shown in the web UI only."
 
 # One emitted piece of a page's Markdown, tagged with what it is. Only section headings and scalar
-# field names are tagged - what the web's ?markdown=true view styles; everything else is "text".
+# field names carry a role of their own; everything else is "text".
 type MarkdownRole = Literal["text", "section-title", "field-name"]
 type MarkdownPart = tuple[MarkdownRole, str]
 
@@ -319,7 +319,7 @@ def render_page_parts(page: Page, page_type: PageType, level: int = 1,
     """A page as Markdown: a title heading, then EVERY declared section and field, then
     `References` and `Child pages` lists. An empty field (and an empty list) renders the italic
     `*None.*` fallback, so a page's shape is visible before it is filled. A web-only fixed field
-    never renders here - it is shown only on the web's structured page view.
+    never renders here: its text is for people, not agents.
 
     A `toc` is the exception: it carries no subject matter and - as the one type with no authoring
     commands (hence no `addLink`) - can never hold an outgoing link, so its References list is always

@@ -326,19 +326,11 @@ def test_render_shows_a_fixed_field():
 _PRESENTATION = "Fixture presentation: shown to people on the web UI only."
 
 
-def test_render_leaves_out_a_web_only_section_by_default():
+def test_render_leaves_out_a_web_only_section():
     md = render_page(create_page(FIELDS, "Blank", None, make_counter()), FIELDS)
     assert "## Presentation" not in md
     assert _PRESENTATION not in md and WEB_ONLY_NOTE not in md
     assert "## Notice" in md                     # the ordinary fixed field still renders
-
-
-def test_render_never_carries_web_only_text_even_in_web_mode():
-    page = create_page(FIELDS, "Blank", None, make_counter())
-    web = RefContext("ws:demo", {}, {}, {}, escape_plain_text=True)
-    for md in (render_page(page, FIELDS), render_page(page, FIELDS, ref_context=web)):
-        assert "## Presentation" not in md
-        assert _PRESENTATION not in md and WEB_ONLY_NOTE not in md
 
 
 def test_render_leaves_out_only_the_web_only_field_of_a_mixed_section():

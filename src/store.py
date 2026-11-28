@@ -414,8 +414,8 @@ class Store:
 
     def render_markdown_parts(self, workspace_id: str, page_id: str) -> list[render.MarkdownPart]:
         """One page's Markdown as the parts `render_markdown` joins, each tagged as text, a section
-        title or a field name - for the web's ?markdown=true view. Rendered with every RefContext
-        default, exactly as the renderPage tool renders it, so the joined text is what an agent reads.
+        title or a field name. Rendered with every RefContext default, as the renderPage tool
+        renders it, so the joined text is what an agent reads.
         """
         workspace = self.load_workspace(workspace_id)
         page, page_type = self._page_and_type(workspace, page_id)

@@ -111,9 +111,9 @@ body.dark {
     background: var(--background-alt); border-radius: 3px; padding: 0 0.2rem; }
 .pasta-page .link-role { color: var(--text-muted); }
 
-/* The ?markdown=true view (render_markdown_source_html): the agent Markdown as source text. Long
-   lines wrap on screen without adding characters; a heading is an inline-block span, so a copy
-   gains no line breaks, and keeps the section-title rule above for its look. */
+/* The ?markdown=true view: the agent Markdown as source text. Long lines wrap on screen without
+   adding characters; a heading is an inline-block span, so a copy gains no line breaks, and it keeps
+   the section-title rule above for its look. */
 .pasta-page .markdown-source { white-space: pre-wrap; overflow-wrap: anywhere; }
 .pasta-page .markdown-source .section-title { display: inline-block; width: 100%; margin: 0;
     font-size: 1.25em; font-weight: 700; }
