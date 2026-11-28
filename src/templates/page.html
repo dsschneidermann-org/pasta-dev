@@ -3,7 +3,14 @@
 {% block title %}{{ workspace_name }}{% endblock %}
 
 {% block main %}
-    {% include "_activity_open.html" %}
+    {# Switches between the structured page and its raw Markdown, keeping the archived view. The
+       ac-sep before the Activity button hides with it while the activity is open. #}
+    {% if markdown_view %}
+    <a id="markdown-switch" href="{{ request.url.path }}{% if show_archived %}?archived=true{% endif %}">Rendered page</a>
+    {% else %}
+    <a id="markdown-switch" href="{{ request.url.path }}?markdown=true{% if show_archived %}&amp;archived=true{% endif %}">Raw markdown</a>
+    {% endif %}
+    <span class="ac-sep">·</span> {% include "_activity_open.html" %}
     {% include "_activity.html" %}
     {{ body | safe }}
 

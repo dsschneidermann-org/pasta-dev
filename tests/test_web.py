@@ -704,6 +704,30 @@ def test_a_markdown_value_other_than_true_shows_the_structured_page(client):
     assert 'class="markdown-source"' not in text and '<article class="pasta-page">' in text
 
 
+def test_the_page_view_links_to_its_raw_markdown_before_the_activity(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    text = client.get(path).text
+    assert f'<a id="markdown-switch" href="{path}?markdown=true">Raw markdown</a>' in text
+    assert text.index('id="markdown-switch"') < text.index('class="ac-sep"') < text.index('id="ac-open"')
+
+
+def test_the_raw_markdown_link_keeps_the_archived_view(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    text = client.get(f"{path}?archived=true").text
+    assert f'<a id="markdown-switch" href="{path}?markdown=true&amp;archived=true">Raw markdown</a>' in text
+
+
+def test_the_markdown_view_links_back_to_the_rendered_page(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    assert (f'<a id="markdown-switch" href="{path}">Rendered page</a>'
+            in client.get(f"{path}?markdown=true").text)
+    assert (f'<a id="markdown-switch" href="{path}?archived=true">Rendered page</a>'
+            in client.get(f"{path}?markdown=true&archived=true").text)
+
+
 def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
     workspace = server.STORE.create_workspace("demo")
     created = server.STORE.create_page(workspace.id, "test-lifecycle", "Brief")
