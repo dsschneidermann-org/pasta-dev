@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, final
 
-from . import activity_log, cleanup, commands, fsm, render, render_html
+from . import activity_log, cleanup, commands, fsm, render
 from .activity_log import ActivityEntry, page_additions
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .event_log import LOG_SUFFIX, Event, PageMark, lifecycle_events, page_marks, parse_jsonl, to_jsonl
@@ -408,41 +408,14 @@ class Store:
         workspace = self.load_workspace(workspace_id)
         if page_id is None:
             return render.render_tree(workspace, show_archived)
-        page, page_type = self._page_and_type(workspace, page_id)
-        ref_context = render.build_ref_context(workspace, show_archived)
-        return render.render_page(page, page_type, ref_context=ref_context)
-
-    def render_markdown_parts(self, workspace_id: str, page_id: str) -> list[render.MarkdownPart]:
-        """One page's Markdown as the parts `render_markdown` joins, each tagged as text, a section
-        title or a field name. Rendered with every RefContext default, as the renderPage tool
-        renders it, so the joined text is what an agent reads.
-        """
-        workspace = self.load_workspace(workspace_id)
-        page, page_type = self._page_and_type(workspace, page_id)
-        return render.render_page_parts(page, page_type, ref_context=render.build_ref_context(workspace))
-
-    def render_html(self, workspace_id: str, page_id: str, show_archived: bool = False) -> str:
-        """One page as structured HTML for the web view. Its Markdown sibling, `render_markdown`,
-        is what the renderPage MCP tool returns and is unchanged.
-
-        `show_archived` acts exactly as it does on the Markdown path: it decides whether a toc lists
-        its archived children, and rides onto the links as a query parameter.
-        """
-        workspace = self.load_workspace(workspace_id)
-        page, page_type = self._page_and_type(workspace, page_id)
-        ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text=True)
-        return render_html.render_page_html(page, page_type, ref_context)
-
-    @staticmethod
-    def _page_and_type(workspace: Workspace, page_id: str) -> tuple[Page, PageType]:
-        """A page of `workspace` and its registered type, for the render methods."""
         page = workspace.get_page(page_id)
         if page is None:
-            raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace.id}'.")
+            raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
         page_type = get_page_type(page.type)
         if page_type is None:
             raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
-        return page, page_type
+        ref_context = render.build_ref_context(workspace, show_archived)
+        return render.render_page(page, page_type, ref_context=ref_context)
 
     def search(self, workspace_id: str, query: str, limit: int = 20) -> dict[str, Any]:
         """Rank live pages by a case-insensitive word-prefix match of `query`'s terms against

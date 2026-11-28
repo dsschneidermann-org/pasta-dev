@@ -598,30 +598,6 @@ def test_render_markdown_child_pages_links(store):
     assert f"- [Child](/{workspace.id}/page/{child.id})" in tree_md
 
 
-def test_render_markdown_parts_join_to_what_render_page_returns(store):
-    workspace = store.create_workspace("demo")
-    page = store.create_page(workspace.id, "test-fields", "Page title").page
-    store.create_page(workspace.id, "test-flow", "Child", parent_id=page.id)
-    parts = store.render_markdown_parts(workspace.id, page.id)
-    assert "".join(text for _, text in parts) == store.render_markdown(workspace.id, page.id)
-    assert ("section-title", "## Basics") in parts and ("field-name", "**label:**") in parts
-
-
-def test_render_markdown_parts_render_as_the_agent_sees_it_whatever_is_archived(store):
-    workspace = store.create_workspace("demo")
-    page = store.create_page(workspace.id, "test-fields", "Page title").page
-    child = store.create_page(workspace.id, "test-flow", "Child", parent_id=page.id).page
-    store.archive_page(workspace.id, child.id)
-    text = "".join(text for _, text in store.render_markdown_parts(workspace.id, page.id))
-    assert f"(/{workspace.id}/page/{child.id})" in text and "?archived=true" not in text
-
-
-def test_render_markdown_parts_of_an_unknown_page_is_not_found(store):
-    workspace = store.create_workspace("demo")
-    with pytest.raises(NotFoundError):
-        store.render_markdown_parts(workspace.id, "test-fields:nope")
-
-
 def test_search_ranks_and_resolves_partial_id(store):
     workspace = store.create_workspace("demo")
     a = store.create_page(workspace.id, "test-fields", "Concurrency model").page
@@ -1811,24 +1787,6 @@ def test_cleanup_leaves_an_archived_workspace_alone(store):
 
     assert report.stamped == 0 and report.pruned == []
     assert store.get_page(workspace.id, page.id).expires_at is None
-
-
-def test_render_html_returns_structured_html_for_one_page(store):
-    workspace = store.create_workspace("demo")
-    page = store.create_page(workspace.id, "test-fields", "Page title").page
-    _mutate(store, workspace.id, page.id, [
-        {"command": "addItem", "args": {"text": "Item one", "note": "a note"}},
-    ])
-    out = store.render_html(workspace.id, page.id)
-    assert '<article class="pasta-page">' in out
-    assert '<h1 class="page-title">Page title</h1>' in out
-    assert "<dt>text</dt><dd><p>Item one</p></dd>" in out
-
-
-def test_render_html_rejects_an_unknown_page(store):
-    workspace = store.create_workspace("demo")
-    with pytest.raises(NotFoundError):
-        store.render_html(workspace.id, "test-fields:nope")
 
 
 # --- block-bearing element fields --------------------------------------------
