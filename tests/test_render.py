@@ -13,7 +13,7 @@ from src.pagetypes.core.fields import SectionSpec, _prose
 from src.pagetypes.core.pagetype import PageType, get_pagetype_field
 from src.pagetypes._registry import get_page_type
 from src.render import (WEB_ONLY_NOTE, RefContext, checkbox_state, escape_markdown, page_text,
-                            render_page, render_workspace_links)
+                            render_page, render_page_parts, render_workspace_links)
 
 # Hand-authored capability fixtures (src.testtypes): test-fields for scalar/prose/list content,
 # test-blocks for the inline-run block surface, test-child for element-FSM checkboxes, test-lifecycle
@@ -823,3 +823,41 @@ def test_render_page_bytes_are_pinned_for_a_filled_page():
     assert render_page(_blocks_page_with_lookalikes(), BLOCKS) == (
         "# Doc\n\n*test-blocks* · `active`\n\n## Body\n\n## Overview\n\n```md\n## not a section\n"
         "- **x:** y\n```\n\n## References\n\n*None.*\n\n## Child pages\n\n*None.*\n")
+
+
+def _texts(parts, role):
+    return [text for part_role, text in parts if part_role == role]
+
+
+def test_render_page_parts_join_to_render_page():
+    for page, page_type in ((_filled_fields_page(), FIELDS), (_blocks_page_with_lookalikes(), BLOCKS),
+                            (_toc_with_children(["test-flow:c"]), TOC)):
+        joined = "".join(text for _, text in render_page_parts(page, page_type))
+        assert joined == render_page(page, page_type)
+
+
+def test_render_page_parts_tag_every_section_heading():
+    parts = render_page_parts(_filled_fields_page(), FIELDS)
+    assert _texts(parts, "section-title") == [
+        "## Basics", "## Items", "## Notice", "## References", "## Child pages"]
+
+
+def test_render_page_parts_tag_scalar_field_names_only():
+    parts = render_page_parts(_filled_fields_page(), FIELDS)
+    assert _texts(parts, "field-name") == ["**label:**", "**kind:**"]
+
+
+def test_render_page_parts_leave_author_lookalikes_as_text():
+    parts = render_page_parts(_blocks_page_with_lookalikes(), BLOCKS)
+    assert _texts(parts, "section-title") == ["## Body", "## References", "## Child pages"]
+    assert _texts(parts, "field-name") == []
+
+
+def test_render_page_parts_of_a_toc_tag_nothing():
+    parts = render_page_parts(_toc_with_children(["test-flow:c"]), TOC)
+    assert _texts(parts, "section-title") == [] and _texts(parts, "field-name") == []
+
+
+def test_render_page_parts_follow_the_heading_level():
+    parts = render_page_parts(_filled_fields_page(), FIELDS, level=3)
+    assert _texts(parts, "section-title")[0] == "#### Basics"
