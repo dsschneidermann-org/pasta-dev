@@ -46,7 +46,7 @@ from .pagetypes._registry import (
     workspace_guidance_fields,
 )
 from .render import escape_markdown, render_workspace_links
-from .render_html import md2html
+from .render_html import md2html, render_markdown_source_html
 from .serialize import page_to_dict
 from .source_link import read_remote_url, to_source_link
 from .store import Store
@@ -336,10 +336,12 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
         page_type = get_page_type(page.type)
         show_archived = True if archived == "true" else False
         nav = md2html.render(render_workspace_links(STORE.tree(workspace_id, show_archived), show_archived, show_meta=False, escape_plain_text=True))
-        body = STORE.render_html(workspace_id, pageId, show_archived)
-        if markdown == "true":
-            body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived,
-                                                        escape_plain_text=True))
+        # ?markdown=true shows the page's Markdown exactly as renderPage returns it, as source text.
+        markdown_view = markdown == "true"
+        if markdown_view:
+            body = render_markdown_source_html(STORE.render_markdown_parts(workspace_id, pageId))
+        else:
+            body = STORE.render_html(workspace_id, pageId, show_archived)
         activity_digest, (entries, events) = _activity_items(workspace_id)
         activity = build_activity_timeline(entries, events, workspace, page.id, time.time())
         return templates.TemplateResponse(
@@ -349,6 +351,8 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 "workspace_id": workspace_id,
                 "workspace_name": workspace.name,
                 "show_archived": show_archived,
+                # Drives the Raw markdown / Rendered page link and the sidebar's archived toggle.
+                "markdown_view": markdown_view,
                 "nav": nav,
                 "body": body,
                 # Drives the Archive/Unarchive button at the bottom of the page (see page.html).
