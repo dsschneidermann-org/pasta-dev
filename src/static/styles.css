@@ -117,11 +117,12 @@ body.dark {
 
 /* The ?markdown=true view: the agent Markdown as source text. Long lines wrap on screen without
    adding characters; a heading is an inline-block span, so a copy gains no line breaks, and it keeps
-   the section-title rule above for its look. The title takes the h1 look at 2rem, since the pre's
-   monospace text is smaller than body text and 2rem is what an h1's 2em comes to. */
+   the section-title rule above for its look. The title takes an h1's size at 2rem, since the pre's
+   monospace text is smaller than body text, but the normal weight: a heading weight reads too heavy
+   in monospace. */
 .pasta-page .markdown-source { margin: 0 0 2rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pasta-page .markdown-source .page-title { display: inline-block; width: 100%; margin: 0;
-    font-size: 2rem; font-weight: 600; color: var(--text-bright); }
+    font-size: 2rem; font-weight: 400; color: var(--text-bright); }
 .pasta-page .markdown-source .section-title { display: inline-block; width: 100%; margin: 0;
     font-size: 1.25em; font-weight: 700; }
 .pasta-page .markdown-source .field-name { font-weight: 700; }
