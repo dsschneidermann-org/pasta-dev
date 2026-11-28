@@ -397,22 +397,19 @@ class Store:
 
     def render_markdown(
         self, workspace_id: str, page_id: str | None = None, show_archived: bool = False,
-        escape_plain_text: bool = False,
     ) -> str:
         """Render one page, or the whole (non-archived) workspace tree, to Markdown.
 
         `show_archived` flows onto page links (as `?archived=true`) so following one keeps the
         archived view, and decides whether a toc lists its archived children; it does not change
-        which pages the tree render includes. `escape_plain_text` markdown-escapes every plain-text
-        leaf for the web HTML view; it defaults off so the MCP render path (renderPage) returns
-        Markdown unchanged. The whole-tree render is MCP-only (no web route renders it), so it always
-        renders unescaped. Web-only fixed text is never rendered here.
+        which pages the tree render includes. The Markdown is never markdown-escaped and never
+        carries web-only fixed text: it is what the renderPage tool returns.
         """
         workspace = self.load_workspace(workspace_id)
         if page_id is None:
             return render.render_tree(workspace, show_archived)
         page, page_type = self._page_and_type(workspace, page_id)
-        ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text)
+        ref_context = render.build_ref_context(workspace, show_archived)
         return render.render_page(page, page_type, ref_context=ref_context)
 
     def render_markdown_parts(self, workspace_id: str, page_id: str) -> list[render.MarkdownPart]:
