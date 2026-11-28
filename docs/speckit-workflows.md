@@ -116,7 +116,9 @@ the marker of a list item that stands alone in a field is dropped, and lines are
 out are the parts a page replaces: scripts, templates, slugs, file writing, hooks and completion reports. Where a
 status is a gate and no skill speaks for it, the text is the gate's own message in `workflows/*/workflow.yml`, the
 assess README or the reference page. The pull-request field and the notices are pasta's own text. A notice is a
-fixed section on each page that says how the text's words map onto the page.
+fixed section on each page that says how the text's words map onto the page. Above it, the spec, idea and bug
+pages open with a web-only line that agents never receive: "Adapted from GitHub Spec Kit,
+https://github.com/github/spec-kit, at commit f201054, under the MIT License."
 
 What the engine changed from the design above it:
 

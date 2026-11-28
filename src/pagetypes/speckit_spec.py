@@ -117,6 +117,10 @@ _IN_CONVERGE = ("converge",)
 _ALL_STATUSES = ("prepare", "specify", "clarify", "plan", "checklist", "tasks", "analyze", "implement", "converge",
                  "shipped", "abandoned")
 
+# Shown to people in the web UI only, first on the page: where its text comes from, and its licence.
+_SOURCE = ("Adapted from GitHub Spec Kit, https://github.com/github/spec-kit, at commit f201054, "
+           "under the MIT License.")
+
 _SPEC_NOTICE = """
     The field instructions and stage guidance of this page are GitHub Spec Kit's own words. Spec Kit
     runs skills over files; this page stands in for both.
@@ -158,6 +162,10 @@ _SPECKIT_SPEC = PageType(
         "open, or a speckit-idea when it is undecided whether to build it at all."
     ),
     sections=(
+        SectionSpec("source", "Spec Kit source", (
+            _prose("body", description="Spec Kit source fixed text, shown in the web UI only.",
+                   fixed=_SOURCE, web_only=True),
+        )),
         SectionSpec("notice", "Spec Kit notice", (
             _prose("body", description="Spec Kit notice fixed text.", fixed=_SPEC_NOTICE),
         )),
