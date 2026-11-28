@@ -343,15 +343,16 @@ def render_page_html(page: Page, page_type: PageType,
             f"{_contents_html(page_type, page, ref_context)}{sections}{tail}</article>")
 
 
-# The two Markdown part roles the raw view styles, and the tags each is wrapped in.
-_SOURCE_TAGS = {"section-title": ('<span class="section-title">', "</span>"),
+# The Markdown part roles the raw view styles, and the tags each is wrapped in.
+_SOURCE_TAGS = {"page-title": ('<span class="page-title">', "</span>"),
+                "section-title": ('<span class="section-title">', "</span>"),
                 "field-name": ('<strong class="field-name">', "</strong>")}
 
 
 def render_markdown_source_html(parts: Iterable[MarkdownPart]) -> str:
     """A page's agent Markdown as source text for the web's ?markdown=true view: every part
-    HTML-escaped into one pre, with only section headings and scalar field names wrapped for
-    styling. Nothing else is added, so the pre's text is the Markdown exactly and a copy of it
+    HTML-escaped into one pre, with only the title line, section headings and scalar field names
+    wrapped for styling. Nothing else is added, so the pre's text is the Markdown exactly and a copy of it
     pastes as real Markdown. The text starts with '# ', so the parser's drop of a newline right
     after <pre> never removes a character. A heading is an inline span, not an h2: an h2 is not
     allowed in a pre, and a block there would add line breaks to a copy.

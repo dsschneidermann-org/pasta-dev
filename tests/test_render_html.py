@@ -608,3 +608,9 @@ def test_raw_markdown_text_content_is_the_joined_markdown():
     match = re.search(r'<pre class="markdown-source">(.*)</pre>', out, re.S)
     assert match is not None
     assert html.unescape(re.sub(r"<[^>]+>", "", match.group(1))) == "".join(text for _, text in parts)
+
+
+def test_raw_markdown_wraps_the_title_line_like_a_heading():
+    out = render_markdown_source_html([("page-title", "# A <b>"), ("text", "\n\n*t* · `s`\n")])
+    assert out == ('<article class="pasta-page raw-markdown"><pre class="markdown-source">'
+                   '<span class="page-title"># A &lt;b&gt;</span>\n\n*t* · `s`\n</pre></article>')
