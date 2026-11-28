@@ -1,5 +1,8 @@
 """Unit tests for the structured HTML renderer (src.render_html)."""
 
+import html
+import re
+
 from src.commands import apply_command, create_page
 from src.model import Page
 from src.pagetypes.core.specs import LIST, SCALAR, FSMSpec
@@ -8,7 +11,7 @@ from src.pagetypes.core.pagetype import PageType, get_pagetype_field
 from src.pagetypes._registry import get_page_type
 from src.render import WEB_ONLY_NOTE, RefContext
 from src.render_html import (_children_html, _field_html, _list_html, _references_html,
-                             _text_html, element_view, render_page_html)
+                             _text_html, element_view, render_markdown_source_html, render_page_html)
 
 CHILD = get_page_type("test-child")
 FIELDS = get_page_type("test-fields")
@@ -576,3 +579,38 @@ def test_html_escapes_web_only_text():
         fsm=FSMSpec(name="XTestWebHtml", initial="active", states=("active",)))
     out = render_page_html(create_page(page_type, "P", None, _counter()), page_type)
     assert "<p>a &lt;b&gt; c</p>" in out and "<b>" not in out
+
+
+# --- Raw Markdown view (?markdown=true) ------------------------------------------
+
+def test_raw_markdown_wraps_only_section_titles_and_field_names():
+    parts = [("text", "# T\n\n"), ("section-title", "## Basics"), ("text", "\n\n- "),
+             ("field-name", "**label:**"), ("text", " *None.*\n")]
+    assert render_markdown_source_html(parts) == (
+        '<article class="pasta-page raw-markdown"><pre class="markdown-source"># T\n\n'
+        '<span class="section-title">## Basics</span>\n\n- '
+        '<strong class="field-name">**label:**</strong> *None.*\n</pre></article>')
+
+
+def test_raw_markdown_escapes_every_part_as_html():
+    out = render_markdown_source_html([("text", "# <b>T</b> & co\n\n"), ("section-title", "## A<i>"),
+                                       ("text", "\n\n- "), ("field-name", "**x&y:**")])
+    assert "<b>" not in out and "<i>" not in out
+    assert "# &lt;b&gt;T&lt;/b&gt; &amp; co" in out
+    assert '<span class="section-title">## A&lt;i&gt;</span>' in out
+    assert '<strong class="field-name">**x&amp;y:**</strong>' in out
+
+
+def test_raw_markdown_text_content_is_the_joined_markdown():
+    parts = [("text", "# T\n\n```\n<x> & \"q\" 'a'\n```\n\n"), ("section-title", "## S"),
+             ("text", "\n\n- "), ("field-name", "**k:**"), ("text", " v\n")]
+    out = render_markdown_source_html(parts)
+    match = re.search(r'<pre class="markdown-source">(.*)</pre>', out, re.S)
+    assert match is not None
+    assert html.unescape(re.sub(r"<[^>]+>", "", match.group(1))) == "".join(text for _, text in parts)
+
+
+def test_raw_markdown_wraps_the_title_line_like_a_heading():
+    out = render_markdown_source_html([("page-title", "# A <b>"), ("text", "\n\n*t* · `s`\n")])
+    assert out == ('<article class="pasta-page raw-markdown"><pre class="markdown-source">'
+                   '<span class="page-title"># A &lt;b&gt;</span>\n\n*t* · `s`\n</pre></article>')

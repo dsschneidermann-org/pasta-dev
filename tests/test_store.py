@@ -574,14 +574,13 @@ def test_render_markdown_page_and_tree(store):
     assert "# demo" in tree_md and "Page title" in tree_md
 
 
-def test_web_only_text_reaches_only_the_markdown_render_that_asks_for_it(store):
+def test_web_only_text_never_reaches_the_markdown_render(store):
     workspace = store.create_workspace("demo")
     page = store.create_page(workspace.id, "test-fields", "Page title").page
     text = "Fixture presentation: shown to people on the web UI only."
     assert text not in store.render_markdown(workspace.id, page.id)
+    assert text not in store.render_markdown(workspace.id, page.id, show_archived=True)
     assert text not in store.render_markdown(workspace.id)               # whole tree
-    assert text in store.render_markdown(workspace.id, page.id, escape_plain_text=True,
-                                         include_web_only=True)
     assert "body" not in store.get_page(workspace.id, page.id).sections["presentation"]
     assert store.search(workspace.id, "presentation")["hits"] == []
 
@@ -1788,24 +1787,6 @@ def test_cleanup_leaves_an_archived_workspace_alone(store):
 
     assert report.stamped == 0 and report.pruned == []
     assert store.get_page(workspace.id, page.id).expires_at is None
-
-
-def test_render_html_returns_structured_html_for_one_page(store):
-    workspace = store.create_workspace("demo")
-    page = store.create_page(workspace.id, "test-fields", "Page title").page
-    _mutate(store, workspace.id, page.id, [
-        {"command": "addItem", "args": {"text": "Item one", "note": "a note"}},
-    ])
-    out = store.render_html(workspace.id, page.id)
-    assert '<article class="pasta-page">' in out
-    assert '<h1 class="page-title">Page title</h1>' in out
-    assert "<dt>text</dt><dd><p>Item one</p></dd>" in out
-
-
-def test_render_html_rejects_an_unknown_page(store):
-    workspace = store.create_workspace("demo")
-    with pytest.raises(NotFoundError):
-        store.render_html(workspace.id, "test-fields:nope")
 
 
 # --- block-bearing element fields --------------------------------------------

@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from .model import JSONValue, Page, Workspace
 from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR, ElementFSMSpec
@@ -228,33 +228,34 @@ def render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None =
 # is visible before it is filled. Rendered italic in the final Markdown.
 _NONE = "*None.*"
 
-# Shown above web-only fixed text on both web views, so a reader knows agents never see it.
+# Shown above web-only fixed text in the web UI, so a reader knows agents never see it.
 WEB_ONLY_NOTE = "Not visible to agents: this text is shown in the web UI only."
 
+# One emitted piece of a page's Markdown, tagged with what it is. Only the title line, section
+# headings and scalar field names carry a role of their own; everything else is "text".
+type MarkdownRole = Literal["text", "page-title", "section-title", "field-name"]
+type MarkdownPart = tuple[MarkdownRole, str]
 
-def _field_content(field_spec: FieldSpec, value: Any, ref_context: RefContext | None = None) -> str:
-    """One field's Markdown, or the italic `*None.*` fallback when it holds no content.
 
-    Scalars keep their `**key:**` label so the field stays named even when empty; prose, list, and
-    blocks fields render bare (named by their section heading), matching how a filled field renders.
+def _field_parts(field_spec: FieldSpec, value: Any,
+                 ref_context: RefContext | None = None) -> list[MarkdownPart]:
+    """One field's Markdown as parts, or the italic `*None.*` fallback when it holds no content.
+
+    A scalar keeps its `**key:**` label - its own field-name part - so it stays named even when
+    empty; prose, list, and blocks fields render bare (named by their section heading).
     """
     if field_spec.kind == SCALAR:
         shown = _plain(str(value), ref_context) if value not in (None, "") else _NONE
-        return f"- **{field_spec.key}:** {shown}"
+        return [("text", "- "), ("field-name", f"**{field_spec.key}:**"), ("text", f" {shown}")]
     if field_spec.kind == PROSE:
-        return _plain(str(value), ref_context) if value else _NONE
+        return [("text", _plain(str(value), ref_context) if value else _NONE)]
     if field_spec.kind == LIST:
         rendered = _render_list(value, field_spec, ref_context) if value else None
-        return rendered if rendered else _NONE
+        return [("text", rendered if rendered else _NONE)]
     if field_spec.kind == BLOCKS:
         rendered = render_blocks(value, ref_context) if value else None
-        return rendered if rendered else _NONE
-    return _NONE
-
-
-def _web_only_content(field_spec: FieldSpec, ref_context: RefContext | None = None) -> str:
-    """A web-only fixed field's Markdown: the note in italics, then its declared text."""
-    return f"*{WEB_ONLY_NOTE}*\n\n{_plain(field_spec.fixed or '', ref_context)}"
+        return [("text", rendered if rendered else _NONE)]
+    return [("text", _NONE)]
 
 
 def _render_child_pages(page: Page, ref_context: RefContext | None = None,
@@ -313,12 +314,12 @@ def _render_references(page: Page, ref_context: RefContext | None = None) -> str
     return "\n".join(lines) if lines else _NONE
 
 
-def render_page(page: Page, page_type: PageType, level: int = 1,
-                ref_context: RefContext | None = None, include_web_only: bool = False) -> str:
+def render_page_parts(page: Page, page_type: PageType, level: int = 1,
+                      ref_context: RefContext | None = None) -> list[MarkdownPart]:
     """A page as Markdown: a title heading, then EVERY declared section and field, then
     `References` and `Child pages` lists. An empty field (and an empty list) renders the italic
     `*None.*` fallback, so a page's shape is visible before it is filled. A web-only fixed field
-    renders only when include_web_only is set.
+    never renders here: its text is for people, not agents.
 
     A `toc` is the exception: it carries no subject matter and - as the one type with no authoring
     commands (hence no `addLink`) - can never hold an outgoing link, so its References list is always
@@ -327,29 +328,51 @@ def render_page(page: Page, page_type: PageType, level: int = 1,
 
     `ref_context` resolves inline `{ref}` runs and child-page links to titled links; omit it (a direct
     render with no workspace) and refs / children fall back to their bare ids.
+
+    The Markdown comes as ordered parts whose text joins to it (see `render_page`). The first part is
+    the page-title, exactly the title line; a section-title part is exactly a section's heading line,
+    `#` marks included, and a field-name part exactly a scalar's `**key:**` label, so a consumer can
+    style them without parsing the text - author content that merely looks like them stays text.
+    Where the text parts split is not a contract.
     """
     meta = f"*{page.type}* · `{page.status}`"
     if page.status_revision_token is not None:
         meta += f" · rev `{page.status_revision_token}`"
-    lines = [f"{'#' * level} {_plain(page.title, ref_context)}", "", meta, ""]
+    parts: list[MarkdownPart] = [
+        ("page-title", f"{'#' * level} {_plain(page.title, ref_context)}"),
+        ("text", f"\n\n{meta}\n\n")]
     section_heading = "#" * (level + 1)
     for section in page_type.sections:
-        shown = [field_spec for field_spec in section.fields
-                 if include_web_only or not field_spec.web_only]
+        shown = [field_spec for field_spec in section.fields if not field_spec.web_only]
         if not shown:
             continue
-        chunks = [_web_only_content(field_spec, ref_context) if field_spec.web_only else
-                  _field_content(field_spec, page.sections.get(section.key, {}).get(field_spec.key), ref_context)
-                  for field_spec in shown]
-        lines += [f"{section_heading} {section.name}", "", "\n\n".join(chunks), ""]
+        parts.extend([("section-title", f"{section_heading} {section.name}"), ("text", "\n\n")])
+        for index, field_spec in enumerate(shown):
+            if index:
+                parts.append(("text", "\n\n"))
+            parts += _field_parts(field_spec, page.sections.get(section.key, {}).get(field_spec.key),
+                                  ref_context)
+        parts.append(("text", "\n\n"))
     if page_type.tag == "toc":
         # A toc's References list is always empty (no addLink) and its whole purpose is the child list,
         # so emit only that list - unheadered - as the table of contents.
-        lines += [_render_child_pages(page, ref_context, listing=True), ""]
+        parts.append(("text", f"{_render_child_pages(page, ref_context, listing=True)}\n\n"))
     else:
-        lines += [f"{section_heading} References", "", _render_references(page, ref_context), ""]
-        lines += [f"{section_heading} Child pages", "", _render_child_pages(page, ref_context), ""]
-    return "\n".join(lines).rstrip() + "\n"
+        parts.extend([("section-title", f"{section_heading} References"),
+                      ("text", f"\n\n{_render_references(page, ref_context)}\n\n"),
+                      ("section-title", f"{section_heading} Child pages"),
+                      ("text", f"\n\n{_render_child_pages(page, ref_context)}\n\n")])
+    # The Markdown ends in exactly one newline. The last part always holds the child list, which is
+    # never blank, so stripping that part alone strips the whole text's trailing whitespace.
+    role, text = parts[-1]
+    parts[-1] = (role, text.rstrip() + "\n")
+    return parts
+
+
+def render_page(page: Page, page_type: PageType, level: int = 1,
+                ref_context: RefContext | None = None) -> str:
+    """A page as Markdown: the joined text of `render_page_parts`, which documents its shape."""
+    return "".join(text for _, text in render_page_parts(page, page_type, level, ref_context))
 
 
 def build_ref_context(workspace: Workspace, show_archived: bool = False,

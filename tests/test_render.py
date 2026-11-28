@@ -13,7 +13,7 @@ from src.pagetypes.core.fields import SectionSpec, _prose
 from src.pagetypes.core.pagetype import PageType, get_pagetype_field
 from src.pagetypes._registry import get_page_type
 from src.render import (WEB_ONLY_NOTE, RefContext, checkbox_state, escape_markdown, page_text,
-                            render_page, render_workspace_links)
+                            render_page, render_page_parts, render_workspace_links)
 
 # Hand-authored capability fixtures (src.testtypes): test-fields for scalar/prose/list content,
 # test-blocks for the inline-run block surface, test-child for element-FSM checkboxes, test-lifecycle
@@ -326,17 +326,11 @@ def test_render_shows_a_fixed_field():
 _PRESENTATION = "Fixture presentation: shown to people on the web UI only."
 
 
-def test_render_leaves_out_a_web_only_section_by_default():
+def test_render_leaves_out_a_web_only_section():
     md = render_page(create_page(FIELDS, "Blank", None, make_counter()), FIELDS)
     assert "## Presentation" not in md
     assert _PRESENTATION not in md and WEB_ONLY_NOTE not in md
     assert "## Notice" in md                     # the ordinary fixed field still renders
-
-
-def test_render_includes_a_web_only_field_with_its_note_when_asked():
-    md = render_page(create_page(FIELDS, "Blank", None, make_counter()), FIELDS,
-                     include_web_only=True)
-    assert f"## Presentation\n\n*{WEB_ONLY_NOTE}*\n\n{_PRESENTATION}\n" in md
 
 
 def test_render_leaves_out_only_the_web_only_field_of_a_mixed_section():
@@ -350,19 +344,6 @@ def test_render_leaves_out_only_the_web_only_field_of_a_mixed_section():
     page = create_page(page_type, "P", None, make_counter())
     md = render_page(page, page_type)
     assert "## Notes\n\n*None.*\n" in md and "people only" not in md
-
-
-def test_render_escapes_web_only_text_on_the_web_path():
-    page_type = PageType(
-        tag="xtest-web-escape", name="Esc", description="ad-hoc",
-        sections=(SectionSpec("p", "P", (
-            _prose("body", fixed="a *b* c", web_only=True, description="d"),)),),
-        commands=(),
-        fsm=FSMSpec(name="XTestWebEscape", initial="active", states=("active",)))
-    page = create_page(page_type, "P", None, make_counter())
-    context = RefContext("ws:demo", {}, {}, {}, escape_plain_text=True)
-    md = render_page(page, page_type, ref_context=context, include_web_only=True)
-    assert escape_markdown("a *b* c") in md and "a *b* c" not in md
 
 
 def test_render_child_pages_direct_titled_links_only():
@@ -801,3 +782,80 @@ def test_page_text_finds_text_inside_an_element_block():
     text = page_text(page, ELEMENT_BLOCKS)
     assert "needle_in_source" in text
     assert "needle_in_code_run" in text
+
+
+# --- Markdown parts ------------------------------------------------------------
+# render_page is the join of render_page_parts, which tags the section headings and scalar field
+# names the web's ?markdown=true view styles. The bytes renderPage returns must not move.
+
+def _filled_fields_page():
+    factory = make_counter()
+    page = create_page(FIELDS, "Page title", None, factory)
+    page = apply_command(page, FIELDS, "setKind", {"kind": "alpha"}, factory).page
+    page = apply_command(page, FIELDS, "setBody", {"text": "The body."}, factory).page
+    return apply_command(page, FIELDS, "addItem", {"text": "Item text."}, factory).page
+
+
+def _blocks_page_with_lookalikes():
+    """A blocks page whose author content looks like a section heading and a field name."""
+    factory = make_counter()
+    page = create_page(BLOCKS, "Doc", None, factory)
+    return apply_command(page, BLOCKS, "addBody", {"blocks": [
+        {"kind": "heading", "level": 2, "inlines": ["Overview"]},
+        {"kind": "code", "language": "md", "source": "## not a section\n- **x:** y"},
+    ]}, factory).page
+
+
+def test_render_page_bytes_are_pinned_for_a_filled_page():
+    assert render_page(_filled_fields_page(), FIELDS) == (
+        "# Page title\n\n*test-fields* · `active`\n\n## Basics\n\n- **label:** *None.*\n\n"
+        "- **kind:** alpha\n\nThe body.\n\n## Items\n\n- Item text.\n\n## Notice\n\n"
+        "Fixture notice: seeded from the declaration and never written.\n\n## References\n\n*None.*\n\n"
+        "## Child pages\n\n*None.*\n")
+    assert render_page(_blocks_page_with_lookalikes(), BLOCKS) == (
+        "# Doc\n\n*test-blocks* · `active`\n\n## Body\n\n## Overview\n\n```md\n## not a section\n"
+        "- **x:** y\n```\n\n## References\n\n*None.*\n\n## Child pages\n\n*None.*\n")
+
+
+def _texts(parts, role):
+    return [text for part_role, text in parts if part_role == role]
+
+
+def test_render_page_parts_join_to_render_page():
+    for page, page_type in ((_filled_fields_page(), FIELDS), (_blocks_page_with_lookalikes(), BLOCKS),
+                            (_toc_with_children(["test-flow:c"]), TOC)):
+        joined = "".join(text for _, text in render_page_parts(page, page_type))
+        assert joined == render_page(page, page_type)
+
+
+def test_render_page_parts_tag_every_section_heading():
+    parts = render_page_parts(_filled_fields_page(), FIELDS)
+    assert _texts(parts, "section-title") == [
+        "## Basics", "## Items", "## Notice", "## References", "## Child pages"]
+
+
+def test_render_page_parts_tag_scalar_field_names_only():
+    parts = render_page_parts(_filled_fields_page(), FIELDS)
+    assert _texts(parts, "field-name") == ["**label:**", "**kind:**"]
+
+
+def test_render_page_parts_leave_author_lookalikes_as_text():
+    parts = render_page_parts(_blocks_page_with_lookalikes(), BLOCKS)
+    assert _texts(parts, "section-title") == ["## Body", "## References", "## Child pages"]
+    assert _texts(parts, "field-name") == []
+
+
+def test_render_page_parts_of_a_toc_tag_nothing():
+    parts = render_page_parts(_toc_with_children(["test-flow:c"]), TOC)
+    assert _texts(parts, "section-title") == [] and _texts(parts, "field-name") == []
+
+
+def test_render_page_parts_follow_the_heading_level():
+    parts = render_page_parts(_filled_fields_page(), FIELDS, level=3)
+    assert _texts(parts, "section-title")[0] == "#### Basics"
+
+
+def test_render_page_parts_tag_the_title_line():
+    assert _texts(render_page_parts(_filled_fields_page(), FIELDS), "page-title") == ["# Page title"]
+    assert _texts(render_page_parts(_filled_fields_page(), FIELDS, level=3), "page-title") == ["### Page title"]
+    assert _texts(render_page_parts(_toc_with_children(["test-flow:c"]), TOC), "page-title") == ["# Features"]

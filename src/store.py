@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, final
 
-from . import activity_log, cleanup, commands, fsm, render, render_html
+from . import activity_log, cleanup, commands, fsm, render
 from .activity_log import ActivityEntry, page_additions
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .event_log import LOG_SUFFIX, Event, PageMark, lifecycle_events, page_marks, parse_jsonl, to_jsonl
@@ -397,17 +397,13 @@ class Store:
 
     def render_markdown(
         self, workspace_id: str, page_id: str | None = None, show_archived: bool = False,
-        escape_plain_text: bool = False, include_web_only: bool = False,
     ) -> str:
         """Render one page, or the whole (non-archived) workspace tree, to Markdown.
 
         `show_archived` flows onto page links (as `?archived=true`) so following one keeps the
         archived view, and decides whether a toc lists its archived children; it does not change
-        which pages the tree render includes. `escape_plain_text` markdown-escapes every plain-text
-        leaf for the web HTML view; it defaults off so the MCP render path (renderPage) returns
-        Markdown unchanged. The whole-tree render is MCP-only (no web route renders it), so it always
-        renders unescaped. `include_web_only` renders web-only fixed text for the web Markdown view;
-        the MCP path leaves it off, and the whole-tree render never includes it.
+        which pages the tree render includes. The Markdown is never markdown-escaped and never
+        carries web-only fixed text: it is what the renderPage tool returns.
         """
         workspace = self.load_workspace(workspace_id)
         if page_id is None:
@@ -418,26 +414,8 @@ class Store:
         page_type = get_page_type(page.type)
         if page_type is None:
             raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
-        ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text)
-        return render.render_page(page, page_type, ref_context=ref_context,
-                                  include_web_only=include_web_only)
-
-    def render_html(self, workspace_id: str, page_id: str, show_archived: bool = False) -> str:
-        """One page as structured HTML for the web view. Its Markdown sibling, `render_markdown`,
-        is what the renderPage MCP tool returns and is unchanged.
-
-        `show_archived` acts exactly as it does on the Markdown path: it decides whether a toc lists
-        its archived children, and rides onto the links as a query parameter.
-        """
-        workspace = self.load_workspace(workspace_id)
-        page = workspace.get_page(page_id)
-        if page is None:
-            raise NotFoundError(f"Page '{page_id}' not found in workspace '{workspace_id}'.")
-        page_type = get_page_type(page.type)
-        if page_type is None:
-            raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
-        ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text=True)
-        return render_html.render_page_html(page, page_type, ref_context)
+        ref_context = render.build_ref_context(workspace, show_archived)
+        return render.render_page(page, page_type, ref_context=ref_context)
 
     def search(self, workspace_id: str, query: str, limit: int = 20) -> dict[str, Any]:
         """Rank live pages by a case-insensitive word-prefix match of `query`'s terms against

@@ -30,7 +30,7 @@ from . import cleanup
 from .activity_log import ActivityEntry, call_entry
 from .activity_timeline import build_activity_timeline
 from .describe import describe_mutations, describe_page_type
-from .errors import PastaError
+from .errors import NotFoundError, PastaError
 from .event_cache import page_events
 from .event_log import Event
 from .event_timeline import build_event_timeline
@@ -45,8 +45,8 @@ from .pagetypes._registry import (
     validate_registry,
     workspace_guidance_fields,
 )
-from .render import escape_markdown, render_workspace_links
-from .render_html import md2html
+from .render import build_ref_context, escape_markdown, render_page_parts, render_workspace_links
+from .render_html import md2html, render_markdown_source_html, render_page_html
 from .serialize import page_to_dict
 from .source_link import read_remote_url, to_source_link
 from .store import Store
@@ -332,14 +332,22 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
     with _guard_http():
         workspace_id = f"ws:{workspaceIdPart}"
         workspace = STORE.load_workspace(workspace_id)
-        page = STORE.get_page(workspace_id, pageId)
+        page = workspace.get_page(pageId)
+        if page is None:
+            raise NotFoundError(f"Page '{pageId}' not found in workspace '{workspace_id}'.")
         page_type = get_page_type(page.type)
+        if page_type is None:
+            raise PastaError(f"Page '{pageId}' has unregistered type '{page.type}'.")
         show_archived = True if archived == "true" else False
         nav = md2html.render(render_workspace_links(STORE.tree(workspace_id, show_archived), show_archived, show_meta=False, escape_plain_text=True))
-        body = STORE.render_html(workspace_id, pageId, show_archived)
-        if markdown == "true":
-            body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived,
-                                                        escape_plain_text=True, include_web_only=True))
+        # ?markdown=true shows the page's Markdown exactly as renderPage returns it, as source text.
+        markdown_view = markdown == "true"
+        if markdown_view:
+            body = render_markdown_source_html(
+                render_page_parts(page, page_type, ref_context=build_ref_context(workspace)))
+        else:
+            body = render_page_html(
+                page, page_type, build_ref_context(workspace, show_archived, escape_plain_text=True))
         activity_digest, (entries, events) = _activity_items(workspace_id)
         activity = build_activity_timeline(entries, events, workspace, page.id, time.time())
         return templates.TemplateResponse(
@@ -349,6 +357,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 "workspace_id": workspace_id,
                 "workspace_name": workspace.name,
                 "show_archived": show_archived,
+                "markdown_view": markdown_view,
                 "nav": nav,
                 "body": body,
                 # Drives the Archive/Unarchive button at the bottom of the page (see page.html).
@@ -358,7 +367,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 "delete_scheduled": page.delete_scheduled,
                 # Drives the status dropdown next to the Archive button: every status of this
                 # page's type, with the current one preselected.
-                "statuses": page_type.fsm.states if page_type is not None else (),
+                "statuses": page_type.fsm.states,
                 "status": page.status,
                 # The Model overlay loads the docsite page for the page's type AND current status.
                 "page_type_doc": f"{page.type}-{page.status}",

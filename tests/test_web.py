@@ -8,6 +8,7 @@ type (architecture): the toggle points at that page type's generated Sphinx doc,
 production types are documentable - a fixture has no doc to link to.
 """
 
+import html
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,7 @@ import src.server as server
 from src.errors import ValidationError
 from src.event_log import to_jsonl
 from src.live_digest import items_digest
+from src.render import WEB_ONLY_NOTE
 from src.serialize import workspace_to_dict
 from src.source_link import SourceLink, read_remote_url, to_source_link
 from src.store import Store
@@ -623,7 +625,7 @@ def test_every_time_both_timelines_show_is_24_hour():
 def test_the_activity_play_button_matches_the_timeline_s_and_the_section_keeps_half_a_rem_below(client):
     css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
     assert "#ac-play { min-width: 6.5rem; margin: 0; }" in css
-    assert ".activity { margin: 0 0 0.5rem; }" in css
+    assert ".activity { margin: 0.5rem 0; }" in css
     workspace = server.STORE.create_workspace("demo")
     assert "#tl-play { min-width: 6.5rem; margin: 0; }" in client.get(f"/{workspace.id}/timeline").text
 
@@ -650,6 +652,117 @@ def test_page_view_renders_the_structured_body(client):
     assert '<nav class="page-contents"' in response.text
     assert "The body." in response.text                 # the prose field still reaches the page
     assert 'id="sidebar"' in response.text              # the Markdown-rendered nav is untouched
+
+
+# --- Raw Markdown view (?markdown=true) ------------------------------------------
+# The agent Markdown, exactly as renderPage returns it, shown as escaped source text.
+
+def _page_path(workspace, page):
+    return f"/{workspace.id}/page/{page.id}"
+
+
+def _source_text(page_html):
+    """The raw view's Markdown as a reader would copy it: the pre's text, tags dropped."""
+    match = re.search(r'<pre class="markdown-source">(.*?)</pre>', page_html, re.S)
+    assert match is not None
+    return html.unescape(re.sub(r"<[^>]+>", "", match.group(1)))
+
+
+def test_the_markdown_view_shows_the_render_page_text_as_source(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page <b>title</b>").page
+    response = client.get(f"{_page_path(workspace, page)}?markdown=true")
+    assert response.status_code == 200
+    assert _source_text(response.text) == server.STORE.render_markdown(workspace.id, page.id)
+    assert "# Page &lt;b&gt;title&lt;/b&gt;" in response.text
+    assert '<span class="section-title">## Basics</span>' in response.text
+    assert '<strong class="field-name">**label:**</strong>' in response.text
+
+
+def test_the_markdown_view_leaves_out_web_only_text(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    text = client.get(f"{_page_path(workspace, page)}?markdown=true").text
+    assert "Fixture presentation" not in text and WEB_ONLY_NOTE not in text
+
+
+def test_the_markdown_view_body_ignores_the_archived_view(client):
+    workspace = server.STORE.create_workspace("demo")
+    parent = server.STORE.create_page(workspace.id, "test-fields", "Parent").page
+    child = server.STORE.create_page(workspace.id, "test-flow", "Child", parent_id=parent.id).page
+    text = client.get(f"{_page_path(workspace, parent)}?markdown=true&archived=true").text
+    source = _source_text(text)
+    assert source == server.STORE.render_markdown(workspace.id, parent.id)
+    assert f"/{workspace.id}/page/{child.id})" in source and "?archived=true" not in source
+    assert f"/{workspace.id}/page/{child.id}?archived=true" in text        # the sidebar keeps it
+
+
+def test_a_markdown_value_other_than_true_shows_the_structured_page(client):
+    workspace = server.STORE.create_workspace("demo")
+    page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
+    text = client.get(f"{_page_path(workspace, page)}?markdown=yes").text
+    assert 'class="markdown-source"' not in text and '<article class="pasta-page">' in text
+
+
+def test_a_page_view_of_an_unknown_page_is_an_error_page(client):
+    workspace = server.STORE.create_workspace("demo")
+    for query in ("", "?markdown=true"):
+        response = client.get(f"/{workspace.id}/page/test-fields:nope{query}")
+        assert response.status_code == 500 and "not found in workspace" in response.text
+
+
+def test_the_page_view_links_to_its_raw_markdown_before_the_activity(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    text = client.get(path).text
+    assert f'<a id="markdown-switch" href="{path}?markdown=true">Raw markdown</a>' in text
+    assert text.index('id="markdown-switch"') < text.index('class="ac-sep"') < text.index('id="ac-open"')
+
+
+def test_the_raw_markdown_link_keeps_the_archived_view(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    text = client.get(f"{path}?archived=true").text
+    assert f'<a id="markdown-switch" href="{path}?markdown=true&amp;archived=true">Raw markdown</a>' in text
+
+
+def test_the_markdown_view_links_back_to_the_rendered_page(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    assert (f'<a id="markdown-switch" href="{path}">Rendered page</a>'
+            in client.get(f"{path}?markdown=true").text)
+    assert (f'<a id="markdown-switch" href="{path}?archived=true">Rendered page</a>'
+            in client.get(f"{path}?markdown=true&archived=true").text)
+
+
+def test_the_archived_toggle_keeps_the_markdown_view(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    assert (f'href="{path}?markdown=true&amp;archived=true">Show archived</a>'
+            in client.get(f"{path}?markdown=true").text)
+    assert (f'href="{path}?markdown=true">Hide archived</a>'
+            in client.get(f"{path}?markdown=true&archived=true").text)
+
+
+def test_the_archived_toggle_of_the_structured_view_is_unchanged(client):
+    workspace = server.STORE.create_workspace("demo")
+    path = _page_path(workspace, server.STORE.create_page(workspace.id, "test-fields", "P").page)
+    assert f'href="{path}?archived=true">Show archived</a>' in client.get(path).text
+    assert f'href="{path}">Hide archived</a>' in client.get(f"{path}?archived=true").text
+
+
+def test_the_raw_markdown_styles_are_scoped_and_take_colours_from_both_themes(client):
+    # Comments go first, or the one above a rule is read as part of its selector.
+    css = re.sub(r"/\*.*?\*/", "", client.get("/static/styles.css").text, flags=re.S)
+    rules = re.findall(r"([^{}]*markdown-source[^{}]*)\{([^}]*)\}", css)
+    assert rules and all(selector.strip().startswith(".pasta-page") for selector, _ in rules)
+    colours = [value for _, body in rules
+               for value in re.findall(r"(?:^|[;\s])(?:color|background|border)\s*:\s*([^;]+);", body)]
+    assert all("var(--" in value for value in colours)
+    names = {name for value in colours for name in re.findall(r"var\((--[a-z-]+)\)", value)}
+    for theme in ("light", "dark"):
+        sheet = client.get(f"/static/water.css/{theme}.min.css").text
+        assert all(f"{name}:" in sheet for name in names)
 
 
 def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):

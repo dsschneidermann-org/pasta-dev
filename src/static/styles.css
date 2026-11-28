@@ -3,6 +3,10 @@ body.page {
   max-width: 1000px;
 }
 
+h1 {
+  font-size: 2em;
+}
+
 button:disabled, input:disabled, select:disabled, textarea:disabled {
     cursor: default;
     opacity: 1;
@@ -111,10 +115,22 @@ body.dark {
     background: var(--background-alt); border-radius: 3px; padding: 0 0.2rem; }
 .pasta-page .link-role { color: var(--text-muted); }
 
+/* The ?markdown=true view: the agent Markdown as source text. Long lines wrap on screen without
+   adding characters; a heading is an inline-block span, so a copy gains no line breaks, and it keeps
+   the section-title rule above for its look. The title takes an h1's size at 2rem, since the pre's
+   monospace text is smaller than body text, but the normal weight: a heading weight reads too heavy
+   in monospace. */
+.pasta-page .markdown-source { margin: 0 0 2rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pasta-page .markdown-source .page-title { display: inline-block; width: 100%; margin: 0;
+    font-size: 2rem; font-weight: 400; color: var(--text-bright); }
+.pasta-page .markdown-source .section-title { display: inline-block; width: 100%; margin: 0;
+    font-size: 1.25em; font-weight: 700; }
+.pasta-page .markdown-source .field-name { font-weight: 700; }
+
 /* Activity timeline (src/templates/_activity.html, drawn by _activity.js) at the top of the page view
    and the workspace index. Scoped by .activity and ac- names; every colour is a theme token, defined
    for both the light and the dark theme. */
-.activity { margin: 0 0 0.5rem; }
+.activity { margin: 0.5rem 0; }
 .ac-open { margin: 0; padding: 0; background: none; border: 0; color: var(--links); font-size: 0.95rem; cursor: pointer; }
 .ac-open:hover { background: none; text-decoration: underline; }
 .ac-sep:has(+ #ac-open[hidden]) { display: none; }
