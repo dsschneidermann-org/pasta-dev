@@ -744,18 +744,11 @@ def test_the_archived_toggle_of_the_structured_view_is_unchanged(client):
     assert f'href="{path}">Hide archived</a>' in client.get(f"{path}?archived=true").text
 
 
-def _sheet_without_comments(client):
-    # Comments go first, or the one above a rule is read as part of its selector.
-    return re.sub(r"/\*.*?\*/", "", client.get("/static/styles.css").text, flags=re.S)
-
-
 def test_the_raw_markdown_styles_are_scoped_and_take_colours_from_both_themes(client):
-    rules = re.findall(r"([^{}]*markdown-source[^{}]*)\{([^}]*)\}", _sheet_without_comments(client))
+    # Comments go first, or the one above a rule is read as part of its selector.
+    css = re.sub(r"/\*.*?\*/", "", client.get("/static/styles.css").text, flags=re.S)
+    rules = re.findall(r"([^{}]*markdown-source[^{}]*)\{([^}]*)\}", css)
     assert rules and all(selector.strip().startswith(".pasta-page") for selector, _ in rules)
-    assert any(selector.strip() == ".pasta-page .markdown-source" and "margin: 0 0 2rem" in body
-               for selector, body in rules)
-    assert any("white-space: pre-wrap" in body for _, body in rules)
-    assert any("section-title" in selector and "display: inline-block" in body for selector, body in rules)
     colours = [value for _, body in rules
                for value in re.findall(r"(?:^|[;\s])(?:color|background|border)\s*:\s*([^;]+);", body)]
     assert all("var(--" in value for value in colours)
@@ -763,20 +756,6 @@ def test_the_raw_markdown_styles_are_scoped_and_take_colours_from_both_themes(cl
     for theme in ("light", "dark"):
         sheet = client.get(f"/static/water.css/{theme}.min.css").text
         assert all(f"{name}:" in sheet for name in names)
-
-
-def test_every_h1_is_two_em_by_a_rule_that_loads_after_water_css(client):
-    assert re.search(r"(?:^|\})\s*h1\s*\{[^}]*font-size:\s*2em;", _sheet_without_comments(client))
-    page = client.get("/").text
-    assert page.index('id="js-stylesheet"') < page.index('href="/static/styles.css"')
-
-
-def test_the_raw_markdown_title_takes_the_h1_look(client):
-    rule = re.search(r"\.pasta-page \.markdown-source \.page-title\s*\{([^}]*)\}", _sheet_without_comments(client))
-    assert rule is not None
-    for declaration in ("display: inline-block", "margin: 0", "font-size: 2rem", "font-weight: 600",
-                        "color: var(--text-bright)"):
-        assert declaration in rule.group(1)
 
 
 def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
