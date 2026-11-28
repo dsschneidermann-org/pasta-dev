@@ -63,6 +63,17 @@ def test_create_seeds_a_fixed_field_and_every_write_restores_it():
     assert after.sections["notice"]["body"] == notice.fixed
 
 
+def test_create_and_every_write_leave_a_web_only_field_unstored():
+    presentation = get_pagetype_field(FIELDS, "presentation", "body")
+    assert presentation is not None and presentation.web_only
+    factory = make_counter()
+    page = create_page(FIELDS, "P", None, factory)
+    assert "body" not in page.sections["presentation"]
+    page.sections["presentation"]["body"] = "stored by mistake"
+    after = apply_command(page, FIELDS, "setLabel", {"label": "x"}, factory).page
+    assert "body" not in after.sections["presentation"]
+
+
 def test_create_page_rejects_blank_title():
     with pytest.raises(ValidationError):
         _ = create_page(FIELDS, "   ", None, make_counter())

@@ -21,7 +21,7 @@ from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR
 from .pagetypes.core.fields import FieldSpec, SectionSpec, block_element_fields, title_element_field
 from .pagetypes.core.pagetype import PageType
 from .pagetypes._registry import is_auto_child_type
-from .render import RefContext, checkbox_state, render_blocks
+from .render import WEB_ONLY_NOTE, RefContext, checkbox_state, render_blocks
 
 # The one Markdown-to-HTML engine, defined here because this is where HTML is produced.
 md2html = Wenmode(github())
@@ -197,6 +197,12 @@ def _field_html(field_spec: FieldSpec, value: Any, ref_context: RefContext | Non
     return _NONE_HTML
 
 
+def _web_only_html(field_spec: FieldSpec) -> str:
+    """A web-only fixed field: the not-visible-to-agents note, then its declared text."""
+    return (f'<p class="web-only-note">{WEB_ONLY_NOTE}</p>'
+            f"{_text_html(field_spec.fixed or '')}")
+
+
 def _page_href(page_id: str, ref_context: RefContext) -> str:
     """The escaped web route of a page, keeping the archived view when the context shows it."""
     query = "?archived=true" if ref_context.show_archived else ""
@@ -295,6 +301,8 @@ def _section_html(section: SectionSpec, page: Page, ref_context: RefContext | No
     count = _section_count(section, page)
     badge = f' <span class="count">{count}</span>' if count else ""
     fields = "".join(
+        f'<div class="field field-{field_spec.kind} field-web-only">{_web_only_html(field_spec)}</div>'
+        if field_spec.web_only else
         f'<div class="field field-{field_spec.kind}">' +
         f"{_field_html(field_spec, page.sections.get(section.key, {}).get(field_spec.key), ref_context)}" +
         "</div>"

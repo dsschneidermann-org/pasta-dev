@@ -397,7 +397,7 @@ class Store:
 
     def render_markdown(
         self, workspace_id: str, page_id: str | None = None, show_archived: bool = False,
-        escape_plain_text: bool = False,
+        escape_plain_text: bool = False, include_web_only: bool = False,
     ) -> str:
         """Render one page, or the whole (non-archived) workspace tree, to Markdown.
 
@@ -406,7 +406,8 @@ class Store:
         which pages the tree render includes. `escape_plain_text` markdown-escapes every plain-text
         leaf for the web HTML view; it defaults off so the MCP render path (renderPage) returns
         Markdown unchanged. The whole-tree render is MCP-only (no web route renders it), so it always
-        renders unescaped.
+        renders unescaped. `include_web_only` renders web-only fixed text for the web Markdown view;
+        the MCP path leaves it off, and the whole-tree render never includes it.
         """
         workspace = self.load_workspace(workspace_id)
         if page_id is None:
@@ -418,7 +419,8 @@ class Store:
         if page_type is None:
             raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
         ref_context = render.build_ref_context(workspace, show_archived, escape_plain_text)
-        return render.render_page(page, page_type, ref_context=ref_context)
+        return render.render_page(page, page_type, ref_context=ref_context,
+                                  include_web_only=include_web_only)
 
     def render_html(self, workspace_id: str, page_id: str, show_archived: bool = False) -> str:
         """One page as structured HTML for the web view. Its Markdown sibling, `render_markdown`,

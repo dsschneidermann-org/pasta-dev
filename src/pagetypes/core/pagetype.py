@@ -161,12 +161,16 @@ def initial_sections(
     a section or field the page type declares but `existing` lacks gets its empty default. This
     lets the same function seed a freshly created page (no `existing`) and backfill an older page
     against a page type that has since gained a section or field. A fixed field is always written
-    from its declaration, so a backfill also refreshes it.
+    from its declaration, so a backfill also refreshes it. A web-only field is never stored, and a
+    backfill drops any value left under its key.
     """
     sections: dict[str, dict[str, Any]] = {}
     for section in page_type.sections:
         field_values: dict[str, Any] = dict((existing or {}).get(section.key, {}))
         for field_spec in section.fields:
+            if field_spec.web_only:
+                field_values.pop(field_spec.key, None)
+                continue
             if field_spec.fixed is not None:
                 field_values[field_spec.key] = field_spec.fixed
                 continue

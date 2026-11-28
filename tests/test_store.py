@@ -574,6 +574,18 @@ def test_render_markdown_page_and_tree(store):
     assert "# demo" in tree_md and "Page title" in tree_md
 
 
+def test_web_only_text_reaches_only_the_markdown_render_that_asks_for_it(store):
+    workspace = store.create_workspace("demo")
+    page = store.create_page(workspace.id, "test-fields", "Page title").page
+    text = "Fixture presentation: shown to people on the web UI only."
+    assert text not in store.render_markdown(workspace.id, page.id)
+    assert text not in store.render_markdown(workspace.id)               # whole tree
+    assert text in store.render_markdown(workspace.id, page.id, escape_plain_text=True,
+                                         include_web_only=True)
+    assert "body" not in store.get_page(workspace.id, page.id).sections["presentation"]
+    assert store.search(workspace.id, "presentation")["hits"] == []
+
+
 def test_render_markdown_child_pages_links(store):
     workspace = store.create_workspace("demo")
     parent = store.create_page(workspace.id, "test-fields", "Parent").page
