@@ -801,3 +801,36 @@ def test_page_text_finds_text_inside_an_element_block():
     text = page_text(page, ELEMENT_BLOCKS)
     assert "needle_in_source" in text
     assert "needle_in_code_run" in text
+
+
+# --- Markdown parts ------------------------------------------------------------
+# render_page is the join of render_page_parts, which tags the section headings and scalar field
+# names the web's ?markdown=true view styles. The bytes renderPage returns must not move.
+
+def _filled_fields_page():
+    factory = make_counter()
+    page = create_page(FIELDS, "Page title", None, factory)
+    page = apply_command(page, FIELDS, "setKind", {"kind": "alpha"}, factory).page
+    page = apply_command(page, FIELDS, "setBody", {"text": "The body."}, factory).page
+    return apply_command(page, FIELDS, "addItem", {"text": "Item text."}, factory).page
+
+
+def _blocks_page_with_lookalikes():
+    """A blocks page whose author content looks like a section heading and a field name."""
+    factory = make_counter()
+    page = create_page(BLOCKS, "Doc", None, factory)
+    return apply_command(page, BLOCKS, "addBody", {"blocks": [
+        {"kind": "heading", "level": 2, "inlines": ["Overview"]},
+        {"kind": "code", "language": "md", "source": "## not a section\n- **x:** y"},
+    ]}, factory).page
+
+
+def test_render_page_bytes_are_pinned_for_a_filled_page():
+    assert render_page(_filled_fields_page(), FIELDS) == (
+        "# Page title\n\n*test-fields* · `active`\n\n## Basics\n\n- **label:** *None.*\n\n"
+        "- **kind:** alpha\n\nThe body.\n\n## Items\n\n- Item text.\n\n## Notice\n\n"
+        "Fixture notice: seeded from the declaration and never written.\n\n## References\n\n*None.*\n\n"
+        "## Child pages\n\n*None.*\n")
+    assert render_page(_blocks_page_with_lookalikes(), BLOCKS) == (
+        "# Doc\n\n*test-blocks* · `active`\n\n## Body\n\n## Overview\n\n```md\n## not a section\n"
+        "- **x:** y\n```\n\n## References\n\n*None.*\n\n## Child pages\n\n*None.*\n")
