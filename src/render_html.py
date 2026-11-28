@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import html
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,7 +22,7 @@ from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR
 from .pagetypes.core.fields import FieldSpec, SectionSpec, block_element_fields, title_element_field
 from .pagetypes.core.pagetype import PageType
 from .pagetypes._registry import is_auto_child_type
-from .render import WEB_ONLY_NOTE, RefContext, checkbox_state, render_blocks
+from .render import WEB_ONLY_NOTE, MarkdownPart, RefContext, checkbox_state, render_blocks
 
 # The one Markdown-to-HTML engine, defined here because this is where HTML is produced.
 md2html = Wenmode(github())
@@ -340,3 +341,22 @@ def render_page_html(page: Page, page_type: PageType,
             f"{_children_html(page, ref_context)}</section>")
     return (f'<article class="pasta-page">{head}'
             f"{_contents_html(page_type, page, ref_context)}{sections}{tail}</article>")
+
+
+# The two Markdown part roles the raw view styles, and the tags each is wrapped in.
+_SOURCE_TAGS = {"section-title": ('<span class="section-title">', "</span>"),
+                "field-name": ('<strong class="field-name">', "</strong>")}
+
+
+def render_markdown_source_html(parts: Iterable[MarkdownPart]) -> str:
+    """A page's agent Markdown as source text for the web's ?markdown=true view: every part
+    HTML-escaped into one pre, with only section headings and scalar field names wrapped for
+    styling. Nothing else is added, so the pre's text is the Markdown exactly and a copy of it
+    pastes as real Markdown. The text starts with '# ', so the parser's drop of a newline right
+    after <pre> never removes a character. A heading is an inline span, not an h2: an h2 is not
+    allowed in a pre, and a block there would add line breaks to a copy.
+    """
+    body = "".join(f"{_SOURCE_TAGS[role][0]}{_escape(text)}{_SOURCE_TAGS[role][1]}"
+                   if role in _SOURCE_TAGS else _escape(text)
+                   for role, text in parts)
+    return f'<article class="pasta-page raw-markdown"><pre class="markdown-source">{body}</pre></article>'
