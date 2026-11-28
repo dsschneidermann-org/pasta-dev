@@ -229,7 +229,7 @@ def render_blocks(blocks: list[dict[str, Any]], ref_context: RefContext | None =
 _NONE = "*None.*"
 
 # Shown above web-only fixed text on both web views, so a reader knows agents never see it.
-WEB_ONLY_NOTE = "Not visible to agents: this text is shown on the web UI only."
+WEB_ONLY_NOTE = "Not visible to agents: this text is shown in the web UI only."
 
 
 def _field_content(field_spec: FieldSpec, value: Any, ref_context: RefContext | None = None) -> str:
@@ -317,11 +317,8 @@ def render_page(page: Page, page_type: PageType, level: int = 1,
                 ref_context: RefContext | None = None, include_web_only: bool = False) -> str:
     """A page as Markdown: a title heading, then EVERY declared section and field, then
     `References` and `Child pages` lists. An empty field (and an empty list) renders the italic
-    `*None.*` fallback, so a page's shape is visible before it is filled.
-
-    A web-only fixed field renders only when include_web_only is set (the web views), under the
-    not-visible-to-agents note; otherwise it is left out, and so is a section with nothing else
-    to show.
+    `*None.*` fallback, so a page's shape is visible before it is filled. A web-only fixed field
+    renders only when include_web_only is set.
 
     A `toc` is the exception: it carries no subject matter and - as the one type with no authoring
     commands (hence no `addLink`) - can never hold an outgoing link, so its References list is always

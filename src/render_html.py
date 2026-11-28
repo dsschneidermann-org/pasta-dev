@@ -199,7 +199,7 @@ def _field_html(field_spec: FieldSpec, value: Any, ref_context: RefContext | Non
 
 def _web_only_html(field_spec: FieldSpec) -> str:
     """A web-only fixed field: the not-visible-to-agents note, then its declared text."""
-    return (f'<p class="web-only-note">{_escape(WEB_ONLY_NOTE)}</p>'
+    return (f'<p class="web-only-note">{WEB_ONLY_NOTE}</p>'
             f"{_text_html(field_spec.fixed or '')}")
 
 
