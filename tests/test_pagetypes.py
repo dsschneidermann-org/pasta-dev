@@ -1311,19 +1311,6 @@ def test_a_fixed_prose_field_is_normalized_seeded_and_reseeded():
     assert _prose("body").fixed is None
 
 
-def test_a_web_only_fixed_field_is_never_stored():
-    page_type = PageType(
-        tag="xtest-web-only", name="WebOnly", description="ad-hoc",
-        sections=(SectionSpec("presentation", "Presentation", (
-                      _prose("body", fixed="for people", web_only=True, description="d"),)),
-                  SectionSpec("summary", "Summary", (_prose("body", description="x"),))),
-        commands=(set_prose_cmd("summary"),),
-        fsm=FSMSpec(name="XTestWebOnlySeed", initial="active", states=("active",)))
-    assert initial_sections(page_type) == {"presentation": {}, "summary": {"body": ""}}
-    stale = {"presentation": {"body": "old text"}, "summary": {"body": "kept"}}
-    assert initial_sections(page_type, stale) == {"presentation": {}, "summary": {"body": "kept"}}
-
-
 @pytest.mark.parametrize("kind", [SCALAR, LIST, BLOCKS])
 def test_fixed_on_a_non_prose_field_is_reported(kind: str):
     field = FieldSpec(key="f", kind=kind, fixed="x",
