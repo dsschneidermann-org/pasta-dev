@@ -231,9 +231,9 @@ _NONE = "*None.*"
 # Shown above web-only fixed text in the web UI, so a reader knows agents never see it.
 WEB_ONLY_NOTE = "Not visible to agents: this text is shown in the web UI only."
 
-# One emitted piece of a page's Markdown, tagged with what it is. Only section headings and scalar
-# field names carry a role of their own; everything else is "text".
-type MarkdownRole = Literal["text", "section-title", "field-name"]
+# One emitted piece of a page's Markdown, tagged with what it is. Only the title line, section
+# headings and scalar field names carry a role of their own; everything else is "text".
+type MarkdownRole = Literal["text", "page-title", "section-title", "field-name"]
 type MarkdownPart = tuple[MarkdownRole, str]
 
 
@@ -329,16 +329,18 @@ def render_page_parts(page: Page, page_type: PageType, level: int = 1,
     `ref_context` resolves inline `{ref}` runs and child-page links to titled links; omit it (a direct
     render with no workspace) and refs / children fall back to their bare ids.
 
-    The Markdown comes as ordered parts whose text joins to it (see `render_page`). A section-title
-    part is exactly a section's heading line, `#` marks included, and a field-name part exactly a
-    scalar's `**key:**` label, so a consumer can style those two without parsing the text - author
-    content that merely looks like them stays text. Where the text parts split is not a contract.
+    The Markdown comes as ordered parts whose text joins to it (see `render_page`). The first part is
+    the page-title, exactly the title line; a section-title part is exactly a section's heading line,
+    `#` marks included, and a field-name part exactly a scalar's `**key:**` label, so a consumer can
+    style them without parsing the text - author content that merely looks like them stays text.
+    Where the text parts split is not a contract.
     """
     meta = f"*{page.type}* · `{page.status}`"
     if page.status_revision_token is not None:
         meta += f" · rev `{page.status_revision_token}`"
     parts: list[MarkdownPart] = [
-        ("text", f"{'#' * level} {_plain(page.title, ref_context)}\n\n{meta}\n\n")]
+        ("page-title", f"{'#' * level} {_plain(page.title, ref_context)}"),
+        ("text", f"\n\n{meta}\n\n")]
     section_heading = "#" * (level + 1)
     for section in page_type.sections:
         shown = [field_spec for field_spec in section.fields if not field_spec.web_only]

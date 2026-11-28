@@ -853,3 +853,9 @@ def test_render_page_parts_of_a_toc_tag_nothing():
 def test_render_page_parts_follow_the_heading_level():
     parts = render_page_parts(_filled_fields_page(), FIELDS, level=3)
     assert _texts(parts, "section-title")[0] == "#### Basics"
+
+
+def test_render_page_parts_tag_the_title_line():
+    assert _texts(render_page_parts(_filled_fields_page(), FIELDS), "page-title") == ["# Page title"]
+    assert _texts(render_page_parts(_filled_fields_page(), FIELDS, level=3), "page-title") == ["### Page title"]
+    assert _texts(render_page_parts(_toc_with_children(["test-flow:c"]), TOC), "page-title") == ["# Features"]
