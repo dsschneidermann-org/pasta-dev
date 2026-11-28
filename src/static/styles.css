@@ -130,7 +130,7 @@ body.dark {
 /* Activity timeline (src/templates/_activity.html, drawn by _activity.js) at the top of the page view
    and the workspace index. Scoped by .activity and ac- names; every colour is a theme token, defined
    for both the light and the dark theme. */
-.activity { margin: 0 0 0.5rem; }
+.activity { margin: 0.5rem 0; }
 .ac-open { margin: 0; padding: 0; background: none; border: 0; color: var(--links); font-size: 0.95rem; cursor: pointer; }
 .ac-open:hover { background: none; text-decoration: underline; }
 .ac-sep:has(+ #ac-open[hidden]) { display: none; }

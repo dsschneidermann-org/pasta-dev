@@ -625,7 +625,7 @@ def test_every_time_both_timelines_show_is_24_hour():
 def test_the_activity_play_button_matches_the_timeline_s_and_the_section_keeps_half_a_rem_below(client):
     css = (Path(server.__file__).parent / "static" / "styles.css").read_text(encoding="utf-8")
     assert "#ac-play { min-width: 6.5rem; margin: 0; }" in css
-    assert ".activity { margin: 0 0 0.5rem; }" in css
+    assert ".activity { margin: 0.5rem 0; }" in css
     workspace = server.STORE.create_workspace("demo")
     assert "#tl-play { min-width: 6.5rem; margin: 0; }" in client.get(f"/{workspace.id}/timeline").text
 
