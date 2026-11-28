@@ -27,6 +27,9 @@ from .feature import (
 from .agent_plan import _AGENT_PLAN
 from .epic import _EPIC
 from .spike import _SOLUTION_INVESTIGATION, _SPIKE
+from .speckit_idea import _SPECKIT_IDEA
+from .speckit_spec import _SPECKIT_SPEC, _SPECKIT_TASKS
+from .speckit_bug import _SPECKIT_BUG
 from .document import _DOCUMENT
 from .toc import _TOC
 
@@ -50,6 +53,10 @@ REGISTRY: dict[str, PageType] = {
     _AGENT_PLAN.tag: _AGENT_PLAN,
     _SPIKE.tag: _SPIKE,
     _SOLUTION_INVESTIGATION.tag: _SOLUTION_INVESTIGATION,
+    _SPECKIT_IDEA.tag: _SPECKIT_IDEA,
+    _SPECKIT_SPEC.tag: _SPECKIT_SPEC,
+    _SPECKIT_TASKS.tag: _SPECKIT_TASKS,
+    _SPECKIT_BUG.tag: _SPECKIT_BUG,
     _DOCUMENT.tag: _DOCUMENT,
     _TOC.tag: _TOC,
 }

@@ -318,11 +318,14 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
 
 
 def element_cmds(section: str, *, field: str = "items", singular: str | None = None,
-                 marks: tuple[tuple[str, str, str, tuple[ArgSpec, ...]] | tuple[str, str, str], ...], legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
+                 marks: tuple[tuple[str, str, str, tuple[ArgSpec, ...]] | tuple[str, str, str], ...],
+                 legal_in: tuple[str, ...] | None = None,
+                 agency: str = "agent") -> tuple[CommandSpec, ...]:
     """ELEMENT_TRANSITION commands for an element-FSM list. Each `marks` entry is
     (name, event, description) or (name, event, description, extra_args) - the derived `<noun>Id` arg
     identifies the element, and any `extra_args` are appended and mapped onto same-named element fields
-    (so a transition can also write a field, not just fire its event)."""
+    (so a transition can also write a field, not just fire its event). `agency` is who may fire every
+    mark in the call; a list with marks of both takes one call each."""
     id_arg = f"{singular or _singular(section)}Id"
     out: list[CommandSpec] = []
     for mark in marks:
@@ -330,7 +333,8 @@ def element_cmds(section: str, *, field: str = "items", singular: str | None = N
         extra = mark[3] if len(mark) == 4 else ()
         out.append(ElementTransitionCommand(name=name, description=description, section=section,
                                             field=field, event=event, args=(_text(id_arg), *extra),
-                                            element_map=_same_named(extra), legal_in=legal_in))
+                                            element_map=_same_named(extra), legal_in=legal_in,
+                                            agency=agency))
     return tuple(out)
 
 

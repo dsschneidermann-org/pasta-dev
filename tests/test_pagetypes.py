@@ -69,6 +69,8 @@ from src.pagetypes.core.commands import (
     set_title_cmd,
     transition_cmd,
     transition_on_add_cmd,
+    ElementTransitionCommand,
+    element_cmds,
 )
 from src.pagetypes.core.fields import (
     ElementBlocksSpec,
@@ -118,6 +120,9 @@ from src.pagetypes.feature import (
 )
 from src.pagetypes.simple_change import _SIMPLE_CHANGE
 from src.pagetypes.spike import _SOLUTION_INVESTIGATION, _SPIKE
+from src.pagetypes.speckit_bug import _SPECKIT_BUG
+from src.pagetypes.speckit_idea import _SPECKIT_IDEA
+from src.pagetypes.speckit_spec import _SPECKIT_SPEC, _SPECKIT_TASKS
 from src.pagetypes.toc import _TOC
 from src.testtypes import TEST_REGISTRY
 
@@ -137,7 +142,7 @@ def _kinds(*names: str) -> tuple[BlockKindSpec, ...]:
 PRODUCTION_TYPES = {page_type.tag: page_type for page_type in (
     _ARCHITECTURE, _DECISION_RECORD, _BUG_REPORT, _SIMPLE_CHANGE, _FEATURE_BRIEF, _FEATURE_SPEC,
     _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _SPIKE, _SOLUTION_INVESTIGATION,
-    _DOCUMENT, _TOC,
+    _SPECKIT_IDEA, _SPECKIT_SPEC, _SPECKIT_TASKS, _SPECKIT_BUG, _DOCUMENT, _TOC,
 )}
 
 # Structural invariants must hold for EVERY page type - production and hand-authored fixture alike.
@@ -964,14 +969,14 @@ def test_validate_block_and_validate_blocks_are_one_grammar():
 def test_the_block_surface_is_three_commands_per_field():
     """The headline outcome, and the only place it is pinned.
 
-    One add per blocks field - nine page-level fields plus one block-bearing element field - and
+    One add per blocks field - thirteen page-level fields plus one block-bearing element field - and
     no in-place edit at all: a block is replaced by removing it and adding at its slot.
     """
     adds = [command.name
             for page_type in PRODUCTION_TYPES.values()
             for command in page_type.commands
             if command.kind == ADD_BLOCK]
-    assert len(adds) == 10
+    assert len(adds) == 14
     document = {command.name for command in PRODUCTION_TYPES["document"].commands}
     assert document == {"addBody", "removeBlock", "reorderBlock", "addLink", "setTitle"}
 
@@ -1238,6 +1243,16 @@ def test_factories_build_the_class_of_their_kind():
     assert block_add.element_field is None
     assert type(transition_cmd("go", "a -> b")) is TransitionCommand
     assert type(add_link_cmd()) is AddLinkCommand and type(set_title_cmd()) is SetTitleCommand
+
+
+def test_element_marks_carry_the_agency_they_are_declared_with():
+    # A mark only a person may make - an answer, a reviewer's tick - reports as human, and a list
+    # with marks of both kinds takes one call for each.
+    mark = (("satisfyCheck", "satisfy", "tick a check"),)
+    (human,) = element_cmds("checks", agency="human", marks=mark)
+    (agent,) = element_cmds("checks", marks=mark)
+    assert type(human) is ElementTransitionCommand and human.agency == "human"
+    assert agent.agency == "agent"
 
 
 def test_compound_holds_its_add_as_a_step():
