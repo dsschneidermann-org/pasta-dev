@@ -333,10 +333,12 @@ def test_render_leaves_out_a_web_only_section_by_default():
     assert "## Notice" in md                     # the ordinary fixed field still renders
 
 
-def test_render_includes_a_web_only_field_with_its_note_when_asked():
-    md = render_page(create_page(FIELDS, "Blank", None, make_counter()), FIELDS,
-                     include_web_only=True)
-    assert f"## Presentation\n\n*{WEB_ONLY_NOTE}*\n\n{_PRESENTATION}\n" in md
+def test_render_never_carries_web_only_text_even_in_web_mode():
+    page = create_page(FIELDS, "Blank", None, make_counter())
+    web = RefContext("ws:demo", {}, {}, {}, escape_plain_text=True)
+    for md in (render_page(page, FIELDS), render_page(page, FIELDS, ref_context=web)):
+        assert "## Presentation" not in md
+        assert _PRESENTATION not in md and WEB_ONLY_NOTE not in md
 
 
 def test_render_leaves_out_only_the_web_only_field_of_a_mixed_section():
@@ -350,19 +352,6 @@ def test_render_leaves_out_only_the_web_only_field_of_a_mixed_section():
     page = create_page(page_type, "P", None, make_counter())
     md = render_page(page, page_type)
     assert "## Notes\n\n*None.*\n" in md and "people only" not in md
-
-
-def test_render_escapes_web_only_text_on_the_web_path():
-    page_type = PageType(
-        tag="xtest-web-escape", name="Esc", description="ad-hoc",
-        sections=(SectionSpec("p", "P", (
-            _prose("body", fixed="a *b* c", web_only=True, description="d"),)),),
-        commands=(),
-        fsm=FSMSpec(name="XTestWebEscape", initial="active", states=("active",)))
-    page = create_page(page_type, "P", None, make_counter())
-    context = RefContext("ws:demo", {}, {}, {}, escape_plain_text=True)
-    md = render_page(page, page_type, ref_context=context, include_web_only=True)
-    assert escape_markdown("a *b* c") in md and "a *b* c" not in md
 
 
 def test_render_child_pages_direct_titled_links_only():

@@ -339,7 +339,7 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
         body = STORE.render_html(workspace_id, pageId, show_archived)
         if markdown == "true":
             body = md2html.render(STORE.render_markdown(workspace_id, pageId, show_archived,
-                                                        escape_plain_text=True, include_web_only=True))
+                                                        escape_plain_text=True))
         activity_digest, (entries, events) = _activity_items(workspace_id)
         activity = build_activity_timeline(entries, events, workspace, page.id, time.time())
         return templates.TemplateResponse(
