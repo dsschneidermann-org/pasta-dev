@@ -744,6 +744,16 @@ def test_the_archived_toggle_of_the_structured_view_is_unchanged(client):
     assert f'href="{path}">Hide archived</a>' in client.get(f"{path}?archived=true").text
 
 
+def test_the_raw_markdown_styles_are_scoped_and_add_no_colour(client):
+    # Comments go first, or the one above the rules is read as part of the first selector.
+    css = re.sub(r"/\*.*?\*/", "", client.get("/static/styles.css").text, flags=re.S)
+    rules = re.findall(r"([^{}]*markdown-source[^{}]*)\{([^}]*)\}", css)
+    assert rules and all(selector.strip().startswith(".pasta-page") for selector, _ in rules)
+    assert any("white-space: pre-wrap" in body for _, body in rules)
+    assert any("section-title" in selector and "display: inline-block" in body for selector, body in rules)
+    assert not any(re.search(r"color|background|border", body) for _, body in rules)
+
+
 def test_page_view_links_pinned_children_and_the_parent_from_the_top(client):
     workspace = server.STORE.create_workspace("demo")
     created = server.STORE.create_page(workspace.id, "test-lifecycle", "Brief")

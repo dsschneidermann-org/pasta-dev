@@ -111,6 +111,14 @@ body.dark {
     background: var(--background-alt); border-radius: 3px; padding: 0 0.2rem; }
 .pasta-page .link-role { color: var(--text-muted); }
 
+/* The ?markdown=true view (render_markdown_source_html): the agent Markdown as source text. Long
+   lines wrap on screen without adding characters; a heading is an inline-block span, so a copy
+   gains no line breaks, and keeps the section-title rule above for its look. */
+.pasta-page .markdown-source { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pasta-page .markdown-source .section-title { display: inline-block; width: 100%; margin: 0;
+    font-size: 1.25em; font-weight: 700; }
+.pasta-page .markdown-source .field-name { font-weight: 700; }
+
 /* Activity timeline (src/templates/_activity.html, drawn by _activity.js) at the top of the page view
    and the workspace index. Scoped by .activity and ac- names; every colour is a theme token, defined
    for both the light and the dark theme. */
